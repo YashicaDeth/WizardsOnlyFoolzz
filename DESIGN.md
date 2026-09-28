@@ -1517,3 +1517,24 @@ playable build and verified before merge.
 - **The den's subject:** decided later.
 - **The den's shiv** is a real Hunt weapon: a fast blade that makes wounds
   bleed and is weak against armour.
+
+### Answered by Greg in question boxes, 28 September (the rest of the vat)
+
+- **One line at each breakout beat:** your own thoughts, first person,
+  short and panicked.
+- **Surfacing into the Hunt:**
+  - blinding daylight, then your eyes adjust to open sky
+  - the facility hum cuts to silence, then open air and wind
+  - the title drop, WIZARDS ONLY FOOLS, over the first view of the world
+  - the run card, as now
+- **Sound:** Claude does the sound pass (StarNet is out of usage).
+- **Controller support:** later; friends use keyboard and mouse.
+- **Body horror** comes from your race and traits: each adds its own
+  wrongness (extra fingers, mismatched skin, cords under the skin).
+- **Looking down in the tank:** your naked grown body (censored per the
+  nudity setting), the cords into your belly and spine, your hands
+  twitching as you wake, and the wrongness visible there first.
+- **The load-in:** surgical flashes (lights, straps, a drill), your vitals
+  flatlining and restarting, and whispers.
+- **Lighting:** darker, with pools of light that lead you; red only on
+  danger.
