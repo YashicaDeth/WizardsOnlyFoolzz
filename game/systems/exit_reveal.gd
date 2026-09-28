@@ -35,10 +35,11 @@ const SHOULDER_UP := 1.4
 const SHOULDER_SIDE := 1.0
 ## Seconds: rising off the exit, each settlement pass, the pull-up, the hand-back.
 ## A beat on the spot first, at eye height, so the rise reads as leaving it.
-const HOLD := 0.9
-const RISE := 3.2
-const PASS := 2.6
-const PULL_UP := 2.2
+## Greg's playtest: arrival was too long. About five seconds now, after the title.
+const HOLD := 0.4
+const RISE := 1.4
+const PASS := 1.0
+const PULL_UP := 1.0
 const HAND_BACK := 0.8
 const RISE_HEIGHT := 34.0
 const PASS_HEIGHT := 58.0
