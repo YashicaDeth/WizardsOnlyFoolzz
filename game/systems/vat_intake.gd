@@ -1114,6 +1114,7 @@ func _draw_body(_rect: Rect2, ink: Color, y: float) -> void:
 		_row_mark(ink, Vector2(30, y - 9), index == row, false)
 		CellOutzType.draw_condensed(self, Vector2(50, y - 10), str(rows[index][0]), 11.0, ink * Color(1, 1, 1, 0.6), 0.8)
 		CellOutzType.draw_condensed(self, Vector2(190, y - 10), str(rows[index][1]), 12.0, ink, 0.9)
+		_body_icon(str(rows[index][0]), Vector2(172, y - 4), ink)
 		# AX1.3/AX1.4. The facility's word for the body it grew, beside the
 		# player's. INTERSEX files as "F / STANDARD" because the form has no
 		# second box -- the distortion is the paperwork's, never the body's.
@@ -1121,6 +1122,30 @@ func _draw_body(_rect: Rect2, ink: Color, y: float) -> void:
 			CellOutzType.draw_condensed(self, Vector2(340, y - 10), "FILED " + str(CharacterSheet.ANATOMY_SEX_FILED.get(sheet.anatomy_sex, "")), 8.0, HOT * Color(1, 1, 1, 0.72), 0.65)
 		y += 28.0
 	CellOutzType.draw_condensed(self, Vector2(30, y + 10), Branding.copy_for("intake", "body_notice"), 8.0, ink * Color(1, 1, 1, 0.42), 0.7)
+
+
+## Greg's queue, item 4: "icons for ink, blood, metal", animated. A drop
+## that swells with your pulse, a tattoo needle that will not keep still, a
+## ring with light running round it. Drawn, small, beside the row.
+func _body_icon(label: String, at: Vector2, ink: Color) -> void:
+	match label:
+		"BLOOD":
+			var beat := 1.0 + 0.18 * pow(maxf(0.0, sin(elapsed * TAU / 0.9)), 6.0)
+			var drop := PackedVector2Array([at + Vector2(0, -7) * beat])
+			for step in 13:
+				var a := PI * float(step) / 12.0
+				drop.append(at + Vector2(cos(a) * 4.5, 1.5 + sin(a) * 4.5) * beat)
+			draw_colored_polygon(drop, HOT)
+			draw_circle(at + Vector2(-1.4, 0.5) * beat, 1.1, Color(1, 1, 1, 0.45))
+		"INK":
+			var chatter := sin(elapsed * 60.0) * 1.3
+			draw_line(at + Vector2(5, -7), at + Vector2(-1, 3 + chatter), ink, 2.0)
+			draw_line(at + Vector2(-1, 3 + chatter), at + Vector2(-2, 6 + chatter), HOT, 1.2)
+			draw_circle(at + Vector2(-3, 8), 1.2, Color(0.1, 0.1, 0.14, 0.9))
+		"METAL":
+			draw_arc(at, 5.0, 0.0, TAU, 20, ink * Color(1, 1, 1, 0.8), 1.6)
+			var glint := fmod(elapsed * 2.4, TAU)
+			draw_arc(at, 5.0, glint, glint + 0.7, 6, Color(1, 1, 1, 0.95), 2.0)
 
 
 func _draw_schedule(_rect: Rect2, ink: Color, y: float) -> void:
