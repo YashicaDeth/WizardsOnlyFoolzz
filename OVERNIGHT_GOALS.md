@@ -164,13 +164,13 @@ branch (item 73). TODO = still open for this run.
 | 4-7 | DONE 17e81b65 | 37 | ALREADY | 72 | BLOCKED (photo as proof) |
 | 8 | DONE 8d15b724 | 38 | BLOCKED | 73 | DONE |
 | 9-13 | BLOCKED (restructure) | 39-40 | ALREADY | 74-77 | DONE 6fa54756 |
-| 14 | BLOCKED | 41 | TODO | 78-83 | ALREADY, ticked 834d5cb4 |
+| 14 | BLOCKED | 41 | DONE 6a144214 | 78-83 | ALREADY, ticked 834d5cb4 |
 | 15-16 | BLOCKED | 42-43 | ALREADY, ticked 961654e7 | 84-86 | BRANCH look-styles |
 | 17 | BLOCKED (vision state) | 44 | BLOCKED (camera failures) | 87 | DONE 410cd924 |
-| 18 | DONE 6518f624 | 45 | TODO | 88 | ALREADY, ticked 98796545 |
-| 19 | ALREADY | 46 | TODO | 89 | CHECKED, left open |
+| 18 | DONE 6518f624 | 45 | SKIP (needs a person timing it) | 88 | ALREADY, ticked 98796545 |
+| 19 | ALREADY | 46 | N/A (door is not on the guided path) | 89 | CHECKED, left open |
 | 20 | TODO | 47 | ALREADY | 90 | TODO |
-| 21 | TODO | 48 | TODO | 91 | ALREADY, ticked b83df383 |
+| 21 | TODO | 48 | ALREADY (ram vs Hollis) | 91 | ALREADY, ticked b83df383 |
 | 22 | NOT DUST | 49-50 | TODO | 92-93 | DONE d6b1a406 |
 | 23 | TODO | 51 | BRANCH look-cables | 94 | DONE 9c774b13 |
 | 24 | TODO | 52-53 | ALREADY | 95 | TODO |
@@ -181,7 +181,7 @@ branch (item 73). TODO = still open for this run.
 | 29 | BLOCKED (tier names) | 58 | ALREADY | 101 | SKIP (ledger is in main checkout) |
 | 30 | with each wiring | 59 | DONE 2fdddf4b | 102 | SKIP (CHANGELOG unused since 12 Sep) |
 | 31 | DONE 2b0d6c3a | 60 | TODO | 103-104 | TODO |
-| 32-33 | TODO | 61-62 | TODO | 105 | TODO (last) |
+| 32-33 | ALREADY, tested+ticked ecdb8047 | 61-62 | TODO | 105 | TODO (last) |
 | 34-35 | ALREADY | 63-68 | BRANCH look-prints | 69 | TODO |
 | | | | | 70 | DONE 30ce303c |
 
