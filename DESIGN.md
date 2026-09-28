@@ -1558,6 +1558,13 @@ playable build and verified before merge.
 - **Brain Index through the inventory head:** clicking the head zooms into
   the brain; the lobes glow as groups: body stats, the chip, recovered
   memories, spirit sight.
+- **At the glass burst:** the green tubes stay on but stutter under the
+  rotating red strobes. One klaxon blast, then silent strobing.
+- **Load-in flashes (all four):** the surgical lamp overhead with masked
+  faces leaning in, your body opened (censored per settings), vitals
+  flatlining then a jolt, and the warning spirits' faces between cuts.
+- **Looking down in the tank:** any time, with the mouse; the body is really
+  there.
 - **Controller support:** later; friends use keyboard and mouse.
 - **Body horror** comes from your race and traits: each adds its own
   wrongness (extra fingers, mismatched skin, cords under the skin).
