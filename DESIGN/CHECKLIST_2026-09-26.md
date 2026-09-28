@@ -104,7 +104,7 @@ still open. **(Greg)** marks something only Greg can do or decide.
 - [ ] **(Greg)** Allow `lfs.github.com` in the environment, or run `tools\Import-Higgsfield.ps1`, so media can be pushed.
 - [x] Placeholder: breakout frames. Code-drawn under each brain-hack beat: the tank glass and rising medium, the brain the rune takes, then the chip's traces as the die lands. Rendered.
 - [x] Placeholder: loading screens. The code-drawn transit plate (seal, X-ray film, code rain) now names where it leads: a route strip of the first thirty minutes with the next stop lit. Rendered.
-- [ ] Placeholder: phone / the Wire.
+- [x] Placeholder: phone / the Wire. Already built in code (accounts, feed, tabs, signal); rendered, and the held-item panel no longer covers the raised phone's corner.
 - [x] Placeholder: kill-cam X-rays. Cold blue film: a skeleton in line art (skull, ribs, clavicles, limb bones, pelvis) with the blade or round path drawn across the struck zone. Rendered.
 - [ ] Log every placed piece in `game/art/GENERATED.md`.
 - [ ] Code-and-effects GFX pass over the placeholder art (Godot shaders).

@@ -8928,7 +8928,10 @@ func _update_held_reliquary() -> void:
 	if held_reliquary == null or not is_instance_valid(held_reliquary):
 		return
 	held_reliquary.set_arm_damage(float(_interface_wound_regions().arms))
-	var covered := world_index.visible or character_archive.visible or allusions_artwork.visible or living_map.visible or pin_board.visible
+	# The raised phone fills the screen; its lower-right corner was hidden
+	# under the held-item panel.
+	var phone_up: bool = handheld != null and is_instance_valid(handheld) and bool(handheld.is_open)
+	var covered := phone_up or world_index.visible or character_archive.visible or allusions_artwork.visible or living_map.visible or pin_board.visible
 	if covered:
 		held_reliquary.clear_item()
 		return
