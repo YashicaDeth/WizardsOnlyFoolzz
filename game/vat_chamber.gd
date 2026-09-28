@@ -319,6 +319,7 @@ func _ready() -> void:
 	sight.set("wires", wires)
 	# A stash in the left wall between the second and third bays.
 	caches.append(HIDDEN_CACHE.place_stash(self, sight, "growing_floor_stash", Vector3(-7.35, 1.0, -5.75), Vector3.RIGHT))
+	_build_den()
 	key_hints = KeyHints.new()
 	add_child(key_hints)
 	brain_hack = BRAIN_HACK.new()
@@ -1178,20 +1179,129 @@ func _build_left_wall() -> void:
 	_slab(Vector3(0.5, WEAK_WALL_SIZE.y, WEAK_WALL_SIZE.x), WEAK_WALL_AT, "rust", Color("1c1712"))
 	weak_wall_body = get_child(get_child_count() - 1) as StaticBody3D
 	weak_wall_body.name = "WeakWall"
-	# The crawlway: floor, roof, two sides and a blind end.
-	var duct_x := -7.85 - 1.1
-	_slab(Vector3(2.2, 0.4, WEAK_WALL_SIZE.x), Vector3(duct_x, -0.2, WEAK_WALL_AT.z), "dirt", Color("15120f"))
-	_slab(Vector3(2.2, 0.3, WEAK_WALL_SIZE.x), Vector3(duct_x, WEAK_WALL_SIZE.y + 0.15, WEAK_WALL_AT.z), "rust", Color("100d0b"))
+	# Greg, 28 September: behind the plaster is a hidden den, not a
+	# shortcut (`_build_den`, built once the sight and stashes exist).
+
+
+const DEN_DEPTH := 3.6
+const DEN_HALF := 1.8
+const DEN_HEIGHT := 2.6
+const DEN_NOTES_LABEL := "SMEARED NOTES"
+const DEN_WEAPON_LABEL := "SHIV"
+var den_centre := Vector3.ZERO
+var den_notes_read := false
+
+
+func _build_den() -> void:
+	var inner_x := -7.85
+	var cx := inner_x - DEN_DEPTH * 0.5
+	var z := WEAK_WALL_AT.z
+	den_centre = Vector3(cx, 0.0, z)
+	_slab(Vector3(DEN_DEPTH, 0.4, DEN_HALF * 2.0), Vector3(cx, -0.2, z), "dirt", Color("15120f"))
+	_slab(Vector3(DEN_DEPTH, 0.3, DEN_HALF * 2.0), Vector3(cx, DEN_HEIGHT + 0.15, z), "rust", Color("100d0b"))
 	for side in [-1.0, 1.0]:
-		_slab(Vector3(2.2, WEAK_WALL_SIZE.y, 0.2), Vector3(duct_x, WEAK_WALL_SIZE.y * 0.5, WEAK_WALL_AT.z + side * (WEAK_WALL_SIZE.x * 0.5 + 0.1)), "rust", Color("100d0b"))
-	_slab(Vector3(0.3, WEAK_WALL_SIZE.y, WEAK_WALL_SIZE.x + 0.4), Vector3(duct_x - 1.25, WEAK_WALL_SIZE.y * 0.5, WEAK_WALL_AT.z), "rust", Color("100d0b"))
-	# A draught of warm light from further down, seen only once it is open.
-	var draught := OmniLight3D.new()
-	draught.position = Vector3(duct_x - 0.6, 0.4, WEAK_WALL_AT.z)
-	draught.light_color = Color("c0703a")
-	draught.light_energy = 0.8
-	draught.omni_range = 2.2
-	add_child(draught)
+		_slab(Vector3(DEN_DEPTH, DEN_HEIGHT, 0.2), Vector3(cx, DEN_HEIGHT * 0.5, z + side * (DEN_HALF + 0.1)), "rust", Color("100d0b"))
+	_slab(Vector3(0.3, DEN_HEIGHT, DEN_HALF * 2.0 + 0.4), Vector3(inner_x - DEN_DEPTH - 0.15, DEN_HEIGHT * 0.5, z), "rust", Color("100d0b"))
+	# Their bedroll against the back wall, and them on it.
+	var back_x := inner_x - DEN_DEPTH + 0.6
+	var bedroll := MeshInstance3D.new()
+	var roll := BoxMesh.new()
+	roll.size = Vector3(0.9, 0.08, 2.0)
+	roll.material = WorldLook.surface(Color("3b3228"), "paint", 941)
+	bedroll.mesh = roll
+	bedroll.position = Vector3(back_x, 0.04, z)
+	add_child(bedroll)
+	var remains := BASELINE_HUMAN.new()
+	remains.name = "DenRemains"
+	add_child(remains)
+	remains.build("den_remains", {"flesh": Color("5e4c3a"), "variation": 7})
+	# Along the bedroll, lengthways across the den.
+	remains.position = Vector3(back_x, 0.14, z + 0.85)
+	# Laid out the way RebirthSite lays old bodies: dead, flat on its back.
+	remains.anatomy.dead = true
+	remains.rotation.x = -PI * 0.46
+	# Tally marks scratched into the side wall: days counted, then stopped.
+	for mark in 23:
+		var tick := MeshInstance3D.new()
+		var line := BoxMesh.new()
+		line.size = Vector3(0.012, 0.16, 0.012) if mark % 5 != 4 else Vector3(0.012, 0.012, 0.2)
+		line.material = WorldLook.surface(Color("a89880"), "paint", 942)
+		tick.mesh = line
+		var group := mark / 5
+		tick.position = Vector3(inner_x - 0.8 - group * 0.3 - (mark % 5) * 0.04, 1.3, z - DEN_HALF + 0.02)
+		if mark % 5 == 4:
+			tick.position.x += 0.08
+			tick.rotation.y = 0.5
+		add_child(tick)
+	# Their notes on a crate, and the shiv they made.
+	var crate := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(0.5, 0.45, 0.5)
+	box.material = WorldLook.surface(Color("4a3b2a"), "rust", 943)
+	crate.mesh = box
+	crate.position = Vector3(inner_x - 1.1, 0.225, z + DEN_HALF - 0.45)
+	add_child(crate)
+	for sheet in 4:
+		var paper := MeshInstance3D.new()
+		var page := BoxMesh.new()
+		page.size = Vector3(0.21, 0.006, 0.28)
+		page.material = WorldLook.surface(Color("cfc3a6"), "paint", 944 + sheet)
+		paper.mesh = page
+		paper.position = crate.position + Vector3(-0.08 + sheet * 0.05, 0.23 + sheet * 0.004, -0.05 + sheet * 0.03)
+		paper.rotation.y = sheet * 0.4
+		paper.name = "DenNote%d" % sheet
+		add_child(paper)
+	var shiv := MeshInstance3D.new()
+	shiv.name = "DenShiv"
+	var blade := BoxMesh.new()
+	blade.size = Vector3(0.03, 0.01, 0.26)
+	blade.material = WorldLook.surface(Color("9aa0a0"), "chrome", 948)
+	shiv.mesh = blade
+	shiv.position = Vector3(back_x + 0.55, 0.05, z - 0.7)
+	shiv.rotation.y = 0.8
+	add_child(shiv)
+	# A stash under the bedroll's corner, and the spirit K shows where they lay.
+	caches.append(HIDDEN_CACHE.place_stash(self, sight, "growing_floor_den_stash", Vector3(inner_x - 0.25, 0.5, z - DEN_HALF + 0.2), Vector3.BACK))
+	var spirits: Array = (sight.get("spirits") as Array).duplicate()
+	spirits.append(Vector3(back_x + 0.3, 0.0, z))
+	sight.set("spirits", spirits)
+	var lamp := OmniLight3D.new()
+	lamp.position = Vector3(cx + 0.4, DEN_HEIGHT - 0.5, z + 0.5)
+	lamp.light_color = Color("d08a4a")
+	lamp.light_energy = 2.2
+	lamp.omni_range = 4.6
+	add_child(lamp)
+
+
+func _in_den() -> bool:
+	return weak_wall_broken and player != null and player.global_position.x < -7.85 and absf(player.global_position.z - WEAK_WALL_AT.z) < DEN_HALF + 0.2
+
+
+## E in the den: the notes, then the shiv.
+func _try_den() -> bool:
+	if not _in_den():
+		return false
+	var notes_at := Vector3(-7.85 - 1.1, 0.0, WEAK_WALL_AT.z + DEN_HALF - 0.45)
+	var shiv_node := get_node_or_null("DenShiv") as Node3D
+	var to_notes := notes_at - player.global_position
+	to_notes.y = 0.0
+	if not den_notes_read and to_notes.length() < 1.6:
+		den_notes_read = true
+		subtitle.text = "THEIR NOTES  //  DAYS COUNTED ON THE WALL, THEN NOTHING  //  THE WRITING IS TOO SMEARED TO READ"
+		WorldHistory.record_event("growing_floor_den_notes_read", {"location": "growing_floor"})
+		return true
+	if shiv_node != null and shiv_node.visible:
+		var to_shiv := shiv_node.global_position - player.global_position
+		to_shiv.y = 0.0
+		if to_shiv.length() < 1.6:
+			shiv_node.visible = false
+			var carry := preload("res://systems/carry.gd").new()
+			carry.items.append({"label": DEN_WEAPON_LABEL, "kind": "weapon", "weapon": "shiv", "mass": 0.2, "perishes": false, "age": 0.0})
+			carry.save_to_history()
+			subtitle.text = "A SHIV  //  THEY MADE IT THEMSELVES"
+			WorldHistory.record_event("growing_floor_den_shiv_taken", {"location": "growing_floor"})
+			return true
+	return false
 
 
 func _near_weak_wall() -> bool:
@@ -1224,7 +1334,7 @@ func break_weak_wall() -> bool:
 		if str(thing.get("id", "")) == WEAK_WALL_ID:
 			thing["gone"] = true
 	opening_audio.cue("door")
-	subtitle.text = "THE PLASTER GIVES  //  A CRAWLWAY, WARM AIR COMING UP"
+	subtitle.text = "THE PLASTER GIVES  //  SOMEONE LIVED BEHIND THIS WALL"
 	preload("res://systems/sight_audio.gd").play_at(self, "crumble", WEAK_WALL_AT, 0.0)
 	WorldHistory.record_event("growing_floor_weak_wall_broken", {"location": "growing_floor"})
 	return true
@@ -2086,8 +2196,6 @@ func _update_movement(delta: float) -> void:
 		anatomy.call("apply_hit", "left_leg", fall_hurt * 0.5, 0.0, "blunt")
 		anatomy.call("apply_hit", "right_leg", fall_hurt * 0.5, 0.0, "blunt")
 	meds.step(self, delta, func() -> void: FIELD_MEDS.heal_anatomy(anatomy))
-	if weak_wall_broken and player.global_position.x < DUCT_DEPTH_X:
-		take_shortcut()
 	player.rotation.y = yaw
 	# Greg, 28 September: less bob, body-cam sway, landing kick, strafe lean.
 	BODY_CAM.apply(camera, player, delta, pitch)
@@ -2103,7 +2211,7 @@ func _interact() -> void:
 		return
 	if _try_staff_door():
 		return
-	if break_weak_wall() or (_near_weak_wall() and take_shortcut()):
+	if break_weak_wall() or _try_den():
 		return
 	if HIDDEN_CACHE.open_near(caches, player.global_position, sight) == "stash":
 		key_hints.offer("field_dressing", KEY_4, "HOLD 4", "dress a wound")
@@ -2258,8 +2366,17 @@ func _update_hud() -> void:
 	if weak_wall_found and not weak_wall_broken and _near_weak_wall():
 		prompt.text = "[E] SHOULDER THROUGH THE HOLLOW WALL"
 		return
+	if _in_den():
+		var shiv_node := get_node_or_null("DenShiv") as Node3D
+		if not den_notes_read:
+			prompt.text = "[E] READ THEIR NOTES"
+		elif shiv_node != null and shiv_node.visible:
+			prompt.text = "[E] TAKE THE SHIV"
+		else:
+			prompt.text = "THEIR DEN  //  K SHOWS WHO STAYED"
+		return
 	if weak_wall_broken and _near_weak_wall():
-		prompt.text = "[E] CRAWL IN   //   A WAY PAST THE PRESSURE GATE"
+		prompt.text = "SOMEONE LIVED BEHIND THIS WALL"
 		return
 	if not HIDDEN_CACHE.nearest(caches, player.global_position).is_empty():
 		prompt.text = "[E] OPEN THE HATCH"
