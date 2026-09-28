@@ -169,6 +169,12 @@ purpose.
 - 38 severed hand at the reader: the barrier accepts it, but the facility
   hands over no blade yet (FacilityGuardPost notes). Where the first blade
   comes from is a level decision.
+- 98 N10.4 severed limb takes its hardware: any hardware makes a limb
+  un-severable today (B6.5/B6.6 read it as a replacement limb), because the
+  implant catalogue does not tell a wrist implant from a prosthetic arm.
+  Which implants are under the skin versus replace the limb is a design
+  call; once made, _throw_limb should carry InstalledHardware and the
+  chunk's "implant" field (both are left behind now).
 - 25 AudioReactive: what the radio should move in the Hunt (the trip dials
   are owned by altered perception every frame) is a look decision.
 
@@ -204,5 +210,6 @@ purpose.
 - 92 perf_probe fixed (TIME_FPS read 1000 ms); route measured idle: d6b1a406
 - 99-100 BONES.md / front door: blocked, it is the ledger's first open
   question ("should this skeleton become the single front door?").
+- 94 the hub body holds your weapon: 9c774b13
 - 19 WofLockup: already used -- store_assets_capture draws every Steam/itch
   plate with it (the ledger's scan skipped tests/). No change.
