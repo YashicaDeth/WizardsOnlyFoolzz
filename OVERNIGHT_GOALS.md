@@ -174,14 +174,14 @@ branch (item 73). TODO = still open for this run.
 | 22 | NOT DUST | 49-50 | DONE b6f55e7b | 92-93 | DONE d6b1a406 |
 | 23 | TODO | 51 | BRANCH look-cables | 94 | DONE 9c774b13 |
 | 24 | TODO | 52-53 | ALREADY | 95 | TODO |
-| 25 | BLOCKED (look) | 54 | TODO | 96 | TODO |
+| 25 | BLOCKED (look) | 54 | ALREADY 3d03fa68 | 96 | TODO |
 | 26 | TODO | 55 | ALREADY (darkness is Greg's call) | 97 | HALF (no missing-limb option) |
 | 27 | BLOCKED (the Board) | 56 | ALREADY | 98 | BLOCKED |
 | 28 | TODO | 57 | BRANCH look-kinship | 99-100 | BLOCKED |
 | 29 | BLOCKED (tier names) | 58 | ALREADY | 101 | SKIP (ledger is in main checkout) |
 | 30 | with each wiring | 59 | DONE 2fdddf4b | 102 | SKIP (CHANGELOG unused since 12 Sep) |
 | 31 | DONE 2b0d6c3a | 60 | TODO | 103-104 | TODO |
-| 32-33 | ALREADY, tested+ticked ecdb8047 | 61-62 | TODO | 105 | TODO (last) |
+| 32-33 | ALREADY, tested+ticked ecdb8047 | 61-62 | DONE b7d45eb5 | 105 | TODO (last) |
 | 34-35 | ALREADY | 63-68 | BRANCH look-prints | 69 | TODO |
 | | | | | 70 | DONE 30ce303c |
 
