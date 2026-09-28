@@ -1168,6 +1168,9 @@ func _ready() -> void:
 	arsenal.configure(player_rig)
 	# The fighting style you gave the examiner decides what is in your hand.
 	arsenal.select_weapon(BloodTrees.starting_weapon(str(WorldHistory.subject("player").get("fighting_style", ""))))
+	# The shiv from the den comes with you (Greg, 28 September).
+	if VatRebirth.carries("SHIV"):
+		arsenal.acquire_melee("shiv")
 	arsenal.apply_skins()
 	arsenal.fired.connect(_on_skin_fired)
 	arsenal.reload_finished.connect(_on_weapon_reload_finished)

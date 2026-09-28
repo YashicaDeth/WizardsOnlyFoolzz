@@ -19,6 +19,14 @@ const WEAPONS := {
 		"impulse": 28.0, "reach": 3.7, "cooldown": 0.58,
 		"windup": 0.28, "stamina": 20.0, "damage_type": "cut",
 	},
+	# Greg, 28 September: the shiv from the den is a real weapon. Fast, it
+	# opens wounds that bleed (puncture), short reach, and armour stops most
+	# of it (low impulse, low damage per hit).
+	"shiv": {
+		"label": "SHIV", "kind": "melee", "damage": 20.0,
+		"impulse": 8.0, "reach": 2.2, "cooldown": 0.3,
+		"windup": 0.12, "stamina": 9.0, "damage_type": "puncture",
+	},
 	"shotgun": {
 		"label": "BONE YARD 12G", "kind": "firearm", "damage": 16.0,
 		"impulse": 34.0, "range": 42.0, "cooldown": 0.92,
@@ -397,6 +405,19 @@ func acquire_sniper(rounds_left: int = -1) -> bool:
 			_magazine_rest[current_id] = magazine_node.position
 	_update_models()
 	equipped.emit(current_id)
+	return true
+
+
+## A melee weapon you came by (the den's shiv): carried from now on.
+func acquire_melee(weapon_id: String) -> bool:
+	if not WEAPONS.has(weapon_id) or str(WEAPONS[weapon_id].kind) != "melee":
+		return false
+	acquired[weapon_id] = true
+	if hand != null and not models.has(weapon_id):
+		var model := _build_weapon_model(weapon_id)
+		hand.add_child(model)
+		models[weapon_id] = model
+		model.visible = weapon_id == current_id
 	return true
 
 

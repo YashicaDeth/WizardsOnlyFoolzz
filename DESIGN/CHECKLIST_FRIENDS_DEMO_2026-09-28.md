@@ -142,7 +142,7 @@ at 100. **(Greg)** marks what only Greg can do.
 
 ### Combat
 
-- [ ] The shiv as a Hunt weapon: fast, bleeds, weak against armour
+- [x] The shiv as a Hunt weapon: fast, bleeds, weak against armour
 - [ ] Controller support (bindings for every action)
 
 ### Brain Index
