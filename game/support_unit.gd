@@ -97,6 +97,7 @@ var guard_post: FacilityGuardPost
 var block_tracker: BlockTracker
 var xray_flash: AlarmXrayFlash
 var alarm_lamps: Array[OmniLight3D] = []
+var room_lights: RoomLights
 var door_leaves: Array[Node3D] = []
 var klaxon: AudioStreamPlayer
 var gate_method := ""
@@ -224,12 +225,13 @@ func _build_shell() -> void:
 		rail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var bay := 0
 	var z := START_Z - 4.0
+	var ceiling: Array = []
 	while z > END_Z + 2.0:
 		_decor(Vector3(HALF_WIDTH * 2.0, 0.5, 0.45), Vector3(0, HEIGHT - 0.25, z), rust)
-		# A strip lamp under every beam: ward light, sickly and even.
+		# A strip lamp under every beam: ward light, sickly, in pools.
 		var tube := _decor(Vector3(0.18, 0.06, 2.4), Vector3(0, HEIGHT - 0.55, z - 2.0), WorldLook.emissive(Color("cfe0c0"), 2.2))
 		tube.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		_lamp(Vector3(0, HEIGHT - 1.2, z - 2.0), Color("c9dcb8"), 5.5, 14.0)
+		ceiling.append(_lamp(Vector3(0, HEIGHT - 1.2, z - 2.0), Color("c9dcb8"), 5.5, 14.0))
 		# The alarm lamps, dark until the alarm: one every other bay,
 		# alternating sides. Dark lamps are hidden, not merely at zero, so
 		# they do not spend the renderer's light budget.
@@ -241,6 +243,9 @@ func _build_shell() -> void:
 			_decor(Vector3(0.18, 0.3, 0.18), Vector3(side * (HALF_WIDTH - 0.1), 4.6, z), WorldLook.emissive(Color("5a0a06"), 0.6))
 		bay += 1
 		z -= 8.0
+	# Greg, 28 September: pools of sick lab light in the black.
+	room_lights = RoomLights.new().setup("support", ceiling)
+	add_child(room_lights)
 	# Signage stencilled high on the wall.
 	for at in [Vector3(-HALF_WIDTH + 0.02, 6.0, -4.0), Vector3(HALF_WIDTH - 0.02, 6.0, -60.0)]:
 		var sign := Label3D.new()
@@ -930,6 +935,8 @@ func _update_alarm_lamps() -> void:
 	for lamp in alarm_lamps:
 		lamp.light_energy = energy
 		lamp.visible = energy > 0.01
+	# The ward lamps flicker harder as the alarm builds.
+	room_lights.tension = 0.9 if director.is_alarm() else (0.5 if director.level == "suspicious" else 0.25)
 
 
 func _nearest_remains() -> String:

@@ -135,9 +135,9 @@ at 100. **(Greg)** marks what only Greg can do.
 
 ### Looks
 
-- [ ] Vat room lighting pass
-- [ ] Service Arcade lighting pass
-- [ ] Support Unit lighting pass
+- [x] Vat room lighting pass
+- [x] Service Arcade lighting pass
+- [x] Support Unit lighting pass
 - [ ] Lower Works and drains lighting pass
 
 ### Combat
