@@ -171,6 +171,7 @@ func _build_shell() -> void:
 	_slab(Vector3(0.45, 8.2, 66.0), Vector3(7.25, 4.0, -27.0), "rust", Color("211a15"))
 	_slab(Vector3(15.0, 8.2, 0.45), Vector3(0, 4.0, 5.5), "rust", Color("211a15"))
 	_slab(Vector3(15.0, 8.2, 0.45), Vector3(0, 4.0, -58.5), "rust", Color("211a15"))
+	var ceiling: Array = []
 	for bay in 13:
 		var z := 2.5 - float(bay) * 4.5
 		_build_arch(z, bay)
@@ -178,10 +179,12 @@ func _build_shell() -> void:
 			_build_side_lab(z - 1.2, bay)
 		var light := OmniLight3D.new()
 		light.position = Vector3(0, 6.7, z)
-		light.light_color = Color("b64027") if bay % 3 else Color("77924f")
 		light.light_energy = 2.2
 		light.omni_range = 8.5
 		add_child(light)
+		ceiling.append(light)
+	# Greg, 28 September: pools of sick lab light in the black.
+	add_child(RoomLights.new().setup("arcade", ceiling))
 
 func _build_arch(z: float, _index: int) -> void:
 	# Two tall piers plus a raised beam read as a vault from the playable floor;

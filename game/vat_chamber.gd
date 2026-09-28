@@ -130,6 +130,10 @@ var sight: Node
 var weak_wall_body: StaticBody3D
 ## Each bay's ceiling strip and the power line feeding it down the left wall.
 var strip_lights: Array = []
+var room_lights: RoomLights
+## Where the red strobes turn when the glass bursts: high on alternate walls
+## down the aisle.
+const STROBES := [Vector3(-7.1, 3.3, 0.5), Vector3(7.1, 3.3, -5.7), Vector3(-7.1, 3.3, -11.9), Vector3(7.1, 3.3, -18.1)]
 ## Stashes and secret doors (HiddenCache records).
 var caches: Array = []
 var weak_wall_found := false
@@ -329,6 +333,9 @@ func _ready() -> void:
 		wires.append({"id": "growing_floor_strip_%d" % index, "points": [Vector3(-7.3, 1.3, z), Vector3(-7.3, 3.9, z), Vector3(0, 3.9, z)],
 			"on_cut": func() -> void: strip.visible = false})
 	sight.set("wires", wires)
+	# Greg, 28 September: pools of light in the black, red only on danger.
+	room_lights = RoomLights.new().setup("vat", strip_lights)
+	add_child(room_lights)
 	# A stash in the left wall between the second and third bays.
 	caches.append(HIDDEN_CACHE.place_stash(self, sight, "growing_floor_stash", Vector3(-7.35, 1.0, -5.75), Vector3.RIGHT))
 	_build_den()
@@ -1531,6 +1538,8 @@ func _physics_process(delta: float) -> void:
 	if bed != null:
 		bed.set("tension", float(VAT_TENSION.get(phase, 0.35)))
 		bed.set("heart_muted", tank_view != null and TANK_PANIC.has(phase))
+	if room_lights != null:
+		room_lights.tension = float(VAT_TENSION.get(phase, 0.35))
 	if phase == "intake":
 		if opening_audio != null:
 			opening_audio.set_phase("intake")
@@ -2188,6 +2197,8 @@ func _breach() -> void:
 	pitch = 0.0
 	player.rotation.y = 0.0
 	opening_audio.cue("glass")
+	if room_lights != null:
+		room_lights.burst(STROBES)
 	vat_glass.visible = false
 	fluid.visible = false
 	for cable in umbilicals:

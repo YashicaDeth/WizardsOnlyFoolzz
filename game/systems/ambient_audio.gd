@@ -15,6 +15,7 @@ const LENGTHS := {
 	"drone": 8.0, "industrial": 4.0, "noise_bed": 6.0,
 	"scream_far": 2.2, "step_bare": 0.22, "step_tile": 0.16, "step_metal": 0.2,
 	"step_water": 0.3, "step_concrete": 0.15, "crack": 0.25, "impact": 0.3, "grunt": 0.45,
+	"klaxon": 2.4,
 }
 
 static var _cache: Dictionary = {}
@@ -94,6 +95,13 @@ static func stream(kind: String) -> AudioStreamWAV:
 			"grunt":
 				var pitch := lerpf(190.0, 120.0, cycle)
 				sample = (sin(TAU * pitch * t) + 0.5 * sin(TAU * pitch * 2.0 * t) + 0.3 * noise) * sin(PI * cycle) * 0.35
+			"klaxon":
+				# The emergency horn, once (Greg, 28 September): two buzzing
+				# voices a semitone apart, hard on, dying as the air runs out.
+				for voice in [311.0, 330.0]:
+					for harmonic in [1.0, 3.0, 5.0, 7.0]:
+						sample += sin(TAU * float(voice) * float(harmonic) * t) / float(harmonic)
+				sample *= minf(1.0, t * 40.0) * clampf((duration - t) / 0.6, 0.0, 1.0) * 0.22
 		var value := clampi(roundi(clampf(sample, -1.0, 1.0) * 32767.0), -32768, 32767)
 		bytes.encode_s16(frame * 2, value)
 	var wav := AudioStreamWAV.new()

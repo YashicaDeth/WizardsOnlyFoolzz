@@ -217,10 +217,13 @@ func _build_bay() -> void:
 		piece.rotation.y = 0.6
 	# Ceiling beams and sodium work lights.
 	var rust := _stained("rust", Color(0.5, 0.42, 0.34))
+	var ceiling: Array = []
 	for beam_index in 5:
 		var z := BAY_NEAR_Z - 2.5 - float(beam_index) * 5.2
 		_mesh_box(self, Vector3(BAY_WIDTH, 0.4, 0.35), Vector3(0, BAY_HEIGHT - 0.2, z), rust)
-		_lamp(Vector3(0, BAY_HEIGHT - 0.8, z), Color("e0a060"), 5.0, 11.0)
+		ceiling.append(_lamp(Vector3(0, BAY_HEIGHT - 0.8, z), Color("e0a060"), 5.0, 11.0))
+	# Greg, 28 September: pools of sick lab light in the black.
+	add_child(RoomLights.new().setup("bay", ceiling))
 	# A cold light over his parking bay, so the car and the man read.
 	_lamp(Vector3(-1.4, BAY_HEIGHT - 1.0, VEHICLE_AT.z + 1.0), Color("c9d6cf"), 2.4, 9.0)
 	# Tool wall and fuel drums, so the room is used, not staged.
