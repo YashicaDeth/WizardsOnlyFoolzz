@@ -194,7 +194,7 @@ const PRESETS := {
 	"lower_works": {
 		"zenith": "07090a", "horizon": "1b1512", "ground": "0c0a08",
 		"fog": "1d1a16", "fog_density": 0.0065, "volumetric": 0.010,
-		"ambient": 0.46, "saturation": 0.96, "contrast": 1.26, "exposure": 1.05,
+		"ambient": 0.46, "saturation": 0.96, "contrast": 1.26, "exposure": 1.4,
 	},
 	# The Growing Floor (Greg, 26 September, the Higgsfield vat renders: a
 	# black room, the colour held in the red vat glow, a faint green haze at
@@ -215,7 +215,7 @@ const PRESETS := {
 	"old_drains": {
 		"zenith": "070907", "horizon": "1a1d14", "ground": "0b0c09",
 		"fog": "262a1c", "fog_density": 0.0075, "volumetric": 0.011,
-		"ambient": 0.5, "saturation": 0.9, "contrast": 1.2, "exposure": 1.05,
+		"ambient": 0.5, "saturation": 0.9, "contrast": 1.2, "exposure": 1.15,
 	},
 }
 

@@ -259,7 +259,7 @@ func _build_city_shell() -> void:
 		# to the floor. At 9.5 (sconces 6.4) it averages 15.3 with half the
 		# frame still in shadow -- vaults, galleries and the lift read, and it
 		# stays darker than the decant room (30-45).
-		light.light_energy = 9.5
+		light.light_energy = 14.0
 		light.omni_range = BAY_LAMP_RANGE
 		light.shadow_enabled = false
 		add_child(light)
@@ -273,7 +273,7 @@ func _build_city_shell() -> void:
 			sconce.name = "WallSconce%d" % bay
 			sconce.position = Vector3(side * 13.4, 3.4, z)
 			sconce.light_color = Color("c2662f")
-			sconce.light_energy = 6.4
+			sconce.light_energy = 10.0
 			sconce.omni_range = 9.5
 			sconce.shadow_enabled = false
 			add_child(sconce)
