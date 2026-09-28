@@ -93,6 +93,7 @@ const WORLD_BREAK := preload("res://systems/world_break.gd")
 const STREET_LIGHT := preload("res://systems/street_light.gd")
 const BREAKABLE_PROP := preload("res://systems/breakable_prop.gd")
 const WORLD_GENERATOR := preload("res://systems/ashbloom_world_generator.gd")
+const PadBridgeScript := preload("res://systems/pad_bridge.gd")
 const MISFIRE_DIRECTOR := preload("res://systems/reality_misfire_director.gd")
 ## AP1.6. Was `preload()` — evaluated at script compile time, which meant
 ## every load of `bone_yard_hunt.gd` (this script is often compiled on a
@@ -1792,7 +1793,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_k_held_for = -1.0
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
-		match event.keycode:
+		match _action_key(event):
 			KEY_1: _equip_weapon(0)
 			KEY_2: _equip_weapon(1)
 			KEY_3: _equip_weapon(2)
@@ -1951,6 +1952,24 @@ func _captain_name() -> String:
 	return str(who.get("name", "THE CAPTAIN")).to_upper()
 
 
+## The rebindable keys (PauseGate CONTROLS) as the key the match below was
+## written against: a key bound to an action reads as that action's default,
+## and the default reads as nothing once it has been moved. The pad's
+## synthetic keys keep the fixed PlayStation layout.
+const ACTION_DEFAULT_KEYS := {"dodge": KEY_SPACE, "interact": KEY_E, "device": KEY_G, "guard": KEY_X}
+
+
+func _action_key(event: InputEventKey) -> Key:
+	if event.device == PadBridgeScript.SYNTHETIC:
+		return event.keycode
+	for action: String in ACTION_DEFAULT_KEYS:
+		if InputMap.has_action(action) and event.is_action(action, true):
+			return ACTION_DEFAULT_KEYS[action]
+	if event.keycode in ACTION_DEFAULT_KEYS.values():
+		return KEY_NONE
+	return event.keycode
+
+
 func _physics_process(delta: float) -> void:
 	_tick_k_hold(delta)
 	_tick_fight(delta)
@@ -2048,7 +2067,7 @@ func _physics_process(delta: float) -> void:
 	# when there is nobody in your hands. A control that does two things at once
 	# is worse than a control that does nothing.
 	var holding_melee_guard := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and arsenal != null and str(arsenal.current().get("kind", "")) != "firearm"
-	var wants_guard := (holding_melee_guard or Input.is_key_pressed(KEY_X)) and panel_mode.is_empty() and not resolution_ui.visible and grapple_target.is_empty() and dodge_remaining <= 0.0
+	var wants_guard := (holding_melee_guard or Input.is_action_pressed("guard")) and panel_mode.is_empty() and not resolution_ui.visible and grapple_target.is_empty() and dodge_remaining <= 0.0
 	if wants_guard and strike_windup >= 0.0:
 		try_feint()
 	if wants_guard and guard_strength() > 0.0 and stamina > 1.0 and not stumbling():

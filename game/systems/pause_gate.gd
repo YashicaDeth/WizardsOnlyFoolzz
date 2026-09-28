@@ -34,9 +34,10 @@ const BUSES := ["Master", "Music", "SFX", "Ambience"]
 
 ## Y1.1. The only actions actually read by name elsewhere — `bone_yard_hunt.gd`,
 ## `rift_derby.gd` and `vat_chamber.gd` all call `Input.get_vector`/`get_axis`
-## with these four, plus the two held modifiers. Jump and the rest of combat
-## are still hardcoded keys in Lane 1's files and are not rebindable from here.
-const CONTROL_ACTIONS := ["move_forward", "move_back", "move_left", "move_right", "sprint", "crouch"]
+## with these four, plus the two held modifiers. The Hunt's dodge, interact,
+## device and guard keys read their actions too (`_action_key`); strike and
+## heavy stay on the mouse buttons.
+const CONTROL_ACTIONS := ["move_forward", "move_back", "move_left", "move_right", "sprint", "crouch", "dodge", "interact", "device", "guard"]
 const CONTROL_LABELS := {
 	"move_forward": "FORWARD",
 	"move_back": "BACK",
@@ -44,6 +45,10 @@ const CONTROL_LABELS := {
 	"move_right": "RIGHT",
 	"sprint": "SPRINT",
 	"crouch": "CROUCH",
+	"dodge": "DODGE",
+	"interact": "USE",
+	"device": "DEVICE",
+	"guard": "GUARD",
 }
 
 var open := false

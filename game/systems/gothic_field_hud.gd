@@ -797,7 +797,7 @@ func _current_offers() -> Array:
 	var held := str((weapon as Dictionary).get("label", ""))
 	if bare:
 		offers.append(["LMB", "STRIKE"])
-		offers.append(["X", "GUARD"])
+		offers.append([_bound("guard", "X"), "GUARD"])
 	elif firearm:
 		offers.append(["LMB", "FIRE"])
 		if int((weapon as Dictionary).get("loaded", 1)) <= 0:
@@ -807,11 +807,26 @@ func _current_offers() -> Array:
 		offers.append(["RMB", "GUARD"])
 		offers.append(["MMB", "HEAVY"])
 	if can_dodge:
-		offers.append(["SPACE", "DODGE"])
+		offers.append([_bound("dodge", "SPACE"), "DODGE"])
 	if near_something:
-		offers.append(["E", str(interact_verb).to_upper()])
-	offers.append(["G", "DEVICE"])
+		offers.append([_bound("interact", "E"), str(interact_verb).to_upper()])
+	offers.append([_bound("device", "G"), "DEVICE"])
 	return offers
+
+
+## The key an action is bound to now (PauseGate CONTROLS), as the strip
+## prints it. On the pad the layout is fixed, so the default goes to
+## PadBridge.keys() for its button.
+func _bound(action: String, fallback: String) -> String:
+	var pad := get_node_or_null("/root/PadBridge")
+	if (pad != null and pad.using_pad) or not InputMap.has_action(action):
+		return fallback
+	for event in InputMap.action_get_events(action):
+		if event is InputEventKey:
+			var key := event as InputEventKey
+			var code := key.keycode if key.keycode != KEY_NONE else DisplayServer.keyboard_get_keycode_from_physical(key.physical_keycode)
+			return OS.get_keycode_string(code).to_upper()
+	return fallback
 
 
 func _refresh_affordance_notice() -> void:
