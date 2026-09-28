@@ -971,4 +971,5 @@ func _update_hud() -> void:
 	elif breach_tool_ready and patrol_alert and not patrol_disabled:
 		prompt.text = "[LMB] DISCHARGE BREACH TOOL // INTERRUPT SENTINEL"
 	else:
-		prompt.text = "WASD MOVE   //   MOUSE LOOK   //   E INTERACT"
+		# AX3.6: no standing controls strip; keys are taught once (KeyHints).
+		prompt.text = ""

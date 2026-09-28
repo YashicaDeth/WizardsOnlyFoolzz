@@ -2690,7 +2690,11 @@ func _update_hud() -> void:
 	# HOLD I is only offered when something is in hand to look at.
 	var inspect_hint := "   //   HOLD I INSPECT" if _inspect_text() != "NOTHING IN HAND TO INSPECT" else ""
 	var pit_line := "[E] ENTER THE UNDERGROUND HEAT" if _pit_door_open() else "PIT DOOR  //  SEALED  //  HIS KEYCARD OPENS IT"
-	prompt.text = pit_line if to_door.length() <= 3.4 else "WASD MOVE   //   MOUSE LOOK   //   E INTERACT" + inspect_hint
+	# AX3.6: no standing controls strip. Inspect is taught once, the first
+	# time there is something in hand to inspect.
+	prompt.text = pit_line if to_door.length() <= 3.4 else ""
+	if inspect_hint != "":
+		key_hints.offer("inspect", KEY_I, "HOLD I", "inspect what you hold")
 	if to_door.length() <= 3.4:
 		osd.point_at(door_marker.global_position + Vector3(0, 1.6, 0))
 

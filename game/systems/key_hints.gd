@@ -7,8 +7,8 @@ extends CanvasLayer
 ## matters; hints queue up, each shows until its key is pressed (or 8 s pass),
 ## and a hint shown once is never shown again in this world.
 ##
-## Keyboard only: the game has no controller bindings yet (DESIGN.md, 28
-## September). When it does, `offer` takes the pad button too.
+## On the PlayStation pad the key is shown as its button (PadBridge.keys).
+## A hint offered with KEY_NONE is a mouse button and is used by a click.
 
 const SUBJECT := "key_hints"
 const HOLD_SECONDS := 8.0
@@ -88,7 +88,9 @@ func _process(delta: float) -> void:
 			return
 		current = queue.pop_front()
 		age = 0.0
-		_key.text = str(current.key)
+		# On the pad, the button (PadBridge keeps the layout).
+		var pad := get_node_or_null("/root/PadBridge")
+		_key.text = pad.keys(str(current.key)) if pad != null else str(current.key)
 		_verb.text = str(current.verb).to_upper()
 		_layout()
 		_panel.visible = true
@@ -99,7 +101,13 @@ func _process(delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if current.is_empty() or not (event is InputEventKey) or not event.pressed:
+	if current.is_empty():
+		return
+	# A mouse-button hint (LMB STRIKE) is used by clicking.
+	if int(current.keycode) == KEY_NONE and event is InputEventMouseButton and event.pressed:
+		_done()
+		return
+	if not (event is InputEventKey) or not event.pressed:
 		return
 	if (event as InputEventKey).keycode == int(current.keycode) or (event as InputEventKey).physical_keycode == int(current.keycode):
 		_done()

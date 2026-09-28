@@ -130,6 +130,8 @@ func _ready() -> void:
 		add_child(ambient_bed_script.new().setup("support"))
 	# Greg, 28 September: each new key shown once (KeyHints).
 	KeyHints.offer_opening_keys(self)
+	KeyHints.offer_in(self, "creep", KEY_CTRL, "HOLD CTRL", "creep: running is loud")
+	KeyHints.offer_in(self, "strike", KEY_NONE, "LMB", "strike")
 	preload("res://systems/run_timer.gd").enter("support_unit")
 	var environment := WorldEnvironment.new()
 	environment.environment = WorldLook.environment("lower_works")
@@ -1048,7 +1050,9 @@ func _update_hud() -> void:
 	elif _facing_cell():
 		prompt.text = "[LMB] BREAK THE CELL OPEN // LET IT OUT"
 	else:
-		prompt.text = "WASD MOVE   //   CTRL CREEP   //   SHIFT RUN IS LOUD   //   LMB STRIKE   //   E INTERACT"
+		# AX3.6: no standing controls strip. What matters here is taught
+		# once: creeping, because running is loud, and striking.
+		prompt.text = ""
 
 
 ## Greg: hacking is "look and hold" once earned. Q held on a lens in sight.

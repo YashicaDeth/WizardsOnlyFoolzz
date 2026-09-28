@@ -669,4 +669,8 @@ func _update_hud() -> void:
 	elif gate_open:
 		prompt.text = "PRESSURE GATE UNSEALED // MOVE THROUGH"
 	else:
-		prompt.text = "WASD MOVE   //   MOUSE LOOK   //   E INTERACT" + ("   //   HOLD I INSPECT" if weapon_taken else "")
+		# AX3.6: no standing controls strip. Inspect is taught once, the
+		# first time there is something in hand to inspect.
+		prompt.text = ""
+		if weapon_taken:
+			KeyHints.offer_in(self, "inspect", KEY_I, "HOLD I", "inspect what you hold")

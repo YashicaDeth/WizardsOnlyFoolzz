@@ -78,6 +78,7 @@ func _ready() -> void:
 		add_child(ambient_bed_script.new().setup("drains"))
 	# Greg, 28 September: each new key shown once (KeyHints).
 	KeyHints.offer_opening_keys(self)
+	KeyHints.offer_in(self, "creep_drains", KEY_CTRL, "HOLD CTRL", "creep: it hunts by sound")
 	preload("res://systems/run_timer.gd").enter("old_drains")
 	var environment := WorldEnvironment.new()
 	environment.environment = WorldLook.environment("old_drains")
@@ -513,4 +514,8 @@ func _update_hud() -> void:
 	elif district_timer > 0.0:
 		prompt.text = str(DISTRICT_LABELS.get(district, ""))
 	else:
-		prompt.text = "WASD MOVE   //   SPACE JUMP / CLIMB   //   CTRL CREEP, IT HUNTS BY SOUND   //   E INTERACT" + ("   //   LMB DISCHARGE THE BREACH TOOL" if VatRebirth.carries("BREACH TOOL") else "")
+		# AX3.6: no standing controls strip. Creeping is taught once, with
+		# the reason; the breach tool once, when you first carry it.
+		prompt.text = ""
+		if VatRebirth.carries("BREACH TOOL"):
+			KeyHints.offer_in(self, "breach_tool", KEY_NONE, "LMB", "discharge the breach tool")

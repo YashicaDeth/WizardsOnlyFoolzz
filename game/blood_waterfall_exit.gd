@@ -872,4 +872,5 @@ func _update_hud() -> void:
 	elif driver != null and driver.can_get_in(player.global_position):
 		prompt.text = "E // GET IN"
 	else:
-		prompt.text = "WASD MOVE   //   SHIFT RUN"
+		# AX3.6: no standing controls strip; keys are taught once (KeyHints).
+		prompt.text = ""
