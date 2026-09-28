@@ -25,6 +25,7 @@ const TORTURE_LOAD_IN := preload("res://systems/torture_load_in.gd")
 const INTAKE_WATCHERS := preload("res://systems/intake_watchers.gd")
 const BRAIN_HACK := preload("res://systems/brain_hack.gd")
 const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
+const BODY_CAM := preload("res://systems/body_cam_feel.gd")
 const FIELD_MEDS := preload("res://systems/field_meds.gd")
 ## Hold 4: a FIELD DRESSING, +20 blood (Greg, 26 September).
 var meds := FIELD_MEDS.new()
@@ -2062,8 +2063,8 @@ func _update_movement(delta: float) -> void:
 	if Input.is_action_just_pressed("crouch"):
 		JUMP_CLIMB.try_slide(player, yaw, sprinting)
 	if not JUMP_CLIMB.slide_step(player, delta):
-		player.velocity.x = move_toward(player.velocity.x, direction.x * speed, 14.0 * delta)
-		player.velocity.z = move_toward(player.velocity.z, direction.z * speed, 14.0 * delta)
+		player.velocity.x = move_toward(player.velocity.x, direction.x * speed, 26.0 * delta)
+		player.velocity.z = move_toward(player.velocity.z, direction.z * speed, 26.0 * delta)
 	JUMP_CLIMB.fall(player, delta)
 	player.move_and_slide()
 	var fall_hurt := JUMP_CLIMB.landing_damage(player)
@@ -2074,11 +2075,9 @@ func _update_movement(delta: float) -> void:
 	if weak_wall_broken and player.global_position.x < DUCT_DEPTH_X:
 		take_shortcut()
 	player.rotation.y = yaw
-	camera.rotation = Vector3(pitch, 0, 0)
-	# A body that just came out of a tank does not walk well.
-	var stride := Vector2(player.velocity.x, player.velocity.z).length()
-	camera.position.y = STANDING_EYE_OFFSET + sin(Time.get_ticks_msec() * 0.0055) * stride * 0.016 - (0.5 if JUMP_CLIMB.sliding(player) else 0.0)
-	camera.rotation.z = sin(Time.get_ticks_msec() * 0.0027) * stride * 0.008
+	# Greg, 28 September: less bob, body-cam sway, landing kick, strafe lean.
+	BODY_CAM.apply(camera, player, delta, pitch)
+	camera.position.y = STANDING_EYE_OFFSET + BODY_CAM.bob(player, Time.get_ticks_msec() * 0.001) - (0.5 if JUMP_CLIMB.sliding(player) else 0.0)
 
 
 func _interact() -> void:

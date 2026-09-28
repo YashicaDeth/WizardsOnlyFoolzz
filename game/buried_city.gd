@@ -1,5 +1,6 @@
 extends Node3D
 const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
+const BODY_CAM := preload("res://systems/body_cam_feel.gd")
 const FIELD_MEDS := preload("res://systems/field_meds.gd")
 ## Hold 4: a FIELD DRESSING, +20 blood (Greg, 26 September).
 var meds := FIELD_MEDS.new()
@@ -617,8 +618,8 @@ func _physics_process(delta: float) -> void:
 		if Input.is_action_just_pressed("crouch"):
 			JUMP_CLIMB.try_slide(player, yaw, Input.is_action_pressed("sprint"))
 		if not JUMP_CLIMB.slide_step(player, delta):
-			player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 17.0 * delta)
-			player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 17.0 * delta)
+			player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 26.0 * delta)
+			player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 26.0 * delta)
 		if player.is_on_floor():
 			# The downward bias keeps them on slopes rather than skipping off the
 			# ramps, so the jump has to be written after it rather than into it.
@@ -638,7 +639,7 @@ func _physics_process(delta: float) -> void:
 			blood = maxf(1.0, blood - fall_hurt)
 	meds.step(self, delta, func() -> void: blood = minf(100.0, blood + FIELD_MEDS.HEALS))
 	player.rotation.y = yaw
-	camera.rotation = Vector3(pitch, 0, 0)
+	BODY_CAM.apply(camera, player, delta, pitch)
 	patrol_phase += delta
 	if breach_flash != null:
 		breach_flash.light_energy = move_toward(breach_flash.light_energy, 0.0, delta * 18.0)
@@ -689,6 +690,7 @@ func _patrol_step(delta: float) -> void:
 		# vat. The sentinel used to stop at a quarter of your blood; now it
 		# finishes what it starts, and your old body stays down here.
 		blood = maxf(0.0, blood - 6.0)
+		BODY_CAM.hit(camera, 0.06)
 		WorldHistory.record_event("lower_works_sentinel_strike", {"location": "lower_works", "damage": 6})
 		if blood <= 0.0:
 			rebirth_site.die("cut down by the Lower Works sentinel", "lower_works_sentinel")

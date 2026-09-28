@@ -1,5 +1,6 @@
 extends Node3D
 const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
+const BODY_CAM := preload("res://systems/body_cam_feel.gd")
 const FIELD_MEDS := preload("res://systems/field_meds.gd")
 ## Hold 4: a FIELD DRESSING, +20 blood (Greg, 26 September).
 var meds := FIELD_MEDS.new()
@@ -692,6 +693,7 @@ func _hurt(damage: float, cause: String, killed_by: String) -> void:
 	if died:
 		return
 	blood = maxf(0.0, blood - damage)
+	BODY_CAM.hit(camera, 0.06)
 	if blood <= 0.0:
 		_die(cause, killed_by)
 
@@ -887,8 +889,8 @@ func _move(delta: float) -> void:
 	if Input.is_action_just_pressed("crouch") and JUMP_CLIMB.try_slide(player, yaw, running):
 		_on_noise(player.global_position, 0.45)
 	if not JUMP_CLIMB.slide_step(player, delta):
-		player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 16.0 * delta)
-		player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 16.0 * delta)
+		player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 26.0 * delta)
+		player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 26.0 * delta)
 	JUMP_CLIMB.fall(player, delta)
 	player.move_and_slide()
 	# Small falls: they sting, never kill.
@@ -897,7 +899,7 @@ func _move(delta: float) -> void:
 		blood = maxf(1.0, blood - fall_hurt)
 	meds.step(self, delta, func() -> void: blood = minf(100.0, blood + FIELD_MEDS.HEALS))
 	player.rotation.y = yaw
-	camera.rotation = Vector3(pitch, 0, 0)
+	BODY_CAM.apply(camera, player, delta, pitch)
 	# Running on tile carries; walking does not.
 	if running and not creeping and Vector2(player.velocity.x, player.velocity.z).length() > 4.0 and fmod(_clock, 0.5) < delta:
 		_on_noise(player.global_position, 0.45)

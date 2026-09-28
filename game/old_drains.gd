@@ -388,6 +388,7 @@ func _unhandled_input(event: InputEvent) -> void:
 ## walkway lip out of the channel, the causeway out of the deep cistern) it
 ## pulls you up onto it instead. Returns what it did.
 const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
+const BODY_CAM := preload("res://systems/body_cam_feel.gd")
 const FIELD_MEDS := preload("res://systems/field_meds.gd")
 ## Hold 4: a FIELD DRESSING, +20 blood (Greg, 26 September).
 var meds := FIELD_MEDS.new()
@@ -413,8 +414,8 @@ func _physics_process(delta: float) -> void:
 	if Input.is_action_just_pressed("crouch"):
 		JUMP_CLIMB.try_slide(player, yaw, Input.is_action_pressed("sprint"))
 	if not JUMP_CLIMB.slide_step(player, delta):
-		player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 16.0 * delta)
-		player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 16.0 * delta)
+		player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 26.0 * delta)
+		player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 26.0 * delta)
 	JUMP_CLIMB.fall(player, delta)
 	player.move_and_slide()
 	var fall_hurt := JUMP_CLIMB.landing_damage(player)
@@ -422,7 +423,7 @@ func _physics_process(delta: float) -> void:
 		stalker.blood = maxf(1.0, stalker.blood - fall_hurt)
 	meds.step(self, delta, func() -> void: stalker.blood = minf(100.0, stalker.blood + FIELD_MEDS.HEALS))
 	player.rotation.y = yaw
-	camera.rotation = Vector3(pitch, 0, 0)
+	BODY_CAM.apply(camera, player, delta, pitch)
 	_file_progress()
 	district_timer = maxf(0.0, district_timer - delta)
 	_update_hud()

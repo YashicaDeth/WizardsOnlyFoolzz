@@ -218,6 +218,7 @@ func _land(kind: String, distance: float) -> void:
 		var capacity := float(anatomy.get("blood_capacity"))
 		anatomy.set("blood_remaining", maxf(0.0, float(anatomy.get("blood_remaining")) - capacity * SCALPEL_BLOOD))
 		_say("THE SCALPEL  //  %s" % zone.replace("_", " ").to_upper())
+	BodyCamFeel.hit(chamber.camera, 0.07)
 	if chamber.get("breach_shake") != null:
 		chamber.breach_shake = maxf(float(chamber.breach_shake), 0.3)
 	WorldHistory.record_event("examiner_fight_wound", {"tool": kind})

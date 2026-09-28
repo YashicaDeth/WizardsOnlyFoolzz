@@ -18,7 +18,8 @@ const JUMP_SPEED := 5.2
 ## Highest ledge you can haul onto, from the soles of the feet.
 const MANTLE_REACH := 1.55
 const MANTLE_SECONDS := 0.4
-const GRAVITY := 18.0
+## 28 September: 18 -> 21, Greg found the opening floaty.
+const GRAVITY := 21.0
 ## Capsule centre above the soles when a body has no capsule to read.
 const FEET_OFFSET := 0.85
 

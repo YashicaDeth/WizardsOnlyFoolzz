@@ -1,6 +1,7 @@
 extends Node3D
 const LOOK := preload("res://systems/look_settings.gd")
 const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
+const BODY_CAM := preload("res://systems/body_cam_feel.gd")
 const FIELD_MEDS := preload("res://systems/field_meds.gd")
 ## Hold 4: a FIELD DRESSING, +20 blood (Greg, 26 September).
 var meds := FIELD_MEDS.new()
@@ -287,6 +288,7 @@ func _on_shot(damage: float) -> void:
 	if died:
 		return
 	blood = maxf(0.0, blood - damage)
+	BODY_CAM.hit(camera, 0.06)
 	if blood <= 0.0:
 		_die("shot by %s at the D-section door" % guard_post.guard_name, guard_post.guard_id)
 
@@ -453,8 +455,8 @@ func _physics_process(delta: float) -> void:
 		if Input.is_action_just_pressed("crouch"):
 			JUMP_CLIMB.try_slide(player, yaw, sprinting)
 		if not JUMP_CLIMB.slide_step(player, delta):
-			player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 16.0 * delta)
-			player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 16.0 * delta)
+			player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 26.0 * delta)
+			player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 26.0 * delta)
 		# The view drops low for the slide.
 		camera.position.y = move_toward(camera.position.y, 0.3 if JUMP_CLIMB.sliding(player) else 0.77, get_physics_process_delta_time() * 4.0)
 		JUMP_CLIMB.fall(player, delta)
@@ -464,7 +466,7 @@ func _physics_process(delta: float) -> void:
 			blood = maxf(1.0, blood - fall_hurt)
 	meds.step(self, delta, func() -> void: blood = minf(100.0, blood + FIELD_MEDS.HEALS))
 	player.rotation.y = yaw
-	camera.rotation = Vector3(pitch, 0, 0)
+	BODY_CAM.apply(camera, player, delta, pitch)
 	# The arcade is a route, not a lockout puzzle. If the card was collected,
 	# entering the obvious pressure-gate threshold opens it even if an input
 	# event was swallowed by the transition frame.
