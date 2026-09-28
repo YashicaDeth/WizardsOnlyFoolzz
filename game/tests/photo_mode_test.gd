@@ -44,10 +44,23 @@ func _ready() -> void:
 	check(photo.cam.global_position.distance_to(hunt.player_body.global_position) <= PhotoMode.RADIUS + 0.01, "the camera stays on its leash")
 	key(photo, KEY_F)
 	check(photo.filter == 1, "F cycles the filter")
+	key(photo, KEY_F)
+	key(photo, KEY_F)
+	check(photo.filter == PhotoMode.DEPTH and photo.cam.environment != null and photo.cam.get_node("PhotoDepth").visible, "the fourth filter is the Black Mirror's depth image")
+	key(photo, KEY_F)
+	check(photo.filter == 0 and photo.cam.environment == null and not photo.cam.get_node("PhotoDepth").visible, "and cycling on puts the natural picture back")
 	key(photo, KEY_ESCAPE)
 	check(not photo.active and not get_tree().paused, "Escape leaves and unfreezes")
 	check(get_viewport().get_camera_3d() == field_camera, "the field camera is current again")
 	check(hunt.get_node("HUD").visible, "the HUD comes back")
+	# Raised in the depth lens, photo mode opens in it.
+	var lens := Node3D.new()
+	lens.name = "BlackMirrorDepth"
+	field_camera.add_child(lens)
+	photo.enter(field_camera, hunt.player_body.global_position)
+	check(photo.filter == PhotoMode.DEPTH, "F10 from the depth lens takes the photo in depth")
+	photo.exit()
+	lens.queue_free()
 
 	PhotoAlbum.dir = "user://photo_mode_test/"
 	for old in PhotoAlbum.list():

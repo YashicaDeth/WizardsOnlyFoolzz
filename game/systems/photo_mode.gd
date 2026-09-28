@@ -15,13 +15,19 @@ signal taken(path: String)
 
 ## How far the camera may wander from where you stood.
 const RADIUS := 12.0
-const FILTERS := ["NATURAL", "DIGICAM", "MONO"]
+## DEPTH is the Black Mirror's LiDAR image (Greg, 24 September: "depth map
+## as a Black Mirror camera mode now. Then photo mode inside it").
+const FILTERS := ["NATURAL", "DIGICAM", "MONO", "DEPTH"]
+const DEPTH := 3
+const DEPTH_SHADER := preload("res://shaders/black_mirror_depth.gdshader")
 const SHADER := preload("res://shaders/photo_filter.gdshader")
 const CellOutzType := preload("res://systems/celloutz_type.gd")
 const AMBER := Color(1.0, 0.55, 0.12)
 
 var active := false
 var filter := 0
+var _depth_quad: MeshInstance3D
+var _depth_environment: Environment
 var fov := 70.0
 var hide_ui := false
 var cam: Camera3D
@@ -85,6 +91,10 @@ func enter(from: Camera3D, anchor: Vector3) -> void:
 	fov = from.fov
 	from.get_parent().add_child(cam)
 	cam.global_transform = from.global_transform
+	# Raised in the depth lens, the photo starts in it.
+	var lens := from.get_node_or_null("BlackMirrorDepth") as Node3D
+	if lens != null and lens.visible:
+		filter = DEPTH
 	var euler := from.global_transform.basis.get_euler()
 	_pitch = euler.x
 	_yaw = euler.y
@@ -115,6 +125,7 @@ func exit() -> void:
 	if is_instance_valid(cam):
 		cam.queue_free()
 	cam = null
+	_depth_quad = null
 	get_tree().paused = _was_paused
 	Input.mouse_mode = _mouse_mode
 	visible = false
@@ -188,8 +199,34 @@ func handle_input(event: InputEvent) -> bool:
 
 
 func _apply_filter() -> void:
-	_grade.visible = filter != 0
+	_grade.visible = filter != 0 and filter != DEPTH
 	(_grade.material as ShaderMaterial).set_shader_parameter("mode", filter)
+	_apply_depth(filter == DEPTH)
+
+
+## The same quad-on-the-camera the Black Mirror uses: only a 3D pass can read
+## the depth buffer, and the image is data, so no grade or tonemap on it.
+func _apply_depth(on: bool) -> void:
+	if not is_instance_valid(cam):
+		return
+	if on and _depth_quad == null:
+		_depth_quad = MeshInstance3D.new()
+		_depth_quad.name = "PhotoDepth"
+		var quad := QuadMesh.new()
+		var material := ShaderMaterial.new()
+		material.shader = DEPTH_SHADER
+		quad.material = material
+		_depth_quad.mesh = quad
+		_depth_quad.extra_cull_margin = 16384.0
+		_depth_quad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		cam.add_child(_depth_quad)
+		_depth_environment = Environment.new()
+		_depth_environment.background_mode = Environment.BG_COLOR
+		_depth_environment.background_color = Color.BLACK
+		_depth_environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+	if _depth_quad != null:
+		_depth_quad.visible = on
+	cam.environment = _depth_environment if on else null
 
 
 ## Takes the picture. Awaitable; returns the saved PNG's path.
@@ -256,6 +293,9 @@ func _draw_ui() -> void:
 		_ui.draw_line(point, point + Vector2(out.x * arm, 0), ink, 2.0)
 		_ui.draw_line(point, point + Vector2(0, out.y * arm), ink, 2.0)
 	var line := "LMB SHOOT   WHEEL ZOOM %dMM   F %s   WASD QE MOVE   H HIDE   ESC LEAVE" % [int(_focal_length()), FILTERS[filter]]
+	# A dark band under the text: the depth image is white where the ground is.
+	_ui.draw_rect(Rect2(Vector2(inset, inset + 2), Vector2(170, 28)), Color(0, 0, 0, 0.45))
+	_ui.draw_rect(Rect2(Vector2(inset, size.y - inset - 30), Vector2(size.x - inset * 2.0, 26)), Color(0, 0, 0, 0.45))
 	CellOutzType.draw_text(_ui, Vector2(inset + 8, inset + 10), "PHOTO MODE", 12.0, ink, 1.5)
 	CellOutzType.draw_text(_ui, Vector2(inset + 8, size.y - inset - 22), line, 9.0, ink, 1.0)
 	if not _last_caption.is_empty():

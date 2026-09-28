@@ -297,6 +297,13 @@ func _ready() -> void:
 		scene.brain_hub.selected_zone = "left_arm"
 		for _f in 5:
 			await get_tree().process_frame
+	elif trigger == "photo_depth":
+		# Photo mode in the depth filter, from where the Hunt spawns you.
+		scene.photo_mode.enter(scene.camera, scene.player_body.global_position)
+		scene.photo_mode.filter = PhotoMode.DEPTH
+		scene.photo_mode._apply_filter()
+		for _f in 20:
+			await get_tree().process_frame
 	elif trigger == "threat":
 		# Three enemies winding up around the player -- behind and due, to the
 		# left mid-swing, ahead-right just starting -- so the ThreatCompass
