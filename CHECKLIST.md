@@ -2831,13 +2831,13 @@ Nine passes of a damage race, ending in a boss that must not be one. AQ1.6.
 - [ ] **O10.2** `v10` Everything O built is present in it and none of it is sufficient
 
 - [ ] **O10.3** `v10` Mass and reach are the entire weapon balance
-- [ ] **O10.4** `v10` Hitstop is local to the two bodies in the exchange
-- [ ] **O10.5** `v10` Gore and chunks run on the exchange's clock, not the world's
-- [ ] **O10.6** `v10` A miss costs footing and a landed blow spends the swing
-- [ ] **O10.7** `v10` Guard has a direction and can be flanked
-- [ ] **O10.8** `v10` You can be disarmed and so can they
+- [x] ~~**O10.4** `v10` Hitstop is local to the two bodies in the exchange~~ Checked 29 Sep: `ImpactFeel.scale_for()` slows only the two fighters; bystanders keep their clock (`hitstop_scope_test`, `impact_feel_test`).
+- [x] ~~**O10.5** `v10` Gore and chunks run on the exchange's clock, not the world's~~ Checked 29 Sep: `GoreChunks.hold()/release()` freezes severed limbs through the hold and hands their velocity back (`gore_hitstop_test`).
+- [x] ~~**O10.6** `v10` A miss costs footing and a landed blow spends the swing~~ Checked 29 Sep: `LimbMomentum.whiff()` carries the weapon on and O5.7's footing reads it (`footing_test`, `enemy_footing_test`); `strike()` zeroes the swing's stored work on contact.
+- [x] ~~**O10.7** `v10` Guard has a direction and can be flanked~~ Checked 29 Sep: A blow from where you face is blocked; from directly behind it goes through whole, with none of a block's reduction (`guard_direction_test`).
+- [x] ~~**O10.8** `v10` You can be disarmed and so can they~~ Checked 29 Sep: `disarm_test` (the player, fatigue-gated, re-arming by drawing again) and `npc_disarm_test` (enemies drop to fists, recover footing, grip returns).
 - [ ] **O10.9** `v10` Bare hands, a shove and a grapple are one object with a different mass
-- [ ] **O10.10** `v10` Fatigue degrades the guard instead of announcing it
+- [x] ~~**O10.10** `v10` Fatigue degrades the guard instead of announcing it~~ Checked 29 Sep: `arm.fatigue` softens the spring and lets the weapon wander -- the guard is measurably worse, nothing is printed (`limb_momentum_test`: fresh vs spent drift).
 - [ ] **O10.11** `v10` Demons, greys and reptilians fight through the same system
 - [ ] **O10.12** `v10` Losing is not dying, and the game means that
 - [ ] **O10.13** `v10` Every hit reaches the anatomy, never a hitbox
