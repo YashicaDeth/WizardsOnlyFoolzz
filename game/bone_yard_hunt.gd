@@ -247,6 +247,11 @@ const STANDING_HEIGHT := 1.8
 var stamina := 100.0
 var health := 100
 const FIELD_MEDS := preload("res://systems/field_meds.gd")
+## Middle mouse: how long a hold becomes a guard break, what it costs, reach.
+const GUARD_BREAK_HOLD := 0.35
+const GUARD_BREAK_STAMINA := 20.0
+const GUARD_BREAK_REACH := 2.4
+var heavy_held := -1.0
 var field_meds := FIELD_MEDS.new()
 var attack_cooldown := 0.0
 ## O2.4. Guarding. Dodging already existed and was already consulted on
@@ -1669,8 +1674,16 @@ func _unhandled_input(event: InputEvent) -> void:
 					_shape_smoke_trick()
 				else:
 					_attack()
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_MIDDLE:
-		_toggle_lock()
+	# Greg, 28 September: middle mouse is the heavy. Tap = a heavy swing; hold
+	# = a guard break (randomly knocks their guard open or throws them).
+	# Lock-on is Z.
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_MIDDLE and panel_mode.is_empty():
+		if event.pressed:
+			heavy_held = 0.0
+		else:
+			if heavy_held >= 0.0 and heavy_held < GUARD_BREAK_HOLD:
+				_attack(true)
+			heavy_held = -1.0
 	if event is InputEventMouseButton and event.pressed and not lock_target.is_empty():
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			_cycle_lock(1)
@@ -1932,6 +1945,11 @@ func _physics_process(delta: float) -> void:
 		_update_hud()
 		return
 	pulse += delta
+	if heavy_held >= 0.0:
+		heavy_held += delta
+		if heavy_held >= GUARD_BREAK_HOLD:
+			heavy_held = -1.0
+			guard_break()
 	# Hold 4: a FIELD DRESSING (Greg, 26 September). A tap of 4 still takes the
 	# carried limb on the key press, as before.
 	field_meds.step(self, delta, func() -> void:
@@ -7622,6 +7640,51 @@ func _lock_candidates() -> Array:
 	return found
 
 
+## Hold middle mouse: at the body in front of you, a shove that either breaks
+## their guard (a stagger and a free hit) or throws them back off their feet.
+## Returns "break", "throw", or "" when nothing happened.
+func guard_break(force := "") -> String:
+	if field_meds.busy() or resolution_ui.visible or player_rig.anatomy.dead:
+		return ""
+	if stamina < GUARD_BREAK_STAMINA:
+		_feedback("TOO WINDED TO SHOVE")
+		return ""
+	var forward := -camera.global_transform.basis.z
+	forward.y = 0.0
+	forward = forward.normalized()
+	var best: Dictionary = {}
+	var best_distance := GUARD_BREAK_REACH
+	for actor: Dictionary in encounter_actors:
+		var node := actor.get("node") as Node3D
+		if node == null or not is_instance_valid(node) or bool(actor.get("dead", false)):
+			continue
+		var to := node.global_position - player
+		to.y = 0.0
+		if to.length() < best_distance and forward.dot(to.normalized()) > 0.55:
+			best_distance = to.length()
+			best = actor
+	if best.is_empty():
+		_feedback("NOBODY IN REACH TO SHOVE")
+		return ""
+	stamina -= GUARD_BREAK_STAMINA
+	var kind := force if force != "" else ("break" if randf() < 0.5 else "throw")
+	best.state = "staggered"
+	best.attack_time = 0.0
+	if kind == "break":
+		best["stagger_remaining"] = 1.4
+		_actor_lose_footing(best, 0.35)
+		prompt.text = "YOU BREAK %s'S GUARD // A FREE HIT" % str(best.display_name).to_upper()
+	else:
+		best["stagger_remaining"] = 2.2
+		_actor_lose_footing(best, 1.0)
+		var body := best.get("node") as CharacterBody3D
+		if body != null:
+			body.velocity += forward * 6.0 + Vector3.UP * 2.0
+		prompt.text = "YOU THROW %s DOWN" % str(best.display_name).to_upper()
+	WorldHistory.record_event("guard_break", {"subject_id": str(best.get("subject_id", "")), "kind": kind, "location": HUNT_LOCATION})
+	return kind
+
+
 func _toggle_lock() -> void:
 	if not lock_target.is_empty():
 		lock_target = ""
@@ -8373,6 +8436,7 @@ func _build_keys_card() -> void:
 		{"group": "FIGHTING", "rows": [
 			["LMB", "ATTACK"],
 			["RMB", "AIM FIREARMS / GUARD (MOUSE PICKS SIDE)"],
+			["MMB", "HEAVY // HOLD: GUARD BREAK"],
 			["HOLD X", "GUARD"],
 			["GUARD MID-SWING", "FEINT (BLOOD TREE)"],
 			["Z", "LOCK ON"],
