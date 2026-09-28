@@ -107,5 +107,5 @@ Foundry, lighter). One brief per agent, one open box from
 
 ---
 
-**Claude (cloud) is doing:** the wizard-eyes shader pass against the Ice
+**Claude (cloud) is doing:** (wizard eyes done 28 September) the Ice
 King / green line-art reference, and reviewing and merging StarNet branches.
