@@ -113,12 +113,12 @@ at 100. **(Greg)** marks what only Greg can do.
 
 ### Guidance through wizard eyes
 
-- [ ] Sine waves rising from objectives (acid)
-- [ ] Red waves from distress
-- [ ] Bone waves from tasks
-- [ ] The chip labels things like a block tracker
-- [ ] Faces of spirits, demons and angels in the spirit view
-- [ ] The way out lit once you stand
+- [x] Sine waves rising from objectives (acid)
+- [x] Red waves from distress
+- [x] Bone waves from tasks
+- [x] The chip labels things like a block tracker
+- [x] Faces of spirits, demons and angels in the spirit view
+- [x] The way out lit once you stand
 
 ### Sound (the StarNet sound pass)
 

@@ -328,6 +328,7 @@ func _ready() -> void:
 	# A stash in the left wall between the second and third bays.
 	caches.append(HIDDEN_CACHE.place_stash(self, sight, "growing_floor_stash", Vector3(-7.35, 1.0, -5.75), Vector3.RIGHT))
 	_build_den()
+	_wire_guidance()
 	key_hints = KeyHints.new()
 	add_child(key_hints)
 	tank_view = TankView.new()
@@ -1286,6 +1287,44 @@ func _build_den() -> void:
 	lamp.light_energy = 2.2
 	lamp.omni_range = 4.6
 	add_child(lamp)
+
+
+## Greg, 28 September: wizard eyes guides. Acid waves rise from where to go
+## (his door, the way out), red from the one awake in the next tank, bone from
+## stashes and the hollow wall; the chip labels what it recognises.
+func _wire_guidance() -> void:
+	sight.set("beacons", func() -> Array:
+		var out: Array = []
+		if doctor_route != null and doctor_route.door != null and not doctor_route.door.broken:
+			out.append({"at": DoctorRoute.DOOR_AT, "kind": "objective"})
+		if door_marker != null:
+			out.append({"at": door_marker.global_position, "kind": "objective"})
+		if horror != null and not horror._entry(1).is_empty() and phase != "intake":
+			out.append({"at": horror._entry(1).at, "kind": "distress"})
+		for record: Dictionary in caches:
+			if not bool(record.get("opened", false)):
+				out.append({"at": record.at, "kind": "task"})
+		if weak_wall_found and not weak_wall_broken:
+			out.append({"at": WEAK_WALL_AT - Vector3(0, 1.0, 0), "kind": "task"})
+		return out)
+	sight.set("labels", func() -> Array:
+		var out: Array = []
+		if doctor_route != null and doctor_route.door != null and not doctor_route.door.broken:
+			out.append({"at": DoctorRoute.DOOR_AT + Vector3(0, 1.3, 0), "word": "his door // weak hinge"})
+		out.append({"at": STAFF_DOOR_AT + Vector3(0, 1.3, 0), "word": "open" if staff_door_open else "locked // staff"})
+		if not weak_wall_broken:
+			out.append({"at": WEAK_WALL_AT, "word": "hollow"})
+		for record: Dictionary in caches:
+			if not bool(record.get("opened", false)):
+				out.append({"at": record.at, "word": "medicine // ammo"})
+		if horror != null:
+			var awake := horror._entry(1)
+			if not awake.is_empty():
+				out.append({"at": (awake.at as Vector3) + Vector3(0, 1.4, 0), "word": "awake // afraid"})
+			var failed := horror._entry(2)
+			if not failed.is_empty():
+				out.append({"at": (failed.at as Vector3) + Vector3(0, 1.4, 0), "word": "dead" if horror.drained else "failing"})
+		return out)
 
 
 func _in_den() -> bool:

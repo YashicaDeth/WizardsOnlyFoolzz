@@ -75,6 +75,15 @@ var phone_lens := false
 ## Callable returning [{"at": Vector3 (the transmitter), "name", "reach"}].
 var emitters: Callable = Callable()
 const INFRARED := Color("d65ad8")
+## Greg, 28 September: guidance through wizard eyes. `beacons` is a Callable
+## returning [{"at": Vector3, "kind": "objective"|"distress"|"task"}]; each
+## sends a sine wave rising through walls, acid, red or bone. `labels` is a
+## Callable returning [{"at": Vector3, "word": String}]: the chip reading
+## what you look at, drawn like the block tracker. Both cost the same strain
+## as the rest of the mode (they only show while a mode is on).
+var beacons: Callable = Callable()
+var labels: Callable = Callable()
+const WAVE_HEIGHT := 5.0
 
 
 func setup(camera: Camera3D) -> void:
@@ -200,6 +209,8 @@ func _draw_marks() -> void:
 			_draw_bodies()
 		_draw_hidden()
 		_draw_wires()
+		_draw_beacons()
+		_draw_labels()
 		CellOutzType.draw_string_compat(marks, Vector2(marks.size.x * 0.05, marks.size.y * 0.2), "WIZARD EYES  //  K" if mode == "wizard" else "DEPTH  //  J", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, ACID if mode == "wizard" else COLD)
 	# The nosebleed: past halfway, blood runs down from the top of the view.
 	if strain > 0.5:
@@ -271,6 +282,65 @@ func _draw_spirits() -> void:
 			marks.draw_circle(top + Vector2(0, height * 0.1), height * 0.1 + grow, colour)
 			var body := PackedVector2Array([top + Vector2(-height * 0.14 - grow, height * 0.22), top + Vector2(height * 0.14 + grow, height * 0.22), feet + Vector2(height * 0.1 + grow, 0), feet + Vector2(-height * 0.1 - grow, 0)])
 			marks.draw_colored_polygon(body, colour)
+		# Greg, 28 September: faces in the spirit view, like the Ice King
+		# sees them: a spirit's hollow eyes, a demon's horns, an angel's halo.
+		var face_at: Vector2 = top + Vector2(0, height * 0.1)
+		var r := height * 0.1
+		var kind := int(absf(point.x * 7.0 + point.z * 3.0)) % 3
+		for eye in [-1.0, 1.0]:
+			marks.draw_circle(face_at + Vector2(eye * r * 0.4, -r * 0.1), r * 0.18, Color(0.02, 0.06, 0.02, 0.9))
+		# A hollow open mouth, not a smile.
+		marks.draw_circle(face_at + Vector2(0, r * 0.42), r * 0.17, Color(0.02, 0.06, 0.02, 0.85))
+		if kind == 1:
+			for side in [-1.0, 1.0]:
+				marks.draw_colored_polygon(PackedVector2Array([face_at + Vector2(side * r * 0.5, -r * 0.7), face_at + Vector2(side * r * 0.9, -r * 1.6), face_at + Vector2(side * r * 0.2, -r * 0.85)]), Color(BLOOD, 0.8))
+		elif kind == 2:
+			marks.draw_arc(face_at + Vector2(0, -r * 1.35), r * 0.7, 0.0, TAU, 20, Color(BONE, 0.85), 2.0)
+
+
+## Waves rising from where to go (acid), who is in trouble (red) and what
+## there is to do (bone): a sine line climbing out of each, through walls.
+func _draw_beacons() -> void:
+	if not beacons.is_valid():
+		return
+	for beacon: Dictionary in beacons.call():
+		var tone: Color = {"objective": ACID, "distress": BLOOD.lightened(0.25), "task": BONE}.get(str(beacon.get("kind", "task")), BONE)
+		var base: Vector3 = beacon.get("at", Vector3.ZERO)
+		var points := PackedVector2Array()
+		for step in 24:
+			var rise := float(step) / 23.0
+			var sway := sin(rise * TAU * 2.0 - clock * 3.0) * 0.35 * (1.0 - rise * 0.5)
+			var at = _project(base + Vector3(sway, rise * WAVE_HEIGHT, 0.0))
+			if at == null:
+				points.clear()
+				break
+			points.append(at)
+		if points.size() > 1:
+			marks.draw_polyline(points, Color(tone, 0.25), 7.0)
+			marks.draw_polyline(points, Color(tone, 0.85), 2.0)
+		var foot = _project(base)
+		if foot != null:
+			marks.draw_circle(foot, 5.0 + 2.0 * absf(sin(clock * 3.0)), Color(tone, 0.8))
+
+
+## The chip's reading: a word on each thing it recognises, boxed like the
+## Hunt's block tracker, nearest first.
+func _draw_labels() -> void:
+	if not labels.is_valid() or view == null:
+		return
+	for label: Dictionary in labels.call():
+		var point: Vector3 = label.get("at", Vector3.ZERO)
+		if view.global_position.distance_to(point) > 14.0:
+			continue
+		var at = _project(point)
+		if at == null:
+			continue
+		var word := str(label.get("word", "")).to_upper()
+		var box := Rect2((at as Vector2) - Vector2(26, 26), Vector2(52, 52))
+		marks.draw_rect(box, Color(ACID, 0.7), false, 1.2)
+		for corner in [box.position, box.position + Vector2(box.size.x, 0), box.position + Vector2(0, box.size.y), box.end]:
+			marks.draw_rect(Rect2(corner - Vector2(3, 3), Vector2(6, 6)), Color(ACID, 0.9))
+		CellOutzType.draw_string_compat(marks, box.position + Vector2(0, -6), word, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(ACID, 0.95))
 
 
 ## Bodies through walls, as X-ray outlines.
