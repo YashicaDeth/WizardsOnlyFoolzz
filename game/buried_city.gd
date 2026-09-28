@@ -729,6 +729,9 @@ func _interact() -> void:
 		WorldHistory.record_event("lower_works_shortcut_powered", {"location": "lower_works", "sentinel_relay": "disabled"})
 		return
 	if _flat_distance(DRAIN_AT) <= DRAIN_REACH:
+		if not FACILITY_ROUTES.escaped_once():
+			objective.text = "OBJECTIVE // THE GRATE IS RUSTED SHUT  //  REACH THE HEAT ELEVATOR"
+			return
 		_enter_drains()
 		return
 	if _flat_distance(EXIT_AT) <= 4.0 and fuse_taken:
@@ -819,7 +822,7 @@ func _update_hud() -> void:
 		prompt.text = "[E] POWER SHORTCUT // DISABLE SENTINEL"
 		osd.point_at(SHORTCUT_AT + Vector3(0, 1.4, 0))
 	elif _flat_distance(DRAIN_AT) <= DRAIN_REACH:
-		prompt.text = "[E] DROP INTO THE OLD DRAINS"
+		prompt.text = "[E] DROP INTO THE OLD DRAINS" if FACILITY_ROUTES.escaped_once() else "A DRAIN GRATE  //  RUSTED SHUT"
 		osd.point_at(DRAIN_AT + Vector3(0, 0.2, 0))
 	elif fuse_taken and _flat_distance(EXIT_AT) <= 4.0:
 		prompt.text = "[E] RIDE THE HEAT ELEVATOR UP"

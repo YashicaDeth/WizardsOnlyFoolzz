@@ -157,7 +157,7 @@ func prompt_text() -> String:
 	if lift_state == "arrived":
 		return "[E] RIDE BACK UP" if placeholder_shown else ""
 	if _in_car():
-		return "[E] DOWN"
+		return "[E] DOWN" if FacilityRoutes.escaped_once() else "HIS LIFT  //  IT ANSWERS TO HIS KEY"
 	if _near_landing() and lift_state == "closed":
 		return "[E] CALL THE LIFT"
 	if _axe_in_reach():
@@ -227,6 +227,9 @@ func _use() -> bool:
 		ride_clock = 0.0
 		return true
 	if _in_car() and lift_state in ["open", "closed"]:
+		if not FacilityRoutes.escaped_once():
+			chamber.subtitle.text = "THE CAR WON'T MOVE  //  HIS KEY, NOT YOURS  //  NOT THIS TIME"
+			return true
 		_ride_down()
 		return true
 	if _near_landing() and lift_state == "closed":

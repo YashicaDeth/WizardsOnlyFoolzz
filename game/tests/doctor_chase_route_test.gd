@@ -53,6 +53,7 @@ func _vat_to_lift() -> void:
 		for _tug in vat.WIRE_TUGS:
 			vat._tug_wire(vat.umbilicals[0])
 	vat._physics_process(vat.REVENGE_HOLD + 0.1)
+	WorldHistory.amend_subject(FacilityRoutes.SUBJECT, {"completed_routes": [FacilityRoutes.ROUTE_HEAT_ELEVATOR]})  # a returning run: side exits open
 	for _step in 80:
 		if vat.can_move:
 			break

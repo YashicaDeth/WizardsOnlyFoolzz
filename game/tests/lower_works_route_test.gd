@@ -63,8 +63,11 @@ func _ready() -> void:
 	check(WorldHistory.event_count("lower_works_sentinel_breached") == 1, "the direct encounter records its actual resolution")
 	combat_city.queue_free()
 
-	# The drain hatch: the second way out, down into the old drains.
+	# The drain hatch: the second way out, shut on the first run.
 	city.player.global_position = city.DRAIN_AT + Vector3(0, 0.9, 1.0)
+	city._update_hud()
+	check(city.prompt.text.contains("RUSTED SHUT"), "first run: the drain grate is rusted shut (%s)" % city.prompt.text)
+	WorldHistory.amend_subject(FacilityRoutes.SUBJECT, {"completed_routes": [FacilityRoutes.ROUTE_HEAT_ELEVATOR]})
 	city._update_hud()
 	check(city.prompt.text.contains("OLD DRAINS"), "the drain hatch offers the old drains (%s)" % city.prompt.text)
 	city._interact()

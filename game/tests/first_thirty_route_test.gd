@@ -122,6 +122,7 @@ func _ready() -> void:
 	var lift_arrival: Vector3 = FacilityRoutes.route(FacilityRoutes.ROUTE_HEAT_ELEVATOR).surface_position
 
 	city = await _through_the_facility("old drains")
+	WorldHistory.amend_subject(FacilityRoutes.SUBJECT, {"completed_routes": [FacilityRoutes.ROUTE_HEAT_ELEVATOR]})  # a returning run: side exits open
 	city.player.global_position = city.DRAIN_AT + Vector3(0, 0.9, 1.0)
 	city._interact()
 	check(city.drains_requested, "old drains: the hatch drops you into the drains")
