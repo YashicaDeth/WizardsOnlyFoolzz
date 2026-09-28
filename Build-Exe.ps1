@@ -20,7 +20,13 @@ $exe = Join-Path $out 'WizardsOnlyFools.exe'
 # the old script test for the EXE while Godot was still writing it. An explicit
 # process wait makes the artifact check truthful for either GUI or console Godot.
 $project = Join-Path $PSScriptRoot 'game'
-$godotArgs = @('--headless', '--path', $project, '--export-release', 'Windows Desktop', $exe)
+# Start-Process joins ArgumentList entries into one command line, so values that
+# contain spaces must carry their own quotes or Godot sees the preset as merely
+# "Windows".
+$quotedProject = '"' + $project + '"'
+$quotedPreset = '"Windows Desktop"'
+$quotedExe = '"' + $exe + '"'
+$godotArgs = @('--headless', '--path', $quotedProject, '--export-release', $quotedPreset, $quotedExe)
 $export = Start-Process -FilePath $toolState.godot -ArgumentList $godotArgs -Wait -NoNewWindow -PassThru
 if ($export.ExitCode -ne 0 -or -not (Test-Path $exe)) { throw "Export failed (exit $($export.ExitCode))." }
 
