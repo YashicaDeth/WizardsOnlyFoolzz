@@ -1,5 +1,5 @@
 extends Node
-## What each processing script really costs: every instance of it switched
+## What each processing (or physics-processing) script really costs: every instance of it switched
 ## off at once, the frame measured with and without. `-- --scene=res://x.tscn`
 
 func _ready() -> void:
@@ -19,7 +19,7 @@ func _ready() -> void:
 	while not stack.is_empty():
 		var node: Node = stack.pop_back()
 		stack.append_array(node.get_children())
-		if node.is_processing() and node.get_script() != null:
+		if (node.is_processing() or node.is_physics_processing()) and node.get_script() != null:
 			var key := str((node.get_script() as Script).resource_path.get_file())
 			if not by_script.has(key):
 				by_script[key] = []
@@ -27,11 +27,16 @@ func _ready() -> void:
 	var base := await _frame_ms(60)
 	print("PROCESS_COST base=%.2fms" % base)
 	for key: String in by_script:
+		var was := {}
 		for node: Node in by_script[key]:
+			was[node] = [node.is_processing(), node.is_physics_processing()]
 			node.set_process(false)
+			node.set_physics_process(false)
 		var without := await _frame_ms(40)
 		for node: Node in by_script[key]:
-			node.set_process(true)
+			if is_instance_valid(node):
+				node.set_process(was[node][0])
+				node.set_physics_process(was[node][1])
 		print("PROCESS_COST %6.2fms  x%-3d %s" % [base - without, by_script[key].size(), key])
 	get_tree().quit()
 
