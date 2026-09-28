@@ -40,6 +40,18 @@ func _ready() -> void:
 	check(hunt.panel_mode == "map" and not hunt.brain_hub.visible, "the MAP tab hands over to the satellite map")
 	key(hunt, KEY_TAB, true)
 	check(hunt.panel_mode == "hub", "Shift+Tab from the map comes back to the hub")
+	# Photo mode's pictures live behind the BRAIN INDEX tab.
+	PhotoAlbum.dir = "user://photo_hub_test/"
+	for old in PhotoAlbum.list():
+		DirAccess.remove_absolute(str(old.path))
+	var print_image := Image.create(64, 36, false, Image.FORMAT_RGB8)
+	print_image.fill(Color(0.6, 0.2, 0.2))
+	PhotoAlbum.save(print_image, {"caption": "HUB TEST"})
+	hunt.brain_hub.tab = BrainIndexHub.TABS.find("BRAIN INDEX")
+	key(hunt, KEY_ENTER)
+	check(hunt.brain_hub.album.visible and hunt.brain_hub.album.photos.size() == 1, "Enter on BRAIN INDEX opens the photo album with the photo in it")
+	key(hunt, KEY_ESCAPE)
+	check(not hunt.brain_hub.album.visible and hunt.brain_hub.visible, "Escape puts the album away and leaves the hub open")
 	key(hunt, KEY_TAB)
 	check(hunt.panel_mode == "" and not hunt.brain_hub.visible, "and Tab again closes it")
 	print("BRAIN_HUB_TEST_RESULT failures=", failures.size())

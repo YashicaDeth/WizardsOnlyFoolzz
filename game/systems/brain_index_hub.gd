@@ -13,6 +13,9 @@ extends Control
 
 signal open_surface(surface: String)
 
+var album: PhotoAlbum
+var _photos_rect := Rect2()
+
 const CellOutzType := preload("res://systems/celloutz_type.gd")
 const VAT_BODY_PREVIEW := preload("res://systems/vat_body_preview.gd")
 const TABS := ["CARRY", "COMBAT", "BRAIN INDEX", "TASKS", "MAP"]
@@ -56,6 +59,12 @@ func _ready() -> void:
 	_marks.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_marks.draw.connect(_draw_marks)
 	add_child(_marks)
+	# Photo mode's pictures live here (Greg, 24 September: photos "stored in
+	# your inventory brain index"). Opened from the BRAIN INDEX tab.
+	album = PhotoAlbum.new()
+	album.name = "PhotoAlbum"
+	album.visible = false
+	add_child(album)
 	resized.connect(_layout)
 	visible = false
 
@@ -80,6 +89,14 @@ func open(carry_model: Object, weapons: Object, rig: Node) -> void:
 
 func close() -> void:
 	visible = false
+	album.visible = false
+
+
+func open_album() -> void:
+	album.refresh()
+	album.visible = true
+	_layout()
+	queue_redraw()
 
 
 func _layout() -> void:
@@ -88,6 +105,10 @@ func _layout() -> void:
 	var vat := _vat_rect()
 	body.position = vat.position + Vector2(10, 10)
 	body.size = vat.size - Vector2(20, 60)
+	if album != null:
+		var content := _content_rect()
+		album.position = content.position
+		album.size = content.size
 
 
 func _frame() -> Rect2:
@@ -109,6 +130,15 @@ func _content_rect() -> Rect2:
 func handle_input(event: InputEvent) -> bool:
 	if not visible:
 		return false
+	# The album owns the keys while it is up; Escape, Tab or Backspace put it
+	# away and leave the hub open.
+	if album.visible:
+		if event is InputEventKey and event.pressed and not event.echo and (event as InputEventKey).keycode in [KEY_ESCAPE, KEY_TAB, KEY_BACKSPACE]:
+			album.visible = false
+			queue_redraw()
+			return true
+		album.handle_input(event)
+		return true
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_TAB, KEY_ESCAPE:
@@ -122,6 +152,8 @@ func handle_input(event: InputEvent) -> bool:
 					open_surface.emit("index")
 				elif TABS[tab] == "MAP":
 					open_surface.emit("map")
+				elif TABS[tab] == "BRAIN INDEX":
+					open_album()
 			_:
 				return true
 		queue_redraw()
@@ -133,6 +165,9 @@ func handle_input(event: InputEvent) -> bool:
 					tab = index
 					queue_redraw()
 					return true
+			if TABS[tab] == "BRAIN INDEX" and _photos_rect.has_point(event.position):
+				open_album()
+				return true
 			if _vat_rect().has_point(event.position):
 				_dragging = true
 				body.set("held", true)
@@ -183,6 +218,10 @@ func _draw() -> void:
 	var content := _content_rect()
 	draw_rect(content, Color(0, 0, 0, 0.35))
 	draw_rect(content, DIM * Color(1, 1, 1, 0.4), false, 1.0)
+	if album.visible:
+		_draw_vat()
+		CellOutzType.draw_condensed(self, Vector2(frame.position.x + 26, frame.end.y - 16), "ARROWS OR CLICK: PICK A PHOTO  //  WHEEL: PAGE  //  ESC OR TAB: BACK TO THE INDEX", 8.0, DIM, 0.7)
+		return
 	match TABS[tab]:
 		"CARRY":
 			_draw_carry(content)
@@ -394,6 +433,15 @@ func _draw_index(rect: Rect2) -> void:
 		column = 1 - column
 		if column == 0:
 			y += 24.0
+	# Photos: the album sits behind this row.
+	y += 30.0
+	var photo_count := PhotoAlbum.list().size()
+	_photos_rect = Rect2(Vector2(rect.position.x + 24, y - 18), Vector2(rect.size.x - 48, 30))
+	draw_rect(_photos_rect, HOT * Color(1, 1, 1, 0.14 + 0.06 * sin(_clock * 3.0)))
+	draw_rect(_photos_rect, HOT * Color(1, 1, 1, 0.6), false, 1.0)
+	draw_string(font, _photos_rect.position + Vector2(10, 20), "PHOTOS", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, INK)
+	draw_string(font, _photos_rect.position + Vector2(rect.size.x * 0.5 - 114, 20), "%02d" % photo_count, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, TEAL if photo_count > 0 else DIM)
+	CellOutzType.draw_condensed(self, _photos_rect.position + Vector2(_photos_rect.size.x - 150, 11), "ENTER OR CLICK: ALBUM", 8.0, DIM, 0.7)
 
 
 func _draw_handoff(rect: Rect2, title: String, note: String, action: String) -> void:

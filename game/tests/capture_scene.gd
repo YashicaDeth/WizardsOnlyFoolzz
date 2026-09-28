@@ -275,13 +275,23 @@ func _ready() -> void:
 				await get_tree().physics_frame
 		for _f in 40:
 			await get_tree().physics_frame
-	elif trigger == "hub" or trigger == "hub_index":
+	elif trigger == "hub" or trigger == "hub_index" or trigger == "hub_album":
 		# The Brain Index hub with something in the bag and a part selected.
 		for info in [{"layer_name": "organ", "organ_id": "left_kidney"}, {"layer_name": "bone", "zone": "left_arm"}, {"layer_name": "cybernetic", "implant": "optic relay"}, {"layer_name": "muscle", "zone": "right_leg"}]:
 			scene.handheld.carry.take_chunk(info)
 		scene._toggle_panel("hub")
 		if trigger == "hub_index":
 			scene.brain_hub.tab = 2
+			# Two prints in the album, taken from this very frame.
+			PhotoAlbum.dir = "user://photo_capture/"
+			for _f in 20:
+				await get_tree().process_frame
+			for n in 2:
+				PhotoAlbum.save(get_viewport().get_texture().get_image(), {"caption": "CAPTURE %d" % n, "filter": "DIGICAM"})
+		if trigger == "hub_album":
+			scene.brain_hub.tab = 2
+			PhotoAlbum.dir = "user://photo_capture/"
+			scene.brain_hub.open_album()
 		for _f in 30:
 			await get_tree().process_frame
 		scene.brain_hub.selected_zone = "left_arm"
