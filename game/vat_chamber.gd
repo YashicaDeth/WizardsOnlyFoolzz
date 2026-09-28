@@ -29,6 +29,8 @@ const BODY_CAM := preload("res://systems/body_cam_feel.gd")
 const FIELD_MEDS := preload("res://systems/field_meds.gd")
 ## Hold 4: a FIELD DRESSING, +20 blood (Greg, 26 September).
 var meds := FIELD_MEDS.new()
+## Greg, 28 September: each new key shown once, big, bottom centre.
+var key_hints: KeyHints
 ## Seconds left of the examiner's syringe, and how slow it makes you.
 var slowed_left := 0.0
 const SLOWED_SCALE := 0.5
@@ -317,6 +319,8 @@ func _ready() -> void:
 	sight.set("wires", wires)
 	# A stash in the left wall between the second and third bays.
 	caches.append(HIDDEN_CACHE.place_stash(self, sight, "growing_floor_stash", Vector3(-7.35, 1.0, -5.75), Vector3.RIGHT))
+	key_hints = KeyHints.new()
+	add_child(key_hints)
 	brain_hack = BRAIN_HACK.new()
 	$HUD.add_child(brain_hack)
 	brain_hack.connect("hack_finished", _on_hack_finished)
@@ -1554,9 +1558,17 @@ func _update_departure(delta: float) -> void:
 
 ## BRAIN HACKED / SOUL OVERTAKEN on the END ALL SUFFERING card, and the tank
 ## starts to fail under it.
+func _offer_standing_hints() -> void:
+	key_hints.offer("use", KEY_E, "E", "use / open / tear")
+	key_hints.offer("jump", KEY_SPACE, "SPACE", "jump and climb")
+	key_hints.offer("slide", KEY_CTRL, "SHIFT + CTRL", "sprint, then slide")
+
+
 func _on_hack_finished(_skipped: bool) -> void:
 	# The chip is yours now, and so are its senses.
 	sight.set("enabled", true)
+	key_hints.offer("wizard_eyes", KEY_K, "K", "wizard eyes")
+	key_hints.offer("depth_scan", KEY_J, "HOLD J", "depth scan")
 	mission_card.play("brain_hacked", "BRAIN HACKED SOUL OVERTAKEN", BRAIN_HACK.CARD_SECONDS)
 	phase = "submerged"
 	clock = 0.0
@@ -1618,6 +1630,7 @@ func _update_sequence(_delta: float) -> void:
 			if t >= 1.0:
 				phase = "aisle"
 				can_move = true
+				_offer_standing_hints()
 				subtitle.text = ""
 				yaw = 0.0
 				pitch = 0.0
@@ -1875,6 +1888,7 @@ func _update_knees(delta: float) -> void:
 		phase = "aisle"
 		pitch = 0.05
 		can_move = true
+		_offer_standing_hints()
 		_get_revenge()
 
 
@@ -2092,6 +2106,7 @@ func _interact() -> void:
 	if break_weak_wall() or (_near_weak_wall() and take_shortcut()):
 		return
 	if HIDDEN_CACHE.open_near(caches, player.global_position, sight) == "stash":
+		key_hints.offer("field_dressing", KEY_4, "HOLD 4", "dress a wound")
 		subtitle.text = "A FIELD DRESSING AND FOUR ROUNDS  //  SOMEBODY HID THESE"
 		return
 	if sight != null and sight.call("cut_wire_near", player.global_position) != "":

@@ -1502,3 +1502,7 @@ playable build and verified before merge.
 - **One-time key hints:** bottom centre and big, a key glyph plus the verb,
   fading once used. They show keyboard or controller buttons, whichever
   was used last (Greg: "you can choose").
+- *Found 28 September:* the game has **no controller bindings at all**
+  (keyboard and mouse only). The one-time key hints show keyboard keys for
+  now. Controller support is its own job: bindings for every action, then
+  hints that follow the last device used.
