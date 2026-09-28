@@ -196,5 +196,13 @@ purpose.
   tonight): Greg's four flashes + whispers, shorter and clearer ticked: 5740c77a
 - 47, 56, 58 already done before tonight: hub draws an icon per kind; Tab is
   the carry view (Greg 26 Sep); F1 card names I (inspect) and U (cases).
+- 70 photo mode DEPTH filter, F10 from the depth lens: 30ce303c
+- 71 photos open from the hub's BRAIN INDEX tab: ed4e4840
+- 78-83 O10 combat lines already true, ticked with suites: 834d5cb4
+- 88 X10.5 caps audited true: 98796545; X10.6 viewports: 410cd924
+- 91 FMOD gone, J1.3/X1.3 ticked: b83df383
+- 92 perf_probe fixed (TIME_FPS read 1000 ms); route measured idle: d6b1a406
+- 99-100 BONES.md / front door: blocked, it is the ledger's first open
+  question ("should this skeleton become the single front door?").
 - 19 WofLockup: already used -- store_assets_capture draws every Steam/itch
   plate with it (the ledger's scan skipped tests/). No change.
