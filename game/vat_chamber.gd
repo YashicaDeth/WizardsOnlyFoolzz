@@ -2052,8 +2052,8 @@ func _begin_smash() -> void:
 	WorldHistory.record_event("opening_glass_faced", {"tank": "0C-7"})
 
 
-## One blow at the glass in front of you. The first two crack it; the third
-## goes through.
+## One blow at the glass in front of you. Each authored blow cracks it further;
+## the final blow goes through.
 func strike_glass() -> void:
 	if phase != "smash":
 		return
@@ -2149,19 +2149,22 @@ func _update_knees(delta: float) -> void:
 func _flood() -> void:
 	var pool := MeshInstance3D.new()
 	pool.name = "SpilledMedium"
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(1.0, 1.0)
+	# This used to be a 1x1 PlaneMesh scaled to 5.5. It made the escaped medium
+	# read as a bright green square around the vat rather than a physical spill.
+	# A shallow round volume expands over the grating instead, beneath the darker
+	# close puddle created at the break point.
+	var disc := CylinderMesh.new()
+	disc.top_radius = 0.5
+	disc.bottom_radius = 0.5
+	disc.height = 0.01
 	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.36, 0.44, 0.22, 0.8)
+	material.albedo_color = Color("160d0b")
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.roughness = 0.02
-	material.metallic = 0.5
-	# A faint glow of its own, so the spill reads in the dark room.
-	material.emission_enabled = true
-	material.emission = Color(0.2, 0.28, 0.1)
-	material.emission_energy_multiplier = 0.35
-	plane.material = material
-	pool.mesh = plane
+	material.roughness = 0.05
+	material.metallic = 0.22
+	material.metallic_specular = 0.65
+	disc.material = material
+	pool.mesh = disc
 	pool.position = Vector3(VAT_POSITION.x, 0.015, VAT_POSITION.z)
 	pool.scale = Vector3(0.5, 1.0, 0.5)
 	add_child(pool)

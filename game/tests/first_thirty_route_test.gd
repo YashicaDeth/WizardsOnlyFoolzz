@@ -28,11 +28,72 @@ func _carries(label: String) -> bool:
 	return VatRebirth.carries(label)
 
 
+func _key(code: Key) -> InputEventKey:
+	var event := InputEventKey.new()
+	event.keycode = code
+	event.pressed = true
+	return event
+
+
+func _click() -> InputEventMouseButton:
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.pressed = true
+	return event
+
+
+## The demo's first real player sequence. This deliberately uses the same
+## inputs as the hands-on breakout instead of relying on the test-mode legacy
+## auto-breach, because a route that only works after a private helper call is
+## not a route a friend can play.
+func _complete_live_breakout(vat: Node, route_name: String) -> void:
+	var wire_count: int = vat.umbilicals.size()
+	for _wire in wire_count:
+		if vat.umbilicals.is_empty():
+			break
+		var cable: Node3D = vat.umbilicals[0]
+		var aim: Vector3 = ((cable.get_child(3) as Node3D).global_position - vat.camera.global_position).normalized()
+		vat.yaw = atan2(-aim.x, -aim.z)
+		vat.pitch = asin(aim.y)
+		vat._update_wired(0.0)
+		for _tug in vat.WIRE_TUGS:
+			vat._unhandled_input(_key(KEY_E))
+		check(not vat.umbilicals.has(cable), "%s: aiming and E tears each wire" % route_name)
+	check(vat.phase == "cord" and vat.mouth_cord != null, "%s: the wires lead to the mouth cord" % route_name)
+	if vat.phase != "cord" or vat.mouth_cord == null:
+		return
+	for _pull in vat.CORD_TUGS:
+		vat._unhandled_input(_key(KEY_E))
+	check(vat.phase == "smash", "%s: E tears the cord before the glass" % route_name)
+	if vat.phase != "smash":
+		return
+	for _blow in vat.GLASS_BLOWS:
+		vat._unhandled_input(_click())
+	check(vat.phase == "knees" and vat.breakout_complete, "%s: every authored glass strike breaks free" % route_name)
+	if vat.boot_hud == null:
+		check(false, "%s: the HUD boot starts on the floor" % route_name)
+		return
+	for _tick in 120:
+		if vat.boot_hud.done:
+			break
+		vat._physics_process(0.05)
+	check(vat.boot_hud.done, "%s: the implant finishes booting before standing" % route_name)
+	if not vat.boot_hud.done:
+		return
+	vat._unhandled_input(_key(KEY_SPACE))
+	for _tick in ceili((vat.RISE_SECONDS + 0.2) / 0.05):
+		if vat.can_move:
+			break
+		vat._physics_process(0.05)
+	check(vat.can_move and vat.phase == "aisle", "%s: crawl and stand deliver normal control" % route_name)
+
+
 ## Everything up to standing in the Lower Works, shared by both routes.
 func _through_the_facility(route_name: String) -> Node:
 	WorldHistory.clear_history()
 	print("--- %s: the vat ---" % route_name)
 	var vat = load("res://vat_chamber.tscn").instantiate()
+	vat.hands_on_breakout = true
 	add_child(vat)
 	await get_tree().process_frame
 	vat.intake._finish_filing()
@@ -43,12 +104,7 @@ func _through_the_facility(route_name: String) -> Node:
 	vat.phase = "voiding"
 	vat._update_sequence(0.05)
 	check(vat.phase == "wired", "%s: the drained tank leaves you in the wires" % route_name)
-	while not vat.umbilicals.is_empty():
-		for _tug in vat.WIRE_TUGS:
-			vat._tug_wire(vat.umbilicals[0])
-	vat._physics_process(vat.REVENGE_HOLD + 0.1)
-	for step in 40:
-		vat._physics_process(0.1)
+	_complete_live_breakout(vat, route_name)
 	check(vat.breakout_complete and vat.can_move, "%s: GET REVENGE, the glass goes, and you stand" % route_name)
 	vat.player.global_position = vat.stuck_tank_marker.global_position + Vector3(0, 0.9, 1.2)
 	vat._interact()

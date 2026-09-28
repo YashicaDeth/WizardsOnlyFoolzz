@@ -1,6 +1,6 @@
 extends Node
 
-## Visual proof for the hands-on breakout: the cord, the cracked glass, on
+## Visual proof for the hands-on breakout: the cord, progressively cracked glass, on
 ## your knees while the implant boots the HUD, the HUD up, and standing up
 ## facing his door under GET REVENGE.
 ## Run windowed: ... res://tests/hands_on_breakout_capture.tscn -- --out=DIR
@@ -36,8 +36,8 @@ func _ready() -> void:
 		vat.tug_cord()
 	vat.yaw = 0.0
 	await _run(vat, 0.5)
-	vat.strike_glass()
-	vat.strike_glass()
+	for _blow in range(1, vat.GLASS_BLOWS):
+		vat.strike_glass()
 	await _run(vat, 0.4)
 	await _capture("%s/bo_2_cracked.png" % out_dir)
 	vat.strike_glass()

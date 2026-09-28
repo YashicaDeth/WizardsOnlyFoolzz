@@ -12,8 +12,9 @@ extends CanvasLayer
 ## the person with the problem do the measuring, and he is playing, not
 ## profiling. This makes the build answer for itself.
 ##
-## F10 toggles it. F11 writes a dump next to the executable that can be sent back
-## as a file rather than retyped.
+## Ctrl+F10 toggles it. Ctrl+F11 writes a dump next to the executable that can
+## be sent back as a file rather than retyped. Plain F10 is the Hunt's photo
+## mode and plain F11 is fullscreen; diagnostics must never steal play keys.
 ##
 ## Deliberately cheap: the numbers come from `RenderingServer.get_rendering_info`
 ## and `Performance`, which the engine is already tracking, and the panel redraws
@@ -64,7 +65,10 @@ func _ready() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey) or not event.pressed or event.echo:
 		return
-	match (event as InputEventKey).keycode:
+	var key := event as InputEventKey
+	if not key.ctrl_pressed:
+		return
+	match key.keycode:
 		KEY_F10:
 			showing = not showing
 			visible = showing
@@ -141,7 +145,7 @@ func _report(rich: bool) -> String:
 	]
 	var body := "\n".join(lines)
 	if rich:
-		return "[font_size=13][color=#cfe3a8]%s[/color]\n[color=#7d8a6a]F10 hide   F11 write a dump to send[/color][/font_size]" % body
+		return "[font_size=13][color=#cfe3a8]%s[/color]\n[color=#7d8a6a]CTRL+F10 hide   CTRL+F11 write a dump to send[/color][/font_size]" % body
 	return body
 
 

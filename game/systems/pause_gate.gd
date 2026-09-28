@@ -322,8 +322,10 @@ func _build_rows() -> void:
 
 
 ## F11 is the key every player already tries before looking for a setting.
+## Ctrl+F11 belongs to PerfProbe's file dump, so this intentional play key does
+## not consume the diagnostic chord before its autoload can receive it.
 func _unhandled_key_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo and (event as InputEventKey).keycode == KEY_F11:
+	if event is InputEventKey and event.pressed and not event.echo and not (event as InputEventKey).ctrl_pressed and (event as InputEventKey).keycode == KEY_F11:
 		_set_fullscreen(not _fullscreen())
 		get_viewport().set_input_as_handled()
 

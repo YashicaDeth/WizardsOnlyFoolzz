@@ -66,6 +66,21 @@ func _ready() -> void:
 	gate._set_fullscreen(fullscreen)
 	check(WorldHistory.event_count("screen_setting_changed") == screen_events + 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0,
 		"an explicit fullscreen choice still persists once and closes its transaction")
+	# Ctrl+F11 is reserved for the performance dump. It must pass through the
+	# pause gate instead of accidentally toggling the screen while a player is
+	# trying to report a slow scene.
+	var dump_key := InputEventKey.new()
+	dump_key.keycode = KEY_F11
+	dump_key.pressed = true
+	dump_key.ctrl_pressed = true
+	gate._unhandled_key_input(dump_key)
+	check(bool(gate._fullscreen()) == fullscreen, "Ctrl+F11 leaves fullscreen alone for the performance dump")
+	var fullscreen_key := InputEventKey.new()
+	fullscreen_key.keycode = KEY_F11
+	fullscreen_key.pressed = true
+	gate._unhandled_key_input(fullscreen_key)
+	check(bool(gate._fullscreen()) != fullscreen, "plain F11 still toggles fullscreen")
+	gate._set_fullscreen(fullscreen)
 
 	# Rows are the menu; settings has to be reachable from root.
 	gate.page = "root"
