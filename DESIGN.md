@@ -1473,3 +1473,25 @@ playable build and verified before merge.
   colder examiner who talks about you like meat and cuts or injects you;
   body horror on your own body (extra fingers, open wounds, cords under
   the skin); and sound (screams, alarms, wet noises).
+- **Memory flash in the hack:** the life of the body's donor, in fragments
+  (a kitchen, a dog, a funeral). Never explained yet.
+- **The colder examiner, during the intake:** he injects you through the
+  tank port, a robotic arm cuts a skin sample while you watch, he reads out
+  your value, your parts and your price like meat, and he casually drains
+  the failed subject's tank beside you.
+- **Body horror on your own body** depends on your intake choices.
+- **The next tanks:** subjects twitching and convulsing, a tank draining so
+  its body slumps against the glass, the medium clouding red with blood,
+  and one subject awake and hammering on the glass like you.
+- **The breakout:**
+  - hard, mashing effort: the cords resist and your blood clouds the water
+  - pain on each cord torn out: a flash, a scream, blood
+  - the glass cracking further with every blow until it bursts
+  - the medium flooding out and you falling to the floor with it
+- **Standing up:** crawl a few metres through the spilled medium, pull
+  yourself up on the tank, then stand.
+- **The load-in** is too long, unclear, not scary enough and looks
+  unfinished.
+- **Tank sound:** the room muffled as if underwater, your heartbeat loud
+  and speeding up, your breathing bubbles, and the examiner's voice
+  muffled through the glass.
