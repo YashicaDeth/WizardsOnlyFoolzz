@@ -27,6 +27,9 @@ func _ready() -> void:
 			archive_subject = argument.trim_prefix("--archive=")
 		elif argument.begins_with("--trigger="):
 			trigger = argument.trim_prefix("--trigger=")
+		elif argument == "--pad":
+			# Prompts as a PlayStation pad player sees them.
+			get_node("/root/PadBridge").using_pad = true
 
 	var packed := load(scene_path)
 	if packed == null:

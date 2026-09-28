@@ -772,6 +772,9 @@ func _draw_controls() -> void:
 	var offers := _current_offers()
 	if offers.is_empty():
 		return
+	var pad := get_node_or_null("/root/PadBridge")
+	if pad != null:
+		offers = offers.map(func(offer: Array) -> Array: return [pad.keys(str(offer[0])), offer[1]])
 
 	# Laid out from the middle, so the strip grows symmetrically rather than
 	# sliding sideways every time an affordance appears or goes.
