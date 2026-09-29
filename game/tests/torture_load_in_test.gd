@@ -1,7 +1,7 @@
 extends Node
 
 ## Greg, 25 September: loading in is being tortured. Black first, screams
-## through fluid, the gag, the broadcast line three times and worse each time,
+## through fluid, the gag, one clear broadcast and two silent broken echoes,
 ## the glitch, then the room. Nothing behind it runs until it hands over, and
 ## F cuts straight to the glitch.
 
@@ -39,9 +39,9 @@ func _ready() -> void:
 			texts.append(line)
 	check(load_in.played.count("scream") == 3, "three screams through the fluid (%d)" % load_in.played.count("scream"))
 	check(load_in.played.has("gag") and load_in.played.has("tube"), "the gag goes in and the breathing goes to the tube")
-	check(load_in.played.count("broadcast") == 3, "the broadcast repeats three times")
+	check(load_in.played.count("broadcast") == 1, "the broadcast is spoken once, not repeated")
 	check(texts.any(func(x): return x.begins_with("HUNDREDS OF YEARS OF THE PERPETUAL POST-APOCALYPSE")), "the first pass is whole")
-	check(texts.any(func(x): return x.contains("#") or x.contains("/") or x.contains("_")), "later passes degrade")
+	check(texts.any(func(x): return x.begins_with("SIGNAL LOST // ARCHIVE")), "later passes are broken archive echoes, not duplicate copy")
 	load_in.step(0.2)
 	check(load_in.played.has("glitch"), "it glitches out")
 	for i in 60:

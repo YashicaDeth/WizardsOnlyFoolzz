@@ -9,9 +9,9 @@ shader_type canvas_item;
 //             colour, scanlines run over it, and it all sinks into dithered
 //             black. Replaced BURN, the pixel-cell wipe Greg disliked on
 //             first launch (2026-09-24).
-// 1 ELEVATOR  two riveted blast doors slam shut, hazard banding, a red lamp
+// 1 ELEVATOR  two riveted blast doors slam shut, oxidised warning banding, a red lamp
 //             on the seam (ref: the OPEN elevator doors)
-// 2 SCROLL    a parchment unrolls down over everything (ref: the scroll panels)
+// 2 SCROLL    a stained transit docket unrolls down over everything (ref: the scroll panels)
 // 3 FLESH     a veined sphincter iris closes on the centre (ref: the heart
 //             emblem and the flesh tunnel)
 // 4 CRT       the picture collapses to a line, then a dot, like a set
@@ -100,10 +100,11 @@ vec4 elevator(vec2 uv, vec2 px) {
 	float local = left ? uv.x / max(half_w, 1e-4) : (1.0 - uv.x) / max(half_w, 1e-4);
 	float steel = 0.34 + 0.10 * fbm(vec2(uv.x * 3.0, uv.y * 80.0)) + 0.05 * sin(uv.y * 900.0);
 	vec3 c = vec3(steel * 0.95, steel, steel * 1.04);
-	// Hazard bands top and bottom: diagonal yellow and black.
+	// Hazard bands top and bottom: diagonal oxide and black. Yellow was the
+	// only saturated colour in the transition set and read as an unrelated UI.
 	float band = step(uv.y, 0.09) + step(0.91, uv.y);
 	float stripe = step(0.5, fract((px.x + px.y) / 46.0));
-	c = mix(c, mix(vec3(0.05), vec3(0.95, 0.72, 0.05), stripe), band);
+	c = mix(c, mix(vec3(0.05), vec3(0.58, 0.07, 0.035), stripe), band);
 	// Rivet columns.
 	vec2 rv = fract(vec2(local * 6.0, uv.y * 14.0)) - 0.5;
 	float rivet = smoothstep(0.12, 0.06, length(rv * vec2(1.0, rect_size.y / rect_size.x * 2.3)));
@@ -122,7 +123,8 @@ vec4 scroll(vec2 uv, vec2 px) {
 		return vec4(0.0);
 	}
 	float stain = fbm(uv * vec2(6.0, 9.0));
-	vec3 paper = mix(vec3(0.86, 0.66, 0.36), vec3(0.62, 0.36, 0.14), stain * stain);
+	// This is a blood-stained transit docket, not a bright parchment panel.
+	vec3 paper = mix(vec3(0.40, 0.11, 0.055), vec3(0.19, 0.035, 0.025), stain * stain);
 	// Charred, torn sides.
 	float torn = fbm(vec2(uv.y * 30.0, 1.7)) * 0.03;
 	float side = min(uv.x, 1.0 - uv.x);

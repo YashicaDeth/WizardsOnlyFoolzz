@@ -5,8 +5,9 @@ extends Control
 ## getting tortured". Beat 1 of `DESIGN/OPENING_TORTURE_INTAKE.md`. Black
 ## first, and the sound comes first: muffled screaming through fluid, a wet
 ## rubber gag forced into your mouth, your breathing going to the tube. Flashes
-## of X-ray film between the black. A broadcast repeats "hundreds of years of
-## the perpetual post-apocalypse" and degrades, glitches out, and you come to
+## of X-ray film between the black. One clear broadcast — "hundreds of years of
+## the perpetual post-apocalypse" — leaves a broken afterimage, glitches out,
+## and you come to
 ## in the vat. F, Enter, Space or a click cuts to the glitch (speedrunners).
 ## The sounds are generated placeholders behind `cue()`; Higgsfield or
 ## recorded takes replace them without touching the timeline.
@@ -20,8 +21,8 @@ const BLOOD := Color("a8281a")
 const FILM := Color("9fc4c8")
 const BLACK := Color("030504")
 
-## When each thing happens, in seconds from black. The broadcast runs three
-## passes, each worse than the last, then the glitch hands over to the room.
+## When each thing happens, in seconds from black. The broadcast plays once;
+## its two silent afterimages tear away before the glitch hands over to the room.
 const SCREAM_AT := [1.1, 3.9, 6.6]
 const GAG_AT := 2.5
 const TUBE_AT := 3.2
@@ -96,8 +97,9 @@ func step(delta: float) -> void:
 		_breath.stream = _wave("breath_tube", 2.4, true)
 		_breath.play()
 		played.append("tube")
-	for pass_index in 3:
-		_cue_between(before, BROADCAST_AT + pass_index * BROADCAST_PASS, "broadcast")
+	# Replaying the whole spoken line three times read as a duplicate rather than
+	# signal decay. The later two passes remain visual only.
+	_cue_between(before, BROADCAST_AT, "broadcast")
 	_cue_between(before, GLITCH_AT, "glitch")
 	if clock >= GLITCH_AT + GLITCH_SECONDS:
 		_breath.volume_db = lerpf(-14.0, -40.0, clampf((clock - GLITCH_AT - GLITCH_SECONDS) / REVEAL_SECONDS, 0.0, 1.0))
@@ -173,8 +175,8 @@ func flash_kind() -> String:
 	return ""
 
 
-## The broadcast line as it is heard on this pass: whole the first time,
-## eaten away after that.
+## The broadcast line appears whole once. Later passes are broken archive
+## identifiers, not a second and third complete sentence.
 func broadcast_text() -> String:
 	if clock < BROADCAST_AT or clock >= GLITCH_AT:
 		return ""
@@ -183,15 +185,8 @@ func broadcast_text() -> String:
 	var shown := BROADCAST.left(int(ceil(clampf(into, 0.0, 1.0) * BROADCAST.length())))
 	if pass_index == 0:
 		return shown + "..."
-	var eaten := ""
-	var noise := RandomNumberGenerator.new()
-	noise.seed = int(clock * 14.0) + pass_index * 97
-	for letter in shown:
-		if letter != " " and noise.randf() < 0.18 * pass_index:
-			eaten += ["#", "/", "_", "-", "."][noise.randi() % 5]
-		else:
-			eaten += letter
-	return eaten + "..."
+	var echo := "SIGNAL LOST // ARCHIVE %02d" % pass_index
+	return echo.left(int(ceil(clampf(into, 0.0, 1.0) * echo.length()))) + "..."
 
 
 func broadcast_pass() -> int:
