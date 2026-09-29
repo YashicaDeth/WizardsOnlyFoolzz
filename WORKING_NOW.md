@@ -52,7 +52,8 @@ Claude:
   game/systems/generated_model.gd, game/systems/dropped_handheld.gd (the world
   Black Mirror), game/systems/examiner_fight.gd, game/systems/examiner_look.gd,
   game/tests/model_capture.gd, game/tests/den_capture.gd,
-  game/tests/model_held_items_test.gd. Released: hunter_arsenal.gd and
+  game/tests/model_held_items_test.gd, new game/tests/model_world_props_test.gd,
+  new game/tests/model_world_props_test.tscn. Released: hunter_arsenal.gd and
   vat_body_preview.gd (BREACH NINE hook committed in 2c822815).
 
 ## Codex is in
