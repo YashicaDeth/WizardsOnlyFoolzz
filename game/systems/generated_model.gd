@@ -39,6 +39,16 @@ const FIT := {
 		"forward": Vector3(-0.214, 0.974, -0.073),
 		"pivot": Vector3.ZERO,
 	},
+	# The broken restraint: its 1.051-unit strap becomes 0.50 m. The buckle at
+	# the positive end is the grip, so the leather and second buckle hang away
+	# from the camera along -Z when it is held.
+	"restraint": {
+		"file": "items/restraint.glb", "scale": 0.476,
+		"right": Vector3(0.203, 0.286, 0.937),
+		"up": Vector3(-0.216, -0.920, 0.327),
+		"forward": Vector3(0.955, -0.269, -0.125),
+		"pivot": Vector3(0.404, -0.128, -0.066),
+	},
 }
 
 

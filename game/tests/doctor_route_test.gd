@@ -110,6 +110,7 @@ func _restraint_then_room_then_lift() -> void:
 	var vat = await _opening()
 	var route: DoctorRoute = vat.doctor_route
 	check(route != null and route.door != null and not route.door.broken, "his door stands behind the vat, whole")
+	check(route.held_restraint != null and route.held_restraint.find_child("generated_restraint", true, false) != null, "the broken restraint is the generated model in the player's hand")
 	# The guided turn: the head comes round to his door on its own.
 	for _frame in int((route.LOOK_SECONDS + 0.3) * Engine.physics_ticks_per_second):
 		await get_tree().physics_frame
@@ -197,6 +198,7 @@ func _axe() -> void:
 	check(route.prompt_text() == "[E] TAKE THE FIRE AXE", "the fire axe by the door can be taken")
 	_press(vat, KEY_E)
 	check(route.carrying_axe and route.held_weapon() == "axe" and not route.axe_model.visible, "E takes it off the wall and into the hand")
+	check(route.held_restraint == null, "the axe replaces the restraint in the hand")
 	var labels := (WorldHistory.subject("inventory").get("items", []) as Array).map(func(item): return str(item.get("label", "")))
 	check(labels.has("FIRE AXE"), "the axe goes into Carry")
 	var swings := await _batter(vat, func() -> void: _click(vat), 30)

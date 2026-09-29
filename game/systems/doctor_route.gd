@@ -22,6 +22,10 @@ const DESTINATION := "res://support_unit.tscn"
 const RESTRAINT_LABEL := "BROKEN MEDICAL RESTRAINT"
 const AXE_LABEL := "FIRE AXE"
 const GUN_LABEL := "CELL OUTZ BREACH NINE"
+const GENERATED_MODEL := preload("res://systems/generated_model.gd")
+
+const AXE_REST := Vector3(18.0, 12.0, -28.0)
+const RESTRAINT_REST := Vector3(24.0, -12.0, -32.0)
 
 const OBJECTIVE_DOOR := "GET REVENGE // HE LEFT THROUGH THAT DOOR\nOR ESCAPE THE FACILITY"
 const OBJECTIVE_DOWN := "GET REVENGE // FOLLOW HIM DOWN\nOR ESCAPE THE FACILITY"
@@ -69,6 +73,7 @@ var chamber: Node3D
 var door: BreakableDoor
 var axe_model: Node3D
 var held_axe: Node3D
+var held_restraint: Node3D
 var carrying_axe := false
 var cooldown := 0.0
 var room_entered := false
@@ -252,6 +257,7 @@ func _use() -> bool:
 func _physics_process(delta: float) -> void:
 	if chamber == null:
 		return
+	_sync_held_restraint()
 	cooldown = maxf(0.0, cooldown - delta)
 	var moving: bool = chamber.can_move and chamber.breakout_complete
 	if moving and not _was_moving:
@@ -467,6 +473,7 @@ func _spend_round() -> void:
 
 func _take_axe() -> void:
 	carrying_axe = true
+	_clear_held_restraint()
 	axe_model.visible = false
 	var carry := Carry.new()
 	carry.items.append({"label": AXE_LABEL, "kind": "tool", "mass": 2.6, "perishes": false, "age": 0.0, "from": "growing_floor"})
@@ -474,7 +481,7 @@ func _take_axe() -> void:
 	WorldHistory.record_event("doctor_route_axe_taken", {"location": "growing_floor"})
 	held_axe = _axe_mesh()
 	LabSurface.hold_in_view(chamber.camera, held_axe)
-	held_axe.rotation_degrees = Vector3(18.0, 12.0, -28.0)
+	held_axe.rotation_degrees = AXE_REST
 	# Full size at arm's length filled a quarter of the first look at it.
 	held_axe.scale = Vector3.ONE * 0.75
 	held_axe.position += Vector3(0.06, -0.06, 0.0)
@@ -482,12 +489,60 @@ func _take_axe() -> void:
 
 
 func _swing_held() -> void:
-	if held_axe == null:
+	var held := held_axe if held_axe != null else held_restraint
+	if held == null:
 		return
-	var rest := Vector3(18.0, 12.0, -28.0)
+	var rest := AXE_REST if held == held_axe else RESTRAINT_REST
 	var tween := create_tween()
-	tween.tween_property(held_axe, "rotation_degrees", rest + Vector3(-70.0, -10.0, 20.0), 0.12).set_ease(Tween.EASE_OUT)
-	tween.tween_property(held_axe, "rotation_degrees", rest, 0.3).set_trans(Tween.TRANS_QUAD)
+	tween.tween_property(held, "rotation_degrees", rest + Vector3(-70.0, -10.0, 20.0), 0.12).set_ease(Tween.EASE_OUT)
+	tween.tween_property(held, "rotation_degrees", rest, 0.3).set_trans(Tween.TRANS_QUAD)
+
+
+## The restraint enters Carry after this route is built, when the player tears
+## free of the vat. Mirror that real inventory rather than inventing another
+## equipped state; the axe takes visual precedence exactly as held_weapon does.
+func _sync_held_restraint() -> void:
+	if carrying_axe or not _carries(RESTRAINT_LABEL):
+		_clear_held_restraint()
+		return
+	if held_restraint != null:
+		return
+	held_restraint = _restraint_mesh()
+	LabSurface.hold_in_view(chamber.camera, held_restraint)
+	held_restraint.rotation_degrees = RESTRAINT_REST
+	held_restraint.position += Vector3(0.02, 0.02, 0.0)
+
+
+func _clear_held_restraint() -> void:
+	if held_restraint != null:
+		held_restraint.queue_free()
+		held_restraint = null
+
+
+func _restraint_mesh() -> Node3D:
+	var generated: Node3D = GENERATED_MODEL.make("restraint")
+	if generated != null:
+		return generated
+	# Media-less checkouts still show the carried tool and keep the route fully
+	# playable. Dimensions match the measured generated strap.
+	var restraint := Node3D.new()
+	restraint.name = "DrawnRestraint"
+	var leather := MeshInstance3D.new()
+	var leather_mesh := BoxMesh.new()
+	leather_mesh.size = Vector3(0.055, 0.018, 0.42)
+	leather_mesh.material = WorldLook.surface(Color("39251d"), "leather", 1204)
+	leather.mesh = leather_mesh
+	leather.position.z = -0.22
+	restraint.add_child(leather)
+	for z in [-0.02, -0.44]:
+		var buckle := MeshInstance3D.new()
+		var buckle_mesh := BoxMesh.new()
+		buckle_mesh.size = Vector3(0.09, 0.035, 0.07)
+		buckle_mesh.material = LabSurface.material("plate")
+		buckle.mesh = buckle_mesh
+		buckle.position.z = z
+		restraint.add_child(buckle)
+	return restraint
 
 
 # --- Building. ---
