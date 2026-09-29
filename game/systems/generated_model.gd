@@ -29,6 +29,16 @@ const FIT := {
 		"forward": Vector3(0.134, -0.627, 0.767),
 		"pivot": Vector3(-0.0245, 0.2288, -0.2778),
 	},
+	# The phone: width to X, the screen normal (the cracked glass faces it) to
+	# Y so it lies screen-up, the top to +Z. 1.036 units long -> a 0.34 m
+	# brick, 0.19 m wide, 4.4 cm thick. The unit box is already centred.
+	"black_mirror": {
+		"file": "items/black_mirror.glb", "scale": 0.328,
+		"right": Vector3(-0.024, 0.069, 0.997),
+		"up": Vector3(0.976, 0.216, 0.008),
+		"forward": Vector3(-0.214, 0.974, -0.073),
+		"pivot": Vector3.ZERO,
+	},
 }
 
 
@@ -52,6 +62,24 @@ static func tame_metal(root: Node, cap := METAL_CAP) -> void:
 				if material != null and material.metallic > cap:
 					var copy := material.duplicate() as BaseMaterial3D
 					copy.metallic = cap
+					instance.set_surface_override_material(surface, copy)
+
+
+## Wear: multiplies every surface's albedo by a dirtier colour as `condition`
+## falls (1 = as generated). Copies the material like tame_metal does.
+static func wear(root: Node, condition: float) -> void:
+	var dirt := Color.WHITE.lerp(Color(0.55, 0.47, 0.42), clampf(1.0 - condition, 0.0, 1.0))
+	var stack: Array[Node] = [root]
+	while not stack.is_empty():
+		var node: Node = stack.pop_back()
+		stack.append_array(node.get_children())
+		if node is MeshInstance3D and (node as MeshInstance3D).mesh != null:
+			var instance := node as MeshInstance3D
+			for surface in instance.mesh.get_surface_count():
+				var material := (instance.get_surface_override_material(surface) if instance.get_surface_override_material(surface) != null else instance.mesh.surface_get_material(surface)) as BaseMaterial3D
+				if material != null:
+					var copy := material.duplicate() as BaseMaterial3D
+					copy.albedo_color = material.albedo_color * dirt
 					instance.set_surface_override_material(surface, copy)
 
 

@@ -4,6 +4,8 @@ extends RigidBody3D
 ## C1.7. The Black Mirror after it leaves the HUD: the same identified object
 ## expressed as colliding world geometry, not a marker or a replacement pickup.
 
+const GENERATED_MODEL := preload("res://systems/generated_model.gd")
+
 var payload: Dictionary = {}
 
 
@@ -45,6 +47,27 @@ func _build() -> void:
 	screen.mesh = screen_mesh
 	screen.position.y = 0.021
 	add_child(screen)
+
+	# The generated Black Mirror (art/generated/items/black_mirror.glb: cracked
+	# glass, a rusted frame, green light through the cracks) is the picture now.
+	# The drawn case and glass stay in the tree, hidden: the collision, the
+	# tests and anything that looks for "Case" and "MirrorGlass" still work,
+	# and a checkout without the media keeps the drawn phone.
+	var generated := GENERATED_MODEL.make("black_mirror")
+	if generated != null:
+		case.visible = false
+		screen.visible = false
+		GENERATED_MODEL.wear(generated, condition)
+		add_child(generated)
+		# A live screen lights the ground a little; a dead battery does not.
+		var glow := OmniLight3D.new()
+		glow.name = "ScreenGlow"
+		glow.light_color = Color("7fd89a")
+		glow.light_energy = 0.08 + 0.6 * charge
+		glow.omni_range = 1.3
+		glow.shadow_enabled = false
+		glow.position = Vector3(0, 0.12, 0)
+		add_child(glow)
 
 	# The lashed replacement cell on the rear makes either face recognisable.
 	var battery := MeshInstance3D.new()

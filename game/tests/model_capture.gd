@@ -42,6 +42,8 @@ func _ready() -> void:
 			await _hunt(tree)
 		"hub":
 			await _hub(tree)
+		"drop":
+			await _drop_phone(tree)
 		"prop":
 			await _prop(tree)
 		"stats":
@@ -213,6 +215,32 @@ func _prop(tree: SceneTree) -> void:
 		camera.global_position = box.get_center() + (shot[1] as Vector3).normalized() * reach
 		camera.look_at(box.get_center(), Vector3.UP)
 		await _shoot(tree, "%s/%s_%s.png" % [out_dir, glb.get_file().get_basename(), shot[0]])
+
+
+## The dropped Black Mirror in the real Hunt, on the ground in front of you.
+func _drop_phone(tree: SceneTree) -> void:
+	WorldHistory.clear_history()
+	WorldHistory.world_minute = hour * WorldClock.MINUTES_PER_HOUR
+	var hunt: Node = load("res://bone_yard_hunt.tscn").instantiate()
+	add_child(hunt)
+	for _frame in 60:
+		await tree.process_frame
+	hunt.handheld.possessed = true
+	hunt.handheld.battery = 0.72
+	hunt.handheld.condition = 0.64
+	hunt.handheld.drop()
+	await tree.physics_frame
+	var forward: Vector3 = -hunt.camera.global_transform.basis.z.normalized()
+	hunt.dropped_handheld.freeze = true
+	hunt.dropped_handheld.global_position = hunt.camera.global_position + forward * 0.9 + Vector3.DOWN * 0.45
+	hunt.dropped_handheld.rotation_degrees = Vector3(0.0, 25.0, 0.0)
+	var lamp := OmniLight3D.new()
+	lamp.light_energy = 2.0
+	lamp.omni_range = 4.0
+	(hunt.camera as Camera3D).add_child(lamp)
+	for _frame in 20:
+		await tree.process_frame
+	await _shoot(tree, "%s/dropped_black_mirror.png" % out_dir)
 
 
 ## Principal axes of every --glb=a.glb,b.glb: how the generator oriented it,

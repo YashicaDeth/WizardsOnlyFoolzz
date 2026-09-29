@@ -1305,17 +1305,22 @@ func _build_den() -> void:
 	add_child(shiv)
 	# Greg's playtest: their Black Mirror lies beside them. Face down, the
 	# screen's glow leaking round the edge.
-	var mirror := MeshInstance3D.new()
+	# The generated phone (cracked glass, green through the cracks), lying
+	# screen-up; the drawn slab is the fallback without the media.
+	var mirror: Node3D = preload("res://systems/generated_model.gd").make("black_mirror")
+	if mirror == null:
+		var drawn := MeshInstance3D.new()
+		var slab := BoxMesh.new()
+		slab.size = Vector3(0.075, 0.012, 0.155)
+		var glass := WorldLook.surface(Color("0b0c0e"), "chrome", 949)
+		glass.emission_enabled = true
+		glass.emission = Color(0.25, 0.55, 0.5)
+		glass.emission_energy_multiplier = 0.25
+		slab.material = glass
+		drawn.mesh = slab
+		mirror = drawn
 	mirror.name = "DenMirror"
-	var slab := BoxMesh.new()
-	slab.size = Vector3(0.075, 0.012, 0.155)
-	var glass := WorldLook.surface(Color("0b0c0e"), "chrome", 949)
-	glass.emission_enabled = true
-	glass.emission = Color(0.25, 0.55, 0.5)
-	glass.emission_energy_multiplier = 0.25
-	slab.material = glass
-	mirror.mesh = slab
-	mirror.position = Vector3(back_x + 0.5, 0.05, z + 0.55)
+	mirror.position = Vector3(back_x + 0.5, 0.03, z + 0.55)
 	mirror.rotation.y = -0.5
 	add_child(mirror)
 	# A stash under the bedroll's corner, and the spirit K shows where they lay.
