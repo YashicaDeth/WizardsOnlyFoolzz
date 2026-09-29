@@ -57,9 +57,7 @@ Claude:
 
 ## Codex is in
 
-- Brief A / cached field HUD: game/bone_yard_hunt.gd,
-  new game/systems/field_hud_cache.gd,
-  new game/tests/field_hud_cache_test.gd, new game/tests/field_hud_cache_test.tscn
+- (free)
 
 ## Handoffs
 
@@ -120,6 +118,19 @@ Claude:
   cadence (4 Hz reduced, 0.67 Hz dormant; nearby/named actors unchanged).
   `hunt_roamer_tick_test` is the focused contract. Perf is green; current Hunt
   probe is 11.54 ms on Greg's RTX 2060 SUPER, so Brief A remains open.
+- Codex wrap-up for the next agent: Brief A remains open at 11.54 ms against
+  the 6.25 ms / 160 fps target. Measured hotspots were the Hunt root physics
+  tick (~3.27 ms), field HUD (~3.5 ms), and ~2,030 shadow casters outside the
+  district shells. The cached-field-HUD idea was only inspected, never coded;
+  the required empty WIP record is `P:/GameDev/Temp/codex-wip.patch`.
+  Rejected experiments: shared material-seed batching washed the rust-black
+  buildings pale; exact-material grouping preserved the look but regressed to
+  13.97 ms / 3,566 draws; disabling hidden panels added draw work. Core's
+  pre-existing `gore_demo_test` failures remain: “blast at your feet takes
+  limbs off” and the room limb count (not caused by Codex); the other gore,
+  anatomy and kill-cam suites passed. Brief B has not been started. First next
+  step: prototype the field HUD in a 30 Hz cached SubViewport, behind a test
+  switch, then compare pinned-hour PNGs and perf before keeping any code.
 
 ## Done
 
