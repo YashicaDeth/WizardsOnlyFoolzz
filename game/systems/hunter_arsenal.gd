@@ -711,7 +711,9 @@ func _build_weapon_model(weapon_id: String) -> Node3D:
 	# groping toward while the real rotation was being thrown away.
 	root.rotation = Vector3(-HUNTER_BODY_MOTION.FIRST_PERSON_ARM_RAISE, -0.34, 0.32)
 	var visual_id := "sidearm" if weapon_id == "facility_sidearm" else weapon_id
-	var gear := HeldGear.build_weapon(visual_id)
+	# The BREACH NINE has its own model; every rule below still treats it as
+	# a sidearm (`visual_id`), which is what poses the hands.
+	var gear := HeldGear.build_weapon("breach_nine" if weapon_id == "facility_sidearm" else visual_id)
 	# Hung off its grip rather than its origin. `HeldGear` builds each weapon
 	# around the shape of the object, so a sword's origin is where the guard
 	# meets the blade and not where a hand closes; mounted at the origin that

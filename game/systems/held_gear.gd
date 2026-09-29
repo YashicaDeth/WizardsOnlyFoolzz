@@ -405,6 +405,7 @@ static func build_weapon(weapon_id: String) -> Node3D:
 		"sword": _build_sword(root)
 		"shotgun": _build_shotgun(root)
 		"sidearm": _build_sidearm(root)
+		"breach_nine": _build_breach_nine(root)
 		"launcher": _build_launcher(root)
 		"shiv": _build_shiv(root)
 		_: _build_sword(root)
@@ -695,6 +696,37 @@ static func _build_shotgun(root: Node3D) -> void:
 	_anchor(root, "grip", Vector3(0, -0.070, -0.044), Vector3(0.42, 0, 0))
 	_anchor(root, "forend", Vector3(0, -0.020, 0.300), Vector3(0.10, 0, 0))
 	_anchor(root, "muzzle", Vector3(0, 0.016, 0.745), Vector3.ZERO)
+
+
+## The BREACH NINE, from the generated model (art/generated/items/
+## breach_nine.glb: Tripo, from a house-style image, 29 September). It keeps
+## the contract every weapon here keeps: muzzle along +Z (the assembly turns
+## it once at the end) and the anchors the hands and the arsenal read. The
+## model's own muzzle is -Z with the grip at +Z, and it is one unit long, so
+## it is turned a half revolution and scaled to a pistol. Measured on the
+## model in its unit box: grip centre (0, -0.234, 0.365), muzzle
+## (0, 0.232, -0.48). It has no separate magazine node, so the reload's
+## magazine drop simply has nothing to move; the reload timer, ammo and the
+## jam logic are unaffected. Falls back to the drawn pistol if the file is
+## not there (an LFS checkout without media still plays).
+const BREACH_NINE_MODEL := "res://art/generated/items/breach_nine.glb"
+const BREACH_NINE_SCALE := 0.23
+
+
+static func _build_breach_nine(root: Node3D) -> void:
+	var scene: PackedScene = load(BREACH_NINE_MODEL) as PackedScene if ResourceLoader.exists(BREACH_NINE_MODEL) else null
+	if scene == null:
+		_build_sidearm(root)
+		return
+	var model := scene.instantiate() as Node3D
+	model.name = "generated_breach_nine"
+	model.scale = Vector3.ONE * BREACH_NINE_SCALE
+	model.rotation.y = PI
+	root.add_child(model)
+	# In the assembly's convention, after the half turn and the scale.
+	_anchor(root, "grip", Vector3(0.001, -0.054, -0.084), Vector3(0.30, 0, 0))
+	_anchor(root, "grip_support", Vector3(0.031, -0.054, -0.064), Vector3(0.30, 0, -0.5))
+	_anchor(root, "muzzle", Vector3(0.0, 0.053, 0.111), Vector3.ZERO)
 
 
 static func _build_sidearm(root: Node3D) -> void:

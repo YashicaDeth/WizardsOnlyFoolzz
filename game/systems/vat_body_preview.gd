@@ -217,7 +217,7 @@ func hold(weapon_id: String) -> void:
 		old.free()
 	if weapon_id.is_empty():
 		return
-	var weapon := HeldGear.build_weapon("sidearm" if weapon_id == "facility_sidearm" else weapon_id)
+	var weapon := HeldGear.build_weapon("breach_nine" if weapon_id == "facility_sidearm" else weapon_id)
 	if weapon == null:
 		return
 	weapon.name = "HeldWeapon"
