@@ -51,7 +51,9 @@ Claude:
 
 ## Codex is in
 
-- (write your files here before you start)
+- Brief A / Hunt render cost: game/systems/ashbloom_world_generator.gd,
+  new game/tests/hunt_render_cost_probe.gd,
+  new game/tests/hunt_render_cost_probe.tscn
 
 ## Handoffs
 
