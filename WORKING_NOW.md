@@ -49,12 +49,11 @@ Claude:
   game/systems/doctor_route.gd, game/systems/doctor_examination.gd,
   game/vat_chamber.gd, new game/systems/model_skin.gd
 - 29 Sep, Claude (model work; the next Claude agent inherits these):
-  game/systems/generated_model.gd, game/systems/dropped_handheld.gd (the world
-  Black Mirror), game/systems/examiner_fight.gd, game/systems/examiner_look.gd,
-  game/tests/model_capture.gd, game/tests/den_capture.gd,
-  game/tests/model_held_items_test.gd, new game/tests/model_world_props_test.gd,
-  new game/tests/model_world_props_test.tscn. Released: hunter_arsenal.gd and
-  vat_body_preview.gd (BREACH NINE hook committed in 2c822815).
+  game/systems/generated_model.gd, game/systems/examiner_fight.gd,
+  game/systems/examiner_look.gd, game/tests/model_capture.gd,
+  game/tests/model_held_items_test.gd. Released: dropped_handheld.gd,
+  den_capture.gd, model_world_props_test.gd/.tscn, hunter_arsenal.gd and
+  vat_body_preview.gd.
 
 ## Codex is in
 
@@ -132,6 +131,10 @@ Claude:
   anatomy and kill-cam suites passed. Brief B has not been started. First next
   step: prototype the field HUD in a 30 Hz cached SubViewport, behind a test
   switch, then compare pinned-hour PNGs and perf before keeping any code.
+- 7ed53e34: generated Black Mirror placed as the dropped Hunt device and the
+  den phone. `Case`/`MirrorGlass`, collider, serial, wear and battery contracts
+  remain. Use `model_capture --mode=drop` for the real Hunt view;
+  `model_world_props_test`, world-drop, weak-wall and all 32 core suites green.
 
 ## Done
 
