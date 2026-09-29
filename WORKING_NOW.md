@@ -48,24 +48,74 @@ Claude:
   (additive skin support only), game/systems/security_camera.gd,
   game/systems/doctor_route.gd, game/systems/doctor_examination.gd,
   game/vat_chamber.gd, new game/systems/model_skin.gd
-- 29 Sep, Claude (continuing the model work): game/systems/hunter_arsenal.gd
-  and game/systems/vat_body_preview.gd (the BREACH NINE hook, one line each),
-  game/systems/examiner_fight.gd, game/systems/examiner_look.gd,
-  game/systems/handheld_device.gd (world/dropped Black Mirror only),
-  game/tests/held_gear_capture.gd, new game/tests/model_*_test.gd
+- 29 Sep, Claude (model work; the next Claude agent inherits these):
+  game/systems/generated_model.gd, game/systems/dropped_handheld.gd (the world
+  Black Mirror), game/systems/examiner_fight.gd, game/systems/examiner_look.gd,
+  game/tests/model_capture.gd, game/tests/den_capture.gd,
+  game/tests/model_held_items_test.gd. Released: hunter_arsenal.gd and
+  vat_body_preview.gd (BREACH NINE hook committed in 2c822815).
 
 ## Codex is in
 
-- (free)
+- Brief A / cached field HUD: game/bone_yard_hunt.gd,
+  new game/systems/field_hud_cache.gd,
+  new game/tests/field_hud_cache_test.gd, new game/tests/field_hud_cache_test.tscn
 
 ## Handoffs
 
 - 97fd657f, e5b2954a, 830ce828: Hornee's card and the art gallery. To put
   more of Greg's art in the world: add the piece to ArtGallery.PIECES, then
   `WallPoster.place(scene, id, position, yaw)` in any scene (one line).
-- 2fd2d8ac: nine generated models imported (examiner rigged, Hornee, BREACH
-  NINE, Black Mirror, shiv, restraint, CCTV, surgical lamp, drill). None is
-  placed in a scene yet.
+- 2fd2d8ac / 2c822815 / f246d263, generated models. PLACED: the BREACH NINE
+  (Hollis's gun: hand, reliquary, hub body) and the shiv (hand, reliquary, den
+  floor). NOT PLACED, next agent take these top first:
+  Tool: `game/systems/generated_model.gd` (preload it; no class_name).
+  `make("name")` -> Node3D, +Z forward, +Y up, metres, pivot at the origin,
+  null when the file is missing (keep the drawn fallback). Add an entry to its
+  FIT table from numbers printed by
+  `Godot --path game res://tests/model_capture.tscn -- --mode=axes --glb=res://art/generated/items/x.glb`
+  (also --mode=stats: triangles, bones, materials; --mode=turntable|prop|hunt|hub
+  render PNGs, see the header). PCA is right for LINEAR things (shiv, strap,
+  phone slab) and WRONG for L-shapes (drill, CCTV, lamp): those came out
+  upright already, so they need only yaw and scale. Every model is a unit box
+  (longest side 1.0), 5.5-7.5k triangles, 2048 maps. make() caps metal: full
+  metal renders black in the Hunt (dark sky, no reflection probes).
+  Measured, in model space:
+  - black_mirror: right (-0.024,0.069,0.997) = width, up (0.976,0.216,0.008) =
+    screen normal (the screen faces +up), forward (-0.214,0.974,-0.073) = the
+    top; pivot ~0; 1.036 units long -> scale 0.328 = a 0.34 m phone. Wire:
+    dropped_handheld.gd `_build()` (RigidBody, box collider 0.18x0.035x0.34;
+    handheld_world_drop_test needs the nodes "Case" and "MirrorGlass" to stay
+    MeshInstance3D, so hide the boxes and add the model beside them) and
+    vat_chamber.gd `_build_den()` `DenMirror` (still a drawn slab).
+  - restraint: long axis (0.955,-0.269,-0.125), 1.05 units, a buckle at each
+    end; scale ~0.48 (a 0.5 m strap). Wire: doctor_route.gd shows a held axe
+    (`_take_axe`, `LabSurface.hold_in_view`, `_swing_held`) but the restraint has
+    no picture at all, though `held_weapon()` returns "restraint": show it when
+    `_carries(RESTRAINT_LABEL)` and there is no axe, and swing it too.
+  - cctv: lens toward +Z, bracket below and behind; scale ~0.45. Wire:
+    security_camera.gd (Support Unit cameras sit on pillars, support_unit.gd
+    ~l.425); keep its lens, cone and hack nodes.
+  - surgical_lamp: ceiling plate up, head faces roughly +X and tilted; measure
+    the head disc normal from the lowest 60% of vertices. Wire: doctor_route.gd
+    `_dress_his_life` (SurgeryLamp dish and spot above the gurney); aim the
+    SpotLight along the head normal.
+  - bone_drill: bit toward +Z, grip down, ~0.28 m. Put it on his tray
+    (`tray_at` in `_dress_his_life`).
+  - examiner.glb (20.7k tris, 24 bones, 1 AnimationPlayer; examiner_walk/idle
+    share the skeleton, copy their clips): NOT STARTED. Rule above applies: a
+    skin on BaselineHuman's zones, gore/anatomy/X-ray never worse, so keep the
+    rig for hits, wounds and blood and do not just hide its meshes. Its
+    material reports emission_enabled=true: check before use. Wire:
+    examiner_fight.gd (his room), the terminal examiner in vat_chamber.gd;
+    new model_skin.gd.
+  Seen / not seen: BREACH NINE and shiv were rendered (turntable, first-person
+  hand, reliquary, den floor). Not recaptured after the metal cap: the hub
+  body. The den doorway shot in den_capture falls back to another camera.
+  Gotchas: the machine renders on the RTX 2060 SUPER; first-person weapons are
+  foreshortened (judge them in the reliquary, or `--mode=hunt --acquire=shiv`);
+  equip with `arsenal.select_weapon(id)`; run Godot with its own
+  `APPDATA=P:/GameDev/Temp/<name>` so two agents do not share user://.
 - 7245f77e: the existing roamer distance tiers now actually reduce Hunt AI
   cadence (4 Hz reduced, 0.67 Hz dormant; nearby/named actors unchanged).
   `hunt_roamer_tick_test` is the focused contract. Perf is green; current Hunt
