@@ -108,6 +108,10 @@ func _ready() -> void:
 		add_child(ambient_bed_script.new().setup("arcade"))
 	# Greg, 28 September: each new key shown once (KeyHints).
 	KeyHints.offer_opening_keys(self)
+	# Greg's art gallery: two posters on the arcade walls, a card dropped by the gate.
+	WallPoster.place(self, "cover_me_in_moss", Vector3(-7.0, 1.9, -16.0), PI * 0.5)
+	WallPoster.place(self, "mirror_hands", Vector3(7.0, 1.9, -24.0), -PI * 0.5)
+	WallPoster.place(self, "the_hand", Vector3(-2.0, 0.01, -38.0), -0.4)
 	preload("res://systems/run_timer.gd").enter("service_arcade")
 	$WorldEnvironment.environment = WorldLook.environment("ossuary")
 	_build_shell()

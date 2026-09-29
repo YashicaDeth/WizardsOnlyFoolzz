@@ -130,6 +130,10 @@ func _ready() -> void:
 		add_child(ambient_bed_script.new().setup("support"))
 	# Greg, 28 September: each new key shown once (KeyHints).
 	KeyHints.offer_opening_keys(self)
+	# Greg's art gallery: two posters between the cells, a card dropped on the floor.
+	WallPoster.place(self, "spitrost", Vector3(-7.23, 1.8, -20.0), PI * 0.5)
+	WallPoster.place(self, "powers_that_be", Vector3(7.23, 1.8, -35.0), -PI * 0.5)
+	WallPoster.place(self, "jester_seal", Vector3(1.2, 0.01, -40.0), 0.3)
 	KeyHints.offer_in(self, "creep", KEY_CTRL, "HOLD CTRL", "creep: running is loud")
 	KeyHints.offer_in(self, "strike", KEY_NONE, "LMB", "strike")
 	preload("res://systems/run_timer.gd").enter("support_unit")

@@ -102,7 +102,15 @@ func _build_poster(texture: Texture2D, aspect: float) -> void:
 func _build_card(texture: Texture2D, aspect: float) -> void:
 	_card = Node3D.new()
 	add_child(_card)
-	var height := 0.09
+	# A dropped card has to be findable on a dark floor: bigger than life,
+	# and a small glow of its own.
+	var glow := OmniLight3D.new()
+	glow.position = Vector3(0, 0.35, 0)
+	glow.omni_range = 0.9
+	glow.light_energy = 1.6
+	glow.light_color = Color(1.0, 0.85, 0.65)
+	_card.add_child(glow)
+	var height := 0.18
 	var width := height * aspect
 	var art := MeshInstance3D.new()
 	var quad := QuadMesh.new()
