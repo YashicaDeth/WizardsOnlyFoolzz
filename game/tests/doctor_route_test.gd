@@ -110,7 +110,7 @@ func _restraint_then_room_then_lift() -> void:
 	var vat = await _opening()
 	var route: DoctorRoute = vat.doctor_route
 	check(route != null and route.door != null and not route.door.broken, "his door stands behind the vat, whole")
-	check(route.held_restraint != null and route.held_restraint.find_child("generated_restraint", true, false) != null, "the broken restraint is the generated model in the player's hand")
+	check(route.held_restraint != null and route.held_restraint.name == "generated_restraint", "the broken restraint is the generated model in the player's hand")
 	# The guided turn: the head comes round to his door on its own.
 	for _frame in int((route.LOOK_SECONDS + 0.3) * Engine.physics_ticks_per_second):
 		await get_tree().physics_frame
