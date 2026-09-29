@@ -848,17 +848,32 @@ func _dress_his_life(gurney_at: Vector3, rng: RandomNumberGenerator) -> void:
 		var tool := _block(Vector3(0.012, 0.008, 0.14 + rng.randf() * 0.06), tray_at + Vector3(-0.18 + index * 0.09, 0.98, rng.randf_range(-0.05, 0.05)), _flat(Color("b8bcb6"), 0.25), false)
 		tool.rotation.y = rng.randf_range(-0.2, 0.2)
 	_block(Vector3(0.12, 0.004, 0.08), tray_at + Vector3(0.12, 0.975, 0.1), _flat(Color("3b0806"), 0.2), false)
+	# Greg's generated bone drill, lying on its side on the tray.
+	var drill := GENERATED_MODEL.make("bone_drill")
+	if drill != null:
+		drill.position = tray_at + Vector3(0.08, 0.97, -0.02)
+		drill.rotation.y = -0.5
+		add_child(drill)
 	var lamp_at := gurney_at + Vector3(0, ROOM_HEIGHT - 0.9, 0)
-	_block(Vector3(0.03, 0.9, 0.03), lamp_at + Vector3(0, 0.45, 0), steel, false)
-	var dish := MeshInstance3D.new()
-	var dish_mesh := CylinderMesh.new()
-	dish_mesh.top_radius = 0.12
-	dish_mesh.bottom_radius = 0.3
-	dish_mesh.height = 0.14
-	dish_mesh.material = steel
-	dish.mesh = dish_mesh
-	dish.position = lamp_at
-	add_child(dish)
+	# Greg's generated lamp: its head where the drawn dish hung, its arm up to
+	# a short pole from the ceiling. The drawn pole and dish are the fallback.
+	var lamp := GENERATED_MODEL.make("surgical_lamp")
+	if lamp != null:
+		lamp.position = lamp_at - GENERATED_MODEL.LAMP_HEAD
+		add_child(lamp)
+		var ceiling := gurney_at.y + ROOM_HEIGHT
+		_block(Vector3(0.03, ceiling - lamp.position.y, 0.03), Vector3(lamp.position.x, (ceiling + lamp.position.y) * 0.5, lamp.position.z), steel, false)
+	else:
+		_block(Vector3(0.03, 0.9, 0.03), lamp_at + Vector3(0, 0.45, 0), steel, false)
+		var dish := MeshInstance3D.new()
+		var dish_mesh := CylinderMesh.new()
+		dish_mesh.top_radius = 0.12
+		dish_mesh.bottom_radius = 0.3
+		dish_mesh.height = 0.14
+		dish_mesh.material = steel
+		dish.mesh = dish_mesh
+		dish.position = lamp_at
+		add_child(dish)
 	var surgery := SpotLight3D.new()
 	surgery.name = "SurgeryLamp"
 	surgery.light_color = Color("e8efe0")

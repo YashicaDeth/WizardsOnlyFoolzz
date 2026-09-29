@@ -61,7 +61,35 @@ const FIT := {
 		"forward": Vector3(0.117, -0.132, 0.984),
 		"pivot": Vector3(0.01, 0.207, 0.141),
 	},
+	# The surgical lamp is an articulated arm whose head faces +X and ~20 degrees
+	# down. The head disc's normal (PCA of the vertices with x > 0.12, y < 0,
+	# signed away from the arm) becomes -Y, so the head looks straight down and
+	# the arm climbs at a slant to its ceiling plate, the pivot (the centroid of
+	# the top 15%). 0.9 makes the head 0.6 m across; its centre ends up at
+	# LAMP_HEAD below and beside the pivot.
+	"surgical_lamp": {
+		"file": "props/surgical_lamp.glb", "scale": 0.9,
+		"right": Vector3(0.345, 0.938, 0.0),
+		"up": Vector3(-0.936, 0.344, -0.071),
+		"forward": Vector3(-0.067, 0.025, 0.998),
+		"pivot": Vector3(-0.234, 0.418, 0.048),
+	},
+	# The bone drill came upright (bit +Z, a slanted grip down), but that grip
+	# would not stand, so it lies on its left side: model +X becomes up. 0.28
+	# makes it 0.28 m long; the pivot is the middle of that side, so y = 0 is
+	# the surface it lies on.
+	"bone_drill": {
+		"file": "props/bone_drill.glb", "scale": 0.28,
+		"right": Vector3(0.0, -1.0, 0.0),
+		"up": Vector3(1.0, 0.0, 0.0),
+		"forward": Vector3(0.0, 0.0, 1.0),
+		"pivot": Vector3(-0.105, 0.0, 0.0),
+	},
 }
+
+## Where the lamp head's centre sits relative to the lamp's pivot, in metres
+## (the head centroid (0.275, -0.223, -0.021) through the FIT above).
+const LAMP_HEAD := Vector3(-0.383, -0.623, -0.107)
 
 
 ## The models' ORM textures mark metal as fully metallic. The Hunt has a dark

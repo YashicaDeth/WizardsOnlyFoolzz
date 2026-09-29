@@ -148,4 +148,13 @@ Claude:
 
 ## Done
 
-- (move finished queue items here with their commit)
+- Claude queue 1 is finished: the examiner skin (b553a6c3), the CCTV (2fe20b1e),
+  and the surgical lamp and bone drill in the doctor's room (on
+  claude/launch-latest). The lamp's head faces +X in the file, so its FIT turns
+  the head normal to -Y and the arm slants up to a short ceiling pole. The
+  drill's grip is slanted, so it lies on its side on the tray. Both were
+  measured headless, not looked at in a window yet: `model_world_props_test`
+  checks size, placement and that the head is over the SurgeryLamp light.
+  Next: queue 2 (Hollis, the guard and the player need Greg's turnaround
+  sheets, which are not in the repo or ArtReference), and hornee_plush.glb is
+  still unplaced.

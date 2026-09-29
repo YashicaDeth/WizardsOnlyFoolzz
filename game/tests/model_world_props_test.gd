@@ -5,6 +5,7 @@ extends Node
 
 const DROPPED := preload("res://systems/dropped_handheld.gd")
 const VAT := preload("res://vat_chamber.tscn")
+const GENERATED_MODEL_SCRIPT := preload("res://systems/generated_model.gd")
 var failures := 0
 
 
@@ -101,6 +102,24 @@ func _ready() -> void:
 	check(wall_camera.lens.visible, "the glow lights when it has you")
 	wall_camera.smash("test")
 	check(not wall_camera.lens.visible and wall_camera.broken, "smashed, the glow is gone")
+
+	# --- His surgery: the lamp over the gurney, the drill on the tray. ---
+	var route := vat.find_child("DoctorRoute", true, false) as Node3D
+	var lamp := route.get_node_or_null("generated_surgical_lamp") as Node3D if route != null else null
+	var drill := route.get_node_or_null("generated_bone_drill") as Node3D if route != null else null
+	check(lamp != null and drill != null, "the doctor's room has the generated lamp and drill")
+	if lamp != null and drill != null:
+		var spot := route.get_node("SurgeryLamp") as SpotLight3D
+		var lamp_box := _vertex_bounds(lamp)
+		var head := lamp.global_position + GENERATED_MODEL_SCRIPT.LAMP_HEAD
+		check(Vector2(head.x - spot.global_position.x, head.z - spot.global_position.z).length() < 0.12, "the head hangs right over the SurgeryLamp light")
+		check(lamp_box.size.x < 1.0 and lamp_box.size.y < 1.0 and lamp_box.size.z < 1.0 and lamp_box.size.x > 0.4, "the lamp is lamp-sized (%.3f x %.3f x %.3f m)" % [lamp_box.size.x, lamp_box.size.y, lamp_box.size.z])
+		# The drawn SurgeryLamp hangs 0.98 m under the ceiling (lamp_at - 0.08).
+		var under_ceiling := spot.position.y + 0.98 - (lamp.position.y + lamp_box.end.y)
+		check(under_ceiling > 0.02 and under_ceiling < 0.4, "the tilted ceiling plate stays under the ceiling, on its short pole (%.3f m below)" % under_ceiling)
+		var drill_box := _vertex_bounds(drill)
+		check(drill_box.size.z > 0.25 and drill_box.size.z < 0.31 and drill_box.size.y < 0.08, "the drill is 0.28 m and lies on its side (%.3f x %.3f x %.3f m)" % [drill_box.size.x, drill_box.size.y, drill_box.size.z])
+		check(absf(drill_box.position.y) < 0.01, "lying on the tray, not in it (bottom %.3f)" % drill_box.position.y)
 
 	print("MODEL_WORLD_PROPS_TEST_RESULT failures=%d" % failures)
 	get_tree().quit(1 if failures > 0 else 0)
