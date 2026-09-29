@@ -290,6 +290,9 @@ func _ready() -> void:
 	fade.color.a = 0.08
 	vat_smash = VAT_SMASH.new(self)
 	_build_chamber()
+	# Greg's art gallery: two of his pieces pasted on the aisle wall.
+	WallPoster.place(self, "cellout_wizards", Vector3(7.33, 1.75, -8.0), -PI * 0.5)
+	WallPoster.place(self, "war_time", Vector3(7.33, 1.75, -15.0), -PI * 0.5)
 	_build_examination_station()
 	# The examiner is not born at the keyboard. He enters after the player wakes.
 	if examiner_node != null:

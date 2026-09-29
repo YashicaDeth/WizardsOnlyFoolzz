@@ -18,6 +18,10 @@ When you finish something the other agent could build on, write it under
   art, collected into the Brain Index)
 - game/art/generated/**, game/art/items/**, game/art/GENERATED.md
   (Higgsfield models)
+- game/art/gallery/** (Greg's own art for the gallery), game/systems/art_gallery.gd,
+  game/systems/wall_poster.gd, game/systems/gallery_view.gd
+- One add_child line each for posters in: game/vat_chamber.gd,
+  game/support_unit.gd, game/service_arcade.gd
 
 ## Codex is in
 
