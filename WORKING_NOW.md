@@ -20,14 +20,16 @@ When you finish something the other agent could build on, write it under
   (Higgsfield models)
 - game/art/gallery/** (Greg's own art for the gallery), game/systems/art_gallery.gd,
   game/systems/wall_poster.gd, game/systems/gallery_view.gd
-- One add_child line each for posters in: game/vat_chamber.gd,
-  game/support_unit.gd, game/service_arcade.gd
 
 ## Codex is in
 
 - (write your files here before you start)
 
 ## Handoffs
+
+- 97fd657f, e5b2954a, 830ce828: Hornee's card and the art gallery. To put
+  more of Greg's art in the world: add the piece to ArtGallery.PIECES, then
+  `WallPoster.place(scene, id, position, yaw)` in any scene (one line).
 
 - 2fd2d8ac: nine generated models imported (examiner rigged, Hornee, BREACH
   NINE, Black Mirror, shiv, restraint, CCTV, surgical lamp, drill). None is
