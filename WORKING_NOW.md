@@ -53,6 +53,7 @@ Claude:
 
 - Brief A / Hunt render cost: game/systems/ashbloom_world_generator.gd,
   game/bone_yard_hunt.gd, new game/systems/hunt_static_batch.gd,
+  new game/systems/hunt_panel_scheduler.gd,
   new game/tests/hunt_render_cost_probe.gd,
   new game/tests/hunt_render_cost_probe.tscn
 
