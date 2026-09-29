@@ -21,6 +21,10 @@ extends Node3D
 signal filmed(camera: SecurityCamera, at: Vector3)
 signal broke(camera: SecurityCamera, method: String)
 
+const GENERATED_MODEL := preload("res://systems/generated_model.gd")
+## Where the generated CCTV's bracket ends and its housing begins, in metres up
+## from the middle of the housing (its FIT pivot).
+const BRACKET_CUT := -0.10
 const RANGE := 12.0
 const HALF_ANGLE := deg_to_rad(19.0)
 ## How far below level the lens looks. The cone lands on the floor a few
@@ -62,6 +66,7 @@ var cone_material: StandardMaterial3D
 var lamp: SpotLight3D
 var tally: OmniLight3D
 var _lens_material: StandardMaterial3D
+var _wears_model := false
 var _since_seen := 999.0
 var _yaw := 0.0
 var _exclude: Array[RID] = []
@@ -76,6 +81,7 @@ func build(id: String, phase := 0.0) -> void:
 	arm_mesh.size = Vector3(0.08, 0.08, 0.45)
 	arm_mesh.material = LabSurface.material("plate")
 	arm.mesh = arm_mesh
+	arm.name = "Arm"
 	arm.position = Vector3(0, 0, -0.2)
 	add_child(arm)
 	head = Node3D.new()
@@ -90,6 +96,7 @@ func build(id: String, phase := 0.0) -> void:
 	var body_mesh := BoxMesh.new()
 	body_mesh.size = Vector3(0.24, 0.22, 0.46)
 	body_mesh.material = WorldLook.surface(Color("2a2b2a"), "paint", 811)
+	body.name = "Body"
 	body.mesh = body_mesh
 	housing.add_child(body)
 	var shape := CollisionShape3D.new()
@@ -156,10 +163,87 @@ func build(id: String, phase := 0.0) -> void:
 	tally.position = Vector3(0, 0.16, -0.1)
 	head.add_child(tally)
 	head.rotation.x = PITCH
+	_wear_model(arm, body)
 	_all.append(weakref(self))
 	_apply_signal_visibility()
 	if str(WorldHistory.subject(camera_id).get("state", "")) == "broken":
 		_show_broken(false)
+
+
+## Greg's generated CCTV (Higgsfield, 29 September) over the drawn box. The
+## housing turns with the head; the bracket is cut off below it and stays put on
+## the mount, so a sweep reads as a camera on a bracket, not a plate swinging
+## round a post. The drawn box and arm hide; the collider, the lens glass (it
+## carries the state colour), the cone, the lamp and the tally stay exactly as
+## they were, and without the media the drawn camera is the camera.
+func _wear_model(arm: MeshInstance3D, body: MeshInstance3D) -> void:
+	var model: Node3D = GENERATED_MODEL.make("cctv")
+	if model == null:
+		return
+	arm.visible = false
+	body.visible = false
+	# The wall plate sits flat on the mount, 0.36 m behind the housing's middle.
+	head.position = Vector3(0.0, -0.05, -0.36)
+	var halves := _cut(model, BRACKET_CUT)
+	# The model looks along +Z and this node looks along -Z.
+	halves[0].name = "Bracket"
+	halves[0].position = head.position
+	halves[0].rotation.y = PI
+	add_child(halves[0])
+	halves[1].name = "HousingModel"
+	halves[1].rotation.y = PI
+	head.add_child(halves[1])
+	# The emissive glass now sits in the model's own lens window.
+	var glass := lens.mesh as CylinderMesh
+	glass.top_radius = 0.04
+	glass.bottom_radius = 0.04
+	glass.height = 0.03
+	lens.position = Vector3(0.0, 0.0, -0.205)
+	# The model's own lens shows until the signal or the lock lights this one.
+	_wears_model = true
+	lens.visible = signals_visible
+
+
+## Two copies of `model`: the triangles below `height` (metres, in its own
+## space) and the triangles above it, for a part that moves and one that does not.
+func _cut(model: Node3D, height: float) -> Array[Node3D]:
+	var halves: Array[Node3D] = []
+	for above in [false, true]:
+		var half := model.duplicate() as Node3D
+		for node in half.find_children("*", "MeshInstance3D", true, false):
+			var instance := node as MeshInstance3D
+			var to_half := Transform3D.IDENTITY
+			var walker: Node3D = instance
+			while walker != half:
+				to_half = walker.transform * to_half
+				walker = walker.get_parent() as Node3D
+			var source := instance.mesh
+			var cut := ArrayMesh.new()
+			for surface in source.get_surface_count():
+				var arrays := source.surface_get_arrays(surface)
+				var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+				var indices := PackedInt32Array()
+				if arrays[Mesh.ARRAY_INDEX] != null:
+					indices = arrays[Mesh.ARRAY_INDEX]
+				else:
+					indices.resize(vertices.size())
+					for index in vertices.size():
+						indices[index] = index
+				var kept := PackedInt32Array()
+				for triangle in indices.size() / 3:
+					var middle := Vector3.ZERO
+					for corner in 3:
+						middle += to_half * vertices[indices[triangle * 3 + corner]]
+					if (middle.y / 3.0 >= height) == above:
+						kept.append(indices[triangle * 3])
+						kept.append(indices[triangle * 3 + 1])
+						kept.append(indices[triangle * 3 + 2])
+				arrays[Mesh.ARRAY_INDEX] = kept
+				cut.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+				cut.surface_set_material(cut.get_surface_count() - 1, source.surface_get_material(surface))
+			instance.mesh = cut
+		halves.append(half)
+	return halves
 
 
 ## Bodies the sight line passes through without being stopped (the host's own
@@ -256,6 +340,8 @@ func _tint() -> void:
 	_lens_material.emission = colour if (signals_visible or tracking) else Color(0, 0, 0)
 	tally.light_energy = 2.5 * blink if tracking else 0.0
 	tally.visible = tracking
+	if _wears_model:
+		lens.visible = signals_visible or tracking
 
 
 ## Every live camera, for the vision modes to draw.
@@ -290,6 +376,8 @@ func _apply_signal_visibility() -> void:
 		cone.visible = signals_visible
 	if lamp != null:
 		lamp.visible = signals_visible
+	if _wears_model:
+		lens.visible = signals_visible or tracking
 
 
 ## LMB with something heavy. Loud, final and recorded. `from` is where the
@@ -311,6 +399,7 @@ func _show_broken(fresh: bool) -> void:
 	lamp.visible = false
 	tally.light_energy = 0.0
 	_lens_material.emission = Color.BLACK
+	lens.visible = not _wears_model
 	# Hanging off its bracket, lens down.
 	head.rotation = Vector3(-1.2, 0.5, 0.6)
 	if fresh:

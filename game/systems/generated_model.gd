@@ -49,6 +49,18 @@ const FIT := {
 		"forward": Vector3(0.955, -0.269, -0.125),
 		"pivot": Vector3(0.404, -0.128, -0.066),
 	},
+	# The wall CCTV, measured on its canopy (the flat sunshade plate): forward is
+	# the canopy's long edge, so the housing looks along +Z exactly level and the
+	# game's own head pitch is the only downward tilt. The pivot is the middle of
+	# the housing, which is where SecurityCamera's head turns. 0.6 makes the
+	# housing 0.42 m long and 0.24 m wide, the box it replaces.
+	"cctv": {
+		"file": "props/cctv.glb", "scale": 0.6,
+		"right": Vector3(0.993, 0.025, -0.115),
+		"up": Vector3(-0.009, 0.991, 0.134),
+		"forward": Vector3(0.117, -0.132, 0.984),
+		"pivot": Vector3(0.01, 0.207, 0.141),
+	},
 }
 
 

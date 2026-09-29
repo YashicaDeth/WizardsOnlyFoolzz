@@ -18,6 +18,9 @@ var slot := -1
 var acquire := ""
 var distance := 0.0
 var target_y := 0.9
+## --slab=lo,hi keeps only the vertices whose height is between those fractions
+## of the model's own Y extent: the canopy of a camera, the head of a lamp.
+var slab := Vector2(0.0, 1.0)
 
 
 func _ready() -> void:
@@ -40,6 +43,9 @@ func _ready() -> void:
 			distance = float(argument.trim_prefix("--distance="))
 		elif argument.begins_with("--target-y="):
 			target_y = float(argument.trim_prefix("--target-y="))
+		elif argument.begins_with("--slab="):
+			var band := argument.trim_prefix("--slab=").split(",")
+			slab = Vector2(float(band[0]), float(band[1]))
 	DirAccess.make_dir_recursive_absolute(out_dir)
 	get_window().size = Vector2i(1280, 720)
 	var tree := get_tree()
@@ -343,6 +349,18 @@ func _axes() -> void:
 				for surface in (node as MeshInstance3D).mesh.get_surface_count():
 					for vertex: Vector3 in (node as MeshInstance3D).mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]:
 						points.append(to_model * vertex)
+		if slab != Vector2(0.0, 1.0):
+			var floor_y := INF
+			var top_y := -INF
+			for point in points:
+				floor_y = minf(floor_y, point.y)
+				top_y = maxf(top_y, point.y)
+			var kept := PackedVector3Array()
+			for point in points:
+				var fraction := (point.y - floor_y) / maxf(top_y - floor_y, 0.0001)
+				if fraction >= slab.x and fraction <= slab.y:
+					kept.append(point)
+			points = kept
 		var centroid := Vector3.ZERO
 		for point in points:
 			centroid += point

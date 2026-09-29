@@ -13,7 +13,8 @@ func check(condition: bool, label: String) -> void:
 	failures += int(not condition)
 
 
-## Tight bounds from the real vertices, in `root`'s space.
+## Tight bounds from the vertices the triangles actually use, in `root`'s space
+## (a cut mesh keeps its whole vertex array and only drops indices).
 func _vertex_bounds(root: Node3D) -> AABB:
 	var box := AABB()
 	var first := true
@@ -24,7 +25,15 @@ func _vertex_bounds(root: Node3D) -> AABB:
 		if node is MeshInstance3D and (node as MeshInstance3D).mesh != null and (node as MeshInstance3D).visible:
 			var to_root := root.global_transform.affine_inverse() * (node as MeshInstance3D).global_transform
 			for surface in (node as MeshInstance3D).mesh.get_surface_count():
-				for vertex: Vector3 in (node as MeshInstance3D).mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]:
+				var arrays := (node as MeshInstance3D).mesh.surface_get_arrays(surface)
+				var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+				var used := PackedVector3Array()
+				if arrays[Mesh.ARRAY_INDEX] != null:
+					for index: int in arrays[Mesh.ARRAY_INDEX]:
+						used.append(vertices[index])
+				else:
+					used = vertices
+				for vertex: Vector3 in used:
 					var point := to_root * vertex
 					box = AABB(point, Vector3.ZERO) if first else box.expand(point)
 					first = false
@@ -68,5 +77,30 @@ func _ready() -> void:
 	check(not (shiv is MeshInstance3D), "and the den's shiv is the generated blade")
 	var mirror_box := _vertex_bounds(mirror)
 	check(mirror_box.size.y < 0.07 and mirror.global_position.y < 0.08, "the phone lies on the floor, not in it or over it")
+
+	# --- The wall CCTV: the housing turns on the head, the bracket stays. ---
+	var wall_camera := SecurityCamera.new()
+	add_child(wall_camera)
+	wall_camera.build("model_props_camera")
+	var bracket := wall_camera.get_node_or_null("Bracket") as Node3D
+	var housing_model := wall_camera.head.get_node_or_null("HousingModel") as Node3D
+	check(bracket != null and housing_model != null, "the CCTV is the generated model: a bracket on the mount, a housing on the head")
+	check(not (wall_camera.get_node("Arm") as MeshInstance3D).visible and not (wall_camera.head.get_node("Housing/Body") as MeshInstance3D).visible, "the drawn arm and box hide")
+	check(wall_camera.lens != null and not wall_camera.lens.visible, "the lens glow is off, so the model's own lens shows")
+	var assembly := _vertex_bounds(wall_camera)
+	check(assembly.end.z > -0.03 and assembly.end.z < 0.03, "the wall plate sits flat on the mount (%.3f)" % assembly.end.z)
+	check(assembly.position.z < -0.5, "and the lens looks out along -Z, away from the wall (front at %.3f)" % assembly.position.z)
+	var housing_box := _vertex_bounds(housing_model)
+	check(housing_box.size.z > 0.35 and housing_box.size.z < 0.5 and housing_box.size.x < 0.3 and housing_box.size.y < 0.28, "the housing is the size of the box it replaces (%.3f x %.3f x %.3f m)" % [housing_box.size.x, housing_box.size.y, housing_box.size.z])
+	var bracket_at := bracket.global_transform
+	wall_camera.head.rotation.y = wall_camera.sweep_half
+	check(bracket.global_transform.is_equal_approx(bracket_at), "the bracket stays put while the head sweeps")
+	check(not housing_model.global_transform.basis.is_equal_approx(bracket_at.basis), "and the housing turns with it")
+	wall_camera.tracking = true
+	wall_camera._tint()
+	check(wall_camera.lens.visible, "the glow lights when it has you")
+	wall_camera.smash("test")
+	check(not wall_camera.lens.visible and wall_camera.broken, "smashed, the glow is gone")
+
 	print("MODEL_WORLD_PROPS_TEST_RESULT failures=%d" % failures)
 	get_tree().quit(1 if failures > 0 else 0)
