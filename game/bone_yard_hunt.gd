@@ -5893,20 +5893,29 @@ func _update_encounter_actors(delta: float) -> void:
 	var melee_slot_taken := _melee_slot_taken()
 	for index in range(encounter_actors.size() - 1, -1, -1):
 		var actor: Dictionary = encounter_actors[index]
+		var node := actor.get("node") as Node3D
+		var anatomy: Node = actor.get("anatomy") as Node
+		if node == null or not is_instance_valid(node) or anatomy == null:
+			encounter_actors.remove_at(index)
+			continue
+		# AX5.3. The distance tiers already hid or retained distant roamers, but
+		# their AI still ran at 60 Hz. Spend the elapsed time in one ordinary
+		# update when the tier comes due; named encounters and nearby bodies keep
+		# the exact per-frame path they had before.
+		var scheduled_delta := delta
+		if str(actor.get("encounter_id", "")).begins_with("roamer_"):
+			scheduled_delta = RoamerDetail.due_delta(actor, player.distance_to(node.global_position), delta)
 		# O2.5 v2. Each body runs on its own clock during a hit: the one that was
 		# struck slows, the rest of the region does not notice. Named apart from
 		# `actor_delta` because GDScript will not let a local shadow a parameter.
-		var actor_delta: float = delta * impact_feel.scale_for(str(actor.get("subject_id", "")))
+		var actor_delta: float = scheduled_delta * impact_feel.scale_for(str(actor.get("subject_id", "")))
 		# O2.7 v4. Their rig animates and bleeds on the same clock their state
 		# machine runs on, so the spray coming out of somebody freezes with
 		# the body it is coming out of.
 		var actor_rig := actor.get("rig") as BaselineHuman
 		if actor_rig != null and is_instance_valid(actor_rig):
 			actor_rig.motion_scale = actor_delta / maxf(delta, 0.00001)
-		var node := actor.get("node") as Node3D
-		var anatomy: Node = actor.get("anatomy") as Node
-		if node == null or not is_instance_valid(node) or anatomy == null:
-			encounter_actors.remove_at(index)
+		if scheduled_delta <= 0.0:
 			continue
 		# A held body has one owner: `_update_grapple()`. Do this before ordinary
 		# animation as well as before AI, otherwise the captive consumes its old

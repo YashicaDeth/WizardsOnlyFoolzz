@@ -51,6 +51,28 @@ static func tick_interval(tier: Tier) -> float:
 	return float(TICK_INTERVAL.get(tier, 0.0))
 
 
+## Returns the time a roamer is allowed to advance on this frame. Reduced and
+## dormant bodies save the same elapsed time the full simulation would have
+## received, then consume it in one update; callers therefore skip work without
+## slowing that body's own clock. The accumulator lives on the actor dictionary
+## so identity and injury state remain owned by the Hunt exactly as before.
+static func due_delta(actor: Dictionary, distance: float, delta: float) -> float:
+	var tier := tier_for(distance)
+	if tier == Tier.CULLED:
+		actor["detail_tick_elapsed"] = 0.0
+		return 0.0
+	var interval := tick_interval(tier)
+	if interval <= 0.0:
+		actor["detail_tick_elapsed"] = 0.0
+		return delta
+	var elapsed := float(actor.get("detail_tick_elapsed", 0.0)) + delta
+	if elapsed + 0.000001 < interval:
+		actor["detail_tick_elapsed"] = elapsed
+		return 0.0
+	actor["detail_tick_elapsed"] = 0.0
+	return elapsed
+
+
 ## Whether the body is drawn. A dormant roamer is still there and still in the
 ## ledger; it is simply not worth a draw call at that range.
 static func renders(tier: Tier) -> bool:
