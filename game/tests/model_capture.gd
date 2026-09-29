@@ -14,6 +14,7 @@ var weapon := "breach_nine"
 var glb := ""
 var hour := 13.0
 var slot := -1
+var acquire := ""
 
 
 func _ready() -> void:
@@ -30,6 +31,8 @@ func _ready() -> void:
 			hour = float(argument.trim_prefix("--hour="))
 		elif argument.begins_with("--slot="):
 			slot = int(argument.trim_prefix("--slot="))
+		elif argument.begins_with("--acquire="):
+			acquire = argument.trim_prefix("--acquire=")
 	DirAccess.make_dir_recursive_absolute(out_dir)
 	get_window().size = Vector2i(1280, 720)
 	var tree := get_tree()
@@ -43,6 +46,8 @@ func _ready() -> void:
 			await _prop(tree)
 		"stats":
 			_stats()
+		"axes":
+			_axes()
 		_:
 			await _turntable(tree)
 	tree.quit(0)
@@ -123,6 +128,8 @@ func _hunt(tree: SceneTree) -> void:
 	lamp.position = Vector3(0.1, -0.1, -0.2)
 	if slot >= 0:
 		print("SLOT ", slot, " ", arsenal.select_slot(slot), " current=", arsenal.current_id)
+	elif not acquire.is_empty():
+		print("ACQUIRE ", acquire, " ", arsenal.acquire_melee(acquire), " select=", arsenal.select_weapon(acquire), " current=", arsenal.current_id)
 	else:
 		print("ACQUIRED ", arsenal.acquire_facility_sidearm(12), " current=", arsenal.current_id)
 	for _frame in 20:
@@ -135,9 +142,20 @@ func _hunt(tree: SceneTree) -> void:
 		if muzzle != null and grip != null:
 			var direction := cam.global_transform.basis.inverse() * (muzzle.global_position - grip.global_position)
 			print("HUNT %s muzzle-from-grip in camera space = %s  (camera -Z is forward; length %.3f)" % [arsenal.current_id, direction.snapped(Vector3.ONE * 0.001), direction.length()])
-	var tag := "slot%d" % slot if slot >= 0 else "facility"
+	if model != null and acquire == "shiv":
+		# Blade tip and pommel from the measured axes (model units), on screen.
+		var generated := model.find_child("generated_shiv", true, false) as Node3D
+		var camera_now := hunt.camera as Camera3D
+		if generated != null:
+			var native := generated.get_child(0) as Node3D
+			var centroid := Vector3(0.009, 0.072, -0.086)
+			var forward := Vector3(0.134, -0.627, 0.767)
+			for named: Array in [["tip", 0.776], ["pommel", -0.508]]:
+				var at := native.global_transform * (centroid + forward * float(named[1]))
+				print("SHIV %s screen=%s distance=%.3f" % [named[0], camera_now.unproject_position(at).round(), at.distance_to(camera_now.global_position)])
+	var tag := "slot%d" % slot if slot >= 0 else (acquire if not acquire.is_empty() else "facility")
 	await _shoot(tree, "%s/hunt_%s.png" % [out_dir, tag])
-	if slot < 0:
+	if slot < 0 and acquire.is_empty():
 		arsenal.reload()
 		for _frame in 14:
 			await tree.process_frame
@@ -197,6 +215,125 @@ func _prop(tree: SceneTree) -> void:
 		await _shoot(tree, "%s/%s_%s.png" % [out_dir, glb.get_file().get_basename(), shot[0]])
 
 
+## Principal axes of every --glb=a.glb,b.glb: how the generator oriented it,
+## so a model can be turned to the game's convention (long axis on +Z, tip
+## forward) by a measured angle instead of a guessed one.
+func _axes() -> void:
+	for path in glb.split(","):
+		var model := (load(path) as PackedScene).instantiate() as Node3D
+		add_child(model)
+		var points := PackedVector3Array()
+		var stack: Array[Node] = [model]
+		while not stack.is_empty():
+			var node: Node = stack.pop_back()
+			stack.append_array(node.get_children())
+			if node is MeshInstance3D and (node as MeshInstance3D).mesh != null:
+				var to_model := model.global_transform.affine_inverse() * (node as MeshInstance3D).global_transform
+				for surface in (node as MeshInstance3D).mesh.get_surface_count():
+					for vertex: Vector3 in (node as MeshInstance3D).mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]:
+						points.append(to_model * vertex)
+		var centroid := Vector3.ZERO
+		for point in points:
+			centroid += point
+		centroid /= float(points.size())
+		var covariance := [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
+		for point in points:
+			var d := point - centroid
+			for row in 3:
+				for column in 3:
+					covariance[row][column] += d[row] * d[column]
+		var eigen := _jacobi(covariance)
+		print("AXES %s  points=%d centroid=%s" % [path.get_file(), points.size(), centroid.snapped(Vector3.ONE * 0.001)])
+		for index in 3:
+			var axis: Vector3 = eigen.vectors[index]
+			var low := INF
+			var high := -INF
+			for point in points:
+				var t := (point - centroid).dot(axis)
+				low = minf(low, t)
+				high = maxf(high, t)
+			# Thickness (distance from the axis) at each end: the thin end is the tip.
+			var span := high - low
+			var near_low := 0.0
+			var near_high := 0.0
+			var count_low := 0
+			var count_high := 0
+			for point in points:
+				var d := point - centroid
+				var t := d.dot(axis)
+				var radial := (d - axis * t).length()
+				if t < low + span * 0.15:
+					near_low += radial
+					count_low += 1
+				elif t > high - span * 0.15:
+					near_high += radial
+					count_high += 1
+			print("  axis%d=%s  extent[%.3f .. %.3f]  end radius low=%.3f high=%.3f" % [index, axis.snapped(Vector3.ONE * 0.001), low, high, near_low / maxf(1.0, count_low), near_high / maxf(1.0, count_high)])
+		# Profile down the long axis: thickness and cross-section by 0.1 steps.
+		var main: Vector3 = eigen.vectors[0]
+		var side_a: Vector3 = eigen.vectors[1]
+		var side_b: Vector3 = eigen.vectors[2]
+		var bins := {}
+		for point in points:
+			var d := point - centroid
+			var bin := int(floorf(d.dot(main) * 10.0))
+			if not bins.has(bin):
+				bins[bin] = {"n": 0, "radial": 0.0, "a_lo": INF, "a_hi": -INF, "b_lo": INF, "b_hi": -INF}
+			var entry: Dictionary = bins[bin]
+			entry.n += 1
+			entry.radial += (d - main * d.dot(main)).length()
+			entry.a_lo = minf(entry.a_lo, d.dot(side_a))
+			entry.a_hi = maxf(entry.a_hi, d.dot(side_a))
+			entry.b_lo = minf(entry.b_lo, d.dot(side_b))
+			entry.b_hi = maxf(entry.b_hi, d.dot(side_b))
+		var keys := bins.keys()
+		keys.sort()
+		for key in keys:
+			var entry: Dictionary = bins[key]
+			print("    t=%+.1f n=%-4d mean-radius=%.3f  widthA=%.3f widthB=%.3f" % [float(key) / 10.0, entry.n, entry.radial / entry.n, entry.a_hi - entry.a_lo, entry.b_hi - entry.b_lo])
+		model.queue_free()
+
+
+## Symmetric 3x3 eigen decomposition (Jacobi), largest eigenvalue first.
+func _jacobi(matrix: Array) -> Dictionary:
+	var a := matrix.duplicate(true)
+	var v := [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+	for _sweep in 30:
+		var off: float = absf(a[0][1]) + absf(a[0][2]) + absf(a[1][2])
+		if off < 1e-12:
+			break
+		for pair: Array in [[0, 1], [0, 2], [1, 2]]:
+			var p: int = pair[0]
+			var q: int = pair[1]
+			if absf(a[p][q]) < 1e-15:
+				continue
+			var theta: float = (a[q][q] - a[p][p]) / (2.0 * a[p][q])
+			var t: float = signf(theta) / (absf(theta) + sqrt(theta * theta + 1.0)) if theta != 0.0 else 1.0
+			var c: float = 1.0 / sqrt(t * t + 1.0)
+			var sn: float = t * c
+			for k in 3:
+				var akp: float = a[k][p]
+				var akq: float = a[k][q]
+				a[k][p] = c * akp - sn * akq
+				a[k][q] = sn * akp + c * akq
+			for k in 3:
+				var apk: float = a[p][k]
+				var aqk: float = a[q][k]
+				a[p][k] = c * apk - sn * aqk
+				a[q][k] = sn * apk + c * aqk
+			for k in 3:
+				var vkp: float = v[k][p]
+				var vkq: float = v[k][q]
+				v[k][p] = c * vkp - sn * vkq
+				v[k][q] = sn * vkp + c * vkq
+	var order := [0, 1, 2]
+	order.sort_custom(func(x, y): return a[x][x] > a[y][y])
+	var vectors := []
+	for index in order:
+		vectors.append(Vector3(v[0][index], v[1][index], v[2][index]).normalized())
+	return {"vectors": vectors}
+
+
 ## Triangles, surfaces and texture sizes of every --glb=a.glb,b.glb given.
 func _stats() -> void:
 	for path in glb.split(","):
@@ -225,6 +362,8 @@ func _stats() -> void:
 					var material := mesh.surface_get_material(surface) as BaseMaterial3D
 					if material != null and material.albedo_texture != null:
 						textures[material.albedo_texture.get_size()] = true
+					if material != null:
+						print("   MATERIAL %s metallic=%.2f roughness=%.2f metal_tex=%s rough_tex=%s ao=%s albedo=%s emission=%s" % [path.get_file(), material.metallic, material.roughness, material.metallic_texture != null, material.roughness_texture != null, material.ao_enabled, material.albedo_color, material.emission_enabled])
 		print("STATS %-28s triangles=%-7d surfaces=%d bones=%d animplayers=%d albedo=%s" % [path.get_file(), triangles, surfaces, skeletons, players, str(textures.keys())])
 		model.free()
 

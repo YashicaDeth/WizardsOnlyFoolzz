@@ -464,7 +464,25 @@ static func _build_launcher(root: Node3D) -> void:
 ## edge is where it runs out.
 ## The shiv from the den (Greg, 28 September): a short scrap blade bound to a
 ## rag-wrapped handle. Built along +Z like the others.
+##
+## It is the generated model now (art/generated/items/shiv.glb, placed from
+## measured axes by GeneratedModel), with the grip where the drawn one had it
+## so nothing that reads the anchor moves. The drawn shiv below is the
+## fallback for a checkout without the media.
+const GENERATED_MODEL := preload("res://systems/generated_model.gd")
+
+
 static func _build_shiv(root: Node3D) -> void:
+	var model := GENERATED_MODEL.make("shiv")
+	if model == null:
+		_build_shiv_drawn(root)
+		return
+	model.position = Vector3(0, 0, -0.07)
+	root.add_child(model)
+	_anchor(root, "grip", Vector3(0, 0, -0.07), Vector3.ZERO)
+
+
+static func _build_shiv_drawn(root: Node3D) -> void:
 	var blade := MeshInstance3D.new()
 	blade.name = "blade"
 	blade.mesh = _blade(0.2, 0.034, 0.008)
@@ -720,6 +738,7 @@ static func _build_breach_nine(root: Node3D) -> void:
 		return
 	var model := scene.instantiate() as Node3D
 	model.name = "generated_breach_nine"
+	GENERATED_MODEL.tame_metal(model)
 	model.scale = Vector3.ONE * BREACH_NINE_SCALE
 	model.rotation.y = PI
 	root.add_child(model)

@@ -1288,13 +1288,19 @@ func _build_den() -> void:
 		paper.rotation.y = sheet * 0.4
 		paper.name = "DenNote%d" % sheet
 		add_child(paper)
-	var shiv := MeshInstance3D.new()
+	# The generated shiv (art/generated/items/shiv.glb), lying flat: its frame
+	# has the blade along +Z and its broad faces up. The drawn blade is the
+	# fallback for a checkout without the media.
+	var shiv: Node3D = preload("res://systems/generated_model.gd").make("shiv")
+	if shiv == null:
+		var drawn := MeshInstance3D.new()
+		var blade := BoxMesh.new()
+		blade.size = Vector3(0.03, 0.01, 0.26)
+		blade.material = WorldLook.surface(Color("9aa0a0"), "chrome", 948)
+		drawn.mesh = blade
+		shiv = drawn
 	shiv.name = "DenShiv"
-	var blade := BoxMesh.new()
-	blade.size = Vector3(0.03, 0.01, 0.26)
-	blade.material = WorldLook.surface(Color("9aa0a0"), "chrome", 948)
-	shiv.mesh = blade
-	shiv.position = Vector3(back_x + 0.55, 0.05, z - 0.7)
+	shiv.position = Vector3(back_x + 0.55, 0.03, z - 0.7)
 	shiv.rotation.y = 0.8
 	add_child(shiv)
 	# Greg's playtest: their Black Mirror lies beside them. Face down, the
