@@ -51,7 +51,7 @@ Claude:
 - 29 Sep, Claude (model work; the next Claude agent inherits these):
   game/systems/generated_model.gd, game/systems/examiner_fight.gd,
   game/systems/examiner_look.gd, game/tests/model_capture.gd,
-  game/tests/model_held_items_test.gd. Released: dropped_handheld.gd,
+  game/tests/model_held_items_test.gd, game/tests/doctor_route_test.gd. Released: dropped_handheld.gd,
   den_capture.gd, model_world_props_test.gd/.tscn, hunter_arsenal.gd and
   vat_body_preview.gd.
 
