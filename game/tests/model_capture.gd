@@ -5,6 +5,7 @@ extends Node3D
 ##       --weapon=breach_nine --out=P:/GameDev/Temp/model
 ##   --mode=hunt     first person, facility sidearm acquired in the real Hunt
 ##   --mode=hub      VatBodyPreview holding `--weapon` (facility_sidearm)
+##   --mode=restraint the real Growing Floor route with its carried restraint
 ##   --mode=prop     `--scene-node=res://systems/x.gd` is not needed: use
 ##                   --glb=res://art/generated/props/cctv.glb for a bare model
 
@@ -15,6 +16,8 @@ var glb := ""
 var hour := 13.0
 var slot := -1
 var acquire := ""
+var distance := 0.0
+var target_y := 0.9
 
 
 func _ready() -> void:
@@ -33,6 +36,10 @@ func _ready() -> void:
 			slot = int(argument.trim_prefix("--slot="))
 		elif argument.begins_with("--acquire="):
 			acquire = argument.trim_prefix("--acquire=")
+		elif argument.begins_with("--distance="):
+			distance = float(argument.trim_prefix("--distance="))
+		elif argument.begins_with("--target-y="):
+			target_y = float(argument.trim_prefix("--target-y="))
 	DirAccess.make_dir_recursive_absolute(out_dir)
 	get_window().size = Vector2i(1280, 720)
 	var tree := get_tree()
@@ -44,12 +51,16 @@ func _ready() -> void:
 			await _hub(tree)
 		"drop":
 			await _drop_phone(tree)
+		"restraint":
+			await _restraint_in_hand(tree)
 		"prop":
 			await _prop(tree)
 		"stats":
 			_stats()
 		"axes":
 			_axes()
+		"skeleton":
+			_skeleton()
 		_:
 			await _turntable(tree)
 	tree.quit(0)
@@ -210,10 +221,16 @@ func _prop(tree: SceneTree) -> void:
 	var box := _bounds(model)
 	print("BOUNDS %s centre=%s size=%s" % [glb.get_file(), box.get_center(), box.size])
 	var reach := maxf(box.size.length(), 0.1) * 1.3
+	var centre := box.get_center()
+	if distance > 0.0:
+		# A rigged model's mesh box is in its own units (the Armature is scaled
+		# 0.01), so frame it from a fixed distance at a fixed height instead.
+		reach = distance
+		centre = Vector3(0, target_y, 0)
 	camera.fov = 40.0
 	for shot: Array in [["front", Vector3(0, 0.15, 1)], ["side", Vector3(1, 0.15, 0)], ["3q", Vector3(0.7, 0.4, 0.8)], ["top", Vector3(0.001, 1, 0.001)]]:
-		camera.global_position = box.get_center() + (shot[1] as Vector3).normalized() * reach
-		camera.look_at(box.get_center(), Vector3.UP)
+		camera.global_position = centre + (shot[1] as Vector3).normalized() * reach
+		camera.look_at(centre, Vector3.UP)
 		await _shoot(tree, "%s/%s_%s.png" % [out_dir, glb.get_file().get_basename(), shot[0]])
 
 
@@ -241,6 +258,72 @@ func _drop_phone(tree: SceneTree) -> void:
 	for _frame in 20:
 		await tree.process_frame
 	await _shoot(tree, "%s/dropped_black_mirror.png" % out_dir)
+
+
+## The real DoctorRoute reads the real Carry record and hangs its tool from the
+## vat camera. This is intentionally not a turntable stand-in: it proves the
+## object the player sees while battering his door.
+func _restraint_in_hand(tree: SceneTree) -> void:
+	WorldHistory.clear_history()
+	var vat: Node = load("res://vat_chamber.tscn").instantiate()
+	add_child(vat)
+	await tree.process_frame
+	if vat.load_in != null:
+		vat.load_in.skip()
+	var carry := Carry.new()
+	carry.items.append({"label": DoctorRoute.RESTRAINT_LABEL, "kind": "tool", "mass": 0.0, "perishes": false, "age": 0.0, "from": "growing_floor"})
+	carry.save_to_history()
+	for _frame in 8:
+		await tree.physics_frame
+	var route: DoctorRoute = vat.doctor_route
+	vat._unhandled_input(InputEventMouseMotion.new())
+	vat.player.global_position = Vector3(route.DOOR_AT.x, vat.BODY_HALF_HEIGHT + 0.02, route.WALL_Z - 1.3)
+	vat.player.velocity = Vector3.ZERO
+	vat.yaw = PI
+	vat.pitch = -0.12
+	vat.player.rotation.y = vat.yaw
+	vat.camera.rotation = Vector3(vat.pitch, 0, 0)
+	var lamp := OmniLight3D.new()
+	lamp.light_energy = 3.0
+	lamp.omni_range = 3.0
+	lamp.shadow_enabled = false
+	vat.camera.add_child(lamp)
+	lamp.position = Vector3(0.1, -0.1, -0.2)
+	for _frame in 12:
+		await tree.process_frame
+	print("RESTRAINT held=", route.held_restraint != null, " generated=", route.held_restraint != null and route.held_restraint.name == "generated_restraint")
+	await _shoot(tree, "%s/restraint_in_hand.png" % out_dir)
+
+
+## Bones, clips and skinning of every rigged --glb=a.glb,b.glb.
+func _skeleton() -> void:
+	for path in glb.split(","):
+		var model := (load(path) as PackedScene).instantiate() as Node3D
+		add_child(model)
+		var stack: Array[Node] = [model]
+		print("SKELETON %s  root=%s" % [path.get_file(), model.name])
+		while not stack.is_empty():
+			var node: Node = stack.pop_back()
+			stack.append_array(node.get_children())
+			if node is Skeleton3D:
+				var skeleton := node as Skeleton3D
+				print("  Skeleton3D %s path=%s bones=%d" % [skeleton.name, model.get_path_to(skeleton), skeleton.get_bone_count()])
+				for bone in skeleton.get_bone_count():
+					var rest := skeleton.get_bone_global_rest(bone).origin
+					print("    bone %2d %-22s parent=%-3d rest_y=%.3f rest_x=%.3f" % [bone, skeleton.get_bone_name(bone), skeleton.get_bone_parent(bone), rest.y, rest.x])
+			elif node is MeshInstance3D:
+				var instance := node as MeshInstance3D
+				var box := instance.mesh.get_aabb() if instance.mesh != null else AABB()
+				print("  MeshInstance3D %s path=%s skeleton=%s skin=%s aabb_size=%s aabb_pos=%s" % [instance.name, model.get_path_to(instance), instance.skeleton, instance.skin != null, box.size, box.position])
+			elif node is AnimationPlayer:
+				var player := node as AnimationPlayer
+				print("  AnimationPlayer %s root_node=%s" % [player.name, player.root_node])
+				for clip in player.get_animation_list():
+					var animation := player.get_animation(clip)
+					print("    clip '%s' length=%.2f tracks=%d loop=%s" % [clip, animation.length, animation.get_track_count(), animation.loop_mode])
+					if animation.get_track_count() > 0:
+						print("      first tracks: %s | %s" % [animation.track_get_path(0), animation.track_get_path(mini(3, animation.get_track_count() - 1))])
+		model.queue_free()
 
 
 ## Principal axes of every --glb=a.glb,b.glb: how the generator oriented it,

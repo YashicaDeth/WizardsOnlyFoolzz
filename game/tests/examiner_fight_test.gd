@@ -83,6 +83,7 @@ func _win_world() -> void:
 	var route = vat.doctor_route
 	var fight = route.fight
 	check(fight != null and fight.state == "idle", "he is in his office, at his bench, back turned")
+	check(fight.skin != null, "he wears the generated model as a skin on the rig")
 	var mask: Node3D = fight.body.parts["head"].get_node("SurgicalMask")
 	await open_door(vat, route)
 	check(route.door.broken, "his door is down")
