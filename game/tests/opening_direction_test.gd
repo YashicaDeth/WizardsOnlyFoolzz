@@ -17,10 +17,17 @@ func _ready() -> void:
 		return
 	WorldHistory.clear_history()
 	var opening = load("res://vat_chamber.tscn").instantiate()
+	# Keep automatic-breakout compatibility coverage here; opening_handoff_test
+	# explicitly exercises the playable cord/glass/boot/crawl route.
+	opening.hands_on_breakout = false
 	add_child(opening)
 	await get_tree().process_frame
 	check(opening.phase == "intake", "the handler and sheet are the first playable beat")
 	check(opening.intake != null, "character creation is reachable from a new run")
+	if opening.intake == null:
+		print("OPENING_DIRECTION_TEST_RESULT failures=", failures.size())
+		get_tree().quit(1)
+		return
 	check(opening.clock == 0.0, "the decanting camera does not run behind the form")
 	check(opening.opening_audio.room.playing and opening.opening_audio.pulse.playing, "the Growing Floor has room and body ambience")
 
