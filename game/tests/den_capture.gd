@@ -28,11 +28,12 @@ func _ready() -> void:
 	var mirror := vat.get_node("DenMirror") as Node3D
 	print("DEN shiv=%s mirror=%s centre=%s" % [shiv.global_position, mirror.global_position, vat.den_centre])
 	var look := (shiv.global_position + mirror.global_position) * 0.5
-	for shot: Array in [["doorway", Vector3(1.9, 1.3, 0.3), look], ["shiv", shiv.global_position + Vector3(0.5, 0.45, 0.0), shiv.global_position], ["mirror", mirror.global_position + Vector3(0.5, 0.45, 0.0), mirror.global_position]]:
+	for shot: Array in [["shiv", shiv.global_position + Vector3(0.5, 0.45, 0.0), shiv.global_position], ["mirror", mirror.global_position + Vector3(0.5, 0.45, 0.0), mirror.global_position]]:
+		camera.make_current()
 		camera.global_position = shot[1]
 		camera.look_at(shot[2], Vector3.UP)
 		lamp.global_position = camera.global_position + Vector3(0, 0.3, 0)
-		for _frame in 4:
+		for _frame in 12:
 			await get_tree().process_frame
 		await RenderingServer.frame_post_draw
 		var path := "%s/den_%s.png" % [out_dir, shot[0]]
