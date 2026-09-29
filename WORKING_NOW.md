@@ -48,12 +48,22 @@ Claude:
   (additive skin support only), game/systems/security_camera.gd,
   game/systems/doctor_route.gd, game/systems/doctor_examination.gd,
   game/vat_chamber.gd, new game/systems/model_skin.gd
-- 29 Sep, Claude (model work; the next Claude agent inherits these):
-  game/systems/generated_model.gd, game/systems/examiner_fight.gd,
-  game/systems/examiner_look.gd, game/tests/model_capture.gd,
-  game/tests/model_held_items_test.gd, game/tests/doctor_route_test.gd. Released: dropped_handheld.gd,
-  den_capture.gd, model_world_props_test.gd/.tscn, hunter_arsenal.gd and
-  vat_body_preview.gd.
+- 29 Sep, TWO agents are on the model lane now (Claude, and Codex running the
+  Claude prompt). Split by file so nobody collides:
+  * Codex: the restraint in hand, the surgical lamp and the bone drill:
+    game/systems/doctor_route.gd, game/tests/doctor_route_test.gd, and the
+    FIT entries for restraint / surgical_lamp / bone_drill in
+    game/systems/generated_model.gd (it owns that file until it commits them).
+  * Claude: the examiner skin (new game/systems/model_skin.gd,
+    game/systems/baseline_human.gd, examiner_fight.gd, examiner_look.gd, the
+    terminal examiner in game/vat_chamber.gd) and the CCTV
+    (game/systems/security_camera.gd, support_unit.gd). Claude adds the cctv
+    FIT entry to generated_model.gd only AFTER Codex's commit lands.
+  * Either: game/tests/model_capture.gd, model_held_items_test.gd,
+    model_world_props_test.gd (append, do not reorder).
+  Released: dropped_handheld.gd, den_capture.gd, hunter_arsenal.gd,
+  vat_body_preview.gd. Greg's frozen playtest copy is P:/GameDev/playtest-stable
+  (104b90ad): no agent works or edits there.
 
 ## Codex is in
 
