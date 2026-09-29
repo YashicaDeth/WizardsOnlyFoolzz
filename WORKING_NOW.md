@@ -56,13 +56,7 @@ Claude:
 
 ## Codex is in
 
-- Brief A / Hunt render cost: game/systems/ashbloom_world_generator.gd,
-  game/bone_yard_hunt.gd, new game/systems/hunt_static_batch.gd,
-  new game/systems/hunt_panel_scheduler.gd,
-  new game/tests/hunt_render_cost_probe.gd,
-  new game/tests/hunt_render_cost_probe.tscn,
-  game/systems/roamer_detail.gd,
-  new game/tests/hunt_roamer_tick_test.gd, new game/tests/hunt_roamer_tick_test.tscn
+- (free)
 
 ## Handoffs
 
@@ -72,6 +66,10 @@ Claude:
 - 2fd2d8ac: nine generated models imported (examiner rigged, Hornee, BREACH
   NINE, Black Mirror, shiv, restraint, CCTV, surgical lamp, drill). None is
   placed in a scene yet.
+- 7245f77e: the existing roamer distance tiers now actually reduce Hunt AI
+  cadence (4 Hz reduced, 0.67 Hz dormant; nearby/named actors unchanged).
+  `hunt_roamer_tick_test` is the focused contract. Perf is green; current Hunt
+  probe is 11.54 ms on Greg's RTX 2060 SUPER, so Brief A remains open.
 
 ## Done
 
