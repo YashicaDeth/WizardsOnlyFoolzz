@@ -15,6 +15,9 @@ signal open_surface(surface: String)
 
 var album: PhotoAlbum
 var _photos_rect := Rect2()
+## Hornee's card: his art, turned over into the plush (HorneeCard).
+var hornee_card: HorneeCard
+var _hornee_rect := Rect2()
 
 const CellOutzType := preload("res://systems/celloutz_type.gd")
 const VAT_BODY_PREVIEW := preload("res://systems/vat_body_preview.gd")
@@ -65,6 +68,9 @@ func _ready() -> void:
 	album.name = "PhotoAlbum"
 	album.visible = false
 	add_child(album)
+	hornee_card = HorneeCard.new()
+	hornee_card.name = "HorneeCard"
+	add_child(hornee_card)
 	resized.connect(_layout)
 	visible = false
 
@@ -90,6 +96,13 @@ func open(carry_model: Object, weapons: Object, rig: Node) -> void:
 func close() -> void:
 	visible = false
 	album.visible = false
+	hornee_card.close()
+
+
+func open_hornee() -> void:
+	hornee_card.open()
+	_layout()
+	queue_redraw()
 
 
 func open_album() -> void:
@@ -109,6 +122,10 @@ func _layout() -> void:
 		var content := _content_rect()
 		album.position = content.position
 		album.size = content.size
+	if hornee_card != null:
+		var card_area := _content_rect()
+		hornee_card.position = card_area.position
+		hornee_card.size = card_area.size
 
 
 func _frame() -> Rect2:
@@ -132,6 +149,13 @@ func handle_input(event: InputEvent) -> bool:
 		return false
 	# The album owns the keys while it is up; Escape, Tab or Backspace put it
 	# away and leave the hub open.
+	if hornee_card.visible:
+		if event is InputEventKey and event.pressed and not event.echo and (event as InputEventKey).keycode in [KEY_ESCAPE, KEY_TAB, KEY_BACKSPACE]:
+			hornee_card.close()
+			queue_redraw()
+			return true
+		hornee_card.handle_input(event)
+		return true
 	if album.visible:
 		if event is InputEventKey and event.pressed and not event.echo and (event as InputEventKey).keycode in [KEY_ESCAPE, KEY_TAB, KEY_BACKSPACE]:
 			album.visible = false
@@ -154,6 +178,9 @@ func handle_input(event: InputEvent) -> bool:
 					open_surface.emit("map")
 				elif TABS[tab] == "BRAIN INDEX":
 					open_album()
+			KEY_H:
+				if TABS[tab] == "BRAIN INDEX":
+					open_hornee()
 			_:
 				return true
 		queue_redraw()
@@ -167,6 +194,9 @@ func handle_input(event: InputEvent) -> bool:
 					return true
 			if TABS[tab] == "BRAIN INDEX" and _photos_rect.has_point(event.position):
 				open_album()
+				return true
+			if TABS[tab] == "BRAIN INDEX" and _hornee_rect.has_point(event.position):
+				open_hornee()
 				return true
 			if _vat_rect().has_point(event.position):
 				_dragging = true
@@ -218,8 +248,10 @@ func _draw() -> void:
 	var content := _content_rect()
 	draw_rect(content, Color(0, 0, 0, 0.35))
 	draw_rect(content, DIM * Color(1, 1, 1, 0.4), false, 1.0)
-	if album.visible:
+	if album.visible or hornee_card.visible:
 		_draw_vat()
+		if hornee_card.visible:
+			return
 		CellOutzType.draw_condensed(self, Vector2(frame.position.x + 26, frame.end.y - 16), "ARROWS OR CLICK: PICK A PHOTO  //  WHEEL: PAGE  //  ESC OR TAB: BACK TO THE INDEX", 8.0, DIM, 0.7)
 		return
 	match TABS[tab]:
@@ -442,6 +474,12 @@ func _draw_index(rect: Rect2) -> void:
 	draw_string(font, _photos_rect.position + Vector2(10, 20), "PHOTOS", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, INK)
 	draw_string(font, _photos_rect.position + Vector2(rect.size.x * 0.5 - 114, 20), "%02d" % photo_count, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, TEAL if photo_count > 0 else DIM)
 	CellOutzType.draw_condensed(self, _photos_rect.position + Vector2(_photos_rect.size.x - 150, 11), "ENTER OR CLICK: ALBUM", 8.0, DIM, 0.7)
+	# Hornee: the plush you made, carried as a card.
+	_hornee_rect = Rect2(_photos_rect.position + Vector2(0, 40), _photos_rect.size)
+	draw_rect(_hornee_rect, HOT * Color(1, 1, 1, 0.1 + 0.05 * sin(_clock * 2.4)))
+	draw_rect(_hornee_rect, HOT * Color(1, 1, 1, 0.6), false, 1.0)
+	draw_string(font, _hornee_rect.position + Vector2(10, 20), "HORNEE", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, INK)
+	CellOutzType.draw_condensed(self, _hornee_rect.position + Vector2(_hornee_rect.size.x - 150, 11), "H OR CLICK: HIS CARD", 8.0, DIM, 0.7)
 
 
 func _draw_handoff(rect: Rect2, title: String, note: String, action: String) -> void:
