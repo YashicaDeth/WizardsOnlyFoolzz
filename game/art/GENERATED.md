@@ -28,3 +28,19 @@ and held outside the repo until then:
 | `generated/video/loop_satellite_scan.ogv` | Higgsfield (Seedance) | V4, satellite scan | 2026-09-25 | D | Phone MAP page |
 | `generated/video/killcam_kidney.ogv` | Higgsfield (Seedance) | G7, kidney kill cam | 2026-09-25 | D | Kill cam |
 | `audio/generated/hf_*.wav` (8) | Higgsfield (Seed Audio) | Section 9 sound list | 2026-09-25 | A | Names to confirm with Greg |
+
+## Asset-generator imports
+
+From the tools in DESIGN/ASSET_TOOLS.md. Placeholder until Greg's own art.
+
+| File | Tool | Model | Licence | Prompt | Date | Lane | For |
+|---|---|---|---|---|---|---|---|
+| `generated/items/hornee_plush.glb` | Higgsfield | per prompt | per Higgsfield terms | Tripo H3.1 multiview from two cut-outs of Greg's own Hornee plush photos (front, back), hand and background removed by GPT Image 2.5 edit | 2026-09-29 | claude | Hornee as a 3D object: the plush in the Brain Index / companion |
+| `generated/items/breach_nine.glb` | Higgsfield | per prompt | per Higgsfield terms | Tripo H3.1 image-to-3D from a GPT Image 2.5 image in the house PS2 style (prompts in Higgsfield history, 29 Sep) | 2026-09-29 | claude | held item model: breach_nine |
+| `generated/items/black_mirror.glb` | Higgsfield | per prompt | per Higgsfield terms | Tripo H3.1 image-to-3D from a GPT Image 2.5 image in the house PS2 style (prompts in Higgsfield history, 29 Sep) | 2026-09-29 | claude | held item model: black_mirror |
+| `generated/items/shiv.glb` | Higgsfield | per prompt | per Higgsfield terms | Tripo H3.1 image-to-3D from a GPT Image 2.5 image in the house PS2 style (prompts in Higgsfield history, 29 Sep) | 2026-09-29 | claude | held item model: shiv |
+| `generated/items/restraint.glb` | Higgsfield | per prompt | per Higgsfield terms | Tripo H3.1 image-to-3D from a GPT Image 2.5 image in the house PS2 style (prompts in Higgsfield history, 29 Sep) | 2026-09-29 | claude | held item model: restraint |
+| `generated/props/cctv.glb` | Higgsfield | per prompt | per Higgsfield terms | Tripo H3.1 image-to-3D from a GPT Image 2.5 image in the house PS2 style (CCTV lifted from the M8 prop sheet) | 2026-09-29 | claude | lab set piece: cctv |
+| `generated/props/surgical_lamp.glb` | Higgsfield | per prompt | per Higgsfield terms | Tripo H3.1 image-to-3D from a GPT Image 2.5 image in the house PS2 style (CCTV lifted from the M8 prop sheet) | 2026-09-29 | claude | lab set piece: surgical_lamp |
+| `generated/props/bone_drill.glb` | Higgsfield | per prompt | per Higgsfield terms | Tripo H3.1 image-to-3D from a GPT Image 2.5 image in the house PS2 style (CCTV lifted from the M8 prop sheet) | 2026-09-29 | claude | lab set piece: bone_drill |
+| `generated/characters/examiner.glb` | Higgsfield | per prompt | per Higgsfield terms | Meshy multi-image to 3D, textured and rigged (A-pose, 1.8 m), from four views redrawn from Greg's M1 examiner turnaround sheet | 2026-09-29 | claude | the examiner's model (M1), replacing the stand-in |
