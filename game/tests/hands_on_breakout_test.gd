@@ -62,8 +62,12 @@ func _ready() -> void:
 	vat._unhandled_input(_click())
 	vat._unhandled_input(_click())
 	check(vat.vat_glass.visible and vat.glass_cracks.size() > 0, "two blows crack the glass (%d cracks)" % vat.glass_cracks.size())
+	# Four blows since ffe83229 (Greg: a harder breakout): the last one breaks it.
+	for _blow in vat.GLASS_BLOWS - 3:
+		vat._unhandled_input(_click())
+	check(vat.vat_glass.visible and not vat.breakout_complete, "the blow before the last still holds")
 	vat._unhandled_input(_click())
-	check(vat.breakout_complete and not vat.vat_glass.visible, "the third blow goes through")
+	check(vat.breakout_complete and not vat.vat_glass.visible, "the last blow goes through")
 	check(vat.phase == "knees" and not vat.can_move, "you come out on your knees, not moving yet")
 	check(vat.camera.position.y + vat.player.position.y < 1.0, "the eye is down at the puddle")
 	check(vat.boot_hud != null and vat.boot_hud.running, "the implant boots the HUD while you're down")
@@ -83,7 +87,7 @@ func _ready() -> void:
 	check(vat.prompt.text.contains("GET UP"), "then SPACE gets you up (%s)" % vat.prompt.text)
 	vat._unhandled_input(_key(KEY_SPACE))
 	check(vat.phase == "rising", "SPACE starts you up off your knees")
-	for _tick in 60:
+	for _tick in int(vat.RISE_SECONDS / 0.05) + 10:
 		if vat.can_move:
 			break
 		vat._physics_process(0.05)
