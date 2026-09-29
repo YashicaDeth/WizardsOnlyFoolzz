@@ -48,6 +48,11 @@ Claude:
   (additive skin support only), game/systems/security_camera.gd,
   game/systems/doctor_route.gd, game/systems/doctor_examination.gd,
   game/vat_chamber.gd, new game/systems/model_skin.gd
+- 29 Sep, Claude (continuing the model work): game/systems/hunter_arsenal.gd
+  and game/systems/vat_body_preview.gd (the BREACH NINE hook, one line each),
+  game/systems/examiner_fight.gd, game/systems/examiner_look.gd,
+  game/systems/handheld_device.gd (world/dropped Black Mirror only),
+  game/tests/held_gear_capture.gd, new game/tests/model_*_test.gd
 
 ## Codex is in
 
@@ -55,7 +60,9 @@ Claude:
   game/bone_yard_hunt.gd, new game/systems/hunt_static_batch.gd,
   new game/systems/hunt_panel_scheduler.gd,
   new game/tests/hunt_render_cost_probe.gd,
-  new game/tests/hunt_render_cost_probe.tscn
+  new game/tests/hunt_render_cost_probe.tscn,
+  game/systems/roamer_detail.gd,
+  new game/tests/hunt_roamer_tick_test.gd, new game/tests/hunt_roamer_tick_test.tscn
 
 ## Handoffs
 
