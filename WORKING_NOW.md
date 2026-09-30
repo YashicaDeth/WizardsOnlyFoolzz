@@ -100,6 +100,17 @@ Claude:
 
 ## Handoffs
 
+- Claude, loop 2-5 (30 Sep): real play's 7 fps was every landed blow stalling
+  (WorldLook grain maps keyed on drifting colours; wounds rebuilt whole; zone
+  damage tints). Fixed; tests/psy_lab_soak (windowed, two-minute pad fight)
+  now shows no frame over 42 ms after the first ~20 s. Enemies circle,
+  press and back out (gore_demo). Perf is fine for combat work now.
+- Greg decides: blood spray (BaselineHuman._spray) renders as large glossy
+  spheres hanging in the air around a hit body; reads as balloons, not blood.
+  Smaller, darker, elongated droplets that fall and pool would read better,
+  but gore look is Greg's call (it must never get worse). Render:
+  P:/GameDev/Temp/claude-lamp/bruise_after.png.
+
 - Codex combat loop 1: fixed the captured roll disassembly in
   `hunter_body_motion.gd`. All six zones now orbit one hip pivot, compact at
   mid-roll, invert as one body and return both feet under the body. New
