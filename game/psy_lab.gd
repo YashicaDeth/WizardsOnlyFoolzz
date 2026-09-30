@@ -95,8 +95,18 @@ func _input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	_frame_ms = lerpf(_frame_ms, delta * 1000.0, 0.1)
-	if readout != null and is_instance_valid(readout):
+	# Greg, 30 September (the sandbox frame rate): this readout was redrawn
+	# every frame, and CellOutzType draws each glyph as polygons, so the thing
+	# measuring the frame was 4.6 of its 10 ms (tests/psy_lab_perf). Numbers
+	# read at five a second.
+	_repaint_clock += delta
+	if _repaint_clock >= READOUT_PERIOD and readout != null and is_instance_valid(readout):
+		_repaint_clock = 0.0
 		readout.queue_redraw()
+
+
+const READOUT_PERIOD := 0.2
+var _repaint_clock := 0.0
 
 
 func _paint() -> void:
@@ -132,5 +142,5 @@ func _paint() -> void:
 	for line: Array in lines:
 		CellOutzType.draw_condensed(readout, Vector2(x, y), str(line[0]), float(line[1]), line[2], 2.0)
 		y += float(line[1]) + 8.0
-	var keys := "LMB SWING  RMB GUARD  H ENEMIES  N DIFFICULTY  R RESPAWN  E TAKE  X XRAY  Q CUT  F OPEN  F1 HIDE"
+	var keys := "V 3RD PERSON  Z LOCK  LMB SWING / HOLD HEAVY  SPACE ROLL  RMB GUARD  H ENEMIES  N DIFFICULTY  R RESPAWN  X XRAY  F1 HIDE"
 	CellOutzType.draw_condensed(readout, Vector2(x, readout.size.y - 44.0), keys, 9.0, bone * Color(1, 1, 1, 0.5), 1.6)
