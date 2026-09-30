@@ -22,7 +22,10 @@ commit. Never edit a file the other agent has claimed.
 
 ## Combat loop live claims
 
-- Codex: clear after loop 1; measuring the next lane problem.
+- Codex loop 2: `game/systems/hunter_body_motion.gd` and
+  `game/tests/body_motion_test.gd`. Measured defect in `light.png`: a light
+  attack leaves the torso and hips rigid while only the forearm flicks for
+  roughly two frames, so the cut has no readable load, step or follow-through.
 
 ## Greg decides
 

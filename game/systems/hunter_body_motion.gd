@@ -546,7 +546,7 @@ func _apply_moveset_pose() -> void:
 		side_sign = 0.35
 	elif moveset_side == BladeRead.LOW:
 		side_sign = -0.35
-	var weight := 1.28 if moveset_attack == "heavy" else (1.12 if moveset_attack in ["running_attack", "roll_attack"] else 1.0)
+	var weight := 1.42 if moveset_attack == "charged_heavy" else (1.28 if moveset_attack == "heavy" else (1.12 if moveset_attack in ["running_attack", "roll_attack"] else 1.0))
 	var windup := 0.0
 	var strike := 0.0
 	var settle := 1.0
@@ -565,6 +565,8 @@ func _apply_moveset_pose() -> void:
 	var left_arm := rig.parts.get("left_arm") as Node3D
 	var torso := rig.parts.get("torso") as Node3D
 	var head := rig.parts.get("head") as Node3D
+	var left_leg := rig.parts.get("left_leg") as Node3D
+	var right_leg := rig.parts.get("right_leg") as Node3D
 	var thrusting := "thrust" in moveset_motion or moveset_motion == "jab" or moveset_motion == "shove"
 	if thrusting:
 		var extension := (windup * -0.34 + strike * 0.92) * weight * settle
@@ -583,19 +585,42 @@ func _apply_moveset_pose() -> void:
 		for zone_id in ["right_arm", "left_arm", "torso", "head"]:
 			_sync_zone_hitbox(zone_id)
 		return
+	# A cut starts at the floor, not at the wrist. Windup shifts the weight away
+	# from the striking side; the active phase plants the lead foot and moves the
+	# pelvis/torso through the target before the arm follows. All body zones are
+	# siblings, so the common upper-body shift must be applied to each of them or
+	# the arm appears to detach while the chest stays behind.
+	var upper_shift := Vector3(
+		side_sign * (-0.055 * windup + 0.075 * strike),
+		-0.035 * windup + 0.025 * strike,
+		0.10 * windup - 0.16 * strike
+	) * weight * settle
+	for upper in [torso, head, left_arm, right_arm]:
+		if upper != null:
+			upper.position += upper_shift
+	var lead_leg := right_leg if side_sign > 0.0 else left_leg
+	var brace_leg := left_leg if side_sign > 0.0 else right_leg
+	if lead_leg != null:
+		lead_leg.position += Vector3(side_sign * 0.025, -0.025 * strike, -0.18 * strike) * weight * settle
+		lead_leg.rotation.x += (-0.16 * windup + 0.30 * strike) * weight * settle
+	if brace_leg != null:
+		brace_leg.position += Vector3(-side_sign * 0.02, -0.015 * windup, 0.08 * windup) * weight * settle
+		brace_leg.rotation.x += (0.12 * windup - 0.10 * strike) * weight * settle
 	if right_arm != null:
-		right_arm.rotation.x += (windup * 0.66 - strike * 0.30) * weight * settle
-		right_arm.rotation.y += side_sign * (windup * -0.28 + strike * 0.34) * weight * settle
-		right_arm.rotation.z += side_sign * (windup * -1.02 + strike * 1.48) * weight * settle
+		right_arm.rotation.x += (windup * 0.78 - strike * 0.52) * weight * settle
+		right_arm.rotation.y += side_sign * (windup * -0.52 + strike * 0.82) * weight * settle
+		right_arm.rotation.z += side_sign * (windup * -1.18 + strike * 1.82) * weight * settle
 	if left_arm != null:
-		left_arm.rotation.x += (windup * 0.22 + strike * 0.14) * weight * settle
-		left_arm.rotation.z += side_sign * (windup * 0.34 - strike * 0.26) * weight * settle
+		left_arm.rotation.x += (windup * 0.30 + strike * 0.20) * weight * settle
+		left_arm.rotation.y -= side_sign * (windup * 0.12 + strike * 0.18) * weight * settle
+		left_arm.rotation.z += side_sign * (windup * 0.42 - strike * 0.34) * weight * settle
 	if torso != null:
-		torso.rotation.y += side_sign * (windup * -0.20 + strike * 0.32) * weight * settle
-		torso.rotation.x += (0.18 if moveset_side == BladeRead.LOW else -0.08) * strike * settle
+		torso.rotation.y += side_sign * (windup * -0.42 + strike * 0.62) * weight * settle
+		torso.rotation.z += side_sign * (windup * 0.09 - strike * 0.14) * weight * settle
+		torso.rotation.x += ((0.22 if moveset_side == BladeRead.LOW else -0.10) * strike - 0.06 * windup) * weight * settle
 	if head != null:
-		head.rotation.y -= side_sign * 0.10 * strike * settle
-	for zone_id in ["right_arm", "left_arm", "torso", "head"]:
+		head.rotation.y += side_sign * (0.14 * windup - 0.18 * strike) * weight * settle
+	for zone_id in ["right_arm", "left_arm", "torso", "head", "left_leg", "right_leg"]:
 		_sync_zone_hitbox(zone_id)
 
 

@@ -63,6 +63,25 @@ func _ready() -> void:
 	motion.update(0.016, Vector3.ZERO, true, false, false, false)
 	check(rig.parts.left_arm.rotation.distance_to(one_hand_guard) > 0.12, "two-hand idle visibly brings the support hand onto the weapon")
 	var slash_rest: Vector3 = rig.parts.right_arm.rotation
+	var slash_rest_torso_rotation: Vector3 = rig.parts.torso.rotation
+	var slash_rest_torso_position: Vector3 = rig.parts.torso.position
+	var slash_rest_right_leg: Vector3 = rig.parts.right_leg.position
+	motion.set_moveset_pose("windup", 1.0, BladeRead.RIGHT, "light_1", "sword", "slash")
+	motion.update(0.0, Vector3.ZERO, true, false, false, false)
+	var loaded_torso_rotation: Vector3 = rig.parts.torso.rotation
+	var loaded_torso_position: Vector3 = rig.parts.torso.position
+	var loaded_arm_rotation: Vector3 = rig.parts.right_arm.rotation
+	motion.set_moveset_pose("active", 1.0, BladeRead.RIGHT, "light_1", "sword", "slash")
+	motion.update(0.0, Vector3.ZERO, true, false, false, false)
+	var committed_torso_rotation: Vector3 = rig.parts.torso.rotation
+	var committed_torso_position: Vector3 = rig.parts.torso.position
+	var committed_arm_rotation: Vector3 = rig.parts.right_arm.rotation
+	check(absf(committed_torso_rotation.y - loaded_torso_rotation.y) > 0.75, "light cut turns the torso from a readable load through the target")
+	check(committed_arm_rotation.distance_to(loaded_arm_rotation) > 2.0, "weapon arm follows through a full authored arc rather than a forearm flick")
+	check(committed_torso_position.distance_to(loaded_torso_position) > 0.22 and rig.parts.right_leg.position.distance_to(slash_rest_right_leg) > 0.12, "light cut transfers weight into a planted lead-foot step")
+	motion.set_moveset_pose("recovery", 1.0, BladeRead.RIGHT, "light_1", "sword", "slash")
+	motion.update(0.0, Vector3.ZERO, true, false, false, false)
+	check(rig.parts.torso.rotation.distance_to(slash_rest_torso_rotation) < 0.02 and rig.parts.torso.position.distance_to(slash_rest_torso_position) < 0.02, "light recovery returns the full body to guard without a snap")
 	motion.set_moveset_pose("active", 0.7, BladeRead.RIGHT, "light_1", "sword", "slash")
 	motion.update(0.0, Vector3.ZERO, true, false, false, false)
 	var slash_pose: Vector3 = rig.parts.right_arm.rotation
