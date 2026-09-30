@@ -23,6 +23,12 @@ const LOCK_CONE := 0.5
 const LOCK_BREAK := 18.0
 ## Third person with no lock: the body turns to where it is being pushed.
 const TURN_RATE := 12.0
+## How far the shoulder camera may tilt (Souls): looking up past this drove
+## the orbit under the floor and left it staring at the sky from the ground
+## (Greg's 30 Sep screenshot). And it never sinks below knee height.
+const PITCH_MIN := -0.75
+const PITCH_MAX := 0.42
+const CAMERA_MIN_HEIGHT := 0.55
 
 var rig: BaselineHuman
 var motion: HunterBodyMotion
@@ -170,7 +176,10 @@ func advance(real_delta: float, eye: Vector3, stance_height: float, yaw: float, 
 		var gap := feet.distance_to(lock_target.global_position)
 		distance = clampf(3.6 + gap * 0.22, 3.6, 6.2)
 		focus = focus.lerp(lock_target.global_position + Vector3.UP * 0.9, 0.32)
-	var desired := feet + Vector3.UP * 1.75 - look * distance + right * 0.62
+	var orbit_pitch := clampf(pitch, PITCH_MIN, PITCH_MAX)
+	var orbit := Vector3(-sin(yaw) * cos(orbit_pitch), sin(orbit_pitch), -cos(yaw) * cos(orbit_pitch))
+	var desired := feet + Vector3.UP * 1.75 - orbit * distance + right * 0.62
+	desired.y = maxf(desired.y, feet.y + CAMERA_MIN_HEIGHT)
 	if not _camera_ready:
 		_camera_at = desired
 		_camera_ready = true

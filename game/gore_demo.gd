@@ -959,7 +959,7 @@ func _melee_contact(attack: Dictionary, found: Dictionary, along: Vector3, origi
 		if defender_motion != null and is_instance_valid(defender_motion):
 			defender_motion.trigger_parry()
 		parry_spark.burst(landed - along * 0.25, camera.global_transform.basis * arm.velocity)
-		_note("PARRIED // %s MET %s" % [str(read.guard).to_upper(), side.to_upper()])
+		_note("PARRIED // %s MET %s" % [str(defender.get("guard", "")).to_upper(), side.to_upper()])
 		return
 	if str(read.outcome) == "block":
 		parry_spark.burst(landed - along * 0.2, camera.global_transform.basis * arm.velocity, 0.5)
@@ -2374,6 +2374,11 @@ func _physics_process(delta: float) -> void:
 	# The eye and the shoulder are one camera, blended (SandboxAvatar), and a
 	# lock turns the view onto whoever it holds.
 	yaw = avatar.steer_yaw(yaw, eye, real_delta)
+	# Over the shoulder the view tilts only as far as the orbit can follow;
+	# the rest of the stick or mouse would be spent winding up a pitch the
+	# camera then has to unwind before it moves again.
+	if third_person:
+		pitch = clampf(pitch, SandboxAvatar.PITCH_MIN, SandboxAvatar.PITCH_MAX)
 	avatar.advance(real_delta, eye, stance_height, yaw, pitch, walk, dodge_remaining > 0.0,
 		Input.is_key_pressed(KEY_CTRL), camera, shove, -impact_feel.roll)
 	var eye_fov := camera.fov

@@ -44,6 +44,15 @@ func _ready() -> void:
 	check(absf(avatar.global_position.y) < 0.05 and Vector2(avatar.global_position.x - demo.eye.x, avatar.global_position.z - demo.eye.z).length() < 0.01, "the body stands on the player's feet")
 	check(absf(demo.camera.fov - SandboxAvatar.THIRD_PERSON_FOV) < 1.0, "at the third-person field of view (%.1f)" % demo.camera.fov)
 
+	# --- Looking all the way up never drives the camera into the floor. ---
+	var pitch_before: float = demo.pitch
+	demo.pitch = 0.9
+	await _frames(60)
+	check(demo.pitch <= SandboxAvatar.PITCH_MAX + 0.001, "third person holds the tilt at the orbit's limit (%.2f)" % demo.pitch)
+	check(demo.camera.global_position.y >= avatar.global_position.y + SandboxAvatar.CAMERA_MIN_HEIGHT - 0.05, "and the camera stays above knee height (%.2f m)" % (demo.camera.global_position.y - avatar.global_position.y))
+	demo.pitch = pitch_before
+	await _frames(30)
+
 	# --- Your own body never stops your own trace. ---
 	var through: Dictionary = demo._trace_body(demo.camera.global_position, (demo.eye - demo.camera.global_position).normalized())
 	check(through.is_empty() or through.get("rig") != avatar.rig, "a trace from behind passes through your own body")

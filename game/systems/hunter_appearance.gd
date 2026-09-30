@@ -52,7 +52,11 @@ static func style_world_rig(rig: BaselineHuman, identity: String, armed: bool, c
 	# The grip sits at the wrist, with the edge projected forward of the body;
 	# it is parented to the arm so a severed arm takes its weapon with it.
 	weapon.position = Vector3(0.0, -0.34, -0.07)
-	weapon.rotation = Vector3(-PI * 0.48, 0.12, 0.0)
+	# Blade forward and down in front of the body, pommel just above the fist
+	# (Greg, 30 Sep: "sword models are backwards in the hands"; -0.48 PI hung
+	# the blade down behind the legs like a reversed cane). Chosen from side
+	# renders of four candidates.
+	weapon.rotation = Vector3(PI * 0.48, 0.12, 0.0)
 	arm.add_child(weapon)
 
 ## Replaceable procedural hero detail mounted directly on BaselineHuman zones.
