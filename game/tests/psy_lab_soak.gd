@@ -116,7 +116,7 @@ func _process(delta: float) -> void:
 		worst = maxf(worst, frame_ms)
 		if frame_ms > 100.0 and spikes < 40:
 			spikes += 1
-			print("SPIKE %6.1f ms at t=%5.1fs after [%s] note [%s] chunks %d | last blow %.1f ms | pipelines +%d (surface +%d, draw +%d, spec +%d)" % [frame_ms, clock, last_action, str(demo.last_note), GoreChunks.live_count(), demo.last_contact_ms, _pipelines() - last_pipelines, int(Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SURFACE)) - last_surface, int(Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_DRAW)) - last_draw, int(Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SPECIALIZATION)) - last_spec])
+			print("SPIKE %6.1f ms at t=%5.1fs after [%s] note [%s] chunks %d | last blow %.1f ms | enemy blow %.1f ms | pipelines +%d (surface +%d, draw +%d, spec +%d)" % [frame_ms, clock, last_action, str(demo.last_note), GoreChunks.live_count(), demo.last_contact_ms, demo.last_enemy_strike_ms, _pipelines() - last_pipelines, int(Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SURFACE)) - last_surface, int(Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_DRAW)) - last_draw, int(Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SPECIALIZATION)) - last_spec])
 	last_us = now
 	last_pipelines = _pipelines()
 	last_surface = int(Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SURFACE))

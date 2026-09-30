@@ -2564,6 +2564,16 @@ func _set_enemies_enabled(enabled: bool) -> void:
 ## knocks an armed hand open, so the weapon flies; the right side late blocks
 ## most of it; anything else is open.
 func _enemy_strike(entry: Dictionary, holder: Node3D) -> void:
+	var started := Time.get_ticks_usec()
+	_enemy_strike_body(entry, holder)
+	last_enemy_strike_ms = (Time.get_ticks_usec() - started) / 1000.0
+
+
+## What an enemy's blow on you costs, in ms (the soak shows it).
+var last_enemy_strike_ms := 0.0
+
+
+func _enemy_strike_body(entry: Dictionary, holder: Node3D) -> void:
 	# Inside the roll's i-frames the blow passes through (SoulsRoll).
 	if roll.is_invulnerable():
 		_note("ROLLED THROUGH // %s" % str(entry.get("swing", "")).to_upper())

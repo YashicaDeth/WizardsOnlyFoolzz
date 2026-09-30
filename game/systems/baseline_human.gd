@@ -93,6 +93,25 @@ const BONE := Color("cfc2a4")
 const BLOOD := Color("6b0f0c")
 const BLOOD_DARK := Color("3d0907")
 const ORGAN := Color("7a1a16")
+## How many shades between ORGAN and BLOOD_DARK a spilled organ blob takes.
+const ORGAN_SHADES := 4
+## The materials every body's gore shares (blood, dark blood, bone, the organ
+## shades), in all six of WorldLook's variations, built the first time any
+## body is: 0.4 s once, at load, instead of 10 ms stalls through the first
+## minute of a fight (Greg's 30 Sep playtest, 7 fps).
+static var _gore_materials_warm := false
+
+
+static func _warm_gore_materials() -> void:
+	if _gore_materials_warm:
+		return
+	_gore_materials_warm = true
+	var shared: Array = [[BLOOD, "flesh"], [BLOOD_DARK, "flesh"], [BONE, "bone"]]
+	for shade in ORGAN_SHADES:
+		shared.append([ORGAN.lerp(BLOOD_DARK, float(shade) / float(ORGAN_SHADES - 1)), "flesh"])
+	for pair: Array in shared:
+		for bucket in 6:
+			WorldLook.surface(pair[0], pair[1], bucket)
 ## Below this share of a zone's health the bone has gone through the skin and
 ## stays gone: a compound fracture is a state of the body, not an effect.
 const FRACTURE_RATIO := 0.4
@@ -253,6 +272,7 @@ static func canonical_zone(zone_id: String) -> String:
 
 func build(id: String, config: Dictionary = {}) -> void:
 	subject_id = id
+	_warm_gore_materials()
 	# Default to the world's gore setting rather than to true. Every rig used to
 	# be born with gore on and every caller had to remember to turn it off - and
 	# one of them did not, which is how the Hunt Grounds shipped ignoring the
@@ -1517,7 +1537,9 @@ func _spill_guts() -> void:
 		var blob := SphereMesh.new()
 		blob.radius = 0.075 + randf() * 0.07
 		blob.height = blob.radius * 2.0 * (1.2 + randf() * 0.9)
-		blob.material = WorldLook.surface(ORGAN.lerp(BLOOD_DARK, randf()), "flesh", index + _variation + 9)
+		# Four shades, not a random colour: a random one missed WorldLook's
+		# cache every time (a 10 ms texture pair per blob).
+		blob.material = WorldLook.surface(ORGAN.lerp(BLOOD_DARK, float(randi() % ORGAN_SHADES) / float(ORGAN_SHADES - 1)), "flesh", index + _variation + 9)
 		organ.mesh = blob
 		root.add_child(organ)
 		organ.global_position = origin + Vector3(randf_range(-0.12, 0.12), randf_range(-0.1, 0.1), randf_range(-0.12, 0.12))
