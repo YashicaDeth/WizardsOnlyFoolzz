@@ -171,6 +171,13 @@ var guard_aim := Vector2.ZERO
 var guard_held := 0.0
 var swing_released_side := ""
 var third_person := false
+## The body and the shoulder camera V actually moves to (Greg, 30 September).
+var avatar: SandboxAvatar
+## Third person swings come from the keys, not the mouse (the mouse is the
+## camera there): the side being fed to the arm and how long is left of it.
+var _tp_swing_side := ""
+var _tp_swing_left := 0.0
+var _tp_chain := 0
 var last_read: Dictionary = {}
 var pending_melee: Dictionary = {}
 var melee_windup := -1.0
@@ -287,6 +294,9 @@ func _ready() -> void:
 	WorldHistory.register_subject(SANDBOX_SUBJECT, {"name": "SANDBOX WITNESS", "kind": "person", "anatomy_state": {}})
 	_build_room()
 	_build_camera()
+	avatar = SandboxAvatar.new()
+	add_child(avatar)
+	avatar.build()
 	impact_feel = IMPACT_FEEL.new()
 	add_child(impact_feel)
 	ballistics = BALLISTICS.new()
@@ -667,7 +677,7 @@ func _fire() -> void:
 			_: _note("BUSY")
 		return
 	var along := -camera.global_transform.basis.z
-	var start := camera.global_position + along * 0.6
+	var start := _shot_origin(along, 0.6)
 	# `shot_directions()` returns one direction for a single-pellet weapon and
 	# several for a shotgun — mirrors `bone_yard_hunt.gd`'s own
 	# `_resolve_firearm()` exactly, calibre included, so the range and the Hunt
@@ -713,7 +723,7 @@ func _fire_launcher() -> void:
 	launcher_rounds -= 1
 	launcher_cooldown = 1.15
 	var along := -camera.global_transform.basis.z
-	var start := _muzzle_world(camera.global_position + along * 0.7)
+	var start := _muzzle_world(_shot_origin(along, 0.7))
 	_shot_serial += 1
 	ballistics.fire(start, along, "rocket", 0.0, 1, "demo", {
 		"source": SHOT_SOURCE,
@@ -814,7 +824,17 @@ func _melee_swing() -> void:
 	if not bool(attack.get("accepted", false)):
 		return
 	_gear_recoil = 1.0
-	swing_released_side = BladeRead.swing_side(arm.velocity)
+	if third_person:
+		# Committed at release, from the keys: push picks the side, no push
+		# alternates forehand and backhand. The arm is then driven along it for
+		# the wind-up so commitment and the cut plane are real, not the mouse.
+		_tp_swing_side = _tp_side_from_keys()
+		_tp_swing_left = maxf(0.01, float(attack.get("windup", 0.12)))
+		swing_released_side = _tp_swing_side
+		if avatar.motion != null:
+			avatar.motion.trigger_attack(_tp_swing_left + 0.25, "melee")
+	else:
+		swing_released_side = BladeRead.swing_side(arm.velocity)
 	attack["released_side"] = swing_released_side
 	pending_melee = attack
 	melee_windup = maxf(0.01, float(attack.get("windup", 0.12)))
@@ -829,12 +849,15 @@ func _resolve_melee_swing() -> void:
 	melee_windup = -1.0
 	if attack.is_empty():
 		return
-	var along := -camera.global_transform.basis.z
-	var start := camera.global_position + along * 0.6
+	# Over the shoulder the blow leaves the body, at the lock or the way it
+	# faces; from the camera it would start metres behind the player.
+	var along := avatar.strike_direction(eye) if third_person else -camera.global_transform.basis.z
+	var origin := eye if third_person else camera.global_position
+	var start := origin + along * (0.3 if third_person else 0.6)
 	var reach := float(attack.get("range", 3.0))
 	var found := _trace_body(start, along)
 	var released_side := str(attack.get("released_side", ""))
-	if found.is_empty() or camera.global_position.distance_to(found.get("position", start)) > reach:
+	if found.is_empty() or origin.distance_to(found.get("position", start)) > reach:
 		# A miss carries through and has to be caught, which is why whiffing a
 		# committed swing is a real cost rather than a free probe.
 		arm.whiff()
@@ -888,7 +911,7 @@ func _resolve_melee_swing() -> void:
 	arm.strike(_melee_bite(off), -along)
 	var defender_hit := defender.get("motion") as HunterBodyMotion
 	if defender_hit != null and is_instance_valid(defender_hit):
-		defender_hit.trigger_stagger(rig.to_local(camera.global_position), 1.0 if off else 0.6)
+		defender_hit.trigger_stagger(rig.to_local(origin), 1.0 if off else 0.6)
 	_note("%s OFF // %s" % [_spoken(zone), side.to_upper()] if off else "HIT // %s // %s" % [_spoken(zone), side.to_upper()])
 	_try_finisher(rig, str(arsenal.current_id), zone, along, float(result.get("damage", 0.0)), damage_type)
 
@@ -897,6 +920,40 @@ func _resolve_melee_swing() -> void:
 ## meeting one that stays on is what jars the arm.
 func _melee_bite(severed: bool) -> float:
 	return 0.25 if severed else 0.75
+
+
+## Where a round leaves. From the eye this is just ahead of the lens; over
+## the shoulder the lens is metres behind the player, so the round starts past
+## the head along the same aim line instead of passing through your own back.
+func _shot_origin(along: Vector3, ahead: float) -> Vector3:
+	var from := camera.global_position
+	if avatar != null and avatar.visible:
+		ahead = maxf(ahead, along.dot(eye - from) + 0.5)
+	return from + along * ahead
+
+
+## The look delta per real second that drives the arm through each side, in
+## the mouse's own convention (x right, y down). Signs are pinned by
+## third_person_sandbox_test: fed for a wind-up, BladeRead reads the side back.
+## ponytail: one fixed push per side; Codex's SwordMoveset replaces this with
+## authored light/heavy chains (DESIGN/CODEX_BRIEF_SOULS_MELEE_2026-09-30.md).
+const TP_SWING_PUSH := {
+	"left": Vector2(-9.0, 0.0), "right": Vector2(9.0, 0.0),
+	"high": Vector2(0.0, -9.0), "low": Vector2(0.0, 9.0),
+}
+
+
+func _tp_side_from_keys() -> String:
+	if Input.is_key_pressed(KEY_W):
+		return BladeRead.HIGH
+	if Input.is_key_pressed(KEY_S):
+		return BladeRead.LOW
+	if Input.is_key_pressed(KEY_A):
+		return BladeRead.LEFT
+	if Input.is_key_pressed(KEY_D):
+		return BladeRead.RIGHT
+	_tp_chain += 1
+	return BladeRead.RIGHT if _tp_chain % 2 == 1 else BladeRead.LEFT
 
 
 ## The bodies entry for a rig, so a swing can ask what its target was holding.
@@ -1225,7 +1282,9 @@ func _equip_launcher() -> void:
 
 
 func _muzzle_world(fallback: Vector3) -> Vector3:
-	if muzzle_point != null and is_instance_valid(muzzle_point):
+	# The muzzle rides the first-person viewmodel, which is behind the player
+	# over the shoulder.
+	if muzzle_point != null and is_instance_valid(muzzle_point) and not (avatar != null and avatar.visible):
 		return muzzle_point.global_position
 	return fallback
 
@@ -1431,7 +1490,8 @@ func _trace_body(from: Vector3, along: Vector3) -> Dictionary:
 		if hit.is_empty():
 			return {}
 		var collider := hit.get("collider") as Node
-		if collider != null and not GoreChunks.identify(collider).is_empty():
+		# Loose gore, and your own body when the camera is behind it.
+		if collider != null and (not GoreChunks.identify(collider).is_empty() or (avatar != null and avatar.owns(collider))):
 			skip.append(hit.get("rid"))
 			continue
 		var rig := _rig_above(collider)
@@ -1514,7 +1574,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		# The same movement that turns the head swings the blade. This is the
 		# whole of the Mordhau input model and it costs one line, because
 		# `LimbMomentum.advance()` has always taken a look delta.
-		_look_delta += turn
+		# Over the shoulder the mouse is the camera, and feeding it to the arm
+		# read every camera turn as a swing: that was third person breaking.
+		if not third_person:
+			_look_delta += turn
 		if guarding:
 			guard_aim += motion.relative
 	if event is InputEventMouseButton:
@@ -1581,8 +1644,17 @@ func _unhandled_input(event: InputEvent) -> void:
 					jump_queued = true
 			KEY_E: _take_station_item()
 			KEY_F: _open_nearest_body()
+			KEY_Z:
+				var was_locked := avatar.lock_target != null
+				if avatar.toggle_lock(bodies, eye, -camera.global_transform.basis.z):
+					_note("LOCKED // Z RELEASES")
+				else:
+					_note("LOCK RELEASED" if was_locked else "NOTHING TO LOCK ON TO")
 			KEY_V:
 				third_person = not third_person
+				avatar.third_person = third_person
+				if not third_person:
+					avatar.release_lock()
 				# The registers differ in when the swing direction is read, so
 				# say which one is running rather than leaving it to be felt.
 				_note("THIRD PERSON // COMMITTED SWINGS" if third_person else "FIRST PERSON // DRAG YOUR SWINGS")
@@ -1922,6 +1994,9 @@ func _physics_process(delta: float) -> void:
 	walk = walk.lerp(move * move_speed, clampf(real_delta * 14.0, 0.0, 1.0))
 	# The arm and guard run in real seconds: sandbox slow motion bends the world,
 	# not the player's input. The delta is already radians, matching the Hunt.
+	if _tp_swing_left > 0.0:
+		_look_delta += TP_SWING_PUSH.get(_tp_swing_side, Vector2.ZERO) * real_delta
+		_tp_swing_left = maxf(0.0, _tp_swing_left - real_delta)
 	if arm != null:
 		var forward := Vector3(sin(yaw), 0.0, cos(yaw))
 		var right := Vector3(forward.z, 0.0, -forward.x)
@@ -1965,15 +2040,21 @@ func _physics_process(delta: float) -> void:
 	# contact. The feeler has been carrying this the whole time and nothing in
 	# this scene was asking it for anything.
 	var shove: Vector2 = impact_feel.camera_offset()
-	camera.global_position = eye
-	camera.global_transform.basis = Basis(Vector3.UP, yaw + shove.x) * Basis(Vector3.RIGHT, pitch + shove.y) * Basis(Vector3.FORWARD, impact_feel.roll)
+	# The eye and the shoulder are one camera, blended (SandboxAvatar), and a
+	# lock turns the view onto whoever it holds.
+	yaw = avatar.steer_yaw(yaw, eye, real_delta)
+	avatar.advance(real_delta, eye, stance_height, yaw, pitch, walk, dodge_remaining > 0.0,
+		Input.is_key_pressed(KEY_CTRL), camera, shove, -impact_feel.roll)
+	var eye_fov := camera.fov
+	if view_gear != null and is_instance_valid(view_gear):
+		view_gear.visible = not avatar.visible
 	var aiming_now := firearm_aiming and str(arsenal.current().get("kind", "")) == "firearm"
 	if launcher_equipped:
 		aiming_now = firearm_aiming
 	if not aiming_now:
 		firearm_aiming = false
 	firearm_aim_blend = move_toward(firearm_aim_blend, 1.0 if aiming_now else 0.0, real_delta * 7.0)
-	camera.fov = lerpf(78.0, 56.0, firearm_aim_blend)
+	camera.fov = lerpf(eye_fov, 56.0, firearm_aim_blend)
 
 	# Everything a shot owes the eye, timed in real seconds like the hitstop is:
 	# a tracer measured on the bent clock would hang in the air for a second and
@@ -2300,7 +2381,7 @@ func _paint_hud() -> void:
 			["SPACE", "JUMP/MOVE+DODGE"], ["C", "GRAPPLE/LET GO"], ["H", "DUMMY/ENEMY"],
 			["6-8", "MELEE/FIREARMS"], ["9", "BREACH LAUNCHER"], ["WHEEL", "CYCLE"], ["T", "RELOAD"],
 			["SHIFT", "HOLD FOR SLOW"], ["X", "X-RAY"], ["Q", "CUT"], ["E", "TAKE"], ["F", "OPEN BODY"],
-			["RMB", "GUARD (MOUSE PICKS SIDE)"], ["V", "1ST/3RD PERSON"],
+			["RMB", "GUARD (MOUSE PICKS SIDE)"], ["V / Z", "3RD PERSON / LOCK ON"],
 			["1-4", "USE/HOLD SMOKE"], ["G", "DEVICE"], ["R", "RESET"], ["CTRL", "CROUCH"], ["F1", "LESS CONTROLS"],
 		]
 	# Emptied rather than branched around, so the layout below stays one code
