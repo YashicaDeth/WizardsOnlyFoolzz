@@ -14,6 +14,8 @@ func _ready() -> void:
 		get_tree().quit(2)
 		return
 	_add_floor()
+	await _test_impulse_regression()
+	await _test_weight_classes()
 	await _test_physics_corpse()
 	_test_opt_out_and_missing_limb()
 	print("RAGDOLL_BODY_TEST_RESULT failures=", failures.size())
@@ -39,8 +41,75 @@ func _body(id: String, ragdoll: bool, travel := 0.25) -> BaselineHuman:
 	return body
 
 
-func _kill(body: BaselineHuman, direction := Vector3.LEFT, impulse := 4.0) -> void:
-	body.hit("head", 200.0, impulse, "puncture", "brain", direction)
+func _kill(body: BaselineHuman, direction := Vector3.LEFT, impulse := 4.0, attack_id := "") -> void:
+	body.hit("head", 200.0, impulse, "puncture", "brain", direction, 1.0, null, null, attack_id)
+
+
+func _translated_body(id: String) -> Dictionary:
+	var holder := Node3D.new()
+	holder.position = Vector3(0.0, 0.9, 0.0)
+	add_child(holder)
+	var body := BaselineHuman.new()
+	holder.add_child(body)
+	body.position = Vector3(0.0, -0.9, 0.0)
+	body.build(id, {"gore": false, "ragdoll": true})
+	await get_tree().physics_frame
+	return {"holder": holder, "body": body}
+
+
+func _test_impulse_regression() -> void:
+	print("RAGDOLL BODY - translated holders never inject first-frame velocity")
+	for impulse in [4.0, 10.0, 16.0, 30.0]:
+		var fixture := await _translated_body("kick_regression_%d" % int(impulse))
+		var body := fixture.body as BaselineHuman
+		_kill(body, Vector3.RIGHT, impulse)
+		var peak := 0.0
+		for _step in 24:
+			await get_tree().physics_frame
+			var torso := body.ragdoll_body.bodies.get("torso") as RigidBody3D
+			peak = maxf(peak, torso.linear_velocity.length())
+		var expected_peak := minf(impulse, RagdollBody.MAX_KILLING_IMPULSE) * RagdollBody.BASE_IMPULSE_SPEED
+		check(peak <= expected_peak + 0.4, "impulse %d stays near its capped authored speed (peak %.2f)" % [int(impulse), peak])
+		(fixture.holder as Node).queue_free()
+		body.ragdoll_body.queue_free()
+		await get_tree().process_frame
+
+
+func _test_weight_classes() -> void:
+	print("RAGDOLL BODY - blow classes carry authored weight without skating")
+	var cases := [
+		{"attack": "light_1", "minimum": 0.0, "maximum": 0.5, "lift": false},
+		{"attack": "heavy", "minimum": 0.8, "maximum": 1.5, "lift": false},
+		{"attack": "charged_heavy", "minimum": 1.5, "maximum": 2.5, "lift": true},
+	]
+	for case in cases:
+		var fixture := await _translated_body("weight_%s" % case.attack)
+		var body := fixture.body as BaselineHuman
+		var torso_part := body.parts.torso as Node3D
+		var start := torso_part.global_position
+		_kill(body, Vector3.RIGHT, 28.0, str(case.attack))
+		check(body.ragdoll_body.attack_id == str(case.attack), "%s id reaches the corpse through BaselineHuman's last-hit record" % case.attack)
+		var peak := 0.0
+		var lifted := false
+		var launched_torso := body.ragdoll_body.bodies.get("torso") as RigidBody3D
+		var max_rise := maxf(0.0, launched_torso.global_position.y - start.y)
+		lifted = max_rise > 0.04
+		for _step in 190:
+			await get_tree().physics_frame
+			var torso := body.ragdoll_body.bodies.get("torso") as RigidBody3D
+			for body_value in body.ragdoll_body.bodies.values():
+				peak = maxf(peak, (body_value as RigidBody3D).linear_velocity.length())
+			max_rise = maxf(max_rise, torso.global_position.y - start.y)
+			lifted = lifted or max_rise > 0.04
+		var travel := maxf(0.0, torso_part.global_position.x - start.x)
+		check(travel >= float(case.minimum) and travel <= float(case.maximum), "%s kill travels %.2f m along the blow (%+.2f z fall offset) inside %.1f-%.1f m" % [case.attack, travel, torso_part.global_position.z - start.z, case.minimum, case.maximum])
+		check(peak <= RagdollBody.MAX_BODY_SPEED + 0.01, "%s kill stays at or below %.1f m/s (peak %.2f)" % [case.attack, RagdollBody.MAX_BODY_SPEED, peak])
+		if bool(case.lift):
+			check(lifted, "poise-breaking heavy briefly lifts the corpse (rise %.2f m)" % max_rise)
+		check(body.ragdoll_body.settled and body.ragdoll_body.all_frozen(), "%s corpse is at rest and frozen within three seconds" % case.attack)
+		(fixture.holder as Node).queue_free()
+		body.ragdoll_body.queue_free()
+		await get_tree().process_frame
 
 
 func _test_physics_corpse() -> void:

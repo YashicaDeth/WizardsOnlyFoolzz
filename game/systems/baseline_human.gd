@@ -230,6 +230,7 @@ var ragdoll_body: RagdollBody
 var _last_hit_direction := Vector3.ZERO
 var _last_hit_impulse := 0.0
 var _last_hit_zone := "torso"
+var _last_hit_attack_id := ""
 ## O2.7 v4. Greg: *"gore and chunk physics still run at full speed through a
 ## hit, so a limb can leave a body that has not moved yet"*. Exactly right, and
 ## it is the most visible hole left in the hitstop work — the whole effect is
@@ -588,13 +589,14 @@ func _set_depth_override(piece: MeshInstance3D, enabled: bool) -> void:
 	material.render_priority = 4 if enabled else 0
 
 
-func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt", organ_id := "", hit_direction := Vector3.ZERO, joint_alignment := 1.0, cut_point: Variant = null, cut_plane: Variant = null) -> Dictionary:
+func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt", organ_id := "", hit_direction := Vector3.ZERO, joint_alignment := 1.0, cut_point: Variant = null, cut_plane: Variant = null, attack_id := "") -> Dictionary:
 	var zone := canonical_zone(zone_id)
 	if severed.has(zone) and not anatomy.installed_parts.has(zone):
 		return {"accepted": false, "reason": "severed", "zone": zone, "severed": false}
 	_last_hit_zone = zone
 	_last_hit_direction = _resolved_hit_direction(zone, hit_direction)
 	_last_hit_impulse = maxf(impulse, 0.0)
+	_last_hit_attack_id = attack_id.strip_edges().to_lower()
 	var penetrates := damage_type in ["cut", "puncture", "ballistic", "shear"]
 	if penetrates and organ_id.is_empty():
 		organ_id = _organ_in_zone(zone)
@@ -750,7 +752,7 @@ func mark_opened(zone_id: String, layer: int) -> int:
 ## and never read by anything. Left at -1 it is derived from the damage type, so
 ## every existing caller keeps working and a caller that knows what it fired
 ## gets a wound that reflects it.
-func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type := "blunt", hit_direction := Vector3.ZERO, penetration := -1.0, cut_plane: Variant = null) -> Dictionary:
+func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type := "blunt", hit_direction := Vector3.ZERO, penetration := -1.0, cut_plane: Variant = null, attack_id := "") -> Dictionary:
 	var zone := zone_nearest(global_point)
 	# Kept before `hit()` resolves, because `hit()` may sever the limb and the
 	# point has to be recorded against the limb that was actually struck.
@@ -767,7 +769,7 @@ func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type :=
 	# so a range or a HUD is told stopped/grazed/lodged/through instead of
 	# inferring it from the size of a capped wound-mark array. Neither is
 	# optional and neither conflicts with the other.
-	var result := hit(zone, damage, impulse, damage_type, organ_id, hit_direction, _joint_alignment_at(zone, global_point), global_point, cut_plane)
+	var result := hit(zone, damage, impulse, damage_type, organ_id, hit_direction, _joint_alignment_at(zone, global_point), global_point, cut_plane, attack_id)
 	if not penetration_report.is_empty():
 		result["penetration"] = penetration_report
 	return result
@@ -906,7 +908,7 @@ func _on_died(_report: Dictionary) -> void:
 		return
 	ragdoll_body = RagdollBody.new()
 	holder.add_child(ragdoll_body)
-	ragdoll_body.activate(self, _last_hit_zone, _last_hit_impulse, _last_hit_direction)
+	ragdoll_body.activate(self, _last_hit_zone, _last_hit_impulse, _last_hit_direction, _last_hit_attack_id)
 
 
 ## B2.7v2. This uses the anatomy's shared posture answer, rather than making

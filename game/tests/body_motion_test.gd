@@ -56,6 +56,22 @@ func _ready() -> void:
 	motion.update(0.1, Vector3.ZERO, true, false, false, false)
 	check(motion.state == "attack" and absf(rig.parts.right_arm.rotation.z) > 0.2, "attack layers a committed weapon-arm arc")
 	motion.attack_time = 0.0
+	motion.set_weapon_stance("sword", "one_hand")
+	motion.update(0.016, Vector3.ZERO, true, false, false, false)
+	var one_hand_guard: Vector3 = rig.parts.left_arm.rotation
+	motion.set_weapon_stance("sword", "two_hand")
+	motion.update(0.016, Vector3.ZERO, true, false, false, false)
+	check(rig.parts.left_arm.rotation.distance_to(one_hand_guard) > 0.12, "two-hand idle visibly brings the support hand onto the weapon")
+	var slash_rest: Vector3 = rig.parts.right_arm.rotation
+	motion.set_moveset_pose("active", 0.7, BladeRead.RIGHT, "light_1", "sword", "slash")
+	motion.update(0.0, Vector3.ZERO, true, false, false, false)
+	var slash_pose: Vector3 = rig.parts.right_arm.rotation
+	motion.set_moveset_pose("active", 0.7, BladeRead.HIGH, "light_1", "shiv", "thrust")
+	motion.update(0.0, Vector3.ZERO, true, false, false, false)
+	var thrust_pose: Vector3 = rig.parts.right_arm.rotation
+	check(thrust_pose.distance_to(slash_pose) > 0.25 and thrust_pose.distance_to(slash_rest) > 0.1, "a shiv thrust has a distinct committed silhouette from a sword slash")
+	motion.clear_moveset_pose()
+	motion.attack_time = 0.0
 	motion.set_combat_pose(1.0, "firearm")
 	motion.update(0.016, Vector3(0, 0, 2.5), true, false, false, false)
 	check(rig.parts.right_arm.rotation.x > 0.8 and rig.parts.left_arm.rotation.x > 0.8,

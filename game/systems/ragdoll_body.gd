@@ -8,11 +8,27 @@ extends Node3D
 const BODY_LAYER := 1 << 6
 const WORLD_MASK := 1
 const MAX_KILLING_IMPULSE := 16.0
+const BASE_IMPULSE_SPEED := 0.12
+const MAX_BODY_SPEED := 6.0
 const SETTLE_LINEAR_SPEED := 0.18
 const SETTLE_ANGULAR_SPEED := 0.28
 const SETTLE_SECONDS := 0.65
 const FREEZE_AFTER_SLEEP_SECONDS := 0.25
 const FORCE_FREEZE_SECONDS := 3.0
+
+const ATTACK_LAUNCH := {
+	"light": {"speed": 0.22, "lift": 0.0},
+	"heavy": {"speed": 5.55, "lift": 0.0, "damp": 1.55},
+	"poise_break": {"speed": 3.40, "lift": 4.50, "damp": 1.0, "initial_lift": 0.07},
+}
+
+const JOINT_LIMITS := {
+	"head": Vector2(-0.42, 0.42),
+	"left_arm": Vector2(-1.05, 1.05),
+	"right_arm": Vector2(-1.05, 1.05),
+	"left_leg": Vector2(-0.78, 0.78),
+	"right_leg": Vector2(-0.78, 0.78),
+}
 
 const MASSES := {
 	"torso": 28.0,
@@ -33,15 +49,24 @@ const JOINTS := [
 
 var bodies: Dictionary = {}
 var source: BaselineHuman
+var attack_id := ""
 var settled := false
 var slept := false
 var _quiet_seconds := 0.0
 var _alive_seconds := 0.0
 var _sleep_seconds := 0.0
+var _lift_seconds := 0.0
 
 
-func activate(rig: BaselineHuman, hit_zone: String, impulse: float, direction: Vector3) -> void:
+func activate(rig: BaselineHuman, hit_zone: String, impulse: float, direction: Vector3, killing_attack_id := "") -> void:
+	# Physics bodies must begin in world space. A ragdoll under a translated
+	# actor holder otherwise appears to the physics server at the holder origin
+	# and is teleported into place on its first frame; that phantom move was the
+	# exact 4 -> 4, 10 -> 10, 16 -> 16 m/s kick from the regression probe.
+	top_level = true
+	global_transform = Transform3D.IDENTITY
 	source = rig
+	attack_id = killing_attack_id.strip_edges().to_lower()
 	name = "%s_ragdoll" % rig.subject_id
 	for zone_id in BaselineHuman.ZONES:
 		if rig.severed.has(zone_id):
@@ -63,14 +88,54 @@ func activate(rig: BaselineHuman, hit_zone: String, impulse: float, direction: V
 	if struck == null:
 		struck = bodies.get("torso") as RigidBody3D
 	if struck != null:
-		var heading := direction.normalized() if direction.length_squared() > 0.001 else Vector3.FORWARD
-		var strength := clampf(maxf(impulse, 1.0), 1.0, MAX_KILLING_IMPULSE)
-		struck.apply_central_impulse(heading * strength * struck.mass * 0.12)
-		struck.apply_torque_impulse(Vector3(0.0, strength * 0.08, -heading.x * strength * 0.12) * struck.mass)
-		var core := bodies.get("torso") as RigidBody3D
-		if core != null and core != struck:
-			core.apply_central_impulse(heading * strength * core.mass * 0.055)
+		_launch(struck, impulse, direction)
 	set_physics_process(true)
+
+
+func _launch(struck: RigidBody3D, impulse: float, direction: Vector3) -> void:
+	var heading := direction
+	heading.y = 0.0
+	heading = heading.normalized() if heading.length_squared() > 0.001 else Vector3.FORWARD
+	var speed := clampf(maxf(impulse, 1.0), 1.0, MAX_KILLING_IMPULSE) * BASE_IMPULSE_SPEED
+	var lift := 0.0
+	var launch_class := _attack_launch_class(attack_id)
+	if ATTACK_LAUNCH.has(launch_class):
+		var profile: Dictionary = ATTACK_LAUNCH[launch_class]
+		speed = float(profile.speed)
+		lift = float(profile.lift)
+		_lift_seconds = 0.06 if launch_class == "poise_break" else 0.0
+	var launch := heading * speed + Vector3.UP * lift
+	if launch.length() > MAX_BODY_SPEED:
+		launch = launch.normalized() * MAX_BODY_SPEED
+	global_position += Vector3.UP * float((ATTACK_LAUNCH.get(launch_class, {}) as Dictionary).get("initial_lift", 0.0))
+	# Moving every connected part in the same broad direction avoids a single
+	# tiny limb yanking the whole rig through a joint. A smaller struck-part
+	# bias gives the body a fold without explosive torque or floor skating.
+	for body_value in bodies.values():
+		var body := body_value as RigidBody3D
+		if body == null:
+			continue
+		body.linear_damp = float((ATTACK_LAUNCH.get(launch_class, {}) as Dictionary).get("damp", 3.2))
+		var carry := 1.0 if launch_class == "poise_break" or body.name.begins_with("torso") else 0.76
+		body.linear_velocity = launch * carry
+		body.angular_velocity = Vector3.ZERO
+	var strike_bias := heading * minf(0.42, speed * 0.12)
+	struck.linear_velocity = _limited_velocity(struck.linear_velocity + strike_bias)
+	struck.angular_velocity = Vector3(0.0, minf(speed * 0.16, 0.75), -heading.x * minf(speed * 0.22, 1.0))
+
+
+func _attack_launch_class(id: String) -> String:
+	if id == "charged_heavy":
+		return "poise_break"
+	if id in ["heavy", "running_attack", "roll_attack"]:
+		return "heavy"
+	if id.begins_with("light_"):
+		return "light"
+	return ""
+
+
+func _limited_velocity(velocity: Vector3) -> Vector3:
+	return velocity.normalized() * MAX_BODY_SPEED if velocity.length() > MAX_BODY_SPEED else velocity
 
 
 func _make_body(zone_id: String, part: MeshInstance3D) -> RigidBody3D:
@@ -82,7 +147,12 @@ func _make_body(zone_id: String, part: MeshInstance3D) -> RigidBody3D:
 	body.continuous_cd = true
 	body.can_sleep = true
 	body.linear_damp = 3.2
-	body.angular_damp = 4.4
+	body.angular_damp = 5.2
+	var contact := PhysicsMaterial.new()
+	contact.friction = 0.88
+	contact.rough = true
+	contact.bounce = 0.0
+	body.physics_material_override = contact
 	add_child(body)
 	body.global_transform = part.global_transform
 
@@ -120,17 +190,24 @@ func _add_joint(zone_a: String, zone_b: String) -> void:
 	joint.global_position = (body_a.global_position + body_b.global_position) * 0.5
 	joint.node_a = joint.get_path_to(body_a)
 	joint.node_b = joint.get_path_to(body_b)
-	# Translation is locked by default. These conservative angular limits make
-	# the corpse give at shoulders and hips without turning into elastic rope.
+	# Translation is locked by default. Neck, shoulder and hip limits differ,
+	# remaining inside an ordinary human range instead of one elastic rope.
+	var limits: Vector2 = JOINT_LIMITS.get(zone_b, Vector2(-0.65, 0.65))
 	for axis in ["x", "y", "z"]:
 		joint.set("angular_limit_%s/enabled" % axis, true)
-		joint.set("angular_limit_%s/lower_angle" % axis, -0.72)
-		joint.set("angular_limit_%s/upper_angle" % axis, 0.72)
+		joint.set("angular_limit_%s/lower_angle" % axis, limits.x)
+		joint.set("angular_limit_%s/upper_angle" % axis, limits.y)
 
 
 func _physics_process(delta: float) -> void:
 	if settled:
 		return
+	if _lift_seconds > 0.0:
+		_lift_seconds = maxf(0.0, _lift_seconds - delta)
+		for body_value in bodies.values():
+			var lifted_body := body_value as RigidBody3D
+			if lifted_body != null:
+				lifted_body.apply_central_force(Vector3.UP * lifted_body.mass * 20.0)
 	_alive_seconds += delta
 	if slept:
 		_sleep_seconds += delta
