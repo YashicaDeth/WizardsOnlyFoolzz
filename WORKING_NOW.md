@@ -76,8 +76,11 @@ Claude:
 
 ## Codex is in
 
-- game/systems/souls_roll.gd, game/systems/sword_moveset.gd,
-  game/systems/hunter_body_motion.gd (see Melee lane)
+- Ragdoll and knockback (DESIGN/CODEX_BRIEF_RAGDOLL_KNOCKBACK_2026-09-30.md,
+  worktree ragdoll): new game/systems/knockback.gd, game/systems/ragdoll_body.gd,
+  their tests, and one opt-in hook in game/systems/baseline_human.gd.
+- Done: souls_roll.gd, sword_moveset.gd, hunter_body_motion.gd poses (7bfea594,
+  merged into claude/launch-latest at c587a8b5).
 
 ## Handoffs
 
