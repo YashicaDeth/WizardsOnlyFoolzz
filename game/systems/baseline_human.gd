@@ -1346,7 +1346,19 @@ func _garment_material(zone_id: String, integrity: float) -> Material:
 
 
 func _zone_material(zone_id: String, tint: Color, kind := "flesh") -> StandardMaterial3D:
-	var material := WorldLook.surface(tint, kind, _variation + ZONES.find(zone_id))
+	# Greg's 30 Sep playtest (7 fps): the tint moves with every blow (bruised,
+	# then opened), so asking WorldLook for it generated a fresh grain pair
+	# (10 ms) on nearly every hit, several zones at a time. The grain is the
+	# body's own flesh, built once; the damage colour is an exact per-channel
+	# tint over it, so a flesh-coloured texel shows the damage colour itself.
+	var base := _flesh if kind == "flesh" else tint
+	var material := WorldLook.surface(base, kind, _variation + ZONES.find(zone_id))
+	var drift := material.albedo_color
+	material.albedo_color = Color(
+		drift.r * clampf(tint.r / maxf(base.r, 0.01), 0.02, 3.0),
+		drift.g * clampf(tint.g / maxf(base.g, 0.01), 0.02, 3.0),
+		drift.b * clampf(tint.b / maxf(base.b, 0.01), 0.02, 3.0),
+		drift.a)
 	# Generated surfaces are open where a limb has been taken off, and the
 	# insides are supposed to be visible when they are.
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
