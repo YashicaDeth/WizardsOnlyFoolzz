@@ -1744,33 +1744,58 @@ func _refresh_wounds(zone_id: String) -> void:
 	if part == null or not is_instance_valid(part):
 		return
 	var holder := part.get_node_or_null("Wounds") as Node3D
-	if holder != null and is_instance_valid(holder):
-		part.remove_child(holder)
-		holder.queue_free()
 	var marks: Array = wound_marks.get(zone, [])
 	if marks.is_empty() or not gore:
+		if holder != null and is_instance_valid(holder):
+			part.remove_child(holder)
+			holder.queue_free()
 		return
-	holder = Node3D.new()
-	holder.name = "Wounds"
-	part.add_child(holder)
+	if holder == null or not is_instance_valid(holder):
+		holder = Node3D.new()
+		holder.name = "Wounds"
+		part.add_child(holder)
+	# Greg's 30 Sep playtest dropped to 7 fps: every blow threw away and
+	# rebuilt every wound on the zone (up to MAX_PER_ZONE meshes and
+	# materials, 340 ms on a busy arm with the real renderer). A wound's look
+	# depends only on itself, the layer the zone is opened to and whether an
+	# organ shows, so each built wound keeps that as its key and only new or
+	# changed wounds are built; dropped ones go.
 	var depth := int(zone_depth.get(zone, 0))
+	var built_nodes := holder.get_children()
+	var kept: Array[Node] = []
 	for wound: Dictionary in marks:
-		# A wound never shows a layer deeper than the limb has actually been
-		# opened to, so a graze recorded before a blast does not retroactively
-		# claim to show bone.
 		var shown: int = mini(int(wound.get("layer", 0)), depth)
-		var tint := Color(str(GoreChunks.LAYER_TINTS[clampi(shown, 0, GoreChunks.LAYER_TINTS.size() - 1)]))
 		var contents: Mesh = null
 		var organ_id := str(wound.get("organ_id", ""))
 		if depth >= GoreChunks.Layer.ORGAN and anatomy.organ_ok(organ_id):
 			var organ := organ_parts.get(organ_id) as MeshInstance3D
 			if organ != null and is_instance_valid(organ):
 				contents = organ.mesh
-		holder.add_child(WoundMarks.build(wound, tint, contents))
+		# The same record (not an equal one), showing the same layer and the
+		# same contents: already built, keep it.
+		var match_node: Node = null
+		for child in built_nodes:
+			if is_same(child.get_meta("wound", null), wound) and int(child.get_meta("shown", -1)) == shown and (child.get_meta("contents") if child.has_meta("contents") else null) == contents:
+				match_node = child
+				break
+		if match_node != null:
+			kept.append(match_node)
+			continue
+		var tint := Color(str(GoreChunks.LAYER_TINTS[clampi(shown, 0, GoreChunks.LAYER_TINTS.size() - 1)]))
+		var built := WoundMarks.build(wound, tint, contents)
+		built.set_meta("wound", wound)
+		built.set_meta("shown", shown)
+		# set_meta(null) removes the key, so an empty wound carries none.
+		if contents != null:
+			built.set_meta("contents", contents)
+		holder.add_child(built)
+		kept.append(built)
+	for child in built_nodes:
+		if not kept.has(child):
+			holder.remove_child(child)
+			child.queue_free()
 
 
-## Reads `zone_depth`, the same ratchet `_shed_chunks` writes, so this survives
-## healing and reattachment exactly the way the remembered depth does.
 func _update_layer_exposure(zone_id: String, prosthetic: bool) -> void:
 	var part := parts.get(zone_id) as Node3D
 	if part == null or not is_instance_valid(part):

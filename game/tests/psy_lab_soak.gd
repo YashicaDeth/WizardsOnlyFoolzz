@@ -21,6 +21,16 @@ var next_action := 0.0
 var step := 0
 var last_action := ""
 var spikes := 0
+var last_pipelines := 0
+var last_surface := 0
+var last_draw := 0
+var last_spec := 0
+
+
+## Every render pipeline Godot has compiled so far (canvas, mesh, surface,
+## draw, specialization). A spike with this climbing is shader compilation.
+func _pipelines() -> int:
+	return int(Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_CANVAS) + Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_MESH) + Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SURFACE) + Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_DRAW) + Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SPECIALIZATION))
 
 
 func _ready() -> void:
@@ -106,8 +116,12 @@ func _process(delta: float) -> void:
 		worst = maxf(worst, frame_ms)
 		if frame_ms > 100.0 and spikes < 40:
 			spikes += 1
-			print("SPIKE %6.1f ms at t=%5.1fs after [%s] note [%s] chunks %d | last blow %.1f ms | script %.1f physics %.1f" % [frame_ms, clock, last_action, str(demo.last_note), GoreChunks.live_count(), demo.last_contact_ms, Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0])
+			print("SPIKE %6.1f ms at t=%5.1fs after [%s] note [%s] chunks %d | last blow %.1f ms | pipelines +%d (surface +%d, draw +%d, spec +%d)" % [frame_ms, clock, last_action, str(demo.last_note), GoreChunks.live_count(), demo.last_contact_ms, _pipelines() - last_pipelines, int(Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SURFACE)) - last_surface, int(Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_DRAW)) - last_draw, int(Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SPECIALIZATION)) - last_spec])
 	last_us = now
+	last_pipelines = _pipelines()
+	last_surface = int(Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SURFACE))
+	last_draw = int(Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_DRAW))
+	last_spec = int(Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SPECIALIZATION))
 	clock += delta
 	window_clock += delta
 	frames += 1

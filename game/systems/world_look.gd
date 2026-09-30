@@ -415,6 +415,9 @@ static func surface(color: Color, kind: String = "paint", variation_seed: int = 
 		tint = tint.lightened(maxf(0.0, drift * 0.16)).darkened(maxf(0.0, -drift * 0.2))
 		tint.h = fposmod(tint.h + drift * 0.015, 1.0)
 	material.albedo_color = tint
+	# The grain maps are generated from the colour as asked for; the seed's
+	# drift rides on top as a tint (see `_apply_grain`).
+	material.set_meta("grain_base", color)
 
 	# A5.1. Up to v4 a kind was two scalars and a pattern, which is why every
 	# surface in the game answered a lamp with the same highlight: the world was
@@ -579,7 +582,15 @@ static func emissive(color: Color, energy: float) -> StandardMaterial3D:
 static func _apply_grain(material: StandardMaterial3D, scale: float, strength: float, kind := "paint", seed_value := 0) -> void:
 	material.uv1_triplanar = true
 	material.uv1_scale = Vector3(scale, scale, scale)
-	var maps := _surface_maps(kind, material.albedo_color, seed_value)
+	# Greg's 30 Sep playtest dropped to 7 fps: the maps were keyed on the
+	# seed-drifted colour, so nearly every blood droplet, body zone and wound
+	# state missed the cache and generated a new 96x96 pair (10 ms each, with
+	# a dozen per landed blow). Keyed on the base colour there are six per
+	# kind and colour (the seed's bucket); the drift is a multiplier below.
+	var drifted := material.albedo_color
+	var base: Color = material.get_meta("grain_base", drifted)
+	material.remove_meta("grain_base")
+	var maps := _surface_maps(kind, base, seed_value)
 	# Albedo was a flat colour on every surface in the game, with only roughness
 	# varying — which is the whole reason the world read as untextured primitives
 	# no matter how the geometry was built. Contamination arrives on the albedo
@@ -648,7 +659,11 @@ static func _apply_grain(material: StandardMaterial3D, scale: float, strength: f
 	# The tint now lives in the texture, so leave the multiplier neutral or the
 	# surface is coloured twice and goes muddy. The alpha is kept: glass carries
 	# its transparency there and the texture has none of its own.
-	material.albedo_color = Color(1, 1, 1, material.albedo_color.a)
+	material.albedo_color = Color(
+		clampf(drifted.r / maxf(base.r, 0.02), 0.6, 1.6),
+		clampf(drifted.g / maxf(base.g, 0.02), 0.6, 1.6),
+		clampf(drifted.b / maxf(base.b, 0.02), 0.6, 1.6),
+		material.albedo_color.a)
 
 
 ## A low-resolution, posterised, contaminated surface for one material kind,
