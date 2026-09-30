@@ -123,6 +123,16 @@ Claude:
     the SwordMoveset arc, not twitch at the side.
   * Grip: the held cleaver now points forward-down (hunter_appearance.gd,
     Claude, PI*0.48); poses should swing it from there.
+  * RE-FILMED after 19184843 (Claude, 30 Sep): the roll now stays one body
+    (fixed), but reads as a stiff full-body flip: dive, upside down, land.
+    A Souls roll tucks: knees to chest, head down, shoulder over, about
+    0.6 m tall at the middle of it. The light still barely moves (arm dips,
+    blade flicks): same note as above. Sheets refreshed in
+    P:/GameDev/Temp/handoff after the next capture.
+- Wired by Claude (30 Sep): SwordMoveset.configure(weapon, stance) follows the
+  held weapon; Y / triangle switches stance; LMB or R2 released after a hold is
+  request_heavy_release (charged past 0.72 s); blows pass their attack id to
+  hit_at and their moveset packet to Knockback.apply.
 - 97fd657f, e5b2954a, 830ce828: Hornee's card and the art gallery. To put
   more of Greg's art in the world: add the piece to ArtGallery.PIECES, then
   `WallPoster.place(scene, id, position, yaw)` in any scene (one line).

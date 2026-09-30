@@ -122,7 +122,18 @@ func _ready() -> void:
 	_axis(JOY_AXIS_TRIGGER_RIGHT, 1.0)
 	await _frames(2)
 	_axis(JOY_AXIS_TRIGGER_RIGHT, 0.0)
-	check(demo.moveset.current_attack() == "heavy", "R2 is the heavy")
+	await _frames(2)
+	check(demo.moveset.current_attack() == "heavy", "R2 pressed and let go is the heavy")
+	await _frames(120)
+	demo.stamina = 100.0
+	_axis(JOY_AXIS_TRIGGER_RIGHT, 1.0)
+	await _frames(55)
+	_axis(JOY_AXIS_TRIGGER_RIGHT, 0.0)
+	await _frames(2)
+	check(demo.moveset.current_attack() == "charged_heavy", "R2 held past the charge is the charged heavy (%s)" % demo.moveset.current_attack())
+	_press(JOY_BUTTON_Y)
+	check(demo.stance == "two_hand", "triangle switches to two hands")
+	_press(JOY_BUTTON_Y)
 	await _frames(120)
 
 	# --- L1 guards, L2 parries, R3 locks, cross takes, d-pad changes weapon. ---

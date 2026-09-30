@@ -117,8 +117,25 @@ func _ready() -> void:
 	demo.stamina = 100.0
 	demo._blade_held = 0.0
 	await _frames(30)
-	check(demo.moveset.current_attack() == "heavy", "held, the press becomes the heavy (%s)" % demo.moveset.current_attack())
-	await _frames(90)
+	demo._blade_release()
+	check(demo.moveset.current_attack() == "heavy", "held and let go, the press is the heavy (%s)" % demo.moveset.current_attack())
+	await _frames(100)
+	demo.stamina = 100.0
+	demo._blade_held = 0.0
+	await _frames(55)
+	demo._blade_release()
+	check(demo.moveset.current_attack() == "charged_heavy", "held past the charge, it is the charged heavy (%s)" % demo.moveset.current_attack())
+	await _frames(120)
+
+	# --- Y / triangle: two hands, a slower and heavier table. ---
+	demo.moveset.reset()
+	var one_hand: Dictionary = demo.moveset.attack_definition("light_1")
+	demo._toggle_stance()
+	var two_hand: Dictionary = demo.moveset.attack_definition("light_1")
+	check(demo.stance == "two_hand" and demo.moveset.stance == "two_hand", "Y switches to two hands")
+	check(float(two_hand.windup) > float(one_hand.windup) and float(two_hand.poise_multiplier) > float(one_hand.poise_multiplier), "two-handed winds up slower and hits poise harder")
+	demo._toggle_stance()
+	check(demo.moveset.stance == "one_hand", "and back to one")
 
 	# --- The roll: carries the body, and its i-frames let a blow through. ---
 	avatar.release_lock()

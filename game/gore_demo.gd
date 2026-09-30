@@ -188,6 +188,8 @@ var duelist := -1
 ## J switches: a duel (one at a time, the rest wait) or the pack (all at once,
 ## spread out).
 var duel_mode := true
+## One hand or two (Y / triangle), fed to the moveset.
+var stance := "one_hand"
 ## Souls guard over the shoulder: what a block costs, and how far round the
 ## front it covers (cosine of the half-angle).
 const GUARD_BLOCK_STAMINA := 22.0
@@ -981,7 +983,7 @@ func _melee_contact_body(attack: Dictionary, found: Dictionary, along: Vector3, 
 	var earned_damage := float(attack.get("damage", 0.0)) * lerpf(0.35, 1.35, commitment)
 	var result: Dictionary = rig.hit_at(
 		landed, earned_damage * through, float(attack.get("impulse", 0.0)) * through,
-		damage_type, along, -1.0, arm.cut_plane(camera.global_transform.basis, landed))
+		damage_type, along, -1.0, arm.cut_plane(camera.global_transform.basis, landed), str(attack.get("attack", "")))
 	if not bool(result.get("accepted", true)):
 		_note("%s ALREADY GONE" % _spoken(zone))
 		return
@@ -1006,7 +1008,9 @@ func _shove(defender: Dictionary, rig: BaselineHuman, attack: Dictionary, along:
 	var poise := defender.get("knockback") as Knockback
 	if poise == null or rig.anatomy.dead:
 		return
-	var report: Dictionary = poise.apply(float(attack.get("impulse", 18.0)) * KNOCKBACK_PER_IMPULSE * through, along, str(attack.get("attack", "")))
+	# The moveset's own packet (per weapon and stance) when the blow has one.
+	var packet: Variant = attack.get("packet", str(attack.get("attack", "")))
+	var report: Dictionary = poise.apply(float(attack.get("impulse", 18.0)) * KNOCKBACK_PER_IMPULSE * through, along, packet)
 	if not bool(report.get("knockdown", false)):
 		return
 	var motion := defender.get("motion") as HunterBodyMotion
@@ -1083,12 +1087,15 @@ func _tp_side_from_keys() -> String:
 
 ## Which attack a third-person press asks for: the heavy if held, else one
 ## out of a roll, a running one at a sprint, or the next light in the chain.
-func _moveset_request(heavy: bool) -> Dictionary:
+func _moveset_request(heavy: bool, charge := 0.0) -> Dictionary:
 	if player_stun > 0.0:
 		return {"accepted": false, "buffered": false, "stamina_cost": 0.0, "attack": ""}
+	_sync_moveset()
 	var result: Dictionary
 	if heavy:
-		result = moveset.request_heavy(stamina)
+		# Bloodborne's R2: held past CHARGED_HEAVY_SECONDS it is the charged
+		# heavy, which breaks a full poise.
+		result = moveset.request_heavy_release(charge, stamina)
 	elif roll.is_rolling() or roll.recovering():
 		roll.cancel()
 		dodge_remaining = 0.0
@@ -1103,6 +1110,37 @@ func _moveset_request(heavy: bool) -> Dictionary:
 	elif not bool(result.get("buffered", false)) and not moveset.is_attacking():
 		_note("TOO TIRED TO SWING")
 	return result
+
+
+## The moveset for what is in hand and how it is held (Codex's per-weapon
+## tables); a sword the table does not know swings as the sword. Not changed
+## mid-swing: configure() resets the chain.
+func _sync_moveset() -> void:
+	if moveset.is_attacking():
+		return
+	var held := str(arsenal.current_id)
+	var table := held if SwordMoveset.WEAPON_TABLES.has(held) else "sword"
+	if moveset.weapon_id != table or moveset.stance != stance:
+		moveset.configure(table, stance)
+
+
+## Dark Souls' triangle: one hand or both. Two-handed is slower, wider and
+## breaks poise harder.
+func _toggle_stance() -> void:
+	stance = "two_hand" if stance == "one_hand" else "one_hand"
+	_sync_moveset()
+	_note("TWO-HANDED" if stance == "two_hand" else "ONE-HANDED")
+
+
+## The left button let go: a tap is the light chain, a hold was the heavy
+## (charged past CHARGED_HEAVY_SECONDS).
+func _blade_release() -> void:
+	var held := _blade_held
+	_blade_held = -1.0
+	if held < HEAVY_HOLD:
+		_moveset_request(false)
+	else:
+		_moveset_request(true, held)
 
 
 func _begin_moveset_attack(attack_id: String) -> void:
@@ -1126,10 +1164,12 @@ func _begin_moveset_attack(attack_id: String) -> void:
 ## Once a physics frame: the attack's clock, its hits, the body's pose.
 func _advance_moveset(real_delta: float) -> void:
 	if _blade_held >= 0.0:
+		var before := _blade_held
 		_blade_held += real_delta
-		if _blade_held >= HEAVY_HOLD:
-			_blade_held = -1.0
-			_moveset_request(true)
+		if before < HEAVY_HOLD and _blade_held >= HEAVY_HOLD:
+			_note("HEAVY // HOLD TO CHARGE")
+		elif before < SwordMoveset.CHARGED_HEAVY_SECONDS and _blade_held >= SwordMoveset.CHARGED_HEAVY_SECONDS:
+			_note("CHARGED // RELEASE")
 	var report: Dictionary = moveset.tick(real_delta, avatar.global_position, avatar.facing_yaw)
 	if bool(report.get("started_buffered", false)):
 		var roll_to: Vector3 = report.get("roll_direction", Vector3.ZERO)
@@ -1170,12 +1210,16 @@ func _moveset_sweep(points: PackedVector3Array, attack_id: String, side: String)
 			continue
 		_moveset_struck.append(rig)
 		var weapon: Dictionary = arsenal.current()
-		var weight := float(MOVESET_WEIGHT.get(attack_id, 1.0))
+		var weight := float(MOVESET_WEIGHT.get(attack_id, MOVESET_WEIGHT.get("heavy", 1.0) if attack_id == "charged_heavy" else 1.0))
+		var definition: Dictionary = moveset.attack_definition(attack_id)
+		definition["attack"] = attack_id
 		var attack := {
 			"damage": float(weapon.get("damage", 24.0)) * weight,
 			"impulse": float(weapon.get("impulse", 18.0)) * weight,
-			"damage_type": str(weapon.get("damage_type", "cut")),
+			# The shiv punctures and fists bruise: the moveset says what hits.
+			"damage_type": str(definition.get("damage_type", weapon.get("damage_type", "cut"))),
 			"attack": attack_id,
+			"packet": definition,
 		}
 		_melee_contact(attack, found, along.normalized(), shoulder, side)
 
@@ -1490,6 +1534,7 @@ func _switch_weapon(slot: int) -> void:
 	view_gear.take(arsenal.current_id)
 	_gear_rest = view_gear.position
 	_refresh_muzzle_anchor()
+	_sync_moveset()
 	_note("EQUIPPED // %s" % str(arsenal.current().label))
 
 
@@ -1817,8 +1862,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			else:
 				_fire()
 		elif click.button_index == MOUSE_BUTTON_LEFT and not click.pressed and _blade_held >= 0.0:
-			_blade_held = -1.0
-			_moveset_request(false)
+			_blade_release()
 		elif click.button_index == MOUSE_BUTTON_RIGHT:
 			if launcher_equipped or str(arsenal.current().get("kind", "")) == "firearm":
 				firearm_aiming = click.pressed
@@ -1859,6 +1903,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_note("FULL CONTROL REFERENCE" if controls_expanded else "ESSENTIAL CONTROLS ONLY")
 			KEY_C: _toggle_grapple()
 			KEY_H: _set_enemies_enabled(not enemies_enabled)
+			KEY_Y: _toggle_stance()
 			KEY_J:
 				duel_mode = not duel_mode
 				duelist = -1
@@ -1955,7 +2000,8 @@ func _build_pad() -> void:
 	pad.name = "SoulsPad"
 	add_child(pad)
 	pad.light.connect(func() -> void: _pad_attack(false))
-	pad.heavy.connect(func() -> void: _pad_attack(true))
+	pad.heavy.connect(func(held: float) -> void: _pad_attack(true, held))
+	pad.stance_toggle.connect(_toggle_stance)
 	pad.roll.connect(func() -> void:
 		var move := _sandbox_move_input()
 		if move.length_squared() > 0.01:
@@ -1988,9 +2034,9 @@ func _build_pad() -> void:
 
 ## R1 / R2. Over the shoulder with a blade these are the moveset's light and
 ## heavy; otherwise R1 is the trigger (a shot, or the first-person swing).
-func _pad_attack(heavy: bool) -> void:
+func _pad_attack(heavy: bool, charge := 0.0) -> void:
 	if third_person and str(arsenal.current().get("kind", "")) == "melee" and not launcher_equipped:
-		_moveset_request(heavy)
+		_moveset_request(heavy, charge)
 	elif not heavy or str(arsenal.current().get("kind", "")) == "firearm":
 		_fire()
 

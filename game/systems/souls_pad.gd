@@ -8,7 +8,8 @@ extends Node
 ## same verbs stay reachable from the keyboard.
 ##
 ##   left stick  move            right stick  camera
-##   R1  light (the chain)       R2  heavy
+##   R1  light (the chain)       R2  heavy (held: charged)
+##   triangle  one hand / two hands
 ##   L1  guard (held)            L2  parry (a guard raised late)
 ##   O   tap: roll / backstep    hold: sprint
 ##   R3  lock on                 X (cross)  take
@@ -16,7 +17,9 @@ extends Node
 ##   d-pad left/right  weapon    d-pad up  duel / pack    options  enemies
 
 signal light
-signal heavy
+## R2 is released with how long it was held (Bloodborne: a hold charges).
+signal heavy(held: float)
+signal stance_toggle
 signal roll
 signal lock
 signal view
@@ -44,6 +47,7 @@ var _quiet := DEVICE_HANDOVER
 var sprinting := false
 var _circle_held := -1.0
 var _r2_down := false
+var _r2_held := 0.0
 var _l2_down := false
 
 
@@ -85,8 +89,10 @@ func _process(delta: float) -> void:
 		_circle_held += delta
 		sprinting = _circle_held >= SPRINT_HOLD
 	var r2 := Input.get_joy_axis(device, JOY_AXIS_TRIGGER_RIGHT) > TRIGGER_PRESS
-	if r2 and not _r2_down:
-		heavy.emit()
+	if r2:
+		_r2_held = 0.0 if not _r2_down else _r2_held + delta
+	elif _r2_down:
+		heavy.emit(_r2_held)
 	_r2_down = r2
 	var l2 := Input.get_joy_axis(device, JOY_AXIS_TRIGGER_LEFT) > TRIGGER_PRESS
 	if l2 != _l2_down:
@@ -132,6 +138,9 @@ func _input(event: InputEvent) -> void:
 		JOY_BUTTON_A:
 			if down:
 				interact.emit()
+		JOY_BUTTON_Y:
+			if down:
+				stance_toggle.emit()
 		JOY_BUTTON_TOUCHPAD, JOY_BUTTON_BACK:
 			if down:
 				view.emit()
