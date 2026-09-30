@@ -227,6 +227,13 @@ const BODY_SPACING := 1.0
 ## Pack mode: everyone comes, but no two closer than this, so they surround
 ## you from their own sides instead of piling onto one spot.
 const PACK_SPACING := 2.0
+## The attacker's rhythm: the ring it circles on, how fast it strafes and
+## closes, and how much of its cadence is left when it steps in.
+const CIRCLE_RADIUS := 2.8
+const CIRCLE_SPEED := 2.2
+const STRAFE_SPEED := 1.5
+const PRESS_SPEED := 3.2
+const PRESS_AT := 0.4
 const MOVESET_WEIGHT := {"light_1": 1.0, "light_2": 1.0, "light_3": 1.25, "heavy": 1.7, "running_attack": 1.3, "roll_attack": 1.1}
 var last_read: Dictionary = {}
 var pending_melee: Dictionary = {}
@@ -2736,14 +2743,31 @@ func _update_training_bodies(real_delta: float) -> void:
 		toward.y = 0.0
 		var distance := toward.length()
 		var visual_velocity := Vector3.ZERO
-		if distance > 1.45:
-			var travel_speed := 3.8 if distance > 4.5 else 2.15
-			var step := toward.normalized() * minf(distance - 1.35, real_delta * travel_speed)
-			holder.global_position += step
-			holder.look_at(Vector3(eye.x, holder.global_position.y, eye.z), Vector3.UP)
-			visual_velocity = step / maxf(real_delta, 0.0001)
 		var cadence := float(SPAR_LEVELS[spar_level].cadence)
 		entry["attack_ready"] = float(entry.get("attack_ready", 0.0)) - real_delta
+		# The Souls rhythm (Greg, 30 Sep: the fighting "looks clunky"): circle
+		# at a distance, strafing, while the next blow comes due; press in
+		# fast when it nearly has; after striking, back out to the circle.
+		# The strike rule below is unchanged, so parry and roll timing are too.
+		var pressing := float(entry["attack_ready"]) <= cadence * PRESS_AT or distance > CIRCLE_RADIUS + 1.6
+		var step := Vector3.ZERO
+		if pressing:
+			if distance > 1.45:
+				var travel_speed := 3.8 if distance > 4.5 else PRESS_SPEED
+				step = toward.normalized() * minf(distance - 1.35, real_delta * travel_speed)
+		else:
+			var inward := toward.normalized() if distance > 0.01 else Vector3.FORWARD
+			var sideways := Vector3(-inward.z, 0.0, inward.x) * float(entry.get("strafe", 1.0))
+			var radial := inward * clampf(distance - CIRCLE_RADIUS, -1.0, 1.0)
+			step = (radial * CIRCLE_SPEED + sideways * STRAFE_SPEED) * real_delta
+			if randf() < real_delta * 0.35:
+				entry["strafe"] = -float(entry.get("strafe", 1.0))
+		if step != Vector3.ZERO:
+			holder.global_position += step
+			holder.global_position.x = clampf(holder.global_position.x, -ARENA + 1.0, ARENA - 1.0)
+			holder.global_position.z = clampf(holder.global_position.z, -ARENA + 1.0, ARENA - 1.0)
+			visual_velocity = step / maxf(real_delta, 0.0001)
+		holder.look_at(Vector3(eye.x, holder.global_position.y, eye.z), Vector3.UP)
 		var windup := clampf(1.0 - float(entry["attack_ready"]) / cadence, 0.0, 1.0) if distance <= 1.65 else 0.0
 		if str(entry.get("swing", "")).is_empty():
 			entry["swing"] = SWING_PATTERN[int(entry.get("swings", 0)) % SWING_PATTERN.size()]
