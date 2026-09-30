@@ -12,6 +12,7 @@ signal foot_planted(side: String)
 ## same arm, so it stays the single source of truth for the pitch rather than
 ## a number copied into a second file.
 const FIRST_PERSON_ARM_RAISE := 0.62
+const ROLL_POSE_DURATION := 0.58
 
 var rig: BaselineHuman
 var first_person := false
@@ -79,6 +80,22 @@ var strafe_approach := 0.0
 var lean_amount := 0.0
 var prone_amount := 0.0
 
+## Authored melee overlays are supplied by SwordMoveset. The old attack pose
+## remains untouched for first-person drag swings and existing AI; this layer
+## is what lets a third-person button attack show its windup, strike and
+## punishable recovery without reading camera motion.
+var moveset_phase := ""
+var moveset_progress := 0.0
+var moveset_side := ""
+var moveset_attack := ""
+
+## Existing callers only expose a dodging bool, so they receive a timed pose
+## automatically. The explicit override lets SoulsRoll's future owner pass its
+## exact normalized progress and keeps tests deterministic.
+var dodge_pose_elapsed := 0.0
+var dodge_pose_was_active := false
+var roll_pose_override := -1.0
+
 ## How long a deflection and a fold last. The parry is short because it is the
 ## window the player is being asked to read; the stagger outlasts it, which is
 ## what makes a failed parry cost something.
@@ -113,6 +130,28 @@ func trigger_attack(duration: float, weapon_kind: String) -> void:
 func set_combat_pose(amount: float, weapon_kind: String) -> void:
 	combat_pose = clampf(amount, 0.0, 1.0)
 	combat_kind = weapon_kind if combat_pose > 0.0 else ""
+
+
+func set_roll_pose(progress: float) -> void:
+	roll_pose_override = clampf(progress, 0.0, 1.0)
+
+
+func clear_roll_pose() -> void:
+	roll_pose_override = -1.0
+
+
+func set_moveset_pose(phase: String, progress: float, side: String, attack_id: String) -> void:
+	moveset_phase = phase if phase in ["windup", "active", "recovery"] else ""
+	moveset_progress = clampf(progress, 0.0, 1.0)
+	moveset_side = side
+	moveset_attack = attack_id
+
+
+func clear_moveset_pose() -> void:
+	moveset_phase = ""
+	moveset_progress = 0.0
+	moveset_side = ""
+	moveset_attack = ""
 
 
 func trigger_recoil(strength: float) -> void:
@@ -207,6 +246,13 @@ func update(delta: float, velocity: Vector3, grounded: bool, sprinting: bool, cr
 	landing_time = maxf(0.0, landing_time - delta)
 	parry_time = maxf(0.0, parry_time - delta)
 	stagger_time = maxf(0.0, stagger_time - delta)
+	if dodging:
+		if not dodge_pose_was_active:
+			dodge_pose_elapsed = 0.0
+		dodge_pose_elapsed = minf(ROLL_POSE_DURATION, dodge_pose_elapsed + delta)
+	elif dodge_pose_was_active:
+		dodge_pose_elapsed = ROLL_POSE_DURATION
+	dodge_pose_was_active = dodging
 	_choose_state(horizontal_speed, grounded, sprinting, crouching, dodging)
 	_pose(horizontal_speed, sprinting, crouching, dodging)
 	_update_camera_motion(horizontal_speed, sprinting, grounded)
@@ -352,7 +398,7 @@ func _pose(horizontal_speed: float, sprinting: bool, _crouching: bool, dodging: 
 		var fp_recede := Vector3(0, -0.16, 0.28) if first_person else Vector3.ZERO
 		var footfall := absf(sin(gait_phase)) * lerpf(0.018, 0.042, run_blend) * locomotion
 		torso.position = rest + fp_recede + Vector3(gait * 0.012 * locomotion, sin(elapsed * 1.7) * 0.008 + footfall - crouch_blend * 0.22, 0)
-		torso.rotation = Vector3(crouch_blend * 0.18 + (0.30 if dodging else 0.0), opposite * 0.035 * locomotion, -gait * lerpf(0.035, 0.07, run_blend) * locomotion)
+		torso.rotation = Vector3(crouch_blend * 0.18, opposite * 0.035 * locomotion, -gait * lerpf(0.035, 0.07, run_blend) * locomotion)
 	var head := rig.parts.get("head") as Node3D
 	if head != null:
 		var head_rest_position: Vector3 = head.get_meta("rest_position", head.position)
@@ -363,6 +409,8 @@ func _pose(horizontal_speed: float, sprinting: bool, _crouching: bool, dodging: 
 		if head_hitbox != null:
 			head_hitbox.position = head.position
 			head_hitbox.rotation = head.rotation
+	_apply_roll_pose(dodging)
+	_apply_moveset_pose()
 	# Directional, brief and additive: a shoulder hit turns the torso away, a
 	# frontal hit folds it back, and the head follows by a smaller amount. The
 	# sine envelope guarantees the body returns to its ordinary locomotion pose
@@ -429,6 +477,87 @@ func _pose(horizontal_speed: float, sprinting: bool, _crouching: bool, dodging: 
 	if not first_person:
 		_sync_zone_hitbox("torso")
 	_apply_fight_layer()
+
+
+## Tuck the articulated body around a complete forward revolution. Only the
+## visible zones and their matching anatomy hitboxes turn; the authoritative
+## CharacterBody root/collider remains upright and owned by movement code.
+func _apply_roll_pose(dodging: bool) -> void:
+	if not dodging and roll_pose_override < 0.0:
+		return
+	var progress := roll_pose_override if roll_pose_override >= 0.0 else clampf(dodge_pose_elapsed / ROLL_POSE_DURATION, 0.0, 1.0)
+	var tuck := sin(progress * PI)
+	var turn := TAU * progress
+	var torso := rig.parts.get("torso") as Node3D
+	var head := rig.parts.get("head") as Node3D
+	var left_arm := rig.parts.get("left_arm") as Node3D
+	var right_arm := rig.parts.get("right_arm") as Node3D
+	var left_leg := rig.parts.get("left_leg") as Node3D
+	var right_leg := rig.parts.get("right_leg") as Node3D
+	if torso != null:
+		torso.position += Vector3(0.0, -0.30 * tuck, 0.16 * tuck)
+		torso.rotation.x += turn
+	if head != null:
+		head.position += Vector3(0.0, -0.24 * tuck, 0.12 * tuck)
+		head.rotation.x += turn - 0.28 * tuck
+	if left_arm != null:
+		left_arm.rotation += Vector3(0.92 * tuck, -0.12 * tuck, 0.88 * tuck)
+	if right_arm != null:
+		right_arm.rotation += Vector3(0.92 * tuck, 0.12 * tuck, -0.88 * tuck)
+	if left_leg != null:
+		left_leg.position += Vector3(0.0, 0.14 * tuck, 0.13 * tuck)
+		left_leg.rotation.x += 1.12 * tuck + turn
+	if right_leg != null:
+		right_leg.position += Vector3(0.0, 0.14 * tuck, 0.13 * tuck)
+		right_leg.rotation.x += 1.12 * tuck + turn
+	for zone_id in ["torso", "head", "left_arm", "right_arm", "left_leg", "right_leg"]:
+		_sync_zone_hitbox(zone_id)
+
+
+## Pose a committed authored swing over locomotion. The four BladeRead sides
+## alter anticipation and follow-through, while attack kind only changes
+## weight; damage, timing and hit detection stay in SwordMoveset/the owner.
+func _apply_moveset_pose() -> void:
+	if moveset_phase.is_empty():
+		return
+	var side_sign := -1.0 if moveset_side == BladeRead.LEFT else 1.0
+	if moveset_side == BladeRead.HIGH:
+		side_sign = 0.35
+	elif moveset_side == BladeRead.LOW:
+		side_sign = -0.35
+	var weight := 1.28 if moveset_attack == "heavy" else (1.12 if moveset_attack in ["running_attack", "roll_attack"] else 1.0)
+	var windup := 0.0
+	var strike := 0.0
+	var settle := 1.0
+	match moveset_phase:
+		"windup":
+			windup = smoothstep(0.0, 1.0, moveset_progress)
+			settle = 1.0
+		"active":
+			windup = 1.0 - moveset_progress
+			strike = smoothstep(0.0, 1.0, moveset_progress)
+			settle = 1.0
+		"recovery":
+			strike = 1.0 - smoothstep(0.0, 1.0, moveset_progress)
+			settle = strike
+	var right_arm := rig.parts.get("right_arm") as Node3D
+	var left_arm := rig.parts.get("left_arm") as Node3D
+	var torso := rig.parts.get("torso") as Node3D
+	var head := rig.parts.get("head") as Node3D
+	if right_arm != null:
+		right_arm.rotation.x += (windup * 0.66 - strike * 0.30) * weight * settle
+		right_arm.rotation.y += side_sign * (windup * -0.28 + strike * 0.34) * weight * settle
+		right_arm.rotation.z += side_sign * (windup * -1.02 + strike * 1.48) * weight * settle
+	if left_arm != null:
+		left_arm.rotation.x += (windup * 0.22 + strike * 0.14) * weight * settle
+		left_arm.rotation.z += side_sign * (windup * 0.34 - strike * 0.26) * weight * settle
+	if torso != null:
+		torso.rotation.y += side_sign * (windup * -0.20 + strike * 0.32) * weight * settle
+		torso.rotation.x += (0.18 if moveset_side == BladeRead.LOW else -0.08) * strike * settle
+	if head != null:
+		head.rotation.y -= side_sign * 0.10 * strike * settle
+	for zone_id in ["right_arm", "left_arm", "torso", "head"]:
+		_sync_zone_hitbox(zone_id)
 
 
 ## The fight, laid over whatever the body was already doing.
