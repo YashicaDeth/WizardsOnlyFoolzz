@@ -84,6 +84,41 @@ func _ready() -> void:
 	check(demo.pending_melee.is_empty(), "the swing resolved")
 	check(not str(demo.last_note).begins_with("MISS") and demo.last_note != notes_before, "and it connected: %s" % demo.last_note)
 
+	# --- Codex's moveset: a light from the keys lands on the locked body. ---
+	await _frames(60)
+	demo.stamina = 100.0
+	demo.moveset.reset()
+	var light: Dictionary = demo._moveset_request(false)
+	check(bool(light.get("accepted", false)) and str(light.get("attack", "")) == "light_1", "LMB tap in third person starts light one")
+	check(demo.stamina < 100.0, "and it costs stamina (%.0f)" % demo.stamina)
+	await _frames(45)
+	check(demo._moveset_struck.has(rig), "the sweep crossed the locked body and cut it")
+	check(str(demo.last_note).begins_with("HIT") or str(demo.last_note).contains("OFF") or str(demo.last_note).begins_with("PARRIED") or str(demo.last_note).begins_with("BLOCKED"), "the cut went through the guard read: %s" % demo.last_note)
+	await _frames(60)
+
+	# --- Held past HEAVY_HOLD it is the heavy. ---
+	demo.stamina = 100.0
+	demo._blade_held = 0.0
+	await _frames(30)
+	check(demo.moveset.current_attack() == "heavy", "held, the press becomes the heavy (%s)" % demo.moveset.current_attack())
+	await _frames(90)
+
+	# --- The roll: carries the body, and its i-frames let a blow through. ---
+	avatar.release_lock()
+	demo.stamina = 100.0
+	var roll_from: Vector3 = demo.eye
+	check(demo._begin_dodge(Vector3.RIGHT), "SPACE with a direction rolls")
+	await _frames(12)
+	check(demo.roll.is_invulnerable(), "a fifth of a second in, the roll is invulnerable")
+	var health_before: int = demo.simulation_health
+	var armed: Dictionary = demo.bodies[1]
+	armed["swing"] = BladeRead.LEFT
+	demo._enemy_strike(armed, armed.holder)
+	check(demo.simulation_health == health_before and str(demo.last_note).begins_with("ROLLED THROUGH"), "a blow inside the i-frames passes through")
+	await _frames(40)
+	check(demo.eye.x > roll_from.x + 3.0, "the roll carried the body (%.2f m)" % (demo.eye.x - roll_from.x))
+	check(not demo.roll.is_rolling(), "and ended")
+
 	# --- Back to first person: the eye again. ---
 	demo.third_person = false
 	avatar.third_person = false

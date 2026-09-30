@@ -33,6 +33,9 @@ var blend := 0.0
 ## The Node3D holder of the locked body (the sandbox's `holder`), or null.
 var lock_target: Node3D
 var facing_yaw := 0.0
+## Set by the owner while a swing is past its wind-up: the body keeps the
+## facing it committed to instead of turning into the stick.
+var turn_locked := false
 var _camera_at := Vector3.ZERO
 var _camera_ready := false
 var _own_colliders: Array[RID] = []
@@ -144,7 +147,9 @@ func advance(real_delta: float, eye: Vector3, stance_height: float, yaw: float, 
 	# Facing. First person: the view. Locked: the target. Otherwise the body
 	# turns into its own movement, which is the Souls free-camera rule.
 	var want := yaw
-	if third_person and lock_target != null:
+	if turn_locked:
+		want = facing_yaw
+	elif third_person and lock_target != null:
 		var to := lock_target.global_position - feet
 		want = atan2(-to.x, -to.z)
 	elif third_person and Vector2(walk.x, walk.z).length() > 0.4:

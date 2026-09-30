@@ -178,6 +178,17 @@ var avatar: SandboxAvatar
 var _tp_swing_side := ""
 var _tp_swing_left := 0.0
 var _tp_chain := 0
+## Codex's roll and third-person sword attacks (DESIGN/CODEX_BRIEF_SOULS_MELEE).
+var roll := SoulsRoll.new()
+var moveset := SwordMoveset.new()
+## Bodies this attack has already cut, so one sweep lands once per body.
+var _moveset_struck: Array = []
+## Real seconds the left button has been held for a third-person blade;
+## -1 when not held. Holding past HEAVY_HOLD is the heavy.
+var _blade_held := -1.0
+const HEAVY_HOLD := 0.35
+## How much of the weapon's own damage each attack carries.
+const MOVESET_WEIGHT := {"light_1": 1.0, "light_2": 1.0, "light_3": 1.25, "heavy": 1.7, "running_attack": 1.3, "roll_attack": 1.1}
 var last_read: Dictionary = {}
 var pending_melee: Dictionary = {}
 var melee_windup := -1.0
@@ -667,6 +678,10 @@ func _fire() -> void:
 		_fire_launcher()
 		return
 	if str(arsenal.current().get("kind", "")) == "melee":
+		if third_person:
+			# Released early it is a light, held it becomes the heavy.
+			_blade_held = 0.0
+			return
 		_melee_swing()
 		return
 	var attack: Dictionary = arsenal.begin_attack()
@@ -863,17 +878,22 @@ func _resolve_melee_swing() -> void:
 		arm.whiff()
 		_note("MISS // %s" % released_side.to_upper() if not released_side.is_empty() else "MISS")
 		return
-	var rig: BaselineHuman = found["rig"]
-	var zone: String = found["zone"]
-	var damage_type := str(attack.get("damage_type", "cut"))
-	var landed: Vector3 = found.get("position", start)
-
 	# Which way this swing is going, off the arm rather than off the camera.
 	# In first person that is read here, at contact, so the mouse is still
 	# steering and a drag lands where it was dragged to. In third person the
 	# direction was locked when it was released and the player is wearing it.
 	var contact_side := BladeRead.swing_side(arm.velocity)
 	var side := BladeRead.committed_side(released_side, contact_side, not third_person)
+	_melee_contact(attack, found, along, origin, side)
+
+
+## A blade meeting a body, whichever way it was swung: the guard read, the
+## cut, the stagger. Shared by the mouse swing and the third-person moveset.
+func _melee_contact(attack: Dictionary, found: Dictionary, along: Vector3, origin: Vector3, side: String) -> void:
+	var rig: BaselineHuman = found["rig"]
+	var zone: String = found["zone"]
+	var damage_type := str(attack.get("damage_type", "cut"))
+	var landed: Vector3 = found.get("position", origin)
 	var defender := _entry_for(rig)
 	var read: Dictionary = BladeRead.resolve(
 		str(defender.get("guard", "")), float(defender.get("guard_age", 99.0)), side, arm.head_speed())
@@ -954,6 +974,97 @@ func _tp_side_from_keys() -> String:
 		return BladeRead.RIGHT
 	_tp_chain += 1
 	return BladeRead.RIGHT if _tp_chain % 2 == 1 else BladeRead.LEFT
+
+
+## Which attack a third-person press asks for: the heavy if held, else one
+## out of a roll, a running one at a sprint, or the next light in the chain.
+func _moveset_request(heavy: bool) -> Dictionary:
+	var result: Dictionary
+	if heavy:
+		result = moveset.request_heavy(stamina)
+	elif roll.is_rolling() or roll.recovering():
+		roll.cancel()
+		dodge_remaining = 0.0
+		result = moveset.request_roll_attack(stamina)
+	elif Vector2(walk.x, walk.z).length() > 5.5:
+		result = moveset.request_running_attack(stamina)
+	else:
+		result = moveset.request_light(stamina)
+	if bool(result.get("accepted", false)):
+		stamina -= float(result.get("stamina_cost", 0.0))
+		_begin_moveset_attack(str(result.get("attack", "")))
+	elif not bool(result.get("buffered", false)) and not moveset.is_attacking():
+		_note("TOO TIRED TO SWING")
+	return result
+
+
+func _begin_moveset_attack(attack_id: String) -> void:
+	var definition: Dictionary = moveset.attack_definition(attack_id)
+	_moveset_struck.clear()
+	_gear_recoil = 1.0
+	# The arm is driven along the attack's side for its wind-up and active
+	# frames, so commitment and the cut plane are this attack's, not zero.
+	_tp_swing_side = str(definition.get("side", BladeRead.RIGHT))
+	_tp_swing_left = float(definition.get("windup", 0.2)) + float(definition.get("active", 0.15))
+	swing_released_side = _tp_swing_side
+	_note(attack_id.replace("_", " ").to_upper())
+
+
+## Once a physics frame: the attack's clock, its hits, the body's pose.
+func _advance_moveset(real_delta: float) -> void:
+	if _blade_held >= 0.0:
+		_blade_held += real_delta
+		if _blade_held >= HEAVY_HOLD:
+			_blade_held = -1.0
+			_moveset_request(true)
+	var report: Dictionary = moveset.tick(real_delta, avatar.global_position, avatar.facing_yaw)
+	if bool(report.get("started_buffered", false)):
+		var roll_to: Vector3 = report.get("roll_direction", Vector3.ZERO)
+		if roll_to.length_squared() > 0.0001:
+			_start_roll(roll_to)
+		elif moveset.is_attacking():
+			stamina -= float(report.get("stamina_cost", 0.0))
+			_begin_moveset_attack(moveset.current_attack())
+	var points: PackedVector3Array = report.get("hit_points", PackedVector3Array())
+	if not points.is_empty():
+		_moveset_sweep(points, str(report.get("attack", "")), str(report.get("side", "")))
+	var motion := avatar.motion
+	if motion != null:
+		if moveset.is_attacking():
+			motion.set_moveset_pose(str(report.get("phase", "")), float(report.get("phase_progress", 0.0)), str(report.get("side", "")), str(report.get("attack", "")))
+		else:
+			motion.clear_moveset_pose()
+		if roll.is_rolling():
+			motion.set_roll_pose(roll.progress())
+		else:
+			motion.clear_roll_pose()
+	avatar.turn_locked = moveset.is_attacking() and moveset.phase() != "windup"
+
+
+## The blade's path this frame, from the shoulder out to each arc point: any
+## body it crosses is cut, once per attack.
+func _moveset_sweep(points: PackedVector3Array, attack_id: String, side: String) -> void:
+	var shoulder := avatar.global_position + Vector3.UP * 1.35
+	for point in points:
+		var along := point - shoulder
+		if along.length_squared() < 0.0001:
+			continue
+		var found := _trace_body(shoulder, along)
+		if found.is_empty() or shoulder.distance_to(found.get("position", shoulder)) > along.length():
+			continue
+		var rig := found.get("rig") as BaselineHuman
+		if _moveset_struck.has(rig):
+			continue
+		_moveset_struck.append(rig)
+		var weapon: Dictionary = arsenal.current()
+		var weight := float(MOVESET_WEIGHT.get(attack_id, 1.0))
+		var attack := {
+			"damage": float(weapon.get("damage", 24.0)) * weight,
+			"impulse": float(weapon.get("impulse", 18.0)) * weight,
+			"damage_type": str(weapon.get("damage_type", "cut")),
+			"attack": attack_id,
+		}
+		_melee_contact(attack, found, along.normalized(), shoulder, side)
 
 
 ## The bodies entry for a rig, so a swing can ask what its target was holding.
@@ -1592,6 +1703,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				_grapple_pressure()
 			else:
 				_fire()
+		elif click.button_index == MOUSE_BUTTON_LEFT and not click.pressed and _blade_held >= 0.0:
+			_blade_held = -1.0
+			_moveset_request(false)
 		elif click.button_index == MOUSE_BUTTON_RIGHT:
 			if launcher_equipped or str(arsenal.current().get("kind", "")) == "firearm":
 				firearm_aiming = click.pressed
@@ -1697,11 +1811,24 @@ func _begin_dodge(requested_direction := Vector3.ZERO) -> bool:
 	if requested.length_squared() <= 0.01:
 		return false
 	dodge_direction = requested.normalized()
-	dodge_remaining = 0.28
-	dodge_cooldown = 0.75
-	stamina -= 25.0
+	# Mid-swing, a roll is buffered and fires the frame the swing lets go.
+	if moveset.is_attacking():
+		return moveset.buffer_roll(dodge_direction)
+	return _start_roll(dodge_direction)
+
+
+## Codex's SoulsRoll owns the timing (duration, i-frames, recovery); the
+## sandbox mirrors it into dodge_remaining/dodge_cooldown so everything that
+## already read those (HUD, grapple, tests) keeps its meaning.
+func _start_roll(direction: Vector3) -> bool:
+	if not roll.start(direction, stamina):
+		return false
+	dodge_direction = direction
+	dodge_remaining = SoulsRoll.DURATION
+	dodge_cooldown = SoulsRoll.DURATION + SoulsRoll.RECOVERY
+	stamina -= roll.stamina_cost()
 	firearm_aiming = false
-	_note("DODGE // COMMIT, RECOVER, MOVE AGAIN")
+	_note("ROLL // COMMIT, RECOVER, MOVE AGAIN")
 	return true
 
 
@@ -2010,12 +2137,17 @@ func _physics_process(delta: float) -> void:
 		melee_windup -= real_delta
 		if melee_windup < 0.0:
 			_resolve_melee_swing()
-	if dodge_remaining > 0.0:
-		eye += dodge_direction * 16.0 * real_delta
+	roll.tick(real_delta)
+	if roll.is_rolling():
+		eye += roll.velocity() * real_delta
+	elif moveset.is_attacking():
+		# A committed swing roots the feet: a drift, not a walk.
+		eye += walk * 0.2 * real_delta
 	else:
 		eye += walk * real_delta
-	dodge_remaining = maxf(0.0, dodge_remaining - real_delta)
+	dodge_remaining = maxf(0.0, dodge_remaining - real_delta) if roll.is_rolling() else 0.0
 	dodge_cooldown = maxf(0.0, dodge_cooldown - real_delta)
+	_advance_moveset(real_delta)
 	if dodge_remaining <= 0.0:
 		stamina = minf(100.0, stamina + 18.0 * real_delta)
 	eye.x = clampf(eye.x, -ARENA + 2.0, ARENA - 2.0)
@@ -2172,6 +2304,10 @@ func _set_enemies_enabled(enabled: bool) -> void:
 ## knocks an armed hand open, so the weapon flies; the right side late blocks
 ## most of it; anything else is open.
 func _enemy_strike(entry: Dictionary, holder: Node3D) -> void:
+	# Inside the roll's i-frames the blow passes through (SoulsRoll).
+	if roll.is_invulnerable():
+		_note("ROLLED THROUGH // %s" % str(entry.get("swing", "")).to_upper())
+		return
 	var armed := _holds_weapon(entry)
 	var stats: Dictionary = HunterArsenal.WEAPONS.get(str(entry.get("weapon", "")), FISTS) if armed else FISTS
 	var side := str(entry.get("swing", BladeRead.HIGH))
