@@ -36,6 +36,11 @@ const SPRINT_HOLD := 0.28
 const TRIGGER_PRESS := 0.5
 
 var device := 0
+## A PS4 pad under DS4Windows / Steam shows up twice (the raw pad and an
+## emulated Xbox pad), and both send every press. Only the pad in use counts:
+## another one takes over once this one has been quiet for DEVICE_HANDOVER.
+const DEVICE_HANDOVER := 1.0
+var _quiet := DEVICE_HANDOVER
 var sprinting := false
 var _circle_held := -1.0
 var _r2_down := false
@@ -75,6 +80,7 @@ func _stick(axis_x: JoyAxis, axis_y: JoyAxis) -> Vector2:
 
 
 func _process(delta: float) -> void:
+	_quiet += delta
 	if _circle_held >= 0.0:
 		_circle_held += delta
 		sprinting = _circle_held >= SPRINT_HOLD
@@ -89,7 +95,19 @@ func _process(delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if not event is InputEventJoypadButton or event.is_echo():
+	if not (event is InputEventJoypadButton or event is InputEventJoypadMotion):
+		return
+	if event.device != device:
+		if _quiet < DEVICE_HANDOVER or (event is InputEventJoypadMotion and absf((event as InputEventJoypadMotion).axis_value) < DEADZONE):
+			get_viewport().set_input_as_handled()
+			return
+		device = event.device
+	if event is InputEventJoypadMotion:
+		if absf((event as InputEventJoypadMotion).axis_value) >= DEADZONE:
+			_quiet = 0.0
+		return
+	_quiet = 0.0
+	if event.is_echo():
 		return
 	var button := event as InputEventJoypadButton
 	var down: bool = button.pressed

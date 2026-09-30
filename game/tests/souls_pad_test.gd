@@ -150,5 +150,21 @@ func _ready() -> void:
 	_press(JOY_BUTTON_START)
 	check(demo.enemies_enabled, "options turns the enemies on")
 
+	# --- One PS4 pad seen twice (raw + emulated Xbox): each press counts once. ---
+	await _frames(90)
+	demo.stamina = 100.0
+	demo.moveset.reset()
+	var lights := [0]
+	demo.pad.light.connect(func() -> void: lights[0] += 1)
+	var twin: int = demo.pad.device + 1
+	for id in [demo.pad.device, twin]:
+		var event := InputEventJoypadButton.new()
+		event.device = id
+		event.button_index = JOY_BUTTON_RIGHT_SHOULDER
+		event.pressed = true
+		Input.parse_input_event(event)
+		Input.flush_buffered_events()
+	check(lights[0] == 1, "a press arriving from the raw pad and its Xbox twin counts once (%d)" % lights[0])
+
 	print("SOULS_PAD_TEST_RESULT failures=%d" % failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
