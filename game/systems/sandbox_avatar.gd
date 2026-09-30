@@ -29,6 +29,11 @@ const TURN_RATE := 12.0
 const PITCH_MIN := -0.75
 const PITCH_MAX := 0.42
 const CAMERA_MIN_HEIGHT := 0.55
+## Locked framing: how far over the shoulder, how high, and how far the aim
+## leans from you toward the target.
+const LOCK_SHOULDER := 1.2
+const LOCK_LIFT := 2.0
+const LOCK_FOCUS := 0.5
 
 var rig: BaselineHuman
 var motion: HunterBodyMotion
@@ -172,13 +177,21 @@ func advance(real_delta: float, eye: Vector3, stance_height: float, yaw: float, 
 	var right := Vector3(cos(yaw), 0.0, -sin(yaw))
 	var focus := feet + Vector3.UP * 1.5
 	var distance := 3.6
+	var shoulder_offset := 0.62
+	var lift := 1.75
 	if lock_target != null:
 		var gap := feet.distance_to(lock_target.global_position)
 		distance = clampf(3.6 + gap * 0.22, 3.6, 6.2)
-		focus = focus.lerp(lock_target.global_position + Vector3.UP * 0.9, 0.32)
+		focus = focus.lerp(lock_target.global_position + Vector3.UP * 0.9, LOCK_FOCUS)
+		# Locked, camera, player and target stood on one line and the player's
+		# own back hid the enemy (30 Sep capture: only its head showed over
+		# the shoulder). Souls framing: further over the shoulder and a touch
+		# higher, aimed between the two, so the target stands beside you.
+		shoulder_offset = LOCK_SHOULDER
+		lift = LOCK_LIFT
 	var orbit_pitch := clampf(pitch, PITCH_MIN, PITCH_MAX)
 	var orbit := Vector3(-sin(yaw) * cos(orbit_pitch), sin(orbit_pitch), -cos(yaw) * cos(orbit_pitch))
-	var desired := feet + Vector3.UP * 1.75 - orbit * distance + right * 0.62
+	var desired := feet + Vector3.UP * lift - orbit * distance + right * shoulder_offset
 	desired.y = maxf(desired.y, feet.y + CAMERA_MIN_HEIGHT)
 	if not _camera_ready:
 		_camera_at = desired

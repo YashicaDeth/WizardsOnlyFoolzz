@@ -227,6 +227,7 @@ const BODY_SPACING := 1.0
 ## Pack mode: everyone comes, but no two closer than this, so they surround
 ## you from their own sides instead of piling onto one spot.
 const PACK_SPACING := 2.0
+const SEPARATION_PASSES := 3
 ## The attacker's rhythm: the ring it circles on, how fast it strafes and
 ## closes, and how much of its cadence is left when it steps in.
 const CIRCLE_RADIUS := 2.8
@@ -2851,6 +2852,13 @@ func _hold_back(entry: Dictionary, holder: Node3D, motion: HunterBodyMotion, rea
 ## No two standing bodies closer than BODY_SPACING: each overlapping pair is
 ## pushed apart evenly, flat on the floor.
 func _separate_bodies() -> void:
+	# A few passes: pushing one pair apart can shove one of them into a
+	# third (a strafing pack bunches up), and one pass left 1.8 m gaps.
+	for _pass in SEPARATION_PASSES:
+		_separate_once()
+
+
+func _separate_once() -> void:
 	for a in bodies.size():
 		if not _can_duel(a) and a != grapple_index:
 			continue
