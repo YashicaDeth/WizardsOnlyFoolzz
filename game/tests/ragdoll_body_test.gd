@@ -33,8 +33,16 @@ func _add_floor() -> void:
 
 
 func _body(id: String, ragdoll: bool, travel := 0.25) -> BaselineHuman:
+	# The production sandbox owns every rig through a holder at +0.9 m, with
+	# the rig offset back down by -0.9 m. Keeping that hierarchy in the proof
+	# catches physics bodies that accidentally inherit their old holder twice.
+	var holder := Node3D.new()
+	holder.name = "%s_holder" % id
+	holder.position.y = 0.9
+	add_child(holder)
 	var body := BaselineHuman.new()
-	add_child(body)
+	body.position.y = -0.9
+	holder.add_child(body)
 	body.build(id, {"gore": false, "ragdoll": ragdoll, "knockdown_travel": travel})
 	return body
 
