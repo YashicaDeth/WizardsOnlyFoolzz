@@ -1,0 +1,75 @@
+class_name Knockback
+extends RefCounted
+
+## Deterministic, owner-driven knockback. The system computes the shove; the
+## CharacterBody (or other holder) remains the only thing allowed to move its
+## own transform.
+
+const MAX_POISE := 100.0
+const POISE_REGEN_PER_SECOND := 24.0
+const POISE_DAMAGE_PER_UNIT_IMPULSE := 3.4
+const SHOVE_PER_IMPULSE := 0.025
+const POISE_BREAK_THRESHOLD := 0.0
+const GROUND_FRICTION := 8.0
+const MIN_SHOVE_REMAINDER := 0.0005
+const ATTACK_SHOVE_MULTIPLIERS := {
+	"light_1": 1.0,
+	"light_2": 1.0,
+	"light_3": 1.0,
+	"heavy": 3.6,
+	"running_attack": 2.4,
+	"roll_attack": 2.8,
+}
+const ATTACK_POISE_MULTIPLIERS := {
+	"light_1": 1.0,
+	"light_2": 1.0,
+	"light_3": 1.0,
+	"heavy": 3.0,
+	"running_attack": 1.8,
+	"roll_attack": 2.1,
+}
+
+var poise := MAX_POISE
+var _shove_remaining := Vector3.ZERO
+
+
+func apply(impulse: float, direction: Vector3, attack_id: String) -> Dictionary:
+	var heading := direction
+	heading.y = 0.0
+	if heading.length_squared() > 0.0001:
+		heading = heading.normalized()
+	else:
+		heading = Vector3.ZERO
+
+	var kind := attack_id.strip_edges().to_lower()
+	var poise_multiplier := float(ATTACK_POISE_MULTIPLIERS.get(kind, 1.0))
+	var shove_multiplier := float(ATTACK_SHOVE_MULTIPLIERS.get(kind, 1.0))
+	var strength := maxf(impulse, 0.0)
+	var poise_damage := strength * POISE_DAMAGE_PER_UNIT_IMPULSE * poise_multiplier
+	poise = maxf(POISE_BREAK_THRESHOLD, poise - poise_damage)
+	var metres := strength * SHOVE_PER_IMPULSE * shove_multiplier
+	var shove := heading * metres
+	_shove_remaining += shove
+	var stagger := clampf(poise_damage / MAX_POISE, 0.0, 1.0)
+	return {
+		"shove": shove,
+		"stagger": stagger,
+		"knockdown": poise <= POISE_BREAK_THRESHOLD,
+	}
+
+
+func tick(delta: float) -> Vector3:
+	var step := maxf(delta, 0.0)
+	poise = minf(MAX_POISE, poise + POISE_REGEN_PER_SECOND * step)
+	if _shove_remaining.length_squared() <= MIN_SHOVE_REMAINDER * MIN_SHOVE_REMAINDER:
+		_shove_remaining = Vector3.ZERO
+		return Vector3.ZERO
+	var fraction := 1.0 - exp(-GROUND_FRICTION * step)
+	var displacement := _shove_remaining * fraction
+	_shove_remaining -= displacement
+	return displacement
+
+
+func reset() -> void:
+	poise = MAX_POISE
+	_shove_remaining = Vector3.ZERO
