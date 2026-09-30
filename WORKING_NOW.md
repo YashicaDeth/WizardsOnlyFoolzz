@@ -76,6 +76,9 @@ Claude:
 
 ## Codex is in
 
+- NEXT: DESIGN/CODEX_BRIEF_STANCES_WEIGHT_2026-09-30.md (ragdoll kick fix, weight,
+  stances and per-weapon movesets): ragdoll_body.gd, knockback.gd, sword_moveset.gd,
+  hunter_body_motion.gd, baseline_human.gd last-hit record only.
 - Ragdoll and knockback (DESIGN/CODEX_BRIEF_RAGDOLL_KNOCKBACK_2026-09-30.md,
   worktree ragdoll): new game/systems/knockback.gd, game/systems/ragdoll_body.gd,
   their tests, and one opt-in hook in game/systems/baseline_human.gd.

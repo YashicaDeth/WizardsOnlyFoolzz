@@ -188,6 +188,12 @@ var duelist := -1
 ## J switches: a duel (one at a time, the rest wait) or the pack (all at once,
 ## spread out).
 var duel_mode := true
+## The PS4 pad (SoulsPad), Bloodborne / Dark Souls 3 layout.
+var pad: SoulsPad
+## Over the shoulder the walk is a jog; Shift or O held sprints (Souls).
+const JOG_SPEED := 4.2
+const SPRINT_SPEED := 7.0
+const SPRINT_STAMINA_PER_SECOND := 14.0
 ## Real seconds the left button has been held for a third-person blade;
 ## -1 when not held. Holding past HEAVY_HOLD is the heavy.
 var _blade_held := -1.0
@@ -330,6 +336,7 @@ func _ready() -> void:
 	avatar = SandboxAvatar.new()
 	add_child(avatar)
 	avatar.build()
+	_build_pad()
 	impact_feel = IMPACT_FEEL.new()
 	add_child(impact_feel)
 	ballistics = BALLISTICS.new()
@@ -1048,6 +1055,12 @@ func _moveset_request(heavy: bool) -> Dictionary:
 
 func _begin_moveset_attack(attack_id: String) -> void:
 	var definition: Dictionary = moveset.attack_definition(attack_id)
+	# Omnidirectional (Greg: Souls-like, "locked in place" once swinging):
+	# the blow turns to wherever you push at the moment you press, then the
+	# body holds that facing until the swing lets go. A lock wins.
+	var push := _sandbox_move_input()
+	if avatar.lock_target == null and push.length_squared() > 0.04:
+		avatar.facing_yaw = atan2(-push.x, -push.z)
 	_moveset_struck.clear()
 	_gear_recoil = 1.0
 	# The arm is driven along the attack's side for its wind-up and active
@@ -1806,24 +1819,15 @@ func _unhandled_input(event: InputEvent) -> void:
 				var move := _sandbox_move_input()
 				if move.length_squared() > 0.01:
 					_begin_dodge(move)
+				elif third_person:
+					# Souls: no jump over the shoulder; SPACE still is a backstep.
+					_backstep()
 				else:
 					jump_queued = true
 			KEY_E: _take_station_item()
 			KEY_F: _open_nearest_body()
-			KEY_Z:
-				var was_locked := avatar.lock_target != null
-				if avatar.toggle_lock(bodies, eye, -camera.global_transform.basis.z):
-					_note("LOCKED // Z RELEASES")
-				else:
-					_note("LOCK RELEASED" if was_locked else "NOTHING TO LOCK ON TO")
-			KEY_V:
-				third_person = not third_person
-				avatar.third_person = third_person
-				if not third_person:
-					avatar.release_lock()
-				# The registers differ in when the swing direction is read, so
-				# say which one is running rather than leaving it to be felt.
-				_note("THIRD PERSON // COMMITTED SWINGS" if third_person else "FIRST PERSON // DRAG YOUR SWINGS")
+			KEY_Z: _toggle_lock_on()
+			KEY_V: _toggle_view()
 			KEY_G:
 				if handheld != null:
 					handheld.toggle_device()
@@ -1852,7 +1856,91 @@ func _sandbox_move_input() -> Vector3:
 	if Input.is_key_pressed(KEY_S): move += forward
 	if Input.is_key_pressed(KEY_A): move -= right
 	if Input.is_key_pressed(KEY_D): move += right
-	return move.normalized()
+	if move.length_squared() > 0.0:
+		return move.normalized()
+	# The pad's stick is analog: a half push is a half-speed walk.
+	var stick := pad.move_stick() if pad != null else Vector2.ZERO
+	return forward * stick.y + right * stick.x
+
+
+func _toggle_lock_on() -> void:
+	var was_locked := avatar.lock_target != null
+	if avatar.toggle_lock(bodies, eye, -camera.global_transform.basis.z):
+		_note("LOCKED // Z OR R3 RELEASES")
+	else:
+		_note("LOCK RELEASED" if was_locked else "NOTHING TO LOCK ON TO")
+
+
+func _toggle_view() -> void:
+	third_person = not third_person
+	avatar.third_person = third_person
+	if not third_person:
+		avatar.release_lock()
+	# The registers differ in when the swing direction is read, so say which
+	# one is running rather than leaving it to be felt.
+	_note("THIRD PERSON // COMMITTED SWINGS" if third_person else "FIRST PERSON // DRAG YOUR SWINGS")
+
+
+## Souls: a roll with nothing pushed is a backstep, straight back from where
+## the body faces (or from the lock).
+func _backstep() -> bool:
+	var back := Vector3(sin(avatar.facing_yaw), 0.0, cos(avatar.facing_yaw))
+	return _begin_dodge(back)
+
+
+## Sprinting over the shoulder: Shift (Elden Ring) or O held (Bloodborne),
+## moving, and with stamina to spend.
+func _sprinting() -> bool:
+	if not third_person or stamina <= 1.0:
+		return false
+	var held := Input.is_key_pressed(KEY_SHIFT) or (pad != null and pad.sprinting)
+	return held and _sandbox_move_input().length_squared() > 0.04
+
+
+# --- The pad (SoulsPad): each verb is the keyboard's own. ---
+func _build_pad() -> void:
+	pad = SoulsPad.new()
+	pad.name = "SoulsPad"
+	add_child(pad)
+	pad.light.connect(func() -> void: _pad_attack(false))
+	pad.heavy.connect(func() -> void: _pad_attack(true))
+	pad.roll.connect(func() -> void:
+		var move := _sandbox_move_input()
+		if move.length_squared() > 0.01:
+			_begin_dodge(move)
+		else:
+			_backstep())
+	pad.lock.connect(_toggle_lock_on)
+	pad.view.connect(_toggle_view)
+	pad.interact.connect(_take_station_item)
+	pad.guard_changed.connect(func(held: bool, parry: bool) -> void:
+		if str(arsenal.current().get("kind", "")) == "firearm" or launcher_equipped:
+			firearm_aiming = held
+			return
+		guarding = held
+		guard_aim = Vector2.ZERO
+		guard_held = 0.0
+		if not held:
+			_note("GUARD DOWN")
+		elif parry:
+			_note("PARRY // MEET THE BLOW LATE"))
+	pad.weapon_step.connect(func(step: int) -> void:
+		var total := HunterArsenal.SLOT_ORDER.size()
+		_switch_weapon(posmod(HunterArsenal.SLOT_ORDER.find(arsenal.current_id) + step, total)))
+	pad.duel_toggle.connect(func() -> void:
+		duel_mode = not duel_mode
+		duelist = -1
+		_note("DUEL // ONE AT A TIME" if duel_mode else "PACK // ALL AT ONCE, SPREAD OUT"))
+	pad.enemies_toggle.connect(func() -> void: _set_enemies_enabled(not enemies_enabled))
+
+
+## R1 / R2. Over the shoulder with a blade these are the moveset's light and
+## heavy; otherwise R1 is the trigger (a shot, or the first-person swing).
+func _pad_attack(heavy: bool) -> void:
+	if third_person and str(arsenal.current().get("kind", "")) == "melee" and not launcher_equipped:
+		_moveset_request(heavy)
+	elif not heavy or str(arsenal.current().get("kind", "")) == "firearm":
+		_fire()
 
 
 func _begin_dodge(requested_direction := Vector3.ZERO) -> bool:
@@ -2163,13 +2251,27 @@ func _physics_process(delta: float) -> void:
 	# Held, not toggled. The world slows; your own aim and your own feet do not,
 	# which is what makes a slow-motion execution feel like something you are
 	# doing rather than something being shown to you.
-	var want := 1.0 if Input.is_key_pressed(KEY_SHIFT) else 0.0
+	# Over the shoulder Shift is the sprint (Elden Ring), so slow motion is a
+	# first-person posture.
+	var want := 1.0 if Input.is_key_pressed(KEY_SHIFT) and not third_person else 0.0
 	slowed = move_toward(slowed, want, real_delta * 5.0)
 	hitstop = maxf(0.0, hitstop - real_delta)
 	Engine.time_scale = lerpf(1.0, SLOW_SCALE, slowed) * (HITSTOP_SCALE if hitstop > 0.0 else 1.0)
 
 	var move := _sandbox_move_input()
-	var move_speed := 7.0 * (0.68 if firearm_aiming else 1.0)
+	var sprinting := _sprinting()
+	var pace := (SPRINT_SPEED if sprinting else JOG_SPEED) if third_person else 7.0
+	var move_speed := pace * (0.68 if firearm_aiming else 1.0)
+	if sprinting:
+		stamina = maxf(0.0, stamina - SPRINT_STAMINA_PER_SECOND * real_delta)
+	if pad != null:
+		var turn := pad.look(real_delta)
+		if turn != Vector2.ZERO:
+			yaw -= turn.x
+			pitch = clampf(pitch - turn.y, -1.2, 0.9)
+			# First person, the stick is the mouse: it swings the blade too.
+			if not third_person:
+				_look_delta += turn
 	walk = walk.lerp(move * move_speed, clampf(real_delta * 14.0, 0.0, 1.0))
 	# The arm and guard run in real seconds: sandbox slow motion bends the world,
 	# not the player's input. The delta is already radians, matching the Hunt.
@@ -2201,7 +2303,8 @@ func _physics_process(delta: float) -> void:
 	dodge_cooldown = maxf(0.0, dodge_cooldown - real_delta)
 	_advance_moveset(real_delta)
 	if dodge_remaining <= 0.0:
-		stamina = minf(100.0, stamina + 18.0 * real_delta)
+		if not _sprinting():
+			stamina = minf(100.0, stamina + 18.0 * real_delta)
 	eye.x = clampf(eye.x, -ARENA + 2.0, ARENA - 2.0)
 	eye.z = clampf(eye.z, -ARENA + 2.0, ARENA - 2.0)
 	var crouching := Input.is_key_pressed(KEY_CTRL)

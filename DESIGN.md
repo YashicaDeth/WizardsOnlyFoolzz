@@ -1592,3 +1592,33 @@ playable build and verified before merge.
 - **The placeholder coat slab and strap come off world bodies** ("deleting
   this chunky shit from the middle of his torso") so real clothes, skin,
   wounds, cutting, organs, cybernetics and blood can be built on the body.
+
+## Stated by Greg, 30 September 2026: Souls-like third-person combat
+
+User requirements (his words where quoted):
+
+- Third person should be "kind of like a Souls-like and omnidirectional, but
+  you're like locked in place as a character": the blow goes any way you
+  push, and a committed swing roots you.
+- Test it on a PS4 pad, "map it to Dark Souls controls for the fighting and
+  the big swings ... or Bloodborne". Over the shoulder Shift runs and SPACE
+  dodges; no jump there.
+- "Third person fighting where the stances are different and we can start
+  making different weapons", tested in the sandbox first, "then we can
+  implement it all into the full game".
+- Like Dark Souls 1-3 and Bloodborne, "except make it way less buggy, super
+  clean".
+- Ragdolls "funny, but also have weight"; deaths "very realistic". A huge
+  sword leaves a massive wound and sends a body flying, "not heaps far",
+  realistic, but "an anime type fight".
+- Later: fighting with disarming and tough duels, escalating to cybernetic
+  "Elden Ring modded" fights, duelling in midair, double jumps, massive
+  attacks that launch a ragdolled body.
+- The sandbox: fight 1v1, or more space between them; they must not all rush
+  you and merge into each other (done 30 Sep: duel by default, pack on J).
+
+Reference to come: a developer's anatomy and gore videos (ragdolls, realistic
+deaths, disarming). References are mood, not layout.
+
+Built 30 Sep (sandbox): SoulsRoll, SwordMoveset, Knockback, RagdollBody,
+SandboxAvatar (shoulder camera, lock), SoulsPad (PS4 layout).
