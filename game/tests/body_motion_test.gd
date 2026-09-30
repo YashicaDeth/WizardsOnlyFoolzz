@@ -56,6 +56,38 @@ func _ready() -> void:
 	motion.update(0.1, Vector3.ZERO, true, false, false, false)
 	check(motion.state == "attack" and absf(rig.parts.right_arm.rotation.z) > 0.2, "attack layers a committed weapon-arm arc")
 	motion.attack_time = 0.0
+	motion.set_weapon_stance("sword", "one_hand")
+	motion.update(0.016, Vector3.ZERO, true, false, false, false)
+	var one_hand_guard: Vector3 = rig.parts.left_arm.rotation
+	motion.set_weapon_stance("sword", "two_hand")
+	motion.update(0.016, Vector3.ZERO, true, false, false, false)
+	check(rig.parts.left_arm.rotation.distance_to(one_hand_guard) > 0.12, "two-hand idle visibly brings the support hand onto the weapon")
+	var slash_rest: Vector3 = rig.parts.right_arm.rotation
+	motion.set_moveset_pose("active", 0.7, BladeRead.RIGHT, "light_1", "sword", "slash")
+	motion.update(0.0, Vector3.ZERO, true, false, false, false)
+	var slash_pose: Vector3 = rig.parts.right_arm.rotation
+	motion.set_moveset_pose("active", 0.7, BladeRead.HIGH, "light_1", "shiv", "thrust")
+	motion.update(0.0, Vector3.ZERO, true, false, false, false)
+	var thrust_pose: Vector3 = rig.parts.right_arm.rotation
+	check(thrust_pose.distance_to(slash_pose) > 0.25 and thrust_pose.distance_to(slash_rest) > 0.1, "a shiv thrust has a distinct committed silhouette from a sword slash")
+	motion.clear_moveset_pose()
+	motion.attack_time = 0.0
+	print("BODY MOTION - roll orbits one tucked body around the hips")
+	motion.set_perspective(false)
+	motion.set_roll_pose(0.25)
+	motion.update(0.0, Vector3.ZERO, true, false, false, true)
+	var quarter_head := rig.parts.head.position as Vector3
+	var quarter_left_foot := rig.parts.left_leg.position as Vector3
+	var quarter_right_foot := rig.parts.right_leg.position as Vector3
+	check(absf(quarter_head.z - quarter_left_foot.z) > 0.65 and signf(quarter_head.z) != signf(quarter_left_foot.z), "head and feet orbit opposite sides of one hip pivot at quarter roll")
+	check(quarter_left_foot.distance_to(quarter_right_foot) < 0.35, "both feet stay together through the tuck")
+	motion.set_roll_pose(0.5)
+	motion.update(0.0, Vector3.ZERO, true, false, false, true)
+	check(rig.parts.head.position.y < 0.45 and rig.parts.left_leg.position.y > 0.85, "the assembled body turns upside down instead of spinning zones in place")
+	motion.set_roll_pose(1.0)
+	motion.update(0.0, Vector3.ZERO, true, false, false, true)
+	check(rig.parts.left_leg.position.distance_to(BaselineHuman.STANDING.left_leg.at) < 0.02 and rig.parts.right_leg.position.distance_to(BaselineHuman.STANDING.right_leg.at) < 0.02, "feet land back under the body at roll completion")
+	motion.clear_roll_pose()
 	motion.set_combat_pose(1.0, "firearm")
 	motion.update(0.016, Vector3(0, 0, 2.5), true, false, false, false)
 	check(rig.parts.right_arm.rotation.x > 0.8 and rig.parts.left_arm.rotation.x > 0.8,

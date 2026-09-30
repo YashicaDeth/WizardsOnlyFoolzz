@@ -88,6 +88,10 @@ var moveset_phase := ""
 var moveset_progress := 0.0
 var moveset_side := ""
 var moveset_attack := ""
+var moveset_weapon := "sword"
+var moveset_motion := "slash"
+var weapon_stance := "one_hand"
+var weapon_stance_enabled := false
 
 ## Existing callers only expose a dodging bool, so they receive a timed pose
 ## automatically. The explicit override lets SoulsRoll's future owner pass its
@@ -140,11 +144,27 @@ func clear_roll_pose() -> void:
 	roll_pose_override = -1.0
 
 
-func set_moveset_pose(phase: String, progress: float, side: String, attack_id: String) -> void:
+func set_weapon_stance(weapon_id: String, stance_id: String) -> void:
+	moveset_weapon = weapon_id.strip_edges().to_lower()
+	weapon_stance = stance_id if stance_id in ["one_hand", "two_hand"] else "one_hand"
+	weapon_stance_enabled = true
+
+
+func set_moveset_pose(phase: String, progress: float, side: String, attack_id: String, weapon_id := "", motion_id := "") -> void:
 	moveset_phase = phase if phase in ["windup", "active", "recovery"] else ""
 	moveset_progress = clampf(progress, 0.0, 1.0)
 	moveset_side = side
 	moveset_attack = attack_id
+	if not weapon_id.is_empty():
+		moveset_weapon = weapon_id.strip_edges().to_lower()
+	if not motion_id.is_empty():
+		moveset_motion = motion_id.strip_edges().to_lower()
+	elif moveset_weapon == "shiv":
+		moveset_motion = "thrust"
+	elif moveset_weapon in ["fists", "bare", "hands"]:
+		moveset_motion = "jab"
+	else:
+		moveset_motion = "slash"
 
 
 func clear_moveset_pose() -> void:
@@ -479,38 +499,38 @@ func _pose(horizontal_speed: float, sprinting: bool, _crouching: bool, dodging: 
 	_apply_fight_layer()
 
 
-## Tuck the articulated body around a complete forward revolution. Only the
-## visible zones and their matching anatomy hitboxes turn; the authoritative
-## CharacterBody root/collider remains upright and owned by movement code.
+## Tuck the articulated body around a complete forward revolution. The zones
+## are siblings rather than a skeleton, so merely rotating each mesh makes six
+## disconnected propellers. Orbit every zone around one hip pivot first, then
+## add its local tuck. The authoritative CharacterBody root/collider remains
+## upright and owned by movement code.
 func _apply_roll_pose(dodging: bool) -> void:
 	if not dodging and roll_pose_override < 0.0:
 		return
 	var progress := roll_pose_override if roll_pose_override >= 0.0 else clampf(dodge_pose_elapsed / ROLL_POSE_DURATION, 0.0, 1.0)
 	var tuck := sin(progress * PI)
 	var turn := TAU * progress
-	var torso := rig.parts.get("torso") as Node3D
-	var head := rig.parts.get("head") as Node3D
-	var left_arm := rig.parts.get("left_arm") as Node3D
-	var right_arm := rig.parts.get("right_arm") as Node3D
-	var left_leg := rig.parts.get("left_leg") as Node3D
-	var right_leg := rig.parts.get("right_leg") as Node3D
-	if torso != null:
-		torso.position += Vector3(0.0, -0.30 * tuck, 0.16 * tuck)
-		torso.rotation.x += turn
-	if head != null:
-		head.position += Vector3(0.0, -0.24 * tuck, 0.12 * tuck)
-		head.rotation.x += turn - 0.28 * tuck
-	if left_arm != null:
-		left_arm.rotation += Vector3(0.92 * tuck, -0.12 * tuck, 0.88 * tuck)
-	if right_arm != null:
-		right_arm.rotation += Vector3(0.92 * tuck, 0.12 * tuck, -0.88 * tuck)
-	if left_leg != null:
-		left_leg.position += Vector3(0.0, 0.14 * tuck, 0.13 * tuck)
-		left_leg.rotation.x += 1.12 * tuck + turn
-	if right_leg != null:
-		right_leg.position += Vector3(0.0, 0.14 * tuck, 0.13 * tuck)
-		right_leg.rotation.x += 1.12 * tuck + turn
+	var hip_pivot := Vector3(0.0, 0.78, 0.0)
+	var orbit := Basis(Vector3.RIGHT, turn)
+	# Pull the centres toward the hip at mid-roll. That is the missing compact
+	# silhouette: arms cover the head, knees come in, and no limb centre can be
+	# left on the floor while the torso revolves above it.
+	var compact := lerpf(1.0, 0.76, tuck)
+	var local_tucks := {
+		"torso": Vector3(0.12, 0.0, 0.0),
+		"head": Vector3(-0.20, 0.0, 0.0),
+		"left_arm": Vector3(0.94, -0.12, 0.88),
+		"right_arm": Vector3(0.94, 0.12, -0.88),
+		"left_leg": Vector3(1.08, 0.0, -0.10),
+		"right_leg": Vector3(1.08, 0.0, 0.10),
+	}
 	for zone_id in ["torso", "head", "left_arm", "right_arm", "left_leg", "right_leg"]:
+		var part := rig.parts.get(zone_id) as Node3D
+		if part == null:
+			continue
+		part.position = hip_pivot + orbit * ((part.position - hip_pivot) * compact)
+		part.rotation.x += turn
+		part.rotation += (local_tucks[zone_id] as Vector3) * tuck
 		_sync_zone_hitbox(zone_id)
 
 
@@ -518,6 +538,7 @@ func _apply_roll_pose(dodging: bool) -> void:
 ## alter anticipation and follow-through, while attack kind only changes
 ## weight; damage, timing and hit detection stay in SwordMoveset/the owner.
 func _apply_moveset_pose() -> void:
+	_apply_weapon_guard_pose()
 	if moveset_phase.is_empty():
 		return
 	var side_sign := -1.0 if moveset_side == BladeRead.LEFT else 1.0
@@ -544,6 +565,24 @@ func _apply_moveset_pose() -> void:
 	var left_arm := rig.parts.get("left_arm") as Node3D
 	var torso := rig.parts.get("torso") as Node3D
 	var head := rig.parts.get("head") as Node3D
+	var thrusting := "thrust" in moveset_motion or moveset_motion == "jab" or moveset_motion == "shove"
+	if thrusting:
+		var extension := (windup * -0.34 + strike * 0.92) * weight * settle
+		if right_arm != null:
+			right_arm.rotation.x += extension
+			right_arm.rotation.y += side_sign * 0.10 * windup * settle
+			right_arm.rotation.z += side_sign * (-0.24 * windup + 0.12 * strike) * settle
+		if left_arm != null:
+			left_arm.rotation.x += (0.18 * windup + 0.24 * strike) * settle
+			left_arm.rotation.z -= side_sign * 0.16 * strike * settle
+		if torso != null:
+			torso.rotation.x += (-0.08 * windup + 0.18 * strike) * settle
+			torso.rotation.y += side_sign * 0.08 * strike * settle
+		if head != null:
+			head.rotation.x -= 0.06 * strike * settle
+		for zone_id in ["right_arm", "left_arm", "torso", "head"]:
+			_sync_zone_hitbox(zone_id)
+		return
 	if right_arm != null:
 		right_arm.rotation.x += (windup * 0.66 - strike * 0.30) * weight * settle
 		right_arm.rotation.y += side_sign * (windup * -0.28 + strike * 0.34) * weight * settle
@@ -557,6 +596,36 @@ func _apply_moveset_pose() -> void:
 	if head != null:
 		head.rotation.y -= side_sign * 0.10 * strike * settle
 	for zone_id in ["right_arm", "left_arm", "torso", "head"]:
+		_sync_zone_hitbox(zone_id)
+
+
+## A quiet stance silhouette is always layered over locomotion; attacks then
+## build on it. Two-hand closes the support hand onto the weapon while fists
+## rise into a compact guard. This is presentation only and does not own input.
+func _apply_weapon_guard_pose() -> void:
+	if not weapon_stance_enabled:
+		return
+	var right_arm := rig.parts.get("right_arm") as Node3D
+	var left_arm := rig.parts.get("left_arm") as Node3D
+	var torso := rig.parts.get("torso") as Node3D
+	if moveset_weapon in ["fists", "bare", "hands"]:
+		if right_arm != null:
+			right_arm.rotation += Vector3(0.34, -0.10, -0.34)
+		if left_arm != null:
+			left_arm.rotation += Vector3(0.38, 0.10, 0.38)
+	elif weapon_stance == "two_hand":
+		if right_arm != null:
+			right_arm.rotation += Vector3(0.16, -0.08, -0.16)
+		if left_arm != null:
+			left_arm.rotation += Vector3(0.46, 0.18, -0.42)
+		if torso != null:
+			torso.rotation.y -= 0.05
+	else:
+		if right_arm != null:
+			right_arm.rotation += Vector3(0.10, -0.04, -0.10)
+		if left_arm != null:
+			left_arm.rotation += Vector3(0.08, 0.04, 0.10)
+	for zone_id in ["right_arm", "left_arm", "torso"]:
 		_sync_zone_hitbox(zone_id)
 
 

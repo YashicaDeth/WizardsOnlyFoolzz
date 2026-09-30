@@ -20,6 +20,19 @@ commit. Never edit a file the other agent has claimed.
   worse. A generated model on a person is a skin riding on BaselineHuman's
   zones, never a replacement for the rig.
 
+## Combat loop live claims
+
+- Codex: clear after loop 1; measuring the next lane problem.
+
+## Greg decides
+
+- Whether a downed-but-still-alive body should enter full ragdoll. Current
+  behavior reserves ragdoll for death and keeps the authored tip-over while
+  alive.
+- Final sword/shiv/fist and one-hand/two-hand tuning after a pad playtest.
+  Current timing, stamina, poise and shove values are deliberately data-driven
+  defaults, not a locked balance decision.
+
 ## Queue (take the top unclaimed item for your name; move it to Done)
 
 Codex:
@@ -87,6 +100,13 @@ Claude:
 
 ## Handoffs
 
+- Codex combat loop 1: fixed the captured roll disassembly in
+  `hunter_body_motion.gd`. All six zones now orbit one hip pivot, compact at
+  mid-roll, invert as one body and return both feet under the body. New
+  `body_motion_test` proof, all 11 combat suites and all 32 core suites pass.
+  A fresh PNG still needs the next sole windowed run; Windows headless Godot
+  uses its dummy renderer, and Claude's sandbox already owned the one allowed
+  window during this iteration.
 - FOR CODEX (hunter_body_motion.gd, 30 Sep, from Greg's pad playtest: "still
   fighting looks clunky", "weird"). Side-view contact sheets, one frame per
   60 ms, in P:/GameDev/Temp/handoff/ (light.png, heavy.png, roll.png; made by
