@@ -22,10 +22,7 @@ commit. Never edit a file the other agent has claimed.
 
 ## Combat loop live claims
 
-- Codex loop 1: `game/systems/hunter_body_motion.gd` and
-  `game/tests/body_motion_test.gd`. Measured defect: the roll capture rotates
-  each body part around itself, visually separating the body instead of
-  tucking and rotating the whole rig around its hips.
+- Codex: clear after loop 1; measuring the next lane problem.
 
 ## Greg decides
 
@@ -103,6 +100,13 @@ Claude:
 
 ## Handoffs
 
+- Codex combat loop 1: fixed the captured roll disassembly in
+  `hunter_body_motion.gd`. All six zones now orbit one hip pivot, compact at
+  mid-roll, invert as one body and return both feet under the body. New
+  `body_motion_test` proof, all 11 combat suites and all 32 core suites pass.
+  A fresh PNG still needs the next sole windowed run; Windows headless Godot
+  uses its dummy renderer, and Claude's sandbox already owned the one allowed
+  window during this iteration.
 - FOR CODEX (hunter_body_motion.gd, 30 Sep, from Greg's pad playtest: "still
   fighting looks clunky", "weird"). Side-view contact sheets, one frame per
   60 ms, in P:/GameDev/Temp/handoff/ (light.png, heavy.png, roll.png; made by
