@@ -29,6 +29,14 @@ func _ready() -> void:
 	await _frames(3)
 	var avatar: SandboxAvatar = demo.avatar
 
+	# --- The armed bodies carry the generated swords (Greg, 30 Sep). ---
+	var carried := []
+	for entry: Dictionary in demo.bodies:
+		var held := entry.get("weapon_node") as Node3D
+		if held != null and held.get_child_count() > 0:
+			carried.append(str(held.get_child(0).name))
+	check(not carried.is_empty() and carried.all(func(n: String) -> bool: return n in preload("res://systems/generated_model.gd").SWORDS), "armed bodies hold generated swords: %s" % [carried])
+
 	# --- First person is unchanged: the eye, the viewmodel, no body. ---
 	check(demo.camera.global_position.distance_to(demo.eye) < 0.05, "first person: the camera is the eye")
 	check(not avatar.visible and demo.view_gear.visible, "first person: no body in view, the viewmodel in hand")

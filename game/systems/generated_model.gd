@@ -87,6 +87,36 @@ const FIT := {
 	},
 }
 
+## Greg, 30 September: sword variation, "if Dark Souls and cyberpunk had a
+## baby ... keeping the Mad Max apocalypse alive". Four Tripo swords, all
+## measured the same way: the long axis is model Z with the hilt at +Z and
+## the tip at -Z, the broad face along Y. Like the shiv: broad face to X,
+## thickness to Y, tip to +Z. The pivot is the grip, a third of the way from
+## the guard to the pommel. Scale is the whole weapon's length in metres.
+const SWORDS := ["chassis_greatsword", "leafspring_longsword", "sawback_sabre", "railspike_estoc"]
+
+
+static func _sword_fit(file: String, length: float, grip_z: float) -> Dictionary:
+	return {
+		"file": file, "scale": length,
+		"right": Vector3(0.0, 1.0, 0.0),
+		"up": Vector3(1.0, 0.0, 0.0),
+		"forward": Vector3(0.0, 0.0, -1.0),
+		"pivot": Vector3(0.0, 0.0, grip_z),
+	}
+
+
+static func fit(model_name: String) -> Dictionary:
+	if FIT.has(model_name):
+		return FIT[model_name]
+	match model_name:
+		"chassis_greatsword": return _sword_fit("items/chassis_greatsword.glb", 1.45, 0.32)
+		"leafspring_longsword": return _sword_fit("items/leafspring_longsword.glb", 1.05, 0.35)
+		"sawback_sabre": return _sword_fit("items/sawback_sabre.glb", 0.9, 0.31)
+		"railspike_estoc": return _sword_fit("items/railspike_estoc.glb", 1.2, 0.35)
+	return {}
+
+
 ## Where the lamp head's centre sits relative to the lamp's pivot, in metres
 ## (the head centroid (0.275, -0.223, -0.021) through the FIT above).
 const LAMP_HEAD := Vector3(-0.383, -0.623, -0.107)
@@ -134,23 +164,24 @@ static func wear(root: Node, condition: float) -> void:
 
 
 static func has(model_name: String) -> bool:
-	return FIT.has(model_name) and ResourceLoader.exists(ART + str(FIT[model_name].file))
+	var entry := fit(model_name)
+	return not entry.is_empty() and ResourceLoader.exists(ART + str(entry.file))
 
 
 static func make(model_name: String) -> Node3D:
 	if not has(model_name):
 		return null
-	var fit: Dictionary = FIT[model_name]
-	var scene := load(ART + str(fit.file)) as PackedScene
+	var entry: Dictionary = fit(model_name)
+	var scene := load(ART + str(entry.file)) as PackedScene
 	if scene == null:
 		return null
 	var model := scene.instantiate() as Node3D
 	if model == null:
 		return null
 	# Rows are the three source directions, so this maps them onto X, Y and Z.
-	var turn := Basis(fit.right, fit.up, fit.forward).transposed()
-	var size := float(fit.scale)
-	model.transform = Transform3D(turn.scaled(Vector3.ONE * size), -(turn * (fit.pivot as Vector3)) * size)
+	var turn := Basis(entry.right, entry.up, entry.forward).transposed()
+	var size := float(entry.scale)
+	model.transform = Transform3D(turn.scaled(Vector3.ONE * size), -(turn * (entry.pivot as Vector3)) * size)
 	tame_metal(model)
 	var holder := Node3D.new()
 	holder.name = "generated_" + model_name

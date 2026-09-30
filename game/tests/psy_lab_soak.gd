@@ -19,6 +19,8 @@ var worst := 0.0
 var last_us := 0
 var next_action := 0.0
 var step := 0
+var last_action := ""
+var spikes := 0
 
 
 func _ready() -> void:
@@ -61,6 +63,7 @@ func _act() -> void:
 	_axis(JOY_AXIS_LEFT_X, cos(angle) * 0.8)
 	_axis(JOY_AXIS_LEFT_Y, sin(angle) * 0.8)
 	_axis(JOY_AXIS_RIGHT_X, 0.3 if step % 6 < 3 else -0.3)
+	last_action = ["R1", "O roll", "move", "R1", "R2 down", "R2 up", "R1", "R3 lock", "L1 guard", "move"][step % 10]
 	match step % 10:
 		0, 3, 6: _tap(JOY_BUTTON_RIGHT_SHOULDER)
 		1: _tap(JOY_BUTTON_B)
@@ -84,6 +87,7 @@ func _act() -> void:
 		if demo._can_duel(index):
 			standing += 1
 	if standing == 0:
+		last_action = "R reset"
 		demo._reset()
 
 
@@ -98,7 +102,11 @@ func _process(delta: float) -> void:
 		return
 	var now := Time.get_ticks_usec()
 	if last_us > 0:
-		worst = maxf(worst, (now - last_us) / 1000.0)
+		var frame_ms := (now - last_us) / 1000.0
+		worst = maxf(worst, frame_ms)
+		if frame_ms > 100.0 and spikes < 40:
+			spikes += 1
+			print("SPIKE %6.1f ms at t=%5.1fs after [%s] note [%s] chunks %d" % [frame_ms, clock, last_action, str(demo.last_note), GoreChunks.live_count()])
 	last_us = now
 	clock += delta
 	window_clock += delta
