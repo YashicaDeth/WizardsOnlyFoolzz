@@ -499,38 +499,38 @@ func _pose(horizontal_speed: float, sprinting: bool, _crouching: bool, dodging: 
 	_apply_fight_layer()
 
 
-## Tuck the articulated body around a complete forward revolution. Only the
-## visible zones and their matching anatomy hitboxes turn; the authoritative
-## CharacterBody root/collider remains upright and owned by movement code.
+## Tuck the articulated body around a complete forward revolution. The zones
+## are siblings rather than a skeleton, so merely rotating each mesh makes six
+## disconnected propellers. Orbit every zone around one hip pivot first, then
+## add its local tuck. The authoritative CharacterBody root/collider remains
+## upright and owned by movement code.
 func _apply_roll_pose(dodging: bool) -> void:
 	if not dodging and roll_pose_override < 0.0:
 		return
 	var progress := roll_pose_override if roll_pose_override >= 0.0 else clampf(dodge_pose_elapsed / ROLL_POSE_DURATION, 0.0, 1.0)
 	var tuck := sin(progress * PI)
 	var turn := TAU * progress
-	var torso := rig.parts.get("torso") as Node3D
-	var head := rig.parts.get("head") as Node3D
-	var left_arm := rig.parts.get("left_arm") as Node3D
-	var right_arm := rig.parts.get("right_arm") as Node3D
-	var left_leg := rig.parts.get("left_leg") as Node3D
-	var right_leg := rig.parts.get("right_leg") as Node3D
-	if torso != null:
-		torso.position += Vector3(0.0, -0.30 * tuck, 0.16 * tuck)
-		torso.rotation.x += turn
-	if head != null:
-		head.position += Vector3(0.0, -0.24 * tuck, 0.12 * tuck)
-		head.rotation.x += turn - 0.28 * tuck
-	if left_arm != null:
-		left_arm.rotation += Vector3(0.92 * tuck, -0.12 * tuck, 0.88 * tuck)
-	if right_arm != null:
-		right_arm.rotation += Vector3(0.92 * tuck, 0.12 * tuck, -0.88 * tuck)
-	if left_leg != null:
-		left_leg.position += Vector3(0.0, 0.14 * tuck, 0.13 * tuck)
-		left_leg.rotation.x += 1.12 * tuck + turn
-	if right_leg != null:
-		right_leg.position += Vector3(0.0, 0.14 * tuck, 0.13 * tuck)
-		right_leg.rotation.x += 1.12 * tuck + turn
+	var hip_pivot := Vector3(0.0, 0.78, 0.0)
+	var orbit := Basis(Vector3.RIGHT, turn)
+	# Pull the centres toward the hip at mid-roll. That is the missing compact
+	# silhouette: arms cover the head, knees come in, and no limb centre can be
+	# left on the floor while the torso revolves above it.
+	var compact := lerpf(1.0, 0.76, tuck)
+	var local_tucks := {
+		"torso": Vector3(0.12, 0.0, 0.0),
+		"head": Vector3(-0.20, 0.0, 0.0),
+		"left_arm": Vector3(0.94, -0.12, 0.88),
+		"right_arm": Vector3(0.94, 0.12, -0.88),
+		"left_leg": Vector3(1.08, 0.0, -0.10),
+		"right_leg": Vector3(1.08, 0.0, 0.10),
+	}
 	for zone_id in ["torso", "head", "left_arm", "right_arm", "left_leg", "right_leg"]:
+		var part := rig.parts.get(zone_id) as Node3D
+		if part == null:
+			continue
+		part.position = hip_pivot + orbit * ((part.position - hip_pivot) * compact)
+		part.rotation.x += turn
+		part.rotation += (local_tucks[zone_id] as Vector3) * tuck
 		_sync_zone_hitbox(zone_id)
 
 

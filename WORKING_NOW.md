@@ -20,6 +20,22 @@ commit. Never edit a file the other agent has claimed.
   worse. A generated model on a person is a skin riding on BaselineHuman's
   zones, never a replacement for the rig.
 
+## Combat loop live claims
+
+- Codex loop 1: `game/systems/hunter_body_motion.gd` and
+  `game/tests/body_motion_test.gd`. Measured defect: the roll capture rotates
+  each body part around itself, visually separating the body instead of
+  tucking and rotating the whole rig around its hips.
+
+## Greg decides
+
+- Whether a downed-but-still-alive body should enter full ragdoll. Current
+  behavior reserves ragdoll for death and keeps the authored tip-over while
+  alive.
+- Final sword/shiv/fist and one-hand/two-hand tuning after a pad playtest.
+  Current timing, stamina, poise and shove values are deliberately data-driven
+  defaults, not a locked balance decision.
+
 ## Queue (take the top unclaimed item for your name; move it to Done)
 
 Codex:
