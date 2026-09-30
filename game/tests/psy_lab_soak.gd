@@ -106,7 +106,7 @@ func _process(delta: float) -> void:
 		worst = maxf(worst, frame_ms)
 		if frame_ms > 100.0 and spikes < 40:
 			spikes += 1
-			print("SPIKE %6.1f ms at t=%5.1fs after [%s] note [%s] chunks %d" % [frame_ms, clock, last_action, str(demo.last_note), GoreChunks.live_count()])
+			print("SPIKE %6.1f ms at t=%5.1fs after [%s] note [%s] chunks %d | last blow %.1f ms | script %.1f physics %.1f" % [frame_ms, clock, last_action, str(demo.last_note), GoreChunks.live_count(), demo.last_contact_ms, Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0])
 	last_us = now
 	clock += delta
 	window_clock += delta
@@ -116,6 +116,7 @@ func _process(delta: float) -> void:
 		next_action = 0.35
 		_act()
 	if window_clock >= REPORT_EVERY:
+		last_us = 0  # the report walks the tree: not a game spike
 		var ms := window_clock * 1000.0 / float(frames)
 		print("SOAK t=%3.0fs %6.1f fps %6.2f ms worst %6.1f | script %5.2f physics %5.2f | nodes %5d objects %6d | rigid %3d active %3d | meshes %4d decals %3d particles %3d | chunks %3d | draws %4d | health %3d" % [
 			clock, 1000.0 / ms, ms, worst,

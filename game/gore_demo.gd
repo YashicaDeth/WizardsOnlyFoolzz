@@ -942,6 +942,16 @@ func _resolve_melee_swing() -> void:
 ## A blade meeting a body, whichever way it was swung: the guard read, the
 ## cut, the stagger. Shared by the mouse swing and the third-person moveset.
 func _melee_contact(attack: Dictionary, found: Dictionary, along: Vector3, origin: Vector3, side: String) -> void:
+	var started := Time.get_ticks_usec()
+	_melee_contact_body(attack, found, along, origin, side)
+	last_contact_ms = (Time.get_ticks_usec() - started) / 1000.0
+
+
+## What one landed blow costs, in ms (the soak and the readout show it).
+var last_contact_ms := 0.0
+
+
+func _melee_contact_body(attack: Dictionary, found: Dictionary, along: Vector3, origin: Vector3, side: String) -> void:
 	var rig: BaselineHuman = found["rig"]
 	var zone: String = found["zone"]
 	var damage_type := str(attack.get("damage_type", "cut"))
