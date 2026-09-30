@@ -87,6 +87,22 @@ Claude:
 
 ## Handoffs
 
+- FOR CODEX (hunter_body_motion.gd, 30 Sep, from Greg's pad playtest: "still
+  fighting looks clunky", "weird"). Side-view contact sheets, one frame per
+  60 ms, in P:/GameDev/Temp/handoff/ (light.png, heavy.png, roll.png; made by
+  game/tests/zz_swing_strip.gd in launch-latest, uncommitted, windowed):
+  * ROLL IS BROKEN: the body comes apart. Frame 2 a leg lies flat on the floor
+    while the torso tumbles above it; frames 3-5 limbs splay separately. Each
+    zone part turns about its own centre instead of the whole body tucking and
+    rotating about the hips. Roll the rig as one (pivot at the hip/centre of
+    mass), limbs tucked relative to the torso, and the feet land under it.
+  * LIGHT READS AS NOTHING: the body stays rigid and upright; only the forearm
+    flicks for ~2 frames. Needs a wind-up that loads the torso (twist away,
+    weight back), a strike that turns hips then shoulders then arm through
+    the arc with a step, and a recovery that settles. The blade should sweep
+    the SwordMoveset arc, not twitch at the side.
+  * Grip: the held cleaver now points forward-down (hunter_appearance.gd,
+    Claude, PI*0.48); poses should swing it from there.
 - 97fd657f, e5b2954a, 830ce828: Hornee's card and the art gallery. To put
   more of Greg's art in the world: add the piece to ArtGallery.PIECES, then
   `WallPoster.place(scene, id, position, yaw)` in any scene (one line).

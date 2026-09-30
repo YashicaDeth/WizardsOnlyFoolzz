@@ -44,6 +44,15 @@ func _ready() -> void:
 	check(absf(avatar.global_position.y) < 0.05 and Vector2(avatar.global_position.x - demo.eye.x, avatar.global_position.z - demo.eye.z).length() < 0.01, "the body stands on the player's feet")
 	check(absf(demo.camera.fov - SandboxAvatar.THIRD_PERSON_FOV) < 1.0, "at the third-person field of view (%.1f)" % demo.camera.fov)
 
+	# --- Looking all the way up never drives the camera into the floor. ---
+	var pitch_before: float = demo.pitch
+	demo.pitch = 0.9
+	await _frames(60)
+	check(demo.pitch <= SandboxAvatar.PITCH_MAX + 0.001, "third person holds the tilt at the orbit's limit (%.2f)" % demo.pitch)
+	check(demo.camera.global_position.y >= avatar.global_position.y + SandboxAvatar.CAMERA_MIN_HEIGHT - 0.05, "and the camera stays above knee height (%.2f m)" % (demo.camera.global_position.y - avatar.global_position.y))
+	demo.pitch = pitch_before
+	await _frames(30)
+
 	# --- Your own body never stops your own trace. ---
 	var through: Dictionary = demo._trace_body(demo.camera.global_position, (demo.eye - demo.camera.global_position).normalized())
 	check(through.is_empty() or through.get("rig") != avatar.rig, "a trace from behind passes through your own body")
@@ -149,6 +158,60 @@ func _ready() -> void:
 	if mark_rig.ragdoll_body != null:
 		var torso := mark_rig.parts.get("torso") as Node3D
 		check(torso != null and torso.global_position.x > stood_at.x + 0.1, "and falls along the blow (torso %.2f m toward +X, y %.2f)" % [(torso.global_position.x - stood_at.x) if torso != null else 0.0, torso.global_position.y if torso != null else 0.0])
+
+	# --- The Souls guard over the shoulder, and being hit. ---
+	await _frames(60)
+	var foe: Dictionary = demo.bodies[1]
+	var foe_holder := foe.holder as Node3D
+	var front := Vector3(-sin(avatar.facing_yaw), 0.0, -cos(avatar.facing_yaw))
+	var place_foe := func(ahead: bool, who: Node3D) -> void:
+		var at: Vector3 = demo.eye + (front if ahead else -front) * 1.4
+		who.global_position = Vector3(at.x, 0.9, at.z)
+		demo.player_poise.reset()
+		demo.player_stun = 0.0
+		demo.simulation_health = 100
+	demo.guarding = true
+	demo.guard_held = 1.0
+	demo.stamina = 100.0
+	place_foe.call(true, foe_holder)
+	foe["swing"] = BladeRead.LEFT
+	demo._enemy_strike(foe, foe_holder)
+	check(str(demo.last_note).begins_with("BLOCKED") and absf(demo.stamina - (100.0 - demo.GUARD_BLOCK_STAMINA)) < 0.01, "a late guard blocks a side blow from the front and costs stamina: %s" % demo.last_note)
+	check(demo.player_stun == 0.0, "a block does not stun")
+	place_foe.call(true, foe_holder)
+	demo.guard_held = 0.05
+	foe["swing"] = BladeRead.LOW
+	demo._enemy_strike(foe, foe_holder)
+	check(str(demo.last_note).begins_with("PARRIED"), "a guard raised just in time parries, whatever the side: %s" % demo.last_note)
+	if not demo._holds_weapon(foe):
+		foe["weapon_node"] = null
+	place_foe.call(false, foe_holder)
+	demo.guard_held = 1.0
+	foe["swing"] = BladeRead.HIGH
+	demo._enemy_strike(foe, foe_holder)
+	check(str(demo.last_note).begins_with("HIT"), "from behind the guard meets nothing: %s" % demo.last_note)
+	place_foe.call(true, foe_holder)
+	demo.guarding = true
+	demo.stamina = 10.0
+	foe["swing"] = BladeRead.RIGHT
+	demo._enemy_strike(foe, foe_holder)
+	check(not demo.guarding and demo.simulation_health < 100 and demo.stamina == 0.0, "with no stamina left the guard breaks and the blow comes through")
+	# An armed one (the parry above disarmed the first).
+	foe = demo.bodies[3]
+	foe_holder = foe.holder as Node3D
+	place_foe.call(true, foe_holder)
+	demo.guarding = false
+	demo.stamina = 100.0
+	var struck_from: Vector3 = demo.eye
+	foe["swing"] = BladeRead.RIGHT
+	demo._enemy_strike(foe, foe_holder)
+	check(demo.player_stun > 0.0, "an open hit stuns you for a moment")
+	check(not bool(demo._moveset_request(false).get("accepted", false)) and not demo._begin_dodge(Vector3.RIGHT), "stunned, you can neither swing nor roll")
+	await _frames(40)
+	var pushed: Vector3 = demo.eye - struck_from
+	check(pushed.dot(-front) > 0.05, "and the blow shoves you back, away from it (%.2f m)" % pushed.dot(-front))
+	check(demo.player_stun == 0.0, "the stun wears off")
+	demo.guarding = false
 
 	# --- Back to first person: the eye again. ---
 	demo.third_person = false
