@@ -65,9 +65,19 @@ Claude:
   vat_body_preview.gd. Greg's frozen playtest copy is P:/GameDev/playtest-stable
   (104b90ad): no agent works or edits there.
 
+## Melee lane (30 Sep, Greg: Souls rolling and good sword fighting, FP and TP)
+
+- Claude: game/gore_demo.gd, game/psy_lab.gd, new game/systems/sandbox_avatar.gd
+  (a real third-person body and camera in the sandbox, lock-on), and wiring
+  Codex's components into the sandbox (then the Hunt).
+- Codex: DESIGN/CODEX_BRIEF_SOULS_MELEE_2026-09-30.md, worktree souls-melee:
+  new game/systems/souls_roll.gd, game/systems/sword_moveset.gd, their
+  tests, and game/systems/hunter_body_motion.gd (roll and swing poses).
+
 ## Codex is in
 
-- (free)
+- game/systems/souls_roll.gd, game/systems/sword_moveset.gd,
+  game/systems/hunter_body_motion.gd (see Melee lane)
 
 ## Handoffs
 
