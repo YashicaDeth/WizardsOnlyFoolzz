@@ -188,6 +188,15 @@ var duelist := -1
 ## J switches: a duel (one at a time, the rest wait) or the pack (all at once,
 ## spread out).
 var duel_mode := true
+## Souls guard over the shoulder: what a block costs, and how far round the
+## front it covers (cosine of the half-angle).
+const GUARD_BLOCK_STAMINA := 22.0
+const GUARD_FRONT := 0.2
+## You, hit: your own poise and shove, and the stun that follows a hit.
+var player_poise := Knockback.new()
+var player_stun := 0.0
+const PLAYER_HIT_STUN := 0.35
+const PLAYER_POISE_BREAK_STUN := 0.8
 ## The PS4 pad (SoulsPad), Bloodborne / Dark Souls 3 layout.
 var pad: SoulsPad
 ## Over the shoulder the walk is a jog; Shift or O held sprints (Souls).
@@ -834,9 +843,17 @@ func _feed_field_hud() -> void:
 
 
 ## Which way the player guard is held right now, from the mouse.
-func _player_guard() -> String:
+func _player_guard(incoming := "", attacker := Vector3.INF) -> String:
 	if not guarding:
 		return ""
+	# Souls, over the shoulder: a raised guard meets whatever comes at your
+	# front, whichever side; timing (the parry window) is the skill. From
+	# behind it meets nothing. First person keeps the mouse-picked side.
+	if third_person and not incoming.is_empty():
+		var front := Vector3(-sin(avatar.facing_yaw), 0.0, -cos(avatar.facing_yaw))
+		var to := attacker - eye if attacker != Vector3.INF else front
+		to.y = 0.0
+		return incoming if to.length_squared() < 0.0001 or front.dot(to.normalized()) > GUARD_FRONT else ""
 	var side := BladeRead.guard_side(guard_aim)
 	# Neutral until the mouse says otherwise, rather than snapping to whatever
 	# the first pixel of drift happened to be.
@@ -991,6 +1008,29 @@ func _shove(defender: Dictionary, rig: BaselineHuman, attack: Dictionary, along:
 	_note("POISE BROKEN")
 
 
+## You, hit (Bloodborne): the blow shoves you back along it (your own
+## Knockback) and a hit stuns you for a moment, so you cannot swing or roll
+## straight back through it; a broken poise stuns longer. A block shoves less
+## and does not stun.
+func _player_struck(stats: Dictionary, from: Vector3, blocked: bool) -> void:
+	var along := eye - from
+	along.y = 0.0
+	if along.length_squared() < 0.0001:
+		return
+	# The weapon decides the shove, not the difficulty: a cleaver moves you
+	# ~0.25 m on any setting.
+	var strength := float(stats.get("impulse", 8.0)) * KNOCKBACK_PER_IMPULSE
+	var report: Dictionary = player_poise.apply(strength * (0.4 if blocked else 1.0), along.normalized(), "")
+	if blocked:
+		return
+	var broken := bool(report.get("knockdown", false))
+	player_stun = maxf(player_stun, PLAYER_POISE_BREAK_STUN if broken else PLAYER_HIT_STUN)
+	if broken:
+		player_poise.poise = Knockback.MAX_POISE
+	if avatar != null and avatar.motion != null:
+		avatar.motion.trigger_hit(along.normalized(), 1.0 if broken else 0.5)
+
+
 ## How hard the blade is stopped. Taking a limb off is barely stopped at all;
 ## meeting one that stays on is what jars the arm.
 func _melee_bite(severed: bool) -> float:
@@ -1034,6 +1074,8 @@ func _tp_side_from_keys() -> String:
 ## Which attack a third-person press asks for: the heavy if held, else one
 ## out of a roll, a running one at a sprint, or the next light in the chain.
 func _moveset_request(heavy: bool) -> Dictionary:
+	if player_stun > 0.0:
+		return {"accepted": false, "buffered": false, "stamina_cost": 0.0, "attack": ""}
 	var result: Dictionary
 	if heavy:
 		result = moveset.request_heavy(stamina)
@@ -1961,7 +2003,7 @@ func _begin_dodge(requested_direction := Vector3.ZERO) -> bool:
 ## sandbox mirrors it into dodge_remaining/dodge_cooldown so everything that
 ## already read those (HUD, grapple, tests) keeps its meaning.
 func _start_roll(direction: Vector3) -> bool:
-	if not roll.start(direction, stamina):
+	if player_stun > 0.0 or not roll.start(direction, stamina):
 		return false
 	dodge_direction = direction
 	dodge_remaining = SoulsRoll.DURATION
@@ -2292,6 +2334,8 @@ func _physics_process(delta: float) -> void:
 		if melee_windup < 0.0:
 			_resolve_melee_swing()
 	roll.tick(real_delta)
+	player_stun = maxf(0.0, player_stun - real_delta)
+	eye += player_poise.tick(real_delta)
 	if roll.is_rolling():
 		eye += roll.velocity() * real_delta
 	elif moveset.is_attacking():
@@ -2466,8 +2510,17 @@ func _enemy_strike(entry: Dictionary, holder: Node3D) -> void:
 	var armed := _holds_weapon(entry)
 	var stats: Dictionary = HunterArsenal.WEAPONS.get(str(entry.get("weapon", "")), FISTS) if armed else FISTS
 	var side := str(entry.get("swing", BladeRead.HIGH))
-	var read: Dictionary = BladeRead.resolve(_player_guard(), guard_held, side, 6.0)
+	var read: Dictionary = BladeRead.resolve(_player_guard(side, holder.global_position), guard_held, side, 6.0)
 	var bind := _bind_point(holder.global_position, side)
+	# Souls, over the shoulder: a block costs stamina, and with none left the
+	# guard breaks and the whole blow comes through.
+	if third_person and str(read.outcome) == "block":
+		stamina -= GUARD_BLOCK_STAMINA
+		if stamina <= 0.0:
+			stamina = 0.0
+			guarding = false
+			read = {"outcome": "open", "through": 1.0}
+			_note("GUARD BROKEN")
 	match str(read.outcome):
 		"parry":
 			parry_spark.burst(bind[0], bind[1])
@@ -2480,13 +2533,15 @@ func _enemy_strike(entry: Dictionary, holder: Node3D) -> void:
 			_note("PARRIED // %s TURNED%s" % [side.to_upper(), " // DISARMED" if armed else ""])
 		"block":
 			parry_spark.burst(bind[0], bind[1], 0.5)
-			_take_training_hit(stats, side, float(read.through), "BLOCKED")
+			_take_training_hit(stats, side, float(read.through), "BLOCKED", holder.global_position)
 		_:
-			_take_training_hit(stats, side, 1.0, "HIT")
+			_take_training_hit(stats, side, 1.0, "HIT", holder.global_position)
 
 
-func _take_training_hit(stats: Dictionary, side: String, through: float, label: String) -> void:
+func _take_training_hit(stats: Dictionary, side: String, through: float, label: String, from := Vector3.INF) -> void:
 	var damage := float(stats.damage) * float(SPAR_LEVELS[spar_level].damage) * through
+	if from != Vector3.INF:
+		_player_struck(stats, from, label == "BLOCKED")
 	simulation_health = maxi(0, simulation_health - roundi(damage))
 	_kick(clampf(damage / 40.0, 0.12, 0.6), str(stats.damage_type), false, HITSTOP_SHOT)
 	_note("%s // %s %s // %d // SIM HEALTH %03d" % [label, str(stats.label), side.to_upper(), roundi(damage), simulation_health])
