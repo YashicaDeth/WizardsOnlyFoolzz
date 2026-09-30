@@ -188,6 +188,13 @@ var _moveset_struck: Array = []
 var _blade_held := -1.0
 const HEAVY_HOLD := 0.35
 ## How much of the weapon's own damage each attack carries.
+## Knockback is tuned (Knockback.SHOVE_PER_IMPULSE) for an impulse near 10:
+## a light shoves 0.25 m, a heavy 0.9 m, a running blow 0.6 m, three lights
+## break poise. The cleaver's impulse is 28, so blows are scaled onto that.
+const KNOCKBACK_PER_IMPULSE := 10.0 / 28.0
+## A broken poise adds this much shove and the strongest stagger, and the
+## body's next strike is pushed back: the opening to follow up.
+const POISE_BREAK_SHOVE := 0.45
 const MOVESET_WEIGHT := {"light_1": 1.0, "light_2": 1.0, "light_3": 1.25, "heavy": 1.7, "running_attack": 1.3, "roll_attack": 1.1}
 var last_read: Dictionary = {}
 var pending_melee: Dictionary = {}
@@ -499,6 +506,9 @@ func _spawn_body(index: int) -> void:
 		# grounded fall pose.  A body cannot be allowed to tunnel beneath the
 		# range floor just because it has gone down.
 		"knockdown_travel": 0.42,
+		# Greg, 30 September: a death falls as a ragdoll, along the blow
+		# (Codex's RagdollBody). Living knockdowns keep the authored tip-over.
+		"ragdoll": true,
 		"cybernetics": {"torso": {"name": "ceramic sternum", "armor": 0.18}},
 	})
 	# Greg: *"the gore in the gore sandbox is not up to date with the gore in the
@@ -536,6 +546,9 @@ func _spawn_body(index: int) -> void:
 		# bodies hold is what they strike with, and it drops when they do.
 		"weapon": "sword" if index % 2 == 1 else "",
 		"weapon_node": rig.find_child("HeldAshlineCleaver", true, false),
+		# Souls poise and shove (Codex's Knockback): blows push the body back
+		# along the blow, and enough of them break its footing.
+		"knockback": Knockback.new(),
 	})
 
 
@@ -924,6 +937,7 @@ func _melee_contact(attack: Dictionary, found: Dictionary, along: Vector3, origi
 		_note("%s ALREADY GONE" % _spoken(zone))
 		return
 	_trigger_body_hit_reaction(rig, along, zone, float(result.get("damage", attack.get("damage", 0.0))))
+	_shove(defender, rig, attack, along, through)
 	var off := bool(result.get("severed", false))
 	if off:
 		severed_total += 1
@@ -934,6 +948,25 @@ func _melee_contact(attack: Dictionary, found: Dictionary, along: Vector3, origi
 		defender_hit.trigger_stagger(rig.to_local(origin), 1.0 if off else 0.6)
 	_note("%s OFF // %s" % [_spoken(zone), side.to_upper()] if off else "HIT // %s // %s" % [_spoken(zone), side.to_upper()])
 	_try_finisher(rig, str(arsenal.current_id), zone, along, float(result.get("damage", 0.0)), damage_type)
+
+
+## The blow pushes the body back along it (Knockback), less through a block;
+## past its poise it breaks: the hardest stagger, a longer shove, and its next
+## strike put off. The shove itself is walked out in _update_training_bodies.
+func _shove(defender: Dictionary, rig: BaselineHuman, attack: Dictionary, along: Vector3, through: float) -> void:
+	var poise := defender.get("knockback") as Knockback
+	if poise == null or rig.anatomy.dead:
+		return
+	var report: Dictionary = poise.apply(float(attack.get("impulse", 18.0)) * KNOCKBACK_PER_IMPULSE * through, along, str(attack.get("attack", "")))
+	if not bool(report.get("knockdown", false)):
+		return
+	var motion := defender.get("motion") as HunterBodyMotion
+	if motion != null and is_instance_valid(motion):
+		motion.trigger_stagger(rig.to_local(rig.global_position - along), 2.0)
+	poise.apply(POISE_BREAK_SHOVE / Knockback.SHOVE_PER_IMPULSE, along, "")
+	poise.poise = Knockback.MAX_POISE
+	defender["attack_ready"] = float(SPAR_LEVELS[spar_level].cadence) * 1.5
+	_note("POISE BROKEN")
 
 
 ## How hard the blade is stopped. Taking a limb off is barely stopped at all;
@@ -2420,6 +2453,13 @@ func _update_training_bodies(real_delta: float) -> void:
 			if index == grapple_index:
 				_release_grapple("THE BODY DROPS OUT OF YOUR HOLD")
 			continue
+		var poise := entry.get("knockback") as Knockback
+		if poise != null:
+			var shoved := poise.tick(real_delta)
+			if shoved.length_squared() > 0.0:
+				holder.global_position += shoved
+				holder.global_position.x = clampf(holder.global_position.x, -ARENA + 1.0, ARENA - 1.0)
+				holder.global_position.z = clampf(holder.global_position.z, -ARENA + 1.0, ARENA - 1.0)
 		if index == grapple_index:
 			var forward := -camera.global_transform.basis.z
 			forward.y = 0.0

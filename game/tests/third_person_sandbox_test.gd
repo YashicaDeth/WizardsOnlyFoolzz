@@ -119,6 +119,37 @@ func _ready() -> void:
 	check(demo.eye.x > roll_from.x + 3.0, "the roll carried the body (%.2f m)" % (demo.eye.x - roll_from.x))
 	check(not demo.roll.is_rolling(), "and ended")
 
+	# --- Knockback: a blow shoves the body back along it; poise breaks. ---
+	var mark: Dictionary = demo.bodies[2]
+	var mark_holder := mark.holder as Node3D
+	var mark_rig: BaselineHuman = mark.rig
+	var poise: Knockback = mark.knockback
+	var shove_from := mark_holder.global_position
+	demo._shove(mark, mark_rig, {"impulse": 28.0, "attack": "light_1"}, Vector3(1, 0, 0), 1.0)
+	await _frames(60)
+	var moved := mark_holder.global_position - shove_from
+	check(moved.x > 0.2 and moved.x < 0.35 and absf(moved.z) < 0.02, "a cleaver light shoves the body ~0.25 m along the blow (%.2f m)" % moved.x)
+	poise.reset()
+	demo._shove(mark, mark_rig, {"impulse": 28.0, "attack": "heavy"}, Vector3(1, 0, 0), 1.0)
+	check(demo.last_note == "POISE BROKEN" and poise.poise >= Knockback.MAX_POISE - 0.01, "a heavy breaks poise, and the body gets its footing back after")
+	check(float(mark.attack_ready) > float(demo.SPAR_LEVELS[demo.spar_level].cadence), "and its next strike is put off: the opening")
+	poise.reset()
+	var blocked_from := mark_holder.global_position
+	demo._shove(mark, mark_rig, {"impulse": 28.0, "attack": "light_1"}, Vector3(1, 0, 0), 0.0)
+	await _frames(30)
+	check(mark_holder.global_position.distance_to(blocked_from) < 0.01, "a blow that does not get through does not shove")
+
+	# --- A death falls as a ragdoll. ---
+	# A blow from -X to +X, then the finish (the path finishers take).
+	var stood_at := mark_holder.global_position
+	mark_rig.hit("torso", 20.0, 30.0, "blunt", "", Vector3(1, 0, 0))
+	mark_rig.anatomy.finish("test")
+	await _frames(120)
+	check(mark_rig.anatomy.dead and mark_rig.ragdoll_body != null, "killed, the body hands its parts to a ragdoll")
+	if mark_rig.ragdoll_body != null:
+		var torso := mark_rig.parts.get("torso") as Node3D
+		check(torso != null and torso.global_position.x > stood_at.x + 0.1, "and falls along the blow (torso %.2f m toward +X, y %.2f)" % [(torso.global_position.x - stood_at.x) if torso != null else 0.0, torso.global_position.y if torso != null else 0.0])
+
 	# --- Back to first person: the eye again. ---
 	demo.third_person = false
 	avatar.third_person = false
