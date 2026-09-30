@@ -223,6 +223,13 @@ var _loose: Array[Dictionary] = []
 ## reads as landing in the arena instead of snapping through its own feet.
 var _knockdown_travel := 0.0
 var _knockdown_tween: Tween
+## Opt-in only. Living knockdowns keep the established authored fall; a body
+## that actually dies can hand these exact zone nodes to physics instead.
+var _ragdoll_enabled := false
+var ragdoll_body: RagdollBody
+var _last_hit_direction := Vector3.ZERO
+var _last_hit_impulse := 0.0
+var _last_hit_zone := "torso"
 ## O2.7 v4. Greg: *"gore and chunk physics still run at full speed through a
 ## hit, so a limb can leave a body that has not moved yet"*. Exactly right, and
 ## it is the most visible hole left in the hitstop work — the whole effect is
@@ -257,6 +264,7 @@ func build(id: String, config: Dictionary = {}) -> void:
 	gore = bool(config.get("gore", apply_gore_setting()))
 	_seated = bool(config.get("seated", false))
 	_knockdown_travel = maxf(0.0, float(config.get("knockdown_travel", 0.0)))
+	_ragdoll_enabled = bool(config.get("ragdoll", false))
 	_flesh = config.get("flesh", Color("6b5842")) as Color
 	_variation = int(config.get("variation", 0))
 	build_factor = clampf(float(config.get("build", 1.0)), 0.7, 1.4)
@@ -308,6 +316,7 @@ func build(id: String, config: Dictionary = {}) -> void:
 	anatomy.configure(id, float(config.get("blood", 5000.0)), config.get("cybernetics", {}))
 	anatomy.organ_ruptured.connect(_on_organ_ruptured)
 	anatomy.went_down.connect(_on_went_down)
+	anatomy.died.connect(_on_died)
 	# Initial prosthetics must read on the mesh before the body is wounded.
 	for zone_id in ZONES:
 		_refresh_zone(zone_id)
@@ -583,6 +592,9 @@ func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt",
 	var zone := canonical_zone(zone_id)
 	if severed.has(zone) and not anatomy.installed_parts.has(zone):
 		return {"accepted": false, "reason": "severed", "zone": zone, "severed": false}
+	_last_hit_zone = zone
+	_last_hit_direction = _resolved_hit_direction(zone, hit_direction)
+	_last_hit_impulse = maxf(impulse, 0.0)
 	var penetrates := damage_type in ["cut", "puncture", "ballistic", "shear"]
 	if penetrates and organ_id.is_empty():
 		organ_id = _organ_in_zone(zone)
@@ -590,7 +602,23 @@ func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt",
 	# for every rig that was never dressed — the audit that proves it is
 	# `clothing_shell_test`'s "naked is unchanged" plus the untouched suites.
 	var cloth := ClothingShell.resolve_hit(wardrobe, zone, damage, damage_type)
-	var result := anatomy.apply_hit(zone, damage - float(cloth.absorbed), impulse, damage_type, organ_id)
+	var result: Dictionary
+	if anatomy.dead and _ragdoll_enabled and ragdoll_body != null:
+		# A corpse still owns its anatomy. Cutting it must continue to address the
+		# real zone rather than a disposable physics duplicate.
+		var corpse_zone: Dictionary = anatomy.zones.get(zone, {})
+		var corpse_damage := maxf(0.0, damage - float(cloth.absorbed))
+		if not corpse_zone.is_empty():
+			corpse_zone["health"] = maxf(0.0, float(corpse_zone.get("health", 0.0)) - corpse_damage)
+			anatomy.zones[zone] = corpse_zone
+		result = {
+			"accepted": true,
+			"zone": zone,
+			"damage": corpse_damage,
+			"disabled": zone_health(zone) <= 0.0,
+		}
+	else:
+		result = anatomy.apply_hit(zone, damage - float(cloth.absorbed), impulse, damage_type, organ_id)
 	result["cloth_absorbed"] = float(cloth.absorbed)
 	result["cloth_breached"] = bool(cloth.breached)
 	result["cloth_integrity"] = float(cloth.integrity)
@@ -600,7 +628,7 @@ func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt",
 		# soaking is the stain a fight leaves, not the fight itself.
 		ClothingShell.stain(self, zone, damage * 0.005)
 		_dress_zone(zone, (_layout.get(zone, {}) as Dictionary).get("size", Vector3.ONE))
-	var direction := _resolved_hit_direction(zone, hit_direction)
+	var direction := _last_hit_direction
 	var did_sever := _accumulate_sever_stress(zone, float(result.get("damage", 0.0)), damage_type, direction, joint_alignment)
 	if did_sever:
 		_sever_zone(zone, direction, result, cut_point, cut_plane)
@@ -865,6 +893,20 @@ func _on_went_down() -> void:
 	if _knockdown_travel > 0.0:
 		_knockdown_tween.tween_property(self, "position", landed, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	went_down.emit()
+
+
+func _on_died(_report: Dictionary) -> void:
+	if ragdoll_body != null or not is_inside_tree():
+		return
+	if not _ragdoll_enabled:
+		_on_went_down()
+		return
+	var holder := get_parent()
+	if holder == null:
+		return
+	ragdoll_body = RagdollBody.new()
+	holder.add_child(ragdoll_body)
+	ragdoll_body.activate(self, _last_hit_zone, _last_hit_impulse, _last_hit_direction)
 
 
 ## B2.7v2. This uses the anatomy's shared posture answer, rather than making
