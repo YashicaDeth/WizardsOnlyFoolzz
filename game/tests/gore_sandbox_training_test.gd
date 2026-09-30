@@ -25,6 +25,8 @@ func _ready() -> void:
 	check(motion != null, "every sandbox body owns the shared gameplay animator")
 	holder.global_position = Vector3(demo.eye.x + 5.0, 0.9, demo.eye.z)
 	var before := holder.global_position
+	# One body fights at a time now (sandbox_duel_test): make it this one.
+	demo.duelist = 0
 	demo._set_enemies_enabled(true)
 	demo._update_training_bodies(0.5)
 	check(demo.mode_button.text.contains("ENEMIES"), "the same physical control visibly switches to ENEMIES")

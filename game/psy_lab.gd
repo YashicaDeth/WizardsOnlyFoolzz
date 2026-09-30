@@ -142,5 +142,5 @@ func _paint() -> void:
 	for line: Array in lines:
 		CellOutzType.draw_condensed(readout, Vector2(x, y), str(line[0]), float(line[1]), line[2], 2.0)
 		y += float(line[1]) + 8.0
-	var keys := "V 3RD PERSON  Z LOCK  LMB SWING / HOLD HEAVY  SPACE ROLL  RMB GUARD  H ENEMIES  N DIFFICULTY  R RESPAWN  X XRAY  F1 HIDE"
+	var keys := "V 3RD PERSON  Z LOCK  LMB SWING / HOLD HEAVY  SPACE ROLL  RMB GUARD  H ENEMIES  J DUEL/PACK  N DIFFICULTY  R RESPAWN  X XRAY  F1 HIDE"
 	CellOutzType.draw_condensed(readout, Vector2(x, readout.size.y - 44.0), keys, 9.0, bone * Color(1, 1, 1, 0.5), 1.6)

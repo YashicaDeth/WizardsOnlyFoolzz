@@ -183,6 +183,11 @@ var roll := SoulsRoll.new()
 var moveset := SwordMoveset.new()
 ## Bodies this attack has already cut, so one sweep lands once per body.
 var _moveset_struck: Array = []
+## The one body fighting you when enemies are on; -1 for none.
+var duelist := -1
+## J switches: a duel (one at a time, the rest wait) or the pack (all at once,
+## spread out).
+var duel_mode := true
 ## Real seconds the left button has been held for a third-person blade;
 ## -1 when not held. Holding past HEAVY_HOLD is the heavy.
 var _blade_held := -1.0
@@ -195,6 +200,16 @@ const KNOCKBACK_PER_IMPULSE := 10.0 / 28.0
 ## A broken poise adds this much shove and the strongest stagger, and the
 ## body's next strike is pushed back: the opening to follow up.
 const POISE_BREAK_SHOVE := 0.45
+## The duel (Greg, 30 September): one fights, the rest wait in a ring.
+const WAIT_RADIUS := 5.0
+const WAIT_SPEED := 1.4
+## Radians a second the waiting ring drifts round you.
+const WAIT_DRIFT := 0.12
+## How close two standing bodies may get, centre to centre.
+const BODY_SPACING := 1.0
+## Pack mode: everyone comes, but no two closer than this, so they surround
+## you from their own sides instead of piling onto one spot.
+const PACK_SPACING := 2.0
 const MOVESET_WEIGHT := {"light_1": 1.0, "light_2": 1.0, "light_3": 1.25, "heavy": 1.7, "running_attack": 1.3, "roll_attack": 1.1}
 var last_read: Dictionary = {}
 var pending_melee: Dictionary = {}
@@ -1779,6 +1794,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				_note("FULL CONTROL REFERENCE" if controls_expanded else "ESSENTIAL CONTROLS ONLY")
 			KEY_C: _toggle_grapple()
 			KEY_H: _set_enemies_enabled(not enemies_enabled)
+			KEY_J:
+				duel_mode = not duel_mode
+				duelist = -1
+				_note("DUEL // ONE AT A TIME" if duel_mode else "PACK // ALL AT ONCE, SPREAD OUT")
 			KEY_N:
 				spar_level = (spar_level + 1) % SPAR_LEVELS.size()
 				_note("SPARRING // %s" % str(SPAR_LEVELS[spar_level].name))
@@ -2439,6 +2458,8 @@ func _update_mode_button() -> void:
 func _update_training_bodies(real_delta: float) -> void:
 	if grapple_index >= bodies.size():
 		_release_grapple()
+	if enemies_enabled and duel_mode:
+		_pick_duelist()
 	for index in bodies.size():
 		var entry: Dictionary = bodies[index]
 		var holder := entry.get("holder") as Node3D
@@ -2479,6 +2500,9 @@ func _update_training_bodies(real_delta: float) -> void:
 				motion.set_combat_pose(0.0, "")
 				motion.update(real_delta, Vector3.ZERO, true, false, false, false)
 			continue
+		if duel_mode and index != duelist:
+			_hold_back(entry, holder, motion, real_delta)
+			continue
 		var toward := eye - holder.global_position
 		toward.y = 0.0
 		var distance := toward.length()
@@ -2508,6 +2532,95 @@ func _update_training_bodies(real_delta: float) -> void:
 			_enemy_strike(entry, holder)
 			entry["swings"] = int(entry.get("swings", 0)) + 1
 			entry["swing"] = ""
+	_separate_bodies()
+
+
+## Greg, 30 September: "you should be able to fight 1v1 and it's not just
+## they all rush to kill you and merge into each other". One body fights you
+## at a time: the one you are locked on to, else the one already fighting,
+## else the nearest standing. When it drops, the next steps in.
+func _pick_duelist() -> void:
+	var locked := avatar.locked_rig() if avatar != null else null
+	if locked != null:
+		for index in bodies.size():
+			if (bodies[index] as Dictionary).get("rig") == locked and _can_duel(index):
+				duelist = index
+				return
+	if _can_duel(duelist):
+		return
+	var nearest := -1
+	var best := INF
+	for index in bodies.size():
+		if not _can_duel(index):
+			continue
+		var holder := (bodies[index] as Dictionary).get("holder") as Node3D
+		var gap := Vector2(holder.global_position.x - eye.x, holder.global_position.z - eye.z).length()
+		if gap < best:
+			best = gap
+			nearest = index
+	if nearest >= 0 and duelist >= 0:
+		_note("THE NEXT ONE STEPS IN")
+	duelist = nearest
+
+
+func _can_duel(index: int) -> bool:
+	if index < 0 or index >= bodies.size() or index == grapple_index:
+		return false
+	var entry: Dictionary = bodies[index]
+	var rig := entry.get("rig") as BaselineHuman
+	var holder := entry.get("holder") as Node3D
+	return rig != null and holder != null and is_instance_valid(rig) and is_instance_valid(holder) and not rig.anatomy.dead and not rig.anatomy.downed
+
+
+## The ones waiting their turn: a loose ring at WAIT_RADIUS, drifting slowly
+## around you, facing you with the guard up, never striking. Their clock is
+## held back, so the one that steps in winds up rather than swinging at once.
+func _hold_back(entry: Dictionary, holder: Node3D, motion: HunterBodyMotion, real_delta: float) -> void:
+	var from_you := holder.global_position - eye
+	from_you.y = 0.0
+	if from_you.length_squared() < 0.01:
+		from_you = Vector3.BACK
+	var bearing := atan2(from_you.x, from_you.z) + real_delta * WAIT_DRIFT
+	var spot := Vector3(eye.x + sin(bearing) * WAIT_RADIUS, holder.global_position.y, eye.z + cos(bearing) * WAIT_RADIUS)
+	var to_spot := spot - holder.global_position
+	to_spot.y = 0.0
+	var step := to_spot.limit_length(real_delta * WAIT_SPEED)
+	holder.global_position += step
+	holder.global_position.x = clampf(holder.global_position.x, -ARENA + 1.0, ARENA - 1.0)
+	holder.global_position.z = clampf(holder.global_position.z, -ARENA + 1.0, ARENA - 1.0)
+	holder.look_at(Vector3(eye.x, holder.global_position.y, eye.z), Vector3.UP)
+	entry["attack_ready"] = float(SPAR_LEVELS[spar_level].cadence)
+	if motion != null:
+		motion.set_combat_pose(0.0, "")
+		motion.update(real_delta, step / maxf(real_delta, 0.0001), true, false, false, false)
+
+
+## No two standing bodies closer than BODY_SPACING: each overlapping pair is
+## pushed apart evenly, flat on the floor.
+func _separate_bodies() -> void:
+	for a in bodies.size():
+		if not _can_duel(a) and a != grapple_index:
+			continue
+		var first := (bodies[a] as Dictionary).get("holder") as Node3D
+		if first == null or not is_instance_valid(first):
+			continue
+		for b in range(a + 1, bodies.size()):
+			if not _can_duel(b) and b != grapple_index:
+				continue
+			var second := (bodies[b] as Dictionary).get("holder") as Node3D
+			if second == null or not is_instance_valid(second):
+				continue
+			var apart := second.global_position - first.global_position
+			apart.y = 0.0
+			var gap := apart.length()
+			var spacing := BODY_SPACING if duel_mode else PACK_SPACING
+			if gap >= spacing:
+				continue
+			var push := (apart / gap if gap > 0.001 else Vector3.RIGHT) * (spacing - gap) * 0.5
+			if a != grapple_index:
+				first.global_position -= push
+			if b != grapple_index:
+				second.global_position += push
 
 
 func _paint_hud() -> void:
