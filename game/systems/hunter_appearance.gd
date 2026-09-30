@@ -2,6 +2,7 @@ class_name HunterAppearance
 extends Node
 
 const HELD_GEAR := preload("res://systems/held_gear.gd")
+const GENERATED_MODEL := preload("res://systems/generated_model.gd")
 
 
 ## Greg: *"the gore in the gore sandbox is not up to date with the gore in the
@@ -47,7 +48,12 @@ static func style_world_rig(rig: BaselineHuman, identity: String, armed: bool, c
 	var arm := rig.parts.get("right_arm") as Node3D
 	if arm == null:
 		return
-	var weapon := HELD_GEAR.build_weapon("sword")
+	# Greg, 30 September: sword variation. Each armed person carries one of
+	# the generated swords, picked from who they are (the same person always
+	# carries the same one); the drawn cleaver when the models are missing.
+	var weapon: Node3D = GENERATED_MODEL.make(GENERATED_MODEL.SWORDS[seed % GENERATED_MODEL.SWORDS.size()])
+	if weapon == null:
+		weapon = HELD_GEAR.build_weapon("sword")
 	weapon.name = "HeldAshlineCleaver"
 	# The grip sits at the wrist, with the edge projected forward of the body;
 	# it is parented to the arm so a severed arm takes its weapon with it.
