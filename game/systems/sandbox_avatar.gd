@@ -47,6 +47,12 @@ var facing_yaw := 0.0
 ## Set by the owner while a swing is past its wind-up: the body keeps the
 ## facing it committed to instead of turning into the stick.
 var turn_locked := false
+## The whole body's share of a swing, set by the owner each frame (radians):
+## a twist about the hips along the blade's arc and a lean into overheads.
+## On top of the facing, so the arm pose (HunterBodyMotion) rides a body that
+## winds up, turns through the blow and settles.
+var swing_twist := 0.0
+var swing_lean := 0.0
 var _camera_at := Vector3.ZERO
 var _camera_ready := false
 var _own_colliders: Array[RID] = []
@@ -170,7 +176,8 @@ func advance(real_delta: float, eye: Vector3, stance_height: float, yaw: float, 
 	else:
 		want = facing_yaw
 	facing_yaw = lerp_angle(facing_yaw, want, clampf(real_delta * TURN_RATE, 0.0, 1.0)) if blend > 0.0 else want
-	rig.rotation.y = facing_yaw
+	rig.rotation.y = facing_yaw + swing_twist
+	rig.rotation.x = swing_lean
 	motion.update(real_delta, walk, true, false, crouching, dodging)
 
 	var look := Vector3(-sin(yaw) * cos(pitch), sin(pitch), -cos(yaw) * cos(pitch)).normalized()

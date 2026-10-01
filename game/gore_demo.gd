@@ -227,6 +227,11 @@ const BODY_SPACING := 1.0
 ## Pack mode: everyone comes, but no two closer than this, so they surround
 ## you from their own sides instead of piling onto one spot.
 const PACK_SPACING := 2.0
+## The body's share of a swing: how much of the arc the hips turn through,
+## how far an overhead leans, and what share of the reach the live frames step.
+const SWING_TWIST := 0.5
+const SWING_LEAN := 0.16
+const SWING_STEP := 0.12
 const SEPARATION_PASSES := 3
 ## The attacker's rhythm: the ring it circles on, how fast it strafes and
 ## closes, and how much of its cadence is left when it steps in.
@@ -1200,6 +1205,45 @@ func _advance_moveset(real_delta: float) -> void:
 		else:
 			motion.clear_roll_pose()
 	avatar.turn_locked = moveset.is_attacking() and moveset.phase() != "windup"
+	_swing_body(real_delta)
+
+
+## The whole body in the swing (Greg: the fighting "looks clunky"; the
+## contact sheets showed a rigid body with only the forearm moving). The hips
+## wind back toward where the arc starts, turn through it while the blade is
+## live and settle; overheads lean back then drive forward; the live frames
+## step the body into the blow. Twist and lean are the avatar's; the step
+## moves the player.
+func _swing_body(real_delta: float) -> void:
+	if not moveset.is_attacking():
+		avatar.swing_twist = move_toward(avatar.swing_twist, 0.0, real_delta * 4.0)
+		avatar.swing_lean = move_toward(avatar.swing_lean, 0.0, real_delta * 2.0)
+		return
+	var definition: Dictionary = moveset.current_definition()
+	var start := float(definition.get("arc_start", 0.0))
+	var finish := float(definition.get("arc_end", 0.0))
+	var progress := moveset.phase_progress()
+	var eased := progress * progress * (3.0 - 2.0 * progress)
+	var angle := 0.0
+	var lean := 0.0
+	var overhead := str(definition.get("motion", "")).contains("overhead")
+	match moveset.phase():
+		"windup":
+			angle = lerpf(0.0, start, eased)
+			lean = lerpf(0.0, -SWING_LEAN * 0.6, eased) if overhead else 0.0
+		"active":
+			angle = lerpf(start, finish, eased)
+			lean = lerpf(-SWING_LEAN * 0.6, SWING_LEAN, eased) if overhead else 0.0
+			# Step into it: a share of the reach over the live frames.
+			var along := Vector3(-sin(avatar.facing_yaw), 0.0, -cos(avatar.facing_yaw))
+			eye += along * (float(definition.get("reach", 2.5)) * SWING_STEP / maxf(float(definition.get("active", 0.15)), 0.05)) * real_delta
+		"recovery":
+			angle = lerpf(finish, 0.0, eased)
+			lean = lerpf(SWING_LEAN, 0.0, eased) if overhead else 0.0
+	# A positive arc angle is the blade to the body's right; turning toward it
+	# is a negative yaw about the hips.
+	avatar.swing_twist = -angle * SWING_TWIST
+	avatar.swing_lean = lean
 
 
 ## The blade's path this frame, from the shoulder out to each arc point: any

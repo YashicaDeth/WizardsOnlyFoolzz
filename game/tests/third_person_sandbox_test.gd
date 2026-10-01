@@ -127,6 +127,24 @@ func _ready() -> void:
 	check(demo.moveset.current_attack() == "charged_heavy", "held past the charge, it is the charged heavy (%s)" % demo.moveset.current_attack())
 	await _frames(120)
 
+	# --- The whole body swings: hips wind and turn through, a step into it. ---
+	avatar.release_lock()
+	demo.stamina = 100.0
+	demo.moveset.reset()
+	await _frames(30)
+	var stood: Vector3 = demo.eye
+	var facing_before: float = avatar.facing_yaw
+	demo._moveset_request(false)
+	var most_twist := 0.0
+	for _i in 30:
+		await get_tree().physics_frame
+		most_twist = maxf(most_twist, absf(avatar.swing_twist))
+	var stepped := Vector2(demo.eye.x - stood.x, demo.eye.z - stood.z).dot(Vector2(-sin(facing_before), -cos(facing_before)))
+	check(most_twist > 0.25, "the hips turn through the light (%.2f rad)" % most_twist)
+	check(stepped > 0.15, "and the body steps into it (%.2f m)" % stepped)
+	await _frames(90)
+	check(absf(avatar.swing_twist) < 0.02 and absf(avatar.swing_lean) < 0.02, "then settles square")
+
 	# --- Y / triangle: two hands, a slower and heavier table. ---
 	demo.moveset.reset()
 	var one_hand: Dictionary = demo.moveset.attack_definition("light_1")
