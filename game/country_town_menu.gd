@@ -240,7 +240,9 @@ func _play_title_sequence() -> void:
 			tween.parallel().tween_method(func(shown: float) -> void: button.text = typed(full, shown), 0.0, 1.0, TYPE_SECONDS).set_delay(TYPE_STAGGER * float(index))
 	tween.tween_callback(func() -> void:
 		if is_instance_valid(intro_veil):
-			intro_veil.queue_free())
+			intro_veil.queue_free()
+		if not settings_panel.visible:
+			$HUD/Play.grab_focus())
 
 
 
@@ -287,7 +289,20 @@ func _build_run_doors() -> void:
 	sandbox.pressed.connect(_open_gore_sandbox)
 	sandbox.mouse_entered.connect(_focus_button.bind(sandbox))
 	sandbox.mouse_exited.connect(_unfocus_button.bind(sandbox))
-	menu_buttons = [play, full_game, sandbox, $HUD/Settings, $HUD/Quit, $HUD/CellOutzSite]
+	# QUIT belongs at the bottom of the column, under everything else.
+	var quit: Button = $HUD/Quit
+	var site: Button = $HUD/CellOutzSite
+	var q_top := quit.offset_top
+	var q_bottom := quit.offset_bottom
+	quit.offset_top = site.offset_top
+	quit.offset_bottom = site.offset_bottom
+	site.offset_top = q_top
+	site.offset_bottom = q_bottom
+	menu_buttons = [play, full_game, sandbox, $HUD/Settings, site, quit]
+	# Controller: the keyboard/pad focus drives the same highlight the mouse does.
+	for button in menu_buttons:
+		button.focus_entered.connect(_focus_button.bind(button))
+		button.focus_exited.connect(_unfocus_button.bind(button))
 	# The column is set in the house type from here on. The buttons keep hit
 	# testing, focus, the tween and every signal; they just stop drawing their
 	# own text in the engine's fallback UI font.
@@ -337,7 +352,58 @@ func _open_new_game() -> void:
 
 ## P2.5. No slot picker and no configuration fork: DEMO selects its isolated
 ## ledger and enters the same `_start_game()` used by PLAY.
+## START opens a one-step input chooser first: CONTROLLER or KEYBOARD + MOUSE.
+## Focus lands on the one that matches what is plugged in, so a pad player only
+## presses confirm. Tests skip it (ATG_TEST_MODE).
 func _start_demo() -> void:
+	if menu_departing:
+		return
+	if OS.get_environment("ATG_TEST_MODE") == "1" or $HUD.has_node("InputChooser"):
+		_begin_demo()
+		return
+	var box := PanelContainer.new()
+	box.name = "InputChooser"
+	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	box.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	box.grow_vertical = Control.GROW_DIRECTION_BOTH
+	box.z_index = 30
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 10)
+	box.add_child(col)
+	var title := Label.new()
+	title.text = "HOW ARE YOU PLAYING?"
+	col.add_child(title)
+	var pad := Button.new()
+	pad.text = "CONTROLLER   (PS4 / PS5)"
+	var kb := Button.new()
+	kb.text = "KEYBOARD + MOUSE"
+	var back := Button.new()
+	back.text = "BACK"
+	for b in [pad, kb, back]:
+		b.custom_minimum_size = Vector2(360, 48)
+		col.add_child(b)
+	var hint := Label.new()
+	hint.text = "controller: L-stick move  R-stick look  R2 attack  L2 guard  R1 heavy  CROSS jump  SQUARE use"
+	hint.add_theme_font_size_override("font_size", 12)
+	hint.modulate = Color(1, 1, 1, 0.6)
+	col.add_child(hint)
+	$HUD.add_child(box)
+	pad.pressed.connect(func() -> void: _choose_input(true))
+	kb.pressed.connect(func() -> void: _choose_input(false))
+	back.pressed.connect(func() -> void:
+		box.queue_free()
+		$HUD/Play.grab_focus())
+	(pad if not Input.get_connected_joypads().is_empty() else kb).grab_focus()
+
+
+func _choose_input(use_pad: bool) -> void:
+	var bridge := get_node_or_null("/root/PadBridge")
+	if bridge != null:
+		bridge.using_pad = use_pad
+	_begin_demo()
+
+
+func _begin_demo() -> void:
 	if menu_departing:
 		return
 	WorldHistory.begin_demo()
@@ -714,6 +780,8 @@ func _dress_settings_panel() -> void:
 	settings_panel.offset_right = 196.0
 	settings_panel.offset_bottom = 150.0
 	settings_panel.z_index = 25
+	settings_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	settings_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	# The same skin the quantum branch picker already uses, so the two panels on
 	# this screen are recognisably the same object.
 	var skin := StyleBoxFlat.new()
@@ -746,10 +814,19 @@ func _open_settings() -> void:
 		return
 	_dress_settings_panel()
 	settings_panel.visible = true
+	effects_button.grab_focus()
 
 
 func _close_settings() -> void:
 	settings_panel.visible = false
+	$HUD/Settings.grab_focus()
+
+
+## B / Escape backs out of settings.
+func _unhandled_input(event: InputEvent) -> void:
+	if settings_panel.visible and event.is_action_pressed("ui_cancel"):
+		get_viewport().set_input_as_handled()
+		_close_settings()
 
 
 func _toggle_effects() -> void:

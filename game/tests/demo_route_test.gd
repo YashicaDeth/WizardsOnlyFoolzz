@@ -28,12 +28,12 @@ func _ready() -> void:
 	get_tree().paused = false
 	hunt.queue_free()
 	await get_tree().process_frame
-	var resumed_hunt := (load("res://bone_yard_hunt.tscn") as PackedScene).instantiate()
-	add_child(resumed_hunt)
+	WorldHistory.begin_demo()
+	var fresh_hunt := (load("res://bone_yard_hunt.tscn") as PackedScene).instantiate()
+	add_child(fresh_hunt)
 	await get_tree().create_timer(0.05, true).timeout
-	check(resumed_hunt.demo_wall.visible, "resuming an ended demo restores the wall")
-	check(get_tree().paused, "an ended demo cannot resume beyond its authored stop")
-	get_tree().paused = false
-	resumed_hunt.queue_free()
+	check(not fresh_hunt.demo_wall.visible, "a new START DEMO does not restore the previous run's wall")
+	check(not get_tree().paused, "a fresh demo can enter the Hunt instead of remaining stopped")
+	fresh_hunt.queue_free()
 	print("DEMO_ROUTE_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
