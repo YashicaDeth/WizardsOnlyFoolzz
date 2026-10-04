@@ -2,10 +2,10 @@ extends Node
 
 const CombatLayer := preload("res://systems/combat_input_layer.gd")
 
-## Greg: controller support, PlayStation layout. The game reads the keyboard
-## and mouse directly in ~290 places and through six input actions; rather
-## than rewrite every scene, this turns the pad into the keys and mouse they
-## already read. One file, every scene.
+## Compatibility bridge for detached labs and other unmigrated scenes. The
+## production route reads InputProfile's native actions, so pad input never
+## masquerades as a key or mouse event there. Semantic combat dispatch remains
+## here until disciplines own it; it does not synthesize an event.
 ##
 ##   Left stick   move (the move_* actions), flicks = arrow keys in menus
 ##   Right stick  look (mouse motion)
@@ -67,6 +67,14 @@ var _labels: Array[Label] = []
 var _swapped := {}
 var _trigger_down := {}
 var _flick := Vector2i.ZERO
+const MIGRATED_SCENES := [
+	"res://country_town_menu.tscn", "res://vat_chamber.tscn",
+	"res://facility.tscn", "res://service_arcade.tscn", "res://support_unit.tscn",
+	"res://buried_city.tscn", "res://old_drains.tscn",
+	"res://doctor_vehicle_bay.tscn", "res://rift_derby.tscn",
+	"res://derby_tunnels.tscn", "res://blood_waterfall_exit.tscn",
+	"res://bone_yard_hunt.tscn",
+]
 var combat_layer_id := "souls_base"
 var combat_layer: Dictionary = CombatLayer.souls_base()
 var combat_context := "melee"
@@ -81,8 +89,6 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	# After every scene script, so the swap sees this frame's prompt text.
 	process_priority = 1000
-	_bind_movement()
-	_bind_native_combat()
 	get_tree().node_added.connect(func(node: Node) -> void:
 		if node is Label:
 			_labels.append(node))
@@ -90,6 +96,9 @@ func _ready() -> void:
 
 ## A prompt line with its key names as pad buttons, when the pad is in use.
 func keys(text: String) -> String:
+	var profile := get_node_or_null("/root/InputProfile")
+	if profile != null:
+		using_pad = bool(profile.using_pad)
 	if not using_pad:
 		return text
 	# A key name is only swapped where a prompt puts one: first word of a
@@ -242,6 +251,11 @@ func _input(event: InputEvent) -> void:
 			using_pad = false
 	if event is InputEventJoypadButton:
 		var pad := event as InputEventJoypadButton
+		if COMBAT_BUTTONS.has(pad.button_index):
+			_dispatch_combat(COMBAT_BUTTONS[pad.button_index], pad.pressed)
+			return
+		if not _fallback_active():
+			return
 		# D-pad drives menus whenever a control has focus (the gameplay keys
 		# K/J/4/I would do nothing there).
 		var dpad := {JOY_BUTTON_DPAD_UP: KEY_UP, JOY_BUTTON_DPAD_DOWN: KEY_DOWN, JOY_BUTTON_DPAD_LEFT: KEY_LEFT, JOY_BUTTON_DPAD_RIGHT: KEY_RIGHT}
@@ -249,9 +263,7 @@ func _input(event: InputEvent) -> void:
 			if pad.pressed:
 				_tap(dpad[pad.button_index])
 			return
-		if COMBAT_BUTTONS.has(pad.button_index):
-			_dispatch_combat(COMBAT_BUTTONS[pad.button_index], pad.pressed)
-		elif BUTTON_KEYS.has(pad.button_index):
+		if BUTTON_KEYS.has(pad.button_index):
 			_send_key(BUTTON_KEYS[pad.button_index], pad.pressed)
 	elif event is InputEventJoypadMotion:
 		var axis := (event as InputEventJoypadMotion).axis
@@ -279,7 +291,9 @@ func _dispatch_combat(physical_action: String, pressed: bool) -> void:
 	if is_instance_valid(_combat_receiver) and _combat_receiver.has_method("_pad_combat_verb"):
 		_combat_receiver.call("_pad_combat_verb", verb, pressed)
 		return
-	# Unmigrated scenes keep working through their established input path.
+	# Only unmigrated scenes keep the legacy key/mouse path.
+	if not _fallback_active():
+		return
 	match verb:
 		"light", "fire": _send_mouse(MOUSE_BUTTON_LEFT, pressed)
 		"heavy": _send_mouse(MOUSE_BUTTON_MIDDLE, pressed)
@@ -293,8 +307,11 @@ func _release_combat_inputs() -> void:
 
 
 func _process(delta: float) -> void:
+	var profile := get_node_or_null("/root/InputProfile")
+	if profile != null:
+		using_pad = bool(profile.using_pad)
 	_swap_labels()
-	if Input.get_connected_joypads().is_empty():
+	if Input.get_connected_joypads().is_empty() or not _fallback_active():
 		return
 	var look := Vector2(Input.get_joy_axis(0, JOY_AXIS_RIGHT_X), Input.get_joy_axis(0, JOY_AXIS_RIGHT_Y))
 	if look.length() > DEADZONE:
@@ -311,6 +328,13 @@ func _process(delta: float) -> void:
 	if flick.y != _flick.y and flick.y != 0:
 		_tap(KEY_DOWN if flick.y > 0 else KEY_UP)
 	_flick = flick
+
+
+func _fallback_active() -> bool:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return false
+	return not str(scene.scene_file_path) in MIGRATED_SCENES
 
 
 func _send_key(keycode: Key, pressed: bool) -> void:
