@@ -149,6 +149,7 @@ const CAVITY := preload("res://systems/cavity.gd")
 const SKULL_BURST := preload("res://systems/skull_burst.gd")
 const LIMB_MOMENTUM := preload("res://systems/limb_momentum.gd")
 const HUNTER_ARSENAL := preload("res://systems/hunter_arsenal.gd")
+const AIM_DOWN_SIGHTS := preload("res://systems/aim_down_sights.gd")
 const HUNTER_BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
 const RIVAL_REGISTRY := preload("res://systems/rival_registry.gd")
 const RIVAL_TACTICS := preload("res://systems/rival_tactics.gd")
@@ -219,6 +220,9 @@ var third_person := false
 ## leaving the game with no actual aiming control at all.
 var firearm_aiming := false
 var firearm_aim_blend := 0.0
+## Greg, 4 October: aiming is down the barrel. Owns the sight stage (L3 /
+## SHIFT steps further in) and carries the held gun onto the eye line.
+var ads := AIM_DOWN_SIGHTS.new()
 ## M1.5. `third_person_unlocked()` is a pure read of history, so it can flip
 ## from false to true on any frame — the instant the first body hit lands —
 ## with nobody pressing anything. Left alone that is a permission
@@ -1755,6 +1759,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			_cycle_carried_weapon(1)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			_cycle_carried_weapon(-1)
+	# L3 on the pad arrives as SHIFT (PadBridge). Shouldered, it steps further
+	# down the sight and back; unaimed it is still only sprint.
+	if event is InputEventKey and event.keycode == KEY_SHIFT and event.pressed and not event.echo and firearm_aiming:
+		var deeper := ads.step_zoom() == 2
+		prompt.text = "%s // %s" % [str(arsenal.current().get("label", "FIREARM")), "DOWN THE SIGHT" if deeper else "AIMING"]
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
 		if smoke_model != null and is_instance_valid(smoke_model) and not smoke_weapon_drawn:
 			if event.pressed:
@@ -1764,7 +1773,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif arsenal != null and not bare_handed and carried_limb_index < 0 and str(arsenal.current().get("kind", "")) == "firearm":
 			firearm_aiming = event.pressed
 			if event.pressed:
-				prompt.text = "%s // AIMING" % str(arsenal.current().get("label", "FIREARM"))
+				prompt.text = "%s // AIMING // SHIFT DOWN THE SIGHT" % str(arsenal.current().get("label", "FIREARM"))
 		else:
 			# A melee right button belongs to defence. The old heavy-attack call
 			# made the existing guard/parry path unreachable from the mouse.
@@ -1967,7 +1976,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		if _pulmonary_diagnostic_active():
 			field_interface.rotate_pulmonary(event.relative)
 		else:
-			apply_look(Vector2(LOOK.dx(event.relative) * 0.0026, LOOK.dy(event.relative) * 0.0024))
+			var sight_scale := AIM_DOWN_SIGHTS.look_scale(camera.fov, FIRST_PERSON_FOV) if firearm_aim_blend > 0.0 else 1.0
+			apply_look(Vector2(LOOK.dx(event.relative) * 0.0026, LOOK.dy(event.relative) * 0.0024) * sight_scale)
 			if guarding or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 				guard_aim += event.relative
 				var aimed_side := BladeRead.guard_side(guard_aim)
@@ -2634,6 +2644,29 @@ func _pose_weapon() -> void:
 	var left_pose := str((active_grip.get("left", {}) as Dictionary).get("pose", "cup" if str(arsenal.current_id) == "sidearm" else "wrap"))
 	_restore_grip_hand(model.get_node_or_null("RightGripHand") as Node3D, right_pose)
 	_restore_grip_hand(model.get_node_or_null("LeftGripHand") as Node3D, left_pose)
+
+
+## After the camera has its final pose (kick included), the shouldered gun is
+## carried from the hand onto the eye line, and the forearms re-follow it.
+func _pose_weapon_on_sight() -> void:
+	if arsenal == null or firearm_aim_blend <= 0.0:
+		ads.has_line = false
+		return
+	var model := arsenal.models.get(str(arsenal.current_id)) as Node3D
+	if model == null or not is_instance_valid(model) or not model.visible:
+		ads.has_line = false
+		return
+	# `_pose_weapon` caches the hand rest the first frame it sees a model; a
+	# model this reaches first must not have the sight pose cached as its rest.
+	if not model.has_meta("rest_position"):
+		model.set_meta("rest_position", model.position)
+		model.set_meta("rest_rotation", model.rotation)
+	var sway := Vector3.ZERO
+	if model.get_parent() is Node3D:
+		var rest: Vector3 = model.get_meta("rest_position")
+		sway = (model.get_parent() as Node3D).global_transform.basis * (model.position - rest)
+	ads.pose(model, camera.global_transform, str(arsenal.current_id), firearm_aim_blend, sway)
+	_update_first_person_forearms()
 
 
 func _uses_third_person_moveset() -> bool:
@@ -3455,6 +3488,12 @@ func _resolve_firearm(attack: Dictionary) -> void:
 		forward = (VatsTargeting.anchor(vats_rig, vats_shot_part) - camera.global_position).normalized()
 		vats_payload = {"vats_part": vats_shot_part.duplicate(), "vats_subject": str(vats_actor.subject_id)}
 	var origin := camera.global_position + forward * 0.48
+	# Down the barrel, the round leaves along the line through both sights.
+	if vats_payload.is_empty() and firearm_aiming and firearm_aim_blend > 0.9 and ads.has_line:
+		forward = ads.line_direction
+		origin = ads.line_origin + forward * 0.3
+	if firearm_aiming:
+		ads.add_kick(1.0 if str(attack.weapon) != "sniper" else 1.4)
 	var directions: Array[Vector3] = arsenal.shot_directions(forward, Vector3.UP, 0.15 if not vats_payload.is_empty() else (0.38 if firearm_aiming else 1.0))
 	# AF1.1. A round is a thing that travels, and now so is what it does: the
 	# damage payload rides on the round itself and is only ever spent when
@@ -9573,6 +9612,7 @@ func _update_camera() -> void:
 	if not aiming_now:
 		firearm_aiming = false
 	firearm_aim_blend = move_toward(firearm_aim_blend, 1.0 if aiming_now else 0.0, get_physics_process_delta_time() * 7.0)
+	ads.advance(get_physics_process_delta_time(), aiming_now)
 	var physical_offset := Vector3.ZERO
 	var fov_add := 0.0
 	if body_motion != null:
@@ -9641,7 +9681,10 @@ func _update_camera() -> void:
 	# frame at the Hunt spawn even though collision avoidance itself was working.
 	var camera_blend := perspective_blend * HUNTER_MOTOR.third_person_clearance_blend(fp_position, tp_position)
 	var base_fov := lerpf(FIRST_PERSON_FOV, THIRD_PERSON_FOV, camera_blend) + fov_add + LOOK.fov_offset()
-	var aimed_fov := lerpf(56.0, 50.0, camera_blend)
+	# Aiming down the barrel is an eye behind a sight, so a shouldered gun
+	# brings the camera in from the shoulder to the eye on the same blend.
+	camera_blend *= 1.0 - firearm_aim_blend
+	var aimed_fov: float = ads.fov(str(arsenal.current_id)) if arsenal != null else 56.0
 	camera.fov = lerpf(base_fov, aimed_fov, firearm_aim_blend)
 	# Locked, the shot is about the pair, so aim between them. Unlocked, aim
 	# parallel to the look heading rather than at the player — aiming *at*
@@ -9684,6 +9727,7 @@ func _update_camera() -> void:
 	# third_person without the F key leaves them stretched back to the lens.
 	if body_motion != null:
 		body_motion.set_perspective(camera_blend <= 0.5)
+	_pose_weapon_on_sight()
 
 
 ## The pointer, in the project's own hand rather than the operating system's. A
