@@ -49,7 +49,7 @@ func _liquid() -> void:
 	check(lab.liquid.broken, "USE on the liquid plinth breaks the tank")
 	await _seconds(1.2)
 	check(BloodPool.pool_count(lab) > 0, "the spill pools on the floor (%d pools)" % BloodPool.pool_count(lab))
-	check(lab.liquid.pour.emitting, "and the fluid pours as particles")
+	check(lab.liquid.pouring(), "and the fluid pours as particles")
 	var before: int = lab.liquid.splashes
 	var tank: Vector3 = lab.liquid.glass_body.global_position
 	check(lab.liquid.touch(Vector3(tank.x, 0, tank.z + 0.9)), "a step in the spill splashes")

@@ -349,7 +349,7 @@ func _physics_process(delta: float) -> void:
 	BODY_CAM.apply(camera, player, delta, pitch)
 	arsenal.tick(delta)
 	var feet := player.global_position - Vector3(0, 0.85, 0)
-	liquid.wade(feet, Vector2(player.velocity.x, player.velocity.z).length(), delta)
+	liquid.wade(player, feet, player.velocity, delta)
 	_note_age += delta
 	_update_hud()
 
