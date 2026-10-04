@@ -68,6 +68,13 @@ func activate(rig: BaselineHuman, hit_zone: String, impulse: float, direction: V
 	source = rig
 	attack_id = killing_attack_id.strip_edges().to_lower()
 	name = "%s_ragdoll" % rig.subject_id
+	# Sandbox bodies are nested below a movable holder. A physics island must
+	# live in world space once the body dies; inheriting the holder's +0.9/-0.9
+	# compensation on the solver's first frame can turn that transform delta
+	# into a violent launch. The original parts are reparented with globals kept,
+	# so making this neutral world-space container does not move the corpse.
+	top_level = true
+	global_transform = Transform3D.IDENTITY
 	for zone_id in BaselineHuman.ZONES:
 		if rig.severed.has(zone_id):
 			continue
