@@ -100,16 +100,19 @@ func _destruction() -> void:
 	await _press("attack")
 	await _seconds(0.3)
 	check(lab.ballistics.marks.any(func(mark: Node) -> bool: return is_instance_valid(mark) and mark.name.begins_with("GroundHole")), "a round into the open ground digs a hole")
-	# The cleaver on the wall (job 3: the HOTLINE CLEAVER replaced the sword,
-	# and a swing now has a windup before it lands).
+	# The cleaver on the wall: since lab-47 the wall is tiered voxels (Greg,
+	# 5 Oct, Teardown-like), not four panels, so the blow takes brick cells.
+	# Job 3: the HOTLINE CLEAVER, with a windup before it lands.
 	lab.arsenal.select_weapon("cleaver")
-	var panel: BreakableProp = station._wall[Vector2i(1, 0)]
-	lab.player.global_position = panel.global_position + Vector3(0, 0.5, 1.6)
+	var wall: VoxelStructure = station.brick_wall
+	var cells_before := wall.solid_count()
+	var face := wall.to_global(Vector3(wall.size) * wall.voxel * Vector3(0.5, 0.5, 1.0))
+	lab.player.global_position = face + Vector3(0, 0.0, 1.6)
 	await _frames(2)
-	await _aim(panel.global_position)
+	await _aim(face)
 	await _press("attack")
 	await _seconds(0.6)
-	check(panel.integrity < panel.max_integrity, "the cleaver damages a wall panel")
+	check(wall.solid_count() < cells_before, "the cleaver knocks brick out of the voxel wall (%d -> %d)" % [cells_before, wall.solid_count()])
 	await _press("interact")
 	check(station.broken_count() == 0, "USE on the destruction plinth rebuilds it all")
 
