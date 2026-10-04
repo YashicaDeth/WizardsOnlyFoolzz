@@ -1,6 +1,8 @@
 class_name SoulsPad
 extends Node
 
+const CombatLayer := preload("res://systems/combat_input_layer.gd")
+
 ## A PS4 pad (or any SDL-mapped pad) in the sandbox, laid out like Bloodborne
 ## and Dark Souls 3 (Greg, 30 September: "map it to Dark Souls controls for
 ## the fighting and the big swings ... or Bloodborne"). This only reads the
@@ -19,6 +21,8 @@ extends Node
 signal light
 ## R2 is released with how long it was held (Bloodborne: a hold charges).
 signal heavy(held: float)
+signal fire
+signal aim_changed(held: bool)
 signal stance_toggle
 signal roll
 signal lock
@@ -49,6 +53,20 @@ var _circle_held := -1.0
 var _r2_down := false
 var _r2_held := 0.0
 var _l2_down := false
+var combat_context := "melee"
+var input_layer: Dictionary = CombatLayer.souls_base()
+
+
+func set_combat_context(context: String) -> void:
+	combat_context = context
+
+
+func set_input_layer(overrides: Dictionary = {}) -> void:
+	input_layer = CombatLayer.with_overrides(overrides)
+
+
+func _verb(physical_action: String) -> String:
+	return CombatLayer.verb(input_layer, physical_action, combat_context)
 
 
 func _ready() -> void:
@@ -92,11 +110,15 @@ func _process(delta: float) -> void:
 	if r2:
 		_r2_held = 0.0 if not _r2_down else _r2_held + delta
 	elif _r2_down:
-		heavy.emit(_r2_held)
+		match _verb(CombatLayer.R2):
+			"heavy": heavy.emit(_r2_held)
+			"fire": fire.emit()
 	_r2_down = r2
 	var l2 := Input.get_joy_axis(device, JOY_AXIS_TRIGGER_LEFT) > TRIGGER_PRESS
 	if l2 != _l2_down:
-		guard_changed.emit(l2, true)
+		match _verb(CombatLayer.L2):
+			"parry": guard_changed.emit(l2, true)
+			"aim": aim_changed.emit(l2)
 	_l2_down = l2
 
 
@@ -119,10 +141,11 @@ func _input(event: InputEvent) -> void:
 	var down: bool = button.pressed
 	match button.button_index:
 		JOY_BUTTON_RIGHT_SHOULDER:
-			if down:
+			if down and _verb(CombatLayer.R1) == "light":
 				light.emit()
 		JOY_BUTTON_LEFT_SHOULDER:
-			guard_changed.emit(down, false)
+			if _verb(CombatLayer.L1) == "block":
+				guard_changed.emit(down, false)
 		JOY_BUTTON_B:
 			if down:
 				_circle_held = 0.0

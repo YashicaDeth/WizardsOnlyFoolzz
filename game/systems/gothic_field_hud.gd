@@ -774,7 +774,7 @@ func _draw_controls() -> void:
 		return
 	var pad := get_node_or_null("/root/PadBridge")
 	if pad != null:
-		offers = offers.map(func(offer: Array) -> Array: return [pad.keys(str(offer[0])), offer[1]])
+		offers = offers.map(func(offer: Array) -> Array: return [pad.hint(str(offer[0]), str(offer[1]), "firearm" if firearm else "melee"), offer[1]])
 
 	# Laid out from the middle, so the strip grows symmetrically rather than
 	# sliding sideways every time an affordance appears or goes.
@@ -797,14 +797,16 @@ func _current_offers() -> Array:
 	var held := str((weapon as Dictionary).get("label", ""))
 	if bare:
 		offers.append(["LMB", "STRIKE"])
-		offers.append([_bound("guard", "X"), "GUARD"])
+		offers.append([_bound("guard", "X"), "BLOCK"])
 	elif firearm:
 		offers.append(["LMB", "FIRE"])
+		offers.append(["RMB", "AIM"])
 		if int((weapon as Dictionary).get("loaded", 1)) <= 0:
 			offers.append(["R", "RELOAD"])
 	else:
-		offers.append(["LMB", held.to_upper() if held != "" else "STRIKE"])
-		offers.append(["RMB", "GUARD"])
+		offers.append(["LMB", "LIGHT // %s" % held.to_upper() if held != "" else "LIGHT"])
+		offers.append([_bound("guard", "X"), "BLOCK"])
+		offers.append(["RMB", "PARRY"])
 		offers.append(["MMB", "HEAVY"])
 	if can_dodge:
 		offers.append([_bound("dodge", "SPACE"), "DODGE"])
@@ -824,8 +826,10 @@ func _bound(action: String, fallback: String) -> String:
 	for event in InputMap.action_get_events(action):
 		if event is InputEventKey:
 			var key := event as InputEventKey
-			var code := key.keycode if key.keycode != KEY_NONE else DisplayServer.keyboard_get_keycode_from_physical(key.physical_keycode)
-			return OS.get_keycode_string(code).to_upper()
+			# `keyboard_get_keycode_from_physical` is unavailable on the headless
+			# display server. The event already knows its physical label and this
+			# is also what PauseGate uses for the rebind row.
+			return OS.get_keycode_string(key.keycode).to_upper() if key.keycode != KEY_NONE else key.as_text_physical_keycode().to_upper()
 	return fallback
 
 

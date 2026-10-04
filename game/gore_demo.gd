@@ -352,6 +352,12 @@ var smoke_draw_started := 0.0
 
 
 func _ready() -> void:
+	# SoulsPad owns the sandbox's pad stream (including its sticks and device
+	# de-duplication). Registering the scene prevents the global compatibility
+	# bridge from synthesizing a second mouse combat event for the same press.
+	var pad_bridge := get_node_or_null("/root/PadBridge")
+	if pad_bridge != null:
+		pad_bridge.set_combat_receiver(self)
 	# The sandbox player has the same persisted body ledger a main-game dose
 	# charges.  There is no free, sandbox-only consumption path.
 	WorldHistory.register_subject(SANDBOX_SUBJECT, {"name": "SANDBOX WITNESS", "kind": "person", "anatomy_state": {}})
@@ -2053,6 +2059,8 @@ func _build_pad() -> void:
 	add_child(pad)
 	pad.light.connect(func() -> void: _pad_attack(false))
 	pad.heavy.connect(func(held: float) -> void: _pad_attack(true, held))
+	pad.fire.connect(_fire)
+	pad.aim_changed.connect(func(held: bool) -> void: firearm_aiming = held)
 	pad.stance_toggle.connect(_toggle_stance)
 	pad.roll.connect(func() -> void:
 		var move := _sandbox_move_input()
@@ -2064,9 +2072,6 @@ func _build_pad() -> void:
 	pad.view.connect(_toggle_view)
 	pad.interact.connect(_take_station_item)
 	pad.guard_changed.connect(func(held: bool, parry: bool) -> void:
-		if str(arsenal.current().get("kind", "")) == "firearm" or launcher_equipped:
-			firearm_aiming = held
-			return
 		guarding = held
 		guard_aim = Vector2.ZERO
 		guard_held = 0.0
@@ -2084,13 +2089,21 @@ func _build_pad() -> void:
 	pad.enemies_toggle.connect(func() -> void: _set_enemies_enabled(not enemies_enabled))
 
 
-## R1 / R2. Over the shoulder with a blade these are the moveset's light and
-## heavy; otherwise R1 is the trigger (a shot, or the first-person swing).
+## R1 / R2. The layer has already resolved these to light and heavy; firearms
+## arrive on the separate R2 `fire` signal, so R1 can never become a second
+## trigger merely because the held item changed.
 func _pad_attack(heavy: bool, charge := 0.0) -> void:
 	if third_person and str(arsenal.current().get("kind", "")) == "melee" and not launcher_equipped:
 		_moveset_request(heavy, charge)
-	elif not heavy or str(arsenal.current().get("kind", "")) == "firearm":
+	elif str(arsenal.current().get("kind", "")) != "firearm":
 		_fire()
+
+
+## Combat itself is consumed by this scene's SoulsPad, which reads the same
+## CombatInputLayer data. This receiver intentionally absorbs PadBridge's
+## compatibility copy so one physical press cannot attack twice.
+func _pad_combat_verb(_verb: String, _pressed: bool) -> void:
+	pass
 
 
 func _begin_dodge(requested_direction := Vector3.ZERO) -> bool:
@@ -2393,6 +2406,8 @@ func _set_xray(enabled: bool) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if pad != null:
+		pad.set_combat_context("firearm" if launcher_equipped or str(arsenal.current().get("kind", "")) == "firearm" else "melee")
 	# Real seconds, whatever the clock is doing to everything else. `delta` is
 	# `real * time_scale` by definition, so this inverts it exactly — and it is
 	# the only honest way to time anything in a scene that bends time on purpose.
@@ -2523,6 +2538,9 @@ func _physics_process(delta: float) -> void:
 
 
 func _exit_tree() -> void:
+	var pad_bridge := get_node_or_null("/root/PadBridge")
+	if pad_bridge != null:
+		pad_bridge.clear_combat_receiver(self)
 	# Leaving this scene with the world still slowed would follow you out of it.
 	Engine.time_scale = 1.0
 

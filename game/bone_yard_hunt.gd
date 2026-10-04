@@ -345,6 +345,11 @@ const ARC_STEP_BONUS := 0.25
 
 var guarding := false
 var guard_raised := 0.0
+## Semantic pad holds supplied by PadBridge's active combat layer. They are
+## separate from keyboard/mouse state so a discipline swap can release them
+## explicitly and can never strand a native action down.
+var pad_block_held := false
+var pad_parry_held := false
 var guard_stamina_drain := 14.0
 ## Directional guard is chosen with the mouse while the blade is raised. X is
 ## retained as a keyboard fallback, but RMB is the production first-person bind.
@@ -966,6 +971,10 @@ var _black_mirror_env: Environment
 
 
 func _ready() -> void:
+	var pad_bridge := get_node_or_null("/root/PadBridge")
+	if pad_bridge != null:
+		pad_bridge.set_combat_receiver(self)
+		pad_bridge.set_combat_context(_pad_combat_context())
 	# Greg, 26 September: "start me at the day time in the overworld".
 	# Play-Overworld.bat launches this scene directly with --daytime.
 	if "--daytime" in OS.get_cmdline_user_args():
@@ -2015,7 +2024,64 @@ func _action_key(event: InputEventKey) -> Key:
 	return event.keycode
 
 
+func _pad_combat_context() -> String:
+	if arsenal != null and not bare_handed and carried_limb_index < 0 and str(arsenal.current().get("kind", "")) == "firearm":
+		return "firearm"
+	return "melee"
+
+
+func _sync_pad_combat_context() -> void:
+	var bridge := get_node_or_null("/root/PadBridge")
+	if bridge != null:
+		bridge.set_combat_context(_pad_combat_context())
+
+
+## PadBridge has resolved the stable physical shoulder through the current
+## discipline layer before this is called. The Hunt consumes verbs, never
+## button numbers, so a later discipline can remap without editing this scene.
+func _pad_combat_verb(verb: String, pressed: bool) -> void:
+	match verb:
+		"light":
+			# A firearm is not a second R1 trigger. The future split-hand loadout
+			# can route this light verb to its main-hand weapon without changing
+			# the pad layer.
+			if pressed and _pad_combat_context() != "firearm":
+				_attack(false)
+		"heavy":
+			if pressed:
+				heavy_held = 0.0
+			else:
+				if heavy_held >= 0.0 and heavy_held < GUARD_BREAK_HOLD:
+					_attack(true)
+				heavy_held = -1.0
+		"block":
+			pad_block_held = pressed
+		"parry":
+			pad_parry_held = pressed
+			if pressed:
+				guard_raised = 0.0
+		"aim":
+			_vats_rmb_down = 0.0 if pressed else -1.0
+			if not pressed and vats.is_active() and not vats.is_resolving():
+				firearm_aiming = false
+				_vats_close()
+			else:
+				firearm_aiming = pressed
+		"fire":
+			_vats_lmb_down = 0.0 if pressed else -1.0
+			if pressed:
+				if _vats_holds_trigger():
+					pass
+				else:
+					_attack(false)
+			elif _vats_chord_pending:
+				# Released before the chord matured: preserve the ordinary shot.
+				_vats_chord_pending = false
+				_attack(false)
+
+
 func _physics_process(delta: float) -> void:
+	_sync_pad_combat_context()
 	_tick_k_hold(delta)
 	_tick_fight(delta)
 	if kill_cam.active:
@@ -2112,7 +2178,7 @@ func _physics_process(delta: float) -> void:
 	# when there is nobody in your hands. A control that does two things at once
 	# is worse than a control that does nothing.
 	var holding_melee_guard := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and arsenal != null and str(arsenal.current().get("kind", "")) != "firearm"
-	var wants_guard := (holding_melee_guard or Input.is_action_pressed("guard")) and panel_mode.is_empty() and not resolution_ui.visible and grapple_target.is_empty() and dodge_remaining <= 0.0
+	var wants_guard := (holding_melee_guard or Input.is_action_pressed("guard") or pad_block_held or pad_parry_held) and panel_mode.is_empty() and not resolution_ui.visible and grapple_target.is_empty() and dodge_remaining <= 0.0
 	if wants_guard and strike_windup >= 0.0:
 		try_feint()
 	if wants_guard and guard_strength() > 0.0 and stamina > 1.0 and not stumbling():
@@ -8477,6 +8543,9 @@ func _process(delta: float) -> void:
 
 
 func _exit_tree() -> void:
+	var bridge := get_node_or_null("/root/PadBridge")
+	if bridge != null:
+		bridge.clear_combat_receiver(self)
 	if vats.is_active():
 		Engine.time_scale = 1.0
 
@@ -8906,10 +8975,11 @@ func _build_keys_card() -> void:
 			["F", "FIRST / THIRD (AFTER HIT)"],
 		]},
 		{"group": "FIGHTING", "rows": [
-			["LMB", "ATTACK"],
-			["RMB", "AIM FIREARMS / GUARD (MOUSE PICKS SIDE)"],
+			["LMB", "LIGHT ATTACK"],
+			["RMB", "AIM FIREARMS / PARRY (MOUSE PICKS SIDE)"],
 			["MMB", "HEAVY // HOLD: GUARD BREAK"],
-			["HOLD X", "GUARD"],
+			["HOLD X", "BLOCK"],
+			["L2 + R2", "AIMED X-RAY / VATS"],
 			["GUARD MID-SWING", "FEINT (BLOOD TREE)"],
 			["Z", "LOCK ON"],
 			["WHEEL", "CYCLE TARGET"],

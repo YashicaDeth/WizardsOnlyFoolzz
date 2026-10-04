@@ -52,5 +52,17 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	check(not hints._panel.visible and KeyHints.seen("use"), "an unused hint still goes after a while")
+	var bridge := get_node("/root/PadBridge")
+	bridge.using_pad = true
+	hints.offer("light_attack", KEY_NONE, "LMB", "light attack")
+	await get_tree().process_frame
+	check(hints._key.text == "R1", "the one-time combat hint reads the active Souls layer")
+	var r1 := InputEventJoypadButton.new()
+	r1.button_index = JOY_BUTTON_RIGHT_SHOULDER
+	r1.pressed = true
+	Input.parse_input_event(r1)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check(KeyHints.seen("light_attack"), "using R1 dismisses the light-attack hint")
 	print("KEY_HINTS_TEST_RESULT failures=%d" % failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
