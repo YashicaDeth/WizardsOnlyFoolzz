@@ -75,6 +75,33 @@ static func third_person_clearance_blend(first_person: Vector3, third_person: Ve
 	return smoothstep(0.55, 1.65, first_person.distance_to(third_person))
 
 
+## The lens is inside the skull only this close to the eye. The head is
+## 0.26-0.28 m across, so past this the camera is outside it and looking at
+## the body, and the body it sees has to be whole.
+const LENS_IN_HEAD := 0.3
+
+
+## Greg, 4 Oct playtest: "no head and massive shoulders". The head used to hide
+## on the camera *blend* (<= 0.5), but a cramped room holds that blend part way,
+## which parks the lens a hand's width behind the skull: the head hidden, the
+## first-person pose pulling the torso back into the lens. Decide on where the
+## lens actually is instead.
+static func lens_in_head(eye: Vector3, lens: Vector3) -> bool:
+	return eye.distance_to(lens) < LENS_IN_HEAD
+
+
+## Clearance commits to the eye or the shoulder rather than resting between
+## them: any resting point between is right behind the head. The ease between
+## the two is a rate the caller applies, so the move still slides, never cuts.
+## The gap between the thresholds stops a lens on the edge from flickering.
+static func clearance_open(was_open: bool, clearance: float) -> bool:
+	if clearance >= 0.6:
+		return true
+	if clearance <= 0.4:
+		return false
+	return was_open
+
+
 ## `jump_impulse` must be applied here, inside the same move_and_slide() this
 ## call makes, not by the caller afterward: is_on_floor() only turns false
 ## once a slide has actually carried the body off the ground, so a caller

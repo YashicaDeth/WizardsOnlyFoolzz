@@ -775,6 +775,11 @@ var camera_ready := false
 ## half-second slide rather than a teleport. Rule 3: every hard cut is a bug.
 var perspective_blend := 0.0
 const PERSPECTIVE_BLEND_RATE := 3.2
+## How much room the shoulder camera has, eased toward the eye (0) or the
+## shoulder (1) as `HunterMotor.clearance_open` commits, never resting between.
+var camera_clearance := 1.0
+var camera_clearance_open := true
+const CAMERA_CLEARANCE_RATE := 4.0
 ## M1.5. Polled rather than hooked to every place a boss could theoretically
 ## die, because the boss condition depends on faction state the Hunt System
 ## mutates in more than one file. A once-a-second check against a one-shot
@@ -9671,9 +9676,13 @@ func _update_camera() -> void:
 				subject_desired = obstruction.position + (subject_focus - obstruction.position).normalized() * 0.35
 			camera.global_position = subject_desired
 			camera.look_at(subject_focus, Vector3.UP)
+			# This shot stands outside the body, so the body it frames keeps
+			# its head (it used to hide it, a headless player in the shot).
 			var player_head := player_rig.parts.get("head") as Node3D
 			if player_head != null and is_instance_valid(player_head):
-				player_head.visible = false
+				player_head.visible = true
+			if body_motion != null:
+				body_motion.set_perspective(false)
 			return
 	var look := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
 	# The sight comes to the eye rather than the world snapping into a zoom.
@@ -9749,7 +9758,9 @@ func _update_camera() -> void:
 	# continue the same authored perspective transition into the eye. Keeping a
 	# nominal third-person blend here made the player's torso fill the complete
 	# frame at the Hunt spawn even though collision avoidance itself was working.
-	var camera_blend := perspective_blend * HUNTER_MOTOR.third_person_clearance_blend(fp_position, tp_position)
+	camera_clearance_open = HUNTER_MOTOR.clearance_open(camera_clearance_open, HUNTER_MOTOR.third_person_clearance_blend(fp_position, tp_position))
+	camera_clearance = move_toward(camera_clearance, 1.0 if camera_clearance_open else 0.0, CAMERA_CLEARANCE_RATE * get_physics_process_delta_time())
+	var camera_blend := perspective_blend * camera_clearance
 	var base_fov := lerpf(FIRST_PERSON_FOV, THIRD_PERSON_FOV, camera_blend) + fov_add + LOOK.fov_offset()
 	# Aiming down the barrel is an eye behind a sight, so a shouldered gun
 	# brings the camera in from the shoulder to the eye on the same blend.
@@ -9789,14 +9800,17 @@ func _update_camera() -> void:
 		# head does not pop in or out at the instant nothing has visibly moved
 		# yet — it appears once the camera has actually pulled back far enough
 		# to have a reason to.
+		#
+		# Where the lens is, not how far the blend got: see
+		# `HunterMotor.lens_in_head`.
 		var head := player_rig.parts.get("head") as Node3D
 		if head != null and is_instance_valid(head):
-			head.visible = camera_blend > 0.5
+			head.visible = not HUNTER_MOTOR.lens_in_head(fp_position, camera.global_position)
 	# The arms follow the camera actually used, like the head: a room that
 	# forces the eye gets first-person arms, and nothing that sets
 	# third_person without the F key leaves them stretched back to the lens.
 	if body_motion != null:
-		body_motion.set_perspective(camera_blend <= 0.5)
+		body_motion.set_perspective(HUNTER_MOTOR.lens_in_head(fp_position, camera.global_position))
 	_pose_weapon_on_sight()
 
 
