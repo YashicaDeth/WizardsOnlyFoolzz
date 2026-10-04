@@ -95,6 +95,20 @@ if [ $list_only -eq 1 ]; then
   exit 0
 fi
 
+# A class_name the editor has never scanned is missing from .godot's class
+# cache, and running a scene does not rescan: every script naming it fails to
+# compile and the route hangs to the timeout with no FAIL line. A merge that
+# adds a class (RiggedBody) did exactly that to the post-merge gate, so import
+# once whenever the cache is missing a declared class.
+cache="$ROOT/game/.godot/global_script_class_cache.cfg"
+missing="$(comm -23 \
+  <(grep -rhoE --include='*.gd' --exclude-dir=addons --exclude-dir=.godot '^class_name +[A-Za-z_][A-Za-z0-9_]*' "$ROOT/game" | awk '{print $2}' | sort -u) \
+  <(grep -oE '"class": &"[A-Za-z0-9_]+"' "$cache" 2>/dev/null | sed -E 's/.*&"(.*)"/\1/' | sort -u) | head -3)"
+if [ -n "$missing" ]; then
+  echo "class cache is missing $(echo $missing); importing once" >&2
+  timeout 900 "$GODOT" --headless --path "$ROOT/game" --import >/dev/null 2>&1
+fi
+
 printf '%-34s %6s %6s  %s\n' "SUITE" "EXIT" "FAILS" "REPORTED"
 printf '%.0s-' {1..78}; echo
 
