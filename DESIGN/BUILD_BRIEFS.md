@@ -40,6 +40,9 @@ design decision, it is listed under OPEN; stop and report instead of choosing.
 4. **One game.** Work in your own worktree off `claude/launch-latest`; run
    `--headless --import` once before anything else. Merge happens through the
    hub gate. Commit small and often so a usage limit cannot lose work.
+   If your branch already has a `WIP <task>` commit, a usage limit cut off an
+   earlier attempt: read `git log -3` and `git show --stat HEAD` and continue that
+   work instead of starting over.
 5. **Look at it.** A change that affects what the player sees is not done
    until you rendered it (capture harness under `game/tests/*_capture.tscn`, or
    one windowed run on the right monitor) and opened the PNG. Say which PNGs in
