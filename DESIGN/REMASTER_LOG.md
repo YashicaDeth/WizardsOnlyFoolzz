@@ -115,3 +115,42 @@ Greg: "it shouldn't instantly dissipate and it should be an actual fluid as well
 - job5 restarted on codex-allusions-team at 10:07 and hit the Codex limit again. That account is parked until 15:11 and job5 stays pending. lab-48 has been running on claude-alt2 since 10:07. Every other account is parked (Claude until 13:04, Codex 13:34 and later), so no new task was queued.
 - Failed queue is unchanged. v0.1 is still 4 of 10 landed, so the v2 draft waits.
 - Top three: (1) lab-48 lands on alt2; (2) at 13:04 lab-47 (with the PNG notes) and job6 go to the Claude accounts; (3) job5 resumes on the first Codex account to unpark (sircuteskingdom-team at 13:34).
+
+## lab-48: organs, cybernetics and the X-ray as one system (2026-10-05)
+
+Spec: Greg 5 Oct ~02:05 in `AgentHub/data/greg_playtest_b_2026-10-05.md`. Code: `game/systems/organ_system.gd`.
+Proven at the mechanics lab's bodies station. Proof PNGs are in `P:/GameDev/Temp/lab48/` (`tests/organ_system_capture.tscn`).
+
+Defaults set behind dials, all in `OrganSystem` unless named. None of these is Greg's decision.
+- `HEART_DEATH_SECONDS` 6. A burst heart with nothing pumping for it kills in 6 s.
+- `SLOW_BLEED_FLOOR` 6 ml/s. This is the lowest internal bleed for a burst liver, gut, stomach or kidney. The rupture itself already bleeds ~13-25 ml/s, so death takes about 2-3 minutes.
+- Lungs: one burst lung with nothing breathing for it means breathless (pace 0.6) and no sprint (`SoulsMover.winded`).
+- Brain: the existing fatal rupture drops the body (for the undying player, the body fails).
+- `SHORT_SECONDS` 6 and `SHORT_WEAR` 0.12. A second shock while an implant is shorted overloads it and burns it out for good. Plates (sternum, spine cage, clavicle rail) conduct but never short.
+- Implant roles:
+  - lung bellows breathes for a lung.
+  - Regulator and pulse cage keep a burst heart going.
+  - Blackbox liver covers a burst liver.
+  - A shorted part stops doing its job, and limb hardware loses its capabilities while shorted.
+- Rip:
+  - `RIP_SECONDS` 1.5 at full grip, pulled in tugs at `TUG_RATE` 2.2/s. If you let go it slips back at `RIP_SLIP_PER_SECOND` 0.7.
+  - Bare hands cost `HAND_DAMAGE` 0.1 condition.
+  - Reach is `RIP_REACH` 2.4 m.
+  - Allowed only on a downed or dead body through an opening: `Cavity` OPEN_MARK, or a wound cut to the organ layer. X-ray visibility is not an opening.
+  - A burst organ is refused ("BURST"), because it already spilled out.
+  - A heart or brain ripped from a living downed body kills it (the finisher). Any other organ adds an internal bleed.
+- Chest opening: a cut, puncture, shear or ballistic torso hit opens the chest once the zone is cut to bone (`OPEN_AT_LAYER`) and is at or under 75% health (`OPEN_AT_HEALTH`).
+- X-ray look:
+  - Skin becomes `xray_shell.gdshader`.
+  - Organs glow at `XRAY_ORGAN_GLOW` 0.85, and hot when damaged.
+  - Hardware is 40% see-through.
+  - The chest and buttock censors and forms hide under the X-ray (`XRAY_HIDES_CHEST_CENSOR`). The groin censor stays.
+  - An opened chest loses its chest censor.
+- Scan loot estimate: `Carry.sale_value()`'s base (organ 12, cybernetic 24) × condition. The scan has no market, buyer or spoil clock.
+- Lab controls (assistant default):
+  - Hold USE (E / pad X) on an organ you can see to rip it.
+  - With an organ in hand, RELOAD (R / Y) installs it into you and DRESS WOUND (4 / d-pad left) sells it.
+- Station dummies carry hardware from the catalogue (`BodiesStation.LOADOUTS`). The lab player carries the decanting loadout.
+- Anatomy fix: the organ layout and skeleton had the spine in front of the heart. The rig faces -Z, as `BodyForms` says. They have been turned round.
+- New organs: stomach and two kidneys.
+- Open question: `AgentHub/queue/questions/lab48_reflex_booster.md`.
