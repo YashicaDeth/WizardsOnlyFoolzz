@@ -45,6 +45,8 @@ static func dummy(parent: Node3D, id: String, at: Vector3, facing: float, variat
 		"ragdoll": true,
 	})
 	HunterAppearance.style_world_rig(rig, id, false)
+	# Job 3: R3 lock-on looks for these.
+	rig.add_to_group(&"lab_lockable")
 	return rig
 
 

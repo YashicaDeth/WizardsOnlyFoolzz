@@ -408,6 +408,8 @@ static func build_weapon(weapon_id: String) -> Node3D:
 		"breach_nine": _build_breach_nine(root)
 		"launcher": _build_launcher(root)
 		"shiv": _build_shiv(root)
+		"cleaver": _build_hotline_cleaver(root)
+		"staff": _build_prodstaff(root)
 		_: _build_sword(root)
 	# Every part above is authored muzzle-forward along +Z because that is the
 	# readable way to write a sweep, and a Godot node's forward is -Z. Turning
@@ -586,6 +588,121 @@ static func _build_sword(root: Node3D) -> void:
 	_anchor(root, "blade_grip", Vector3(0, 0, 0.230), Vector3.ZERO)
 	_anchor(root, "blade_high", Vector3(0, 0, 0.430), Vector3.ZERO)
 	_anchor(root, "muzzle", Vector3(0, 0, 0.740), Vector3.ZERO)
+
+
+## v0.1 Brawler (job 3). Greg, 5 Oct: "200 years in the future, why would they
+## just have an axe" -- a meat-processing cleaver with a heating element down
+## the edge, working name HOTLINE CLEAVER. Same axis convention as the sword
+## (along +Z, flat faces +-Y, edge +X). The edge strip is its own mesh with
+## its own material, named `heat_edge`, so `MeleeDriver` can brighten it as the
+## blade takes heat from hits.
+static func _build_hotline_cleaver(root: Node3D) -> void:
+	var steel := Color("6f7376")
+	var housing := _metal(Color("1d1f1e"), 0.55, 61)
+	# A wide, square-nosed slab: most of the mass is in the blade, as on a
+	# butcher's cleaver, so a light swing still lands heavy.
+	_part(root, "blade", _box(Vector3(0.112, 0.006, 0.290)), Vector3(0.026, 0, 0.175), _metal(steel, 0.38, 62))
+	# The element housing along the spine, with a cable run back to the grip.
+	_part(root, "element_housing", _box(Vector3(0.020, 0.013, 0.270)), Vector3(-0.036, 0, 0.170), housing)
+	for index in 6:
+		_part(root, "element_rib%d" % index, _box(Vector3(0.022, 0.015, 0.006)),
+			Vector3(-0.036, 0, 0.060 + float(index) * 0.044), _metal(Color("3a2b20"), 0.5, 63 + index))
+	# The heated edge: a thin strip proud of the blade, lit from inside.
+	var edge := _part(root, "heat_edge", _box(Vector3(0.010, 0.0068, 0.284)), Vector3(0.086, 0, 0.175), heat_edge_material())
+	edge.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# The hang hole a cleaver has near its nose, punched through as a dark plug.
+	var hole := _part(root, "hang_hole", BodyMesh.revolve([Vector3(-0.004, 0.009, 0.009), Vector3(0.004, 0.009, 0.009)], 10),
+		Vector3(0.0, 0, 0.292), _bore())
+	# Bolster and an industrial grip: hazard-yellow over black rubber, a
+	# battery block for a pommel and a short cable between them.
+	_part(root, "bolster", _box(Vector3(0.060, 0.022, 0.026)), Vector3(-0.004, 0, 0.018), _metal(Color("4a4b48"), 0.42, 70))
+	var grip := _part(root, "grip", BodyMesh.revolve([
+		Vector3(0.0, 0.0175, 0.0135),
+		Vector3(0.060, 0.0190, 0.0145),
+		Vector3(0.130, 0.0180, 0.0140),
+	], 10), Vector3(0, 0, 0.004), _leather(Color("1a1816"), 71))
+	grip.rotation.x = -PI * 0.5
+	for index in 3:
+		var band := _part(root, "band%d" % index, BodyMesh.revolve([
+			Vector3(-0.006, 0.0197, 0.0152), Vector3(0.006, 0.0197, 0.0152),
+		], 10), Vector3(0, 0, -0.020 - float(index) * 0.042), _leather(Color("b88a1c"), 72 + index))
+		band.rotation.x = -PI * 0.5
+	_part(root, "battery", _box(Vector3(0.042, 0.034, 0.050)), Vector3(0, 0, -0.152), housing)
+	_part(root, "battery_lamp", _box(Vector3(0.010, 0.036, 0.010)), Vector3(0.012, 0, -0.140), _glow(Color("d24a1e")))
+	_part(root, "cable", _box(Vector3(0.007, 0.007, 0.170)), Vector3(-0.026, 0.004, -0.050), housing)
+
+	_anchor(root, "grip", Vector3(0, 0, -0.060), Vector3.ZERO)
+	_anchor(root, "grip_low", Vector3(0, 0, -0.110), Vector3.ZERO)
+	_anchor(root, "muzzle", Vector3(0.030, 0, 0.320), Vector3.ZERO)
+
+
+## v0.1 Brawler (job 3): a guard's shock staff, working name PRODSTAFF. Reach
+## over a sword's, two hands, a forked head that carries the charge. The head
+## glow is its own mesh, `shock_tip`, for `MeleeDriver` to flare on a charged
+## blow. Most of the length is ahead of the hands; little sits behind them,
+## because in first person what is behind the hand is behind the eye.
+static func _build_prodstaff(root: Node3D) -> void:
+	var shaft_metal := _metal(Color("3c403e"), 0.48, 80)
+	var wrap := _leather(Color("1c1a18"), 81)
+	var shaft := _part(root, "shaft", BodyMesh.revolve([
+		Vector3(-0.52, 0.0150, 0.0150),
+		Vector3(1.10, 0.0140, 0.0140),
+	], 10), Vector3.ZERO, shaft_metal)
+	shaft.rotation.x = PI * 0.5
+	# Two rubber grip sleeves where the hands go, and a hazard band between.
+	for entry in [[-0.10, 0.20], [-0.46, 0.14]]:
+		var sleeve := _part(root, "sleeve", BodyMesh.revolve([
+			Vector3(0.0, 0.0185, 0.0185), Vector3(float(entry[1]), 0.0185, 0.0185),
+		], 10), Vector3(0, 0, float(entry[0]) - float(entry[1]) * 0.5), wrap)
+		sleeve.rotation.x = PI * 0.5
+	var band := _part(root, "hazard_band", BodyMesh.revolve([
+		Vector3(0.0, 0.0175, 0.0175), Vector3(0.05, 0.0175, 0.0175),
+	], 10), Vector3(0, 0, 0.08), _leather(Color("b88a1c"), 82))
+	band.rotation.x = PI * 0.5
+	# The power collar under the head and its status lamp.
+	_part(root, "collar", _box(Vector3(0.050, 0.050, 0.110)), Vector3(0, 0, 0.96), _metal(Color("1d1f1e"), 0.55, 83))
+	_part(root, "collar_lamp", _box(Vector3(0.008, 0.052, 0.012)), Vector3(0.022, 0, 0.94), _glow(Color("7fd6e8")))
+	# The fork: two prongs either side, a tip between them that lights.
+	for side in [-1.0, 1.0]:
+		_part(root, "prong", _box(Vector3(0.012, 0.012, 0.150)), Vector3(side * 0.030, 0, 1.085), shaft_metal)
+	var tip := MeshInstance3D.new()
+	tip.name = "shock_tip"
+	var ball := SphereMesh.new()
+	ball.radius = 0.016
+	ball.height = 0.032
+	ball.radial_segments = 10
+	ball.rings = 5
+	tip.mesh = ball
+	tip.position = Vector3(0, 0, 1.13)
+	tip.material_override = shock_tip_material()
+	tip.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(tip)
+	_part(root, "butt_cap", _box(Vector3(0.036, 0.036, 0.040)), Vector3(0, 0, -0.53), _metal(Color("1d1f1e"), 0.55, 84))
+
+	_anchor(root, "grip", Vector3(0, 0, -0.10), Vector3.ZERO)
+	_anchor(root, "grip_low", Vector3(0, 0, -0.46), Vector3.ZERO)
+	_anchor(root, "muzzle", Vector3(0, 0, 1.15), Vector3.ZERO)
+
+
+## Shared so a fresh model and a driver-brightened one start from one look.
+static func heat_edge_material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color("5a2010")
+	material.roughness = 0.4
+	material.metallic = 0.6
+	material.emission_enabled = true
+	material.emission = Color("ff5a1a")
+	material.emission_energy_multiplier = 0.6
+	return material
+
+
+static func shock_tip_material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color("9fe8ff")
+	material.emission_enabled = true
+	material.emission = Color("7fd6e8")
+	material.emission_energy_multiplier = 1.2
+	return material
 
 
 ## The BONE YARD 12G. Pump, box-fed, with a vent rib and a brass bead you can
@@ -999,6 +1116,7 @@ func _default_grip(weapon_id: String) -> String:
 	match weapon_id:
 		"": return "fists"
 		"sword": return "two_hand"
+		"staff": return "two_hand"
 		"shotgun": return "long_gun"
 		"sidearm": return "pistol"
 		"launcher": return "long_gun"
