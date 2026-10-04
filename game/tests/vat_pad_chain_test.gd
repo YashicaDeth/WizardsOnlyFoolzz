@@ -98,6 +98,16 @@ func _ready() -> void:
 
 	print("-- load-in: Cross cuts to the glitch --")
 	check(vat.load_in != null, "the load-in plays first")
+	# Greg, playtest D: the intro played "ultra sped up". Behind the travel
+	# plate it must not run, and a long hitch must not leap it forward.
+	var plate := get_node("/root/Interstitial")
+	var held_clock: float = vat.load_in.clock
+	plate.set("travelling", true)
+	vat.load_in._process(2.0)
+	check(is_equal_approx(vat.load_in.clock, held_clock), "the load-in waits behind the loading plate")
+	plate.set("travelling", false)
+	vat.load_in._process(2.0)
+	check(vat.load_in.clock - held_clock <= 1.0 / 30.0 + 0.0001, "a 2 s hitch moves it one frame, not two seconds (%.3f)" % (vat.load_in.clock - held_clock))
 	button(JOY_BUTTON_A)
 	check(await wait_for(func() -> bool: return vat.load_in == null, 8.0), "Cross skips the load-in and it hands over")
 

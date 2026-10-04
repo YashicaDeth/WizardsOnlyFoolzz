@@ -36,7 +36,8 @@ func _ready() -> void:
 			break
 		vat._physics_process(0.1)
 	check(vat.can_move, "out of the tank and standing")
-	check(vat._carries_restraint(), "the broken restraint came out of the vat with you")
+	# Greg, playtest B: "why am I holding this stupid piece of a belt?"
+	check(not vat._carries_restraint(), "nothing in your hands comes out of the vat with you")
 	check(Clothing.worn("player") == "bare", "you come out wearing nothing")
 
 	# Away from it, nothing happens.
@@ -45,7 +46,7 @@ func _ready() -> void:
 	check(not vat._try_take_garment(), "and nothing can be taken from a tank that is still shut")
 
 	vat.player.global_position = vat.stuck_tank_marker.global_position + Vector3(1.5, 0, 0)
-	check(vat._try_pry_stuck_tank(), "the restraint pries the stuck tank open")
+	check(vat._try_pry_stuck_tank(), "your fingers pry the stuck tank open")
 	check(WorldHistory.event_count("opening_first_object_used") == 1, "filed as the first object used")
 	check(not vat._try_pry_stuck_tank(), "and it only opens once")
 
