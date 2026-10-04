@@ -80,3 +80,26 @@ Greg: "it shouldn't instantly dissipate and it should be an actual fluid as well
 - Every account parked: Claude default/alt to 13:04 (session limit hit by lab-47, lab-48), claude-alt2 to 10:04, codex allusions-team 09:56, sircuteskingdom-team 13:34, allusions-plus 14:03, sircuteskingdom-plus to 10-11. lab-47 and lab-48 were cut off and sit in pending to resume.
 - Failures: unchanged (job2, job2b superseded; lane-exit-routes old).
 - Top three: (1) queued `remaster-job4-p1` (70, claude): render the vat, collide the stub, declutter the room; (2) lab-48 (98) and lab-47 (97) resume first when claude-alt2 unparks at 10:04; (3) a codex fix for `hidden_cache_test` when allusions-team unparks at 09:56.
+
+## Manager notes, 2026-10-05 09:05
+
+- **Merged since last entry:** nothing. Running: 0. Every account is parked: claude-alt2 until 10:04, Claude default/alt until 13:04; codex allusions-team 09:56, sircuteskingdom-team 13:34, allusions-plus 14:03, sircuteskingdom-plus until 10-11.
+- **Unmerged work waiting to resume:**
+  - lab-47: 2 commits plus PNGs in `P:/GameDev/Temp/lab47/`.
+  - lab-48: 1 commit.
+  - job5: 2 commits, `--core` 30/30. Codex ran out of credits mid-run.
+  - lab-52: a WIP commit.
+- **Weak (lab-47 PNGs):**
+  - After the charge the HUD still reads `BROKEN 0/11`.
+  - The charge only notches the brick wall.
+  - The dug ground is flat beige.
+  - The "DESTRUCTION REBUILD" sign covers the shot.
+  - The `ACID ON YOU` line shows although acid is meant to be off.
+  - These notes were appended to the pending lab-47 task.
+- **Not rendered:** windowed Godot PID 28648 is still open (one-window rule).
+- **Failures:** unchanged. job2 and job2b are superseded; lane-exit-routes is an old task.
+- **Morning report:** written to `P:/GameDev/AgentHub/MORNING_REPORT.md`. Game plan v2 skipped: 4 of 10 v0.1 jobs have landed.
+- **Top three:**
+  1. Queued `fix-hidden-cache-test` (70, codex) for when codex unparks.
+  2. lab-48, then lab-47 with the PNG notes, on claude-alt2 from 10:04.
+  3. job5 lands on codex-allusions-team at 09:56. Then job6, job9 and job7 at 13:04.
