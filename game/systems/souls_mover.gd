@@ -31,6 +31,9 @@ const CROUCH_EYE_DROP := 0.5
 var roll := SoulsRoll.new()
 var crouched := false
 var sprinting := false
+## Lab-48. Set by the owner from `OrganSystem.failure()`: a body with a lung
+## gone and nothing breathing for it cannot sprint.
+var winded := false
 var eye_drop := 0.0
 var _evade_held := -1.0
 var _evade_from_pad := false
@@ -87,7 +90,7 @@ func tick(body: CharacterBody3D, input: Vector2, yaw: float, delta: float, drive
 			crouched = tilt < 0.2 or not _evade_from_pad
 	var want_sprint := (_sprint_key or (_evade_held >= HOLD_SECONDS and _evade_from_pad and tilt >= 0.2)) and not crouched
 	var stamina := driver.stamina if driver != null else MeleeDriver.MAX_STAMINA
-	sprinting = want_sprint and tilt > 0.3 and stamina > 1.0
+	sprinting = want_sprint and tilt > 0.3 and stamina > 1.0 and not winded
 	if sprinting and driver != null:
 		driver.spend(SPRINT_STAMINA * delta)
 	eye_drop = move_toward(eye_drop, CROUCH_EYE_DROP if crouched else 0.0, delta * 3.2)

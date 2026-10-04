@@ -46,7 +46,8 @@ func build(owner_lab: Node3D) -> void:
 func _spawn() -> void:
 	if holder != null and is_instance_valid(holder):
 		holder.queue_free()
-	rig = BODIES.dummy(self, "lab_sparring_%d" % Time.get_ticks_msec(), Vector3.ZERO, PI, 3)
+	# Lab-48: hardware for the PRODSTAFF to short and the X-ray to tag.
+	rig = BODIES.dummy(self, "lab_sparring_%d" % Time.get_ticks_msec(), Vector3.ZERO, PI, 3, {"chest": "copper lung bellows", "organ_bays": "quiet-heart regulator"})
 	holder = rig.get_parent() as Node3D
 	staff = HeldGear.build_weapon("staff")
 	staff.name = "PartnerStaff"
@@ -91,7 +92,8 @@ func _physics_process(delta: float) -> void:
 			home.y = 0.0
 			var chasing := distance < ENGAGE and (player.global_position - global_position).length() < LEASH + REACH
 			if chasing and distance > REACH * 0.85:
-				holder.global_position += to.normalized() * SPEED * delta
+				# Lab-48: a lung gone is breathless, a heart gone barely moves.
+				holder.global_position += to.normalized() * SPEED * OrganSystem.pace(rig.anatomy) * delta
 			elif chasing:
 				_enter("windup")
 			elif home.length() > 0.2:
@@ -142,6 +144,9 @@ func _land_blow(distance: float) -> void:
 			lab.player_health = maxf(0.0, float(lab.player_health) - float(answer.damage))
 			if outcome == "hit" or outcome == "guard_broken":
 				BODY_CAM.hit(lab.camera, 0.08)
+				# Its staff is a PRODSTAFF: your own hardware shorts too.
+				if lab.has_method("on_player_shocked"):
+					lab.on_player_shocked()
 	outcomes.append(outcome)
 	if outcome == "parried":
 		var away: Vector3 = holder.global_position - lab.player.global_position

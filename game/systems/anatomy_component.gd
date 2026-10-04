@@ -33,6 +33,11 @@ const ORGANS := {
 	"liver": {"zone": "torso", "health": 40.0, "bleed": 1.8, "fatal": false},
 	"gut": {"zone": "torso", "health": 52.0, "bleed": 0.9, "fatal": false},
 	"spine": {"zone": "torso", "health": 30.0, "bleed": 0.4, "fatal": false},
+	# Lab-48. Greg's organ list names a stomach and kidneys; both fail the
+	# way the liver and gut do, as a slow internal bleed (`OrganSystem`).
+	"stomach": {"zone": "torso", "health": 38.0, "bleed": 1.0, "fatal": false},
+	"left_kidney": {"zone": "torso", "health": 28.0, "bleed": 1.5, "fatal": false},
+	"right_kidney": {"zone": "torso", "health": 28.0, "bleed": 1.5, "fatal": false},
 }
 const SPINE_VERTEBRAE := 33
 
@@ -591,6 +596,10 @@ func limb_capabilities(site_id: String) -> Array[String]:
 	if part.is_empty():
 		return out
 	if implant_condition_ratio(part) < CAPABILITY_MINIMUM_CONDITION:
+		return out
+	# Lab-48. Shorted hardware (`OrganSystem.shock()`) does nothing until it
+	# comes back.
+	if OrganSystem.is_shorted(part):
 		return out
 	for capability in LIMB_CAPABILITIES.get(str(part.get("profile", "")), []):
 		out.append(str(capability))
