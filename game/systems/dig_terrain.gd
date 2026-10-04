@@ -152,24 +152,32 @@ func _mesh_chunk(key: Vector3i) -> void:
 	var verts := PackedVector3Array()
 	var colours := PackedColorArray()
 	var base: Color = (MaterialToughness.MATERIALS.get(material, MaterialToughness.MATERIALS.dirt) as Dictionary).colour
+	var sy := cells.x + 1
+	var sz := sy * (cells.y + 1)
+	var offsets := [0, 1, sy, 1 + sy, sz, 1 + sz, sy + sz, 1 + sy + sz]
+	var corner := PackedFloat32Array()
+	corner.resize(8)
 	for z in range(maxi(start.z - 1, 0), end.z):
 		for y in range(maxi(start.y - 1, 0), end.y):
 			for x in range(maxi(start.x - 1, 0), end.x):
+				# Most cells are all soil or all air: eight reads and out.
+				var origin := _s(x, y, z)
+				var solid := 0
+				for k in 8:
+					corner[k] = density[origin + offsets[k]]
+					solid += 1 if corner[k] > 0.0 else 0
+				if solid == 0 or solid == 8:
+					continue
 				var sum := Vector3.ZERO
 				var crossings := 0
 				for edge in _EDGES:
-					var p: Vector3i = Vector3i(x, y, z) + (edge[0] as Vector3i)
-					var q: Vector3i = Vector3i(x, y, z) + (edge[1] as Vector3i)
-					var dp := density[_s(p.x, p.y, p.z)]
-					var dq := density[_s(q.x, q.y, q.z)]
+					var dp := corner[edge[0]]
+					var dq := corner[edge[1]]
 					if (dp > 0.0) != (dq > 0.0):
-						var t := dp / (dp - dq)
-						sum += Vector3(p).lerp(Vector3(q), t)
+						sum += _CORNERS[edge[0]].lerp(_CORNERS[edge[1]], dp / (dp - dq))
 						crossings += 1
-				if crossings == 0:
-					continue
+				var at := Vector3(x, y, z) + sum / float(crossings)
 				vertex_of[Vector3i(x, y, z)] = verts.size()
-				var at := sum / float(crossings)
 				verts.append(at * cell)
 				# Deeper soil is darker and redder.
 				var below := clampf((depth - at.y * cell) / depth, 0.0, 1.0)
@@ -184,17 +192,16 @@ func _mesh_chunk(key: Vector3i) -> void:
 		var u := (axis + 1) % 3
 		var v := (axis + 2) % 3
 		# Only the chunk owning the edge's base sample draws it.
+		var stride: int = [1, sy, sz][axis]
 		for z in range(start.z, end.z):
 			for y in range(start.y, end.y):
 				for x in range(start.x, end.x):
-					var s := Vector3i(x, y, z)
-					var t := s
-					t[axis] += 1
-					if s[u] < 1 or s[v] < 1:
+					var i := _s(x, y, z)
+					var ds := density[i]
+					if (ds > 0.0) == (density[i + stride] > 0.0):
 						continue
-					var ds := density[_s(s.x, s.y, s.z)]
-					var dt := density[_s(t.x, t.y, t.z)]
-					if (ds > 0.0) == (dt > 0.0):
+					var s := Vector3i(x, y, z)
+					if s[u] < 1 or s[v] < 1:
 						continue
 					var c0 := s
 					var c1 := s
@@ -250,11 +257,9 @@ func _mesh_chunk(key: Vector3i) -> void:
 	collider.shape = trimesh
 
 
-const _EDGES := [
-	[Vector3i(0, 0, 0), Vector3i(1, 0, 0)], [Vector3i(0, 1, 0), Vector3i(1, 1, 0)],
-	[Vector3i(0, 0, 1), Vector3i(1, 0, 1)], [Vector3i(0, 1, 1), Vector3i(1, 1, 1)],
-	[Vector3i(0, 0, 0), Vector3i(0, 1, 0)], [Vector3i(1, 0, 0), Vector3i(1, 1, 0)],
-	[Vector3i(0, 0, 1), Vector3i(0, 1, 1)], [Vector3i(1, 0, 1), Vector3i(1, 1, 1)],
-	[Vector3i(0, 0, 0), Vector3i(0, 0, 1)], [Vector3i(1, 0, 0), Vector3i(1, 0, 1)],
-	[Vector3i(0, 1, 0), Vector3i(0, 1, 1)], [Vector3i(1, 1, 0), Vector3i(1, 1, 1)],
+## A cell's corners, k = x + 2y + 4z, and its twelve edges as corner pairs.
+const _CORNERS: Array[Vector3] = [
+	Vector3(0, 0, 0), Vector3(1, 0, 0), Vector3(0, 1, 0), Vector3(1, 1, 0),
+	Vector3(0, 0, 1), Vector3(1, 0, 1), Vector3(0, 1, 1), Vector3(1, 1, 1),
 ]
+const _EDGES := [[0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7]]

@@ -949,6 +949,20 @@ will be an impact hole".
   morning answer (question boxes, 25 September morning, above): "partly
   destructible" means authored damage stages, and not Teardown-style
   material removal, for buildings as well as the ground.
+- **Superseded, Greg 5 October ~01:45** (`AgentHub/data/greg_playtest_b_2026-10-05.md`;
+  newest wins): destruction "as much like Teardown as possible", including
+  the ground being DIGGABLE. Look: smooth ground digging (SDF / marching-cubes
+  terrain) and chunky VOXEL walls and buildings that break into cubes. A
+  five-tier toughness scale: 1 soft (dirt, wood, flesh), 2 medium (brick,
+  drywall), 3 hard (concrete, steel sheet), 4 armoured (bunker, vault),
+  5 sealed (elite bunkers, story doors); melee breaks 1-2, guns 1-3,
+  explosives 1-4, special charges 5; heavy carried tools over time, chaos
+  magick at altitude and vehicles ramming also beat the top tiers. Why: to
+  blast into hidden underground city networks and elites' buried bunkers,
+  central to raiding and warring. Built in the mechanics lab (lab-47):
+  `systems/material_toughness.gd`, `voxel_structure.gd`, `dig_terrain.gd`,
+  `blast.gd`. The flat-ground round holes (`GroundHole`) stay where a scene's
+  ground is not yet a `DigTerrain`.
 
 ### Greg, 25 September 2026: the New Vegas opening, again
 
