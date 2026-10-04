@@ -37,7 +37,7 @@ void vertex() {
 }
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float noise(vec2 p) {
+float vnoise(vec2 p) {
 	vec2 i = floor(p);
 	vec2 f = fract(p);
 	f = f * f * (3.0 - 2.0 * f);
@@ -47,13 +47,13 @@ float noise(vec2 p) {
 void fragment() {
 	float d = texture(field, UV).r;
 	// A ragged wet edge instead of the grid's soft blob.
-	float edge = film * (0.5 + noise(world.xz * 9.0) * 0.9);
+	float edge = film * (0.5 + vnoise(world.xz * 9.0) * 0.9);
 	float cover = smoothstep(edge * 0.6, edge * 1.4, d);
 	if (cover <= 0.01) discard;
 	float t = smoothstep(0.002, 0.035, d);
 	vec3 behind = textureLod(screen_tex, SCREEN_UV + NORMAL.xz * 0.04, 1.0).rgb;
 	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 4.0);
-	vec3 arc = vec3(0.55, 0.75, 1.0) * shock * (0.4 + 0.6 * noise(world.xz * 14.0 + TIME * 30.0));
+	vec3 arc = vec3(0.55, 0.75, 1.0) * shock * (0.4 + 0.6 * vnoise(world.xz * 14.0 + TIME * 30.0));
 	ALBEDO = mix(behind * shallow.rgb * 1.3, deep.rgb, t) + arc * 0.3;
 	ALPHA = clamp(cover * mix(shallow.a, deep.a, t) + rim * 0.15, 0.0, 1.0);
 	ROUGHNESS = 0.04;

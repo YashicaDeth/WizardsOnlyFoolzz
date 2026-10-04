@@ -27,7 +27,7 @@ uniform sampler2D screen_tex : hint_screen_texture, filter_linear_mipmap;
 varying vec3 local_pos;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float noise(vec2 p) {
+float vnoise(vec2 p) {
 	vec2 i = floor(p);
 	vec2 f = fract(p);
 	f = f * f * (3.0 - 2.0 * f);
@@ -46,13 +46,13 @@ float crack_at(vec2 here, vec4 impact) {
 	float reach = impact.w * (0.18 + crack * 0.75);
 	if (len > reach) return 0.0;
 	float a = atan(d.y, d.x) / 6.2831853;
-	float wobble = noise(vec2(len * 9.0, impact.x * 13.0)) * 0.12;
+	float wobble = vnoise(vec2(len * 9.0, impact.x * 13.0)) * 0.12;
 	float spoke = abs(fract(a * 11.0 + wobble + hash(impact.xy) ) - 0.5) * 2.0;
 	float width = 0.035 * (1.0 - len / reach) + 0.006;
 	float radial = 1.0 - smoothstep(width * 0.5, width, (1.0 - spoke) * len * 4.0);
 	// Broken rings, the conchoidal steps round the impact.
-	float ring_n = len * (14.0 - crack * 4.0) + noise(d * 20.0) * 0.6;
-	float ring = (1.0 - smoothstep(0.0, 0.07, abs(fract(ring_n) - 0.5) * 2.0 - 0.9)) * step(0.5, noise(vec2(floor(ring_n), a * 9.0)));
+	float ring_n = len * (14.0 - crack * 4.0) + vnoise(d * 20.0) * 0.6;
+	float ring = smoothstep(0.9, 0.97, abs(fract(ring_n) - 0.5) * 2.0) * step(0.5, vnoise(vec2(floor(ring_n), a * 9.0)));
 	ring *= step(0.4, crack);
 	// The white bruise at the point of impact.
 	float bruise = 1.0 - smoothstep(0.0, 0.03 + crack * 0.03, len);
