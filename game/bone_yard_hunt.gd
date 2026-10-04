@@ -916,6 +916,21 @@ var xray_active := false
 var captivity_procedure_notice := 0.0
 ## How long the button has to be down before the segment becomes the radial.
 const XRAY_HOLD_TO_WHEEL := 0.35
+## Aimed X-ray (Greg, 2026-10-04): slowed time, one body's parts as targets.
+## Pad: L2 and R2 together and held. Mouse: aiming (RMB) and Q.
+var vats := VatsTargeting.new()
+var vats_overlay: VatsOverlay = null
+## The actor record VATS is open on, and the part the next round is sent to.
+var vats_actor: Dictionary = {}
+var vats_shot_part: Dictionary = {}
+## Real seconds since each button went down; -1 when up. The chord is read
+## from these, so a quick aim-then-fire stays a shot.
+var _vats_rmb_down := -1.0
+var _vats_lmb_down := -1.0
+## R2 came down inside the chord window: held on, it is VATS; let go, the
+## shot it was holding back fires.
+var _vats_chord_pending := false
+var _vats_mouse_sweep := 0.0
 
 @onready var camera: Camera3D = $CameraRig/Camera3D
 ## Agent 1 brief. "Do not solve darkness by merely increasing ambient
@@ -1071,6 +1086,9 @@ func _ready() -> void:
 	lock_readout = LockReadout.new()
 	lock_readout.name = "LockReadout"
 	$HUD.add_child(lock_readout)
+	vats_overlay = VatsOverlay.new()
+	vats_overlay.name = "VatsOverlay"
+	$HUD.add_child(vats_overlay)
 	_carry_current_weapon()
 	# AF1. Rounds and brass live in the world, not in the HUD.
 	ballistics = BALLISTICS.new()
@@ -1605,6 +1623,9 @@ func _register_people() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if resolution_ui.visible or kill_cam.active:
 		return
+	if _vats_input(event):
+		get_viewport().set_input_as_handled()
+		return
 	if panel_mode == "hub" and brain_hub != null and brain_hub.handle_input(event):
 		get_viewport().set_input_as_handled()
 		return
@@ -1680,6 +1701,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
 			return
 	if event is InputEventKey and event.keycode == KEY_Q and not event.echo:
+		if event.pressed and firearm_aiming and vats_open():
+			q_tap_pending = false
+			return
 		if event.pressed:
 			q_tap_pending = panel_mode.is_empty() and not resolution_ui.visible
 		else:
@@ -1694,8 +1718,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			if event.pressed:
 				if smoke_trick_window > 0.0:
 					_shape_smoke_trick()
+				elif _vats_holds_trigger():
+					pass
 				else:
 					_attack()
+			elif _vats_chord_pending:
+				# R2 let go before the chord held: it was a shot after all.
+				_vats_chord_pending = false
+				_attack()
 	# Greg, 28 September: middle mouse is the heavy. Tap = a heavy swing; hold
 	# = a guard break (randomly knocks their guard open or throws them).
 	# Lock-on is Z.
@@ -2111,7 +2141,7 @@ func _physics_process(delta: float) -> void:
 	# *hold* — you are meant to be moving while you do it. Greg: "make the b
 	# slider change to like e or idk r or q"; E is interact and R is reload, so
 	# Q is the one of the three that is actually free.
-	_update_xray(delta, Input.is_key_pressed(KEY_Q))
+	_update_xray(delta, Input.is_key_pressed(KEY_Q) and not vats.is_active())
 	cost = ScriptCost.lap("_update_xray", cost)
 	# Reports walk home in real time; F1.3's window only exists if it ticks.
 	# A report that reaches the faction holding the ground is also the only door
@@ -3157,7 +3187,13 @@ func _resolve_body_hit(struck: Node, hit: Dictionary, payload: Dictionary) -> bo
 	# A delayed round is resolved on its impact frame, but its anatomy, response,
 	# death and loot still form one physical outcome on that frame.
 	WorldHistory.begin_ledger_batch()
-	var result := rig.hit_at(hit.get("position", actor.node.global_position), damage, impulse, damage_type, direction)
+	var vats_part: Dictionary = payload.get("vats_part", {})
+	if str(payload.get("vats_subject", "")) != str(actor.subject_id):
+		vats_part = {}
+	var result := VatsTargeting.strike(rig, vats_part, damage, impulse, direction, damage_type) if not vats_part.is_empty() \
+		else rig.hit_at(hit.get("position", actor.node.global_position), damage, impulse, damage_type, direction)
+	if not vats_part.is_empty():
+		_apply_vats_break(actor, vats_part, result)
 	var zones: Array[String] = [str(result.get("zone", "torso"))]
 	var severed: Array[String] = []
 	var ruptures: Array[String] = []
@@ -3285,8 +3321,15 @@ func _settle_shot(shot_id: int, hit_body: bool, subject_id := "") -> void:
 
 func _resolve_firearm(attack: Dictionary) -> void:
 	var forward := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
+	# Aimed X-ray: the round goes to the chosen part, and carries which part
+	# it was sent to so the body it reaches can be told.
+	var vats_payload := {}
+	var vats_rig := vats_actor.get("rig") as BaselineHuman if not vats_actor.is_empty() else null
+	if not vats_shot_part.is_empty() and vats_rig != null and is_instance_valid(vats_rig):
+		forward = (VatsTargeting.anchor(vats_rig, vats_shot_part) - camera.global_position).normalized()
+		vats_payload = {"vats_part": vats_shot_part.duplicate(), "vats_subject": str(vats_actor.subject_id)}
 	var origin := camera.global_position + forward * 0.48
-	var directions: Array[Vector3] = arsenal.shot_directions(forward, Vector3.UP, 0.38 if firearm_aiming else 1.0)
+	var directions: Array[Vector3] = arsenal.shot_directions(forward, Vector3.UP, 0.15 if not vats_payload.is_empty() else (0.38 if firearm_aiming else 1.0))
 	# AF1.1. A round is a thing that travels, and now so is what it does: the
 	# damage payload rides on the round itself and is only ever spent when
 	# `_on_round_hit()`/`_on_round_expired()` reports that round's own real
@@ -3319,6 +3362,7 @@ func _resolve_firearm(attack: Dictionary) -> void:
 			"weapon": str(attack.weapon),
 			"heavy": bool(attack.get("heavy", false)),
 		}
+		payload.merge(vats_payload)
 		ballistics.fire(origin, direction, calibre, 0.0, 1, "player", payload)
 	# The trigger going down is not an anatomy question — it happens here,
 	# on this frame, same as it always did. What it hit is a separate record
@@ -5979,7 +6023,8 @@ func _update_encounter_actors(delta: float) -> void:
 		actor["footing"] = clampf(_actor_footing(actor) + FOOTING_RECOVERY * actor_delta, 0.0, 1.0)
 		# O6.1. A grip regained rather than a weapon regained — the same
 		# threshold that took it decides when it comes back.
-		if bool(actor.get("disarmed", false)) and float(actor.footing) >= STUMBLE_AT:
+		# A hand whose arm was shot to pieces in aimed X-ray does not regrip.
+		if bool(actor.get("disarmed", false)) and not bool(actor.get("vats_disarmed", false)) and float(actor.footing) >= STUMBLE_AT:
 			actor["disarmed"] = false
 			prompt.text = "%s RECOVERS THEIR GRIP" % str(actor.display_name).to_upper()
 		if anatomy.downed:
@@ -8246,6 +8291,208 @@ func _update_xray(delta: float, holding: bool) -> void:
 			handheld.close_radial()
 
 
+## Aimed X-ray runs on real time: the world is slowed, choosing is not, and
+## physics ticks too rarely at a fifth of speed to read a stick from.
+func _process(delta: float) -> void:
+	_update_vats(delta / maxf(Engine.time_scale, 0.001))
+
+
+func _exit_tree() -> void:
+	if vats.is_active():
+		Engine.time_scale = 1.0
+
+
+## R2 has just come down. True if it is the second half of the L2+R2 chord
+## (L2 inside the window, or squeezed with it and not yet past the bridge's
+## press point), in which case the shot is held back until the chord resolves.
+func _vats_holds_trigger() -> bool:
+	if vats.is_active() or not _vats_can_open():
+		return false
+	var l2_squeezed := Input.get_joy_axis(0, JOY_AXIS_TRIGGER_LEFT) > 0.25
+	var l2_fresh := _vats_rmb_down >= 0.0 and _vats_rmb_down <= VatsTargeting.CHORD_WINDOW
+	if l2_fresh or (l2_squeezed and _vats_rmb_down < 0.0):
+		_vats_chord_pending = true
+		return true
+	return false
+
+
+func _vats_can_open() -> bool:
+	return arsenal != null and not bare_handed and carried_limb_index < 0 and panel_mode.is_empty() \
+		and str(arsenal.current().get("kind", "")) == "firearm"
+
+
+## Whoever is locked, else whoever is most squarely in the sights.
+func _vats_target_actor() -> Dictionary:
+	if not lock_target.is_empty():
+		var locked := _actor_by_id(lock_target)
+		if not locked.is_empty() and not bool(locked.get("dead", false)) and locked.get("rig") is BaselineHuman:
+			return locked
+	var forward := -camera.global_transform.basis.z
+	var best: Dictionary = {}
+	var best_score := 0.8
+	for actor: Dictionary in encounter_actors:
+		var node := actor.get("node") as Node3D
+		if node == null or not is_instance_valid(node) or bool(actor.get("dead", false)) or not actor.get("rig") is BaselineHuman:
+			continue
+		var toward := node.global_position + Vector3.UP * 1.1 - camera.global_position
+		if toward.length() > 26.0:
+			continue
+		var score := forward.dot(toward.normalized()) - toward.length() * 0.004
+		if score > best_score:
+			best_score = score
+			best = actor
+	return best
+
+
+func vats_open() -> bool:
+	if vats.is_active():
+		return true
+	_vats_chord_pending = false
+	if not _vats_can_open():
+		_feedback("AIMED XRAY NEEDS A FIREARM IN HAND")
+		return false
+	var actor := _vats_target_actor()
+	if actor.is_empty() or not vats.begin(actor.rig as BaselineHuman):
+		_feedback("NOBODY IN THE SIGHTS TO OPEN")
+		return false
+	vats_actor = actor
+	firearm_aiming = true
+	Engine.time_scale = VatsTargeting.TIME_SCALE
+	var rig := actor.rig as BaselineHuman
+	rig.reveal_organs(true)
+	rig.see_through(true)
+	WorldHistory.record_event("vats_opened", {"subject_id": str(actor.subject_id), "parts": vats.parts.size(), "location": HUNT_LOCATION})
+	prompt.text = "XRAY AIMED // MOUSE PICKS A PART // LMB FIRES // RMB UP CANCELS"
+	return true
+
+
+func _vats_close() -> void:
+	if not vats.is_active():
+		return
+	var rig := vats_actor.get("rig") as BaselineHuman if not vats_actor.is_empty() else null
+	if rig != null and is_instance_valid(rig) and not xray_active:
+		rig.reveal_organs(false)
+		rig.see_through(false)
+	vats.end()
+	vats_actor = {}
+	vats_shot_part = {}
+	_vats_chord_pending = false
+	_vats_mouse_sweep = 0.0
+	if vats_overlay != null:
+		vats_overlay.clear()
+	# The kill cam a VATS round earned owns time from here.
+	if kill_cam == null or not kill_cam.active:
+		Engine.time_scale = 1.0
+
+
+## Consumes what VATS owns while it is open. Button state is tracked always,
+## because the chord is read from it.
+func _vats_input(event: InputEvent) -> bool:
+	if event is InputEventMouseButton:
+		var button := event as InputEventMouseButton
+		if button.button_index == MOUSE_BUTTON_RIGHT:
+			_vats_rmb_down = 0.0 if button.pressed else -1.0
+		elif button.button_index == MOUSE_BUTTON_LEFT:
+			_vats_lmb_down = 0.0 if button.pressed else -1.0
+	if not vats.is_active():
+		return false
+	if event is InputEventMouseMotion:
+		# The pad's stick is read directly in `_update_vats`; its synthetic
+		# mouse motion is only swallowed here so the camera holds still.
+		var motion := event as InputEventMouseMotion
+		if motion.device != PadBridgeScript.SYNTHETIC and not vats.is_resolving():
+			_vats_mouse_sweep += motion.relative.x + motion.relative.y
+			if absf(_vats_mouse_sweep) > 70.0:
+				vats.step(1 if _vats_mouse_sweep > 0.0 else -1)
+				_vats_mouse_sweep = 0.0
+		return true
+	if event is InputEventMouseButton:
+		var button := event as InputEventMouseButton
+		if button.pressed and not vats.is_resolving():
+			match button.button_index:
+				MOUSE_BUTTON_WHEEL_UP:
+					vats.step(-1)
+				MOUSE_BUTTON_WHEEL_DOWN:
+					vats.step(1)
+				MOUSE_BUTTON_LEFT:
+					_vats_fire()
+		elif not button.pressed and button.button_index == MOUSE_BUTTON_RIGHT:
+			firearm_aiming = false
+			if not vats.is_resolving():
+				_vats_close()
+		return true
+	return false
+
+
+func _vats_fire() -> void:
+	var part := vats.current()
+	if part.is_empty():
+		return
+	vats_shot_part = part.duplicate()
+	var fired_before := _shot_counter
+	_attack()
+	if _shot_counter != fired_before:
+		vats.follow = VatsTargeting.FOLLOW_SECONDS
+	vats_shot_part = {}
+
+
+func _update_vats(real_delta: float) -> void:
+	if _vats_rmb_down >= 0.0:
+		_vats_rmb_down += real_delta
+	if _vats_lmb_down >= 0.0:
+		_vats_lmb_down += real_delta
+	if _vats_chord_pending and _vats_lmb_down >= VatsTargeting.CHORD_WINDOW:
+		_vats_chord_pending = false
+		if _vats_rmb_down >= 0.0 or Input.get_joy_axis(0, JOY_AXIS_TRIGGER_LEFT) > 0.5:
+			vats_open()
+		else:
+			_attack()
+	if not vats.is_active():
+		return
+	var rig := vats_actor.get("rig") as BaselineHuman if not vats_actor.is_empty() else null
+	var gone := rig == null or not is_instance_valid(rig) or bool(vats_actor.get("dead", false))
+	if not vats.tick(real_delta) or (gone and not vats.is_resolving()):
+		_vats_close()
+		return
+	if not vats.is_resolving():
+		vats.read_stick(Vector2(Input.get_joy_axis(0, JOY_AXIS_RIGHT_X), Input.get_joy_axis(0, JOY_AXIS_RIGHT_Y)))
+		Engine.time_scale = VatsTargeting.TIME_SCALE
+	if vats_overlay == null or gone or camera == null:
+		return
+	var marks: Array = []
+	var chosen := -1
+	for position in vats.parts.size():
+		var part: Dictionary = vats.parts[position]
+		var at := VatsTargeting.anchor(rig, part)
+		if camera.is_position_behind(at):
+			continue
+		if position == vats.index:
+			chosen = marks.size()
+		marks.append({"at": camera.unproject_position(at), "part": part})
+	vats_overlay.show_parts(marks, chosen, vats.focus / VatsTargeting.FOCUS_SECONDS, str(vats_actor.get("display_name", "")))
+
+
+## A VATS round reached its part. What broke, what that does to them, and
+## the record of it.
+func _apply_vats_break(actor: Dictionary, part: Dictionary, result: Dictionary) -> void:
+	var name_upper := str(actor.get("display_name", "")).to_upper()
+	if not bool(result.get("broken", false)):
+		if str(part.get("kind", "")) == "implant" and float(result.get("implant_condition", 0.0)) > 0.0:
+			prompt.text = "%s // %s HOLDS // %d%% LEFT" % [name_upper, str(part.get("label", "")), roundi(float(result.implant_condition) * 100.0)]
+		return
+	var effect := str(result.get("effect", ""))
+	var landed := VatsTargeting.apply_effect(actor, effect)
+	WorldHistory.record_event("vats_part_broken", {
+		"subject_id": str(actor.get("subject_id", "")), "part": str(part.get("id", "")),
+		"kind": str(part.get("kind", "")), "effect": effect if landed else "",
+		"armour": float(part.get("armour", 0.0)), "location": HUNT_LOCATION,
+	})
+	var kind := str(part.get("kind", ""))
+	var verb := "BURSTS" if kind in ["organ", "sense"] else ("BLOWS APART" if kind == "implant" else "IS CRIPPLED")
+	var consequence := str({"slow": "SLOWED", "blind": "BLINDED", "disarm": "DISARMED"}.get(effect, "")) if landed else ""
+	prompt.text = "%s // %s %s%s" % [name_upper, str(part.get("label", "")), verb, (" // " + consequence) if not consequence.is_empty() else ""]
+
+
 ## The recollection is derived from real installed hardware and happens once.
 ## A run without the captured-installed chip gets no substitute exposition.
 func _reveal_captivity_procedure() -> bool:
@@ -9835,9 +10082,10 @@ func _update_perception(delta: float) -> void:
 		query.exclude = excluded
 		var obstruction := get_world_3d().direct_space_state.intersect_ray(query)
 		var cover := 0.0 if obstruction.is_empty() else 1.0
-		var body_visibility := PERCEPTION.visibility(light, player_noise, cover, distance, PERCEPTION_MAX_RANGE)
+		# Eyes shot out in aimed X-ray see a fifth of what they did.
+		var body_visibility := PERCEPTION.visibility(light, player_noise, cover, distance, PERCEPTION_MAX_RANGE) * VatsTargeting.sight(actor)
 		var saw_body: bool = body_visibility >= PERCEPTION.UNSEEN_THRESHOLD
-		var saw_light: bool = handheld.is_lit() and PERCEPTION.sees_emitted_light(distance, handheld.light_radius(), cover) and not saw_body
+		var saw_light: bool = handheld.is_lit() and PERCEPTION.sees_emitted_light(distance, handheld.light_radius(), cover) and not saw_body and not bool(actor.get("blinded", false))
 		var was_tracking_player := bool(actor.get("tracking_player", false))
 		var was_tracking_light := bool(actor.get("tracking_light", false))
 		actor["tracking_player"] = saw_body
