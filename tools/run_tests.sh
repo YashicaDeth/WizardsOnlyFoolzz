@@ -2,7 +2,8 @@
 # Run this project's test scenes and report them the same way, whatever they
 # print.
 #
-# There are 495 test scenes. 268 of them end with `<NAME>_RESULT failures=N`;
+# There are 498 `*_test.tscn` test scenes. 268 of them end with
+# `<NAME>_RESULT failures=N`;
 # the rest do not. Some print `failures: N`, some print a sentence, and some --
 # handheld_satellite_test is the one that caught me -- print only `ok` and
 # `PASS` lines with no summary at all. So grepping the suite for failures finds
@@ -16,7 +17,7 @@
 # Usage:
 #   tools/run_tests.sh npc_ gore          run every scene matching either
 #   tools/run_tests.sh --core             the ones worth running before a commit
-#   tools/run_tests.sh --all              all 495, which takes hours
+#   tools/run_tests.sh --all              all 498, which takes hours
 #   tools/run_tests.sh --list npc_        show what would run, run nothing
 #   tools/run_tests.sh --perf             windowed frame budget over the route
 #                                         (X10.11; headless draws nothing)
@@ -61,7 +62,7 @@ done
 
 if [ ${#patterns[@]} -eq 0 ]; then
   echo "usage: tools/run_tests.sh [--core|--all|--list] [pattern ...]" >&2
-  echo "       refusing to guess; --all runs all 495 and takes hours" >&2
+  echo "       refusing to guess; --all runs all 498 and takes hours" >&2
   exit 2
 fi
 
@@ -69,6 +70,10 @@ fi
 # run the same suite twice.
 scenes=()
 for pattern in "${patterns[@]}"; do
+  candidates=("$ROOT"/game/tests/*.tscn)
+  # `--all` means all tests, not capture/gallery/manual scenes that happen to
+  # live beside them and intentionally wait for input instead of quitting.
+  [ -z "$pattern" ] && candidates=("$ROOT"/game/tests/*_test.tscn)
   while IFS= read -r scene; do
     name="$(basename "$scene" .tscn)"
     found=0
@@ -76,7 +81,7 @@ for pattern in "${patterns[@]}"; do
       [ "$seen" = "$name" ] && found=1 && break
     done
     [ $found -eq 0 ] && scenes+=("$name")
-  done < <(ls "$ROOT"/game/tests/*.tscn | grep -- "$pattern" || true)
+  done < <(printf '%s\n' "${candidates[@]}" | grep -- "$pattern" || true)
 done
 
 if [ ${#scenes[@]} -eq 0 ]; then
