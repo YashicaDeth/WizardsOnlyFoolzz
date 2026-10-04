@@ -8,6 +8,7 @@ extends SubViewportContainer
 
 const BASELINE_HUMAN := preload("res://systems/baseline_human.gd")
 const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
+const VAT_FLOAT := preload("res://systems/vat_float.gd")
 
 const VIEW_SIZE := Vector2i(300, 440)
 
@@ -27,6 +28,14 @@ var face_focus := 0.0
 var spin_offset := 0.0
 var held := false
 var _focus_target := 0.0
+## Greg, 25 September: the specimen floats rather than borrowing the seated
+## driver layout. The motion node is shared with the real Growing Floor vats.
+const FLOAT_Y := 0.34
+const CROWN_Y := 2.58
+var _head_y := 1.27
+var vat_float: Node
+var _feed: MeshInstance3D
+var _cables: Array[MeshInstance3D] = []
 const BODY_EYE := Vector3(0.0, 1.20, -3.9)
 const BODY_LOOK := Vector3(0.0, 1.05, 0.0)
 const FACE_EYE := Vector3(-0.16, 1.33, -0.98)
@@ -131,22 +140,93 @@ func _build_tank() -> void:
 		ring.rotation_degrees = Vector3(90, 0, 0)
 		stage.add_child(ring)
 
-	# The tube. Greg's brief: "a tube in your mouth that's visible too." It hangs
-	# from the tank's crown into the face, so the state the player is in is
-	# visible on the body they are choosing rather than only described.
-	var feed := MeshInstance3D.new()
-	var feed_mesh := CylinderMesh.new()
-	feed_mesh.top_radius = 0.020
-	feed_mesh.bottom_radius = 0.016
-	feed_mesh.height = 1.25
-	feed_mesh.material = WorldLook.surface(Color("6b5a4a"), "flesh", 944)
-	feed.mesh = feed_mesh
-	# Off the centre line and down to the seated rig's mouth (head sits at y
-	# 1.28 once the rig's own offset is added). Dead centre and thicker, it
-	# bisected the face the panel exists to let the player read.
-	feed.position = Vector3(0.055, 1.92, -0.115)
-	feed.rotation_degrees = Vector3(10, 0, 0)
-	stage.add_child(feed)
+	# Real curved hoses follow the moving anatomy. A straight cylinder made the
+	# mouth feed read as a rigid pole and left the requested skull wiring absent.
+	_feed = _hose(0.013, Color("7a6552"), 944)
+	_feed.name = "MouthFeed"
+	for index in 3:
+		var lead := _hose(0.009 - index * 0.0015, Color("201a1c"), 950 + index)
+		lead.name = "SkullLead%d" % index
+		_cables.append(lead)
+
+
+func _hose(radius: float, tint: Color, seed_value: int) -> MeshInstance3D:
+	var hose := MeshInstance3D.new()
+	hose.mesh = ImmediateMesh.new()
+	hose.material_override = WorldLook.surface(tint, "flesh", seed_value)
+	hose.set_meta("radius", radius)
+	stage.add_child(hose)
+	return hose
+
+
+const HOSE_SEGMENTS := 12
+const HOSE_SIDES := 6
+
+
+func _hang(hose: MeshInstance3D, from: Vector3, to: Vector3, sag: Vector3) -> void:
+	var control := from.lerp(to, 0.5) + sag * 2.0
+	var radius: float = hose.get_meta("radius", 0.01)
+	var rings: Array = []
+	for step in HOSE_SEGMENTS + 1:
+		var t := float(step) / HOSE_SEGMENTS
+		var point := from.lerp(control, t).lerp(control.lerp(to, t), t)
+		var tangent := (control - from).lerp(to - control, t).normalized()
+		var side := tangent.cross(Vector3.UP)
+		if side.length() < 0.01:
+			side = tangent.cross(Vector3.RIGHT)
+		side = side.normalized()
+		var normal := side.cross(tangent).normalized()
+		var ring: Array = []
+		for corner in HOSE_SIDES:
+			var angle := TAU * float(corner) / HOSE_SIDES
+			var out := side * cos(angle) + normal * sin(angle)
+			ring.append([point + out * radius, out])
+		rings.append(ring)
+	var mesh := hose.mesh as ImmediateMesh
+	mesh.clear_surfaces()
+	mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+	for step in HOSE_SEGMENTS:
+		for corner in HOSE_SIDES:
+			var next := (corner + 1) % HOSE_SIDES
+			var a: Array = rings[step][corner]
+			var b: Array = rings[step][next]
+			var c: Array = rings[step + 1][corner]
+			var d: Array = rings[step + 1][next]
+			for vertex in [a, c, b, b, c, d]:
+				mesh.surface_set_normal(vertex[1])
+				mesh.surface_add_vertex(vertex[0])
+	mesh.surface_end()
+	hose.set_meta("from", from)
+	hose.set_meta("to", to)
+	hose.visible = true
+
+
+func _span_hoses() -> void:
+	var all_hoses: Array = [_feed] + _cables
+	if rig == null or not is_instance_valid(rig):
+		for hose in all_hoses:
+			if hose != null:
+				hose.visible = false
+		return
+	var head := rig.parts.get("head") as Node3D
+	var torso := rig.parts.get("torso") as Node3D
+	if head == null or not is_instance_valid(head):
+		return
+	var head_at := head.global_position
+	var forward := -rig.global_transform.basis.z
+	forward.y = 0.0
+	forward = forward.normalized() if forward.length() > 0.01 else Vector3.FORWARD
+	var mouth := head_at + forward * 0.11 + Vector3.DOWN * 0.075
+	var side := forward.cross(Vector3.UP).normalized()
+	var feed_top := Vector3(0.0, CROWN_Y, 0.0) + side * 0.34 + forward * 0.22
+	_hang(_feed, feed_top, mouth, side * 0.10 + forward * 0.08 + Vector3.DOWN * 0.16)
+	var back := -forward
+	var targets := [head_at + back * 0.10 + Vector3.UP * 0.03, head_at + back * 0.08 + Vector3.DOWN * 0.12]
+	if torso != null and is_instance_valid(torso):
+		targets.append(torso.global_position + back * 0.12 + Vector3.UP * 0.18)
+	var tops := [Vector3(-0.30, CROWN_Y - 0.2, 0.0) + back * 0.62, Vector3(0.28, CROWN_Y - 0.15, 0.0) + back * 0.64, Vector3(0.04, CROWN_Y - 0.3, 0.0) + back * 0.66]
+	for index in _cables.size():
+		_hang(_cables[index], tops[index], targets[index], back * (0.10 + index * 0.04) + Vector3.DOWN * (0.34 + index * 0.08))
 
 
 func _add_light(label: String, at: Vector3, color: Color, energy: float, reach: float) -> void:
@@ -189,11 +269,11 @@ func present(record: Dictionary) -> void:
 		rig.queue_free()
 	var config: Dictionary = BASELINE_HUMAN.config_from_subject(normalized)
 	config["gore"] = false
-	config["seated"] = true
+	config["seated"] = false
 	last_config = config.duplicate(true)
 	rig = BASELINE_HUMAN.new()
 	rig.name = "IntakeSpecimen"
-	rig.position = Vector3(0.0, 0.12, 0.0)
+	rig.position = Vector3(0.0, FLOAT_Y, 0.0)
 	stage.add_child(rig)
 	var identity := str((normalized.get("appearance", {}) as Dictionary).get("name", "THE HUNTER"))
 	rig.build("intake_preview_" + identity, config)
@@ -201,6 +281,12 @@ func present(record: Dictionary) -> void:
 	appearance_node.name = "PreviewAppearance"
 	rig.add_child(appearance_node)
 	appearance_node.configure(rig, normalized.get("appearance", {}) as Dictionary)
+	vat_float = VAT_FLOAT.new()
+	rig.add_child(vat_float)
+	vat_float.setup(rig, Vector3.ZERO, 0.67, 0.0, 2.62, 944, false)
+	var head := rig.parts.get("head") as Node3D
+	if head != null and is_instance_valid(head):
+		_head_y = head.global_position.y
 
 
 ## N4.2: the weapon you have out is in this body's hand, on the hunters'
@@ -236,15 +322,19 @@ func set_face_focus(on: bool) -> void:
 func _process(delta: float) -> void:
 	_clock += delta
 	face_focus = move_toward(face_focus, _focus_target, delta * 1.8)
+	if vat_float != null:
+		vat_float.rotation_bias.y = spin_offset + (0.0 if held else sin(_clock * 0.42) * 0.15 * (1.0 - face_focus * 0.85))
+		vat_float.advance(delta)
+	var head := rig.parts.get("head") as Node3D if rig != null and is_instance_valid(rig) else null
+	if head != null:
+		_head_y = head.global_position.y
 	if camera != null:
 		var t := ease(face_focus, -2.0)
-		camera.position = BODY_EYE.lerp(FACE_EYE, t)
-		camera.look_at(BODY_LOOK.lerp(FACE_LOOK, t), Vector3.UP)
-	if rig != null and is_instance_valid(rig):
-		# Just enough movement to establish this as a body in a vat, not a menu
-		# sprite.  It never spins all the way around or interrupts face reading.
-		rig.rotation.y = spin_offset + (0.0 if held else sin(_clock * 0.42) * 0.22 * (1.0 - face_focus * 0.85))
-		rig.rotation.z = sin(_clock * 0.66) * 0.025
+		var face_eye := FACE_EYE + Vector3(0.0, _head_y - FACE_LOOK.y, 0.0)
+		var face_look := Vector3(FACE_LOOK.x, _head_y, FACE_LOOK.z)
+		camera.position = BODY_EYE.lerp(face_eye, t)
+		camera.look_at(BODY_LOOK.lerp(face_look, t), Vector3.UP)
+	_span_hoses()
 
 
 ## Where each body part sits in this preview's own pixels, for clicking a part
