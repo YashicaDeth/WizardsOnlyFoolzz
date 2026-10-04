@@ -64,6 +64,23 @@ const OPEN_AT_HEALTH := 0.75
 ## DIAL. The X-ray hides the chest's mosaic censor (it censors skin, and the
 ## X-ray is not looking at skin); an opened chest loses it with the wall.
 const XRAY_HIDES_CHEST_CENSOR := true
+## DIAL. Under the X-ray: how hard each organ glows in its own colour, and
+## how see-through hardware is, so a sternum plate does not hide the heart
+## behind it. The skin becomes `xray_shell.gdshader`'s film (the sweep's own
+## 62% flesh left a red dummy's organs lost in its red skin).
+const XRAY_ORGAN_GLOW := 0.85
+const XRAY_HARDWARE := 0.4
+const XRAY_SHELL := preload("res://systems/xray_shell.gdshader")
+const SHELL_PIECES := ["Shoulder_", "Clavicle_"]
+
+static var _shell: ShaderMaterial
+
+
+static func xray_shell() -> ShaderMaterial:
+	if _shell == null:
+		_shell = ShaderMaterial.new()
+		_shell.shader = XRAY_SHELL
+	return _shell
 
 ## What `Carry.sale_value()` starts from for each kind, mirrored for the scan's
 ## estimate (the scan has no buyer, no market and no spoil clock to ask).
@@ -663,12 +680,17 @@ static func sync_visuals(rig: BaselineHuman, xray: bool) -> void:
 			visual.material_override = material
 		var shorted := is_shorted(part) and float(part.get("condition", 0.0)) > 0.0
 		var dead := float(part.get("condition", 0.0)) <= 0.0
-		visual.visible = xray or is_opened(rig, zone)
-		material.no_depth_test = xray
-		material.render_priority = 5 if xray else 0
-		material.emission_enabled = xray or shorted
-		material.emission = SPARK if shorted else (Color(0.25, 0.1, 0.08) if dead else XRAY_CYAN)
-		material.emission_energy_multiplier = 1.6 if xray else 0.8
+		var shown := xray or is_opened(rig, zone)
+		if visual.visible != shown:
+			visual.visible = shown
+		visual.transparency = XRAY_HARDWARE if xray else 0.0
+		var glow: Color = SPARK if shorted else (Color(0.25, 0.1, 0.08) if dead else XRAY_CYAN)
+		if material.no_depth_test != xray or material.emission_enabled != (xray or shorted) or material.emission != glow:
+			material.no_depth_test = xray
+			material.render_priority = 5 if xray else 0
+			material.emission_enabled = xray or shorted
+			material.emission = glow
+			material.emission_energy_multiplier = 1.6 if xray else 0.8
 	for zone_id in rig.parts:
 		var part_node := rig.parts[zone_id] as Node3D
 		if part_node == null or not is_instance_valid(part_node):
@@ -676,18 +698,81 @@ static func sync_visuals(rig: BaselineHuman, xray: bool) -> void:
 		for child in part_node.get_children():
 			if str(child.name).begins_with("Implant_") and not wanted.has(str(child.name)):
 				child.queue_free()
+	# Organs glow their own colour under the X-ray, a damaged one hot.
+	for organ_id in rig.organ_parts:
+		var organ := rig.organ_parts[organ_id] as MeshInstance3D
+		if organ == null or not is_instance_valid(organ) or organ.mesh == null or organ.mesh.get_surface_count() == 0:
+			continue
+		var wet := organ.mesh.surface_get_material(0) as StandardMaterial3D
+		if wet == null:
+			continue
+		var glow := xray and organ.visible
+		if wet.emission_enabled != glow:
+			wet.emission_enabled = glow
+		if glow:
+			var ceiling := float((AnatomyComponent.ORGANS.get(organ_id, {"health": 30.0}) as Dictionary).health)
+			var hurt := 1.0 - clampf(float((rig.anatomy.organs.get(organ_id, {}) as Dictionary).get("health", ceiling)) / maxf(1.0, ceiling), 0.0, 1.0)
+			var hue := wet.albedo_color.lightened(0.25).lerp(Color(1.0, 0.25, 0.1), hurt)
+			if wet.emission != hue:
+				wet.emission = hue
+				wet.emission_energy_multiplier = XRAY_ORGAN_GLOW * (1.0 + hurt)
+	_shell_skin(rig, xray)
 	if XRAY_HIDES_CHEST_CENSOR:
 		var torso_open := bool((rig.parts.get("torso") as Node3D).get_meta(Cavity.OPEN_MARK, false)) if rig.parts.get("torso") != null else false
 		_set_chest_forms(rig, not xray and not torso_open)
+		_set_form(rig, "buttock", not xray)
+
+
+## Under the X-ray the zone parts (and the shoulder caps over them) wear the
+## radiograph film; off it, the rig redraws its own flesh (`_refresh_zone`),
+## so wounds, bruising and dose come back exactly as they were.
+static func _shell_skin(rig: BaselineHuman, xray: bool) -> void:
+	var shell := xray_shell()
+	for zone_id in rig.parts:
+		var skin := rig.parts[zone_id] as MeshInstance3D
+		if skin == null or not is_instance_valid(skin):
+			continue
+		var on := xray and not rig.severed.has(zone_id) and not rig.anatomy.installed_parts.has(zone_id)
+		if on:
+			if skin.material_override != shell:
+				skin.material_override = shell
+			if skin.transparency != 0.0:
+				skin.transparency = 0.0
+		elif skin.material_override == shell:
+			rig.call("_refresh_zone", zone_id)
+		for child in skin.get_children():
+			var piece := child as MeshInstance3D
+			if piece == null or not _is_shell_piece(str(piece.name)):
+				continue
+			if on and piece.material_override != shell:
+				piece.set_meta("pre_xray", piece.material_override)
+				piece.material_override = shell
+			elif not on and piece.material_override == shell:
+				piece.material_override = piece.get_meta("pre_xray") as Material
+				piece.remove_meta("pre_xray")
+
+
+static func _is_shell_piece(piece_name: String) -> bool:
+	for prefix: String in SHELL_PIECES:
+		if piece_name.begins_with(prefix):
+			return true
+	return false
 
 
 static func _set_chest_forms(rig: BaselineHuman, shown: bool) -> void:
+	_set_form(rig, "chest", shown)
+
+
+## A `BodyForms` region's form and censor, shown or not. The censor covers
+## skin; under the X-ray the skin is not what is being looked at. The groin's
+## stays (it is in front of nothing the scan reads).
+static func _set_form(rig: BaselineHuman, region: String, shown: bool) -> void:
 	var torso := rig.parts.get("torso") as Node3D
 	if torso == null or not is_instance_valid(torso):
 		return
 	for child in torso.get_children():
 		var child_name := str(child.name)
-		if child_name.ends_with("chest") and (child_name.begins_with("Censor_") or child_name.begins_with("Nude_")):
+		if child_name.contains(region) and (child_name.begins_with("Censor_") or child_name.begins_with("Nude_")):
 			(child as Node3D).visible = shown
 
 
@@ -707,8 +792,8 @@ static func spark(rig: BaselineHuman, site_id: String, strength := 1.0) -> void:
 	burst.name = "ImplantSparks"
 	burst.one_shot = true
 	burst.emitting = false
-	burst.amount = int(18 + 30 * strength)
-	burst.lifetime = 0.45
+	burst.amount = int(30 + 50 * strength)
+	burst.lifetime = 0.6
 	burst.explosiveness = 0.9
 	burst.direction = Vector3.UP
 	burst.spread = 180.0
@@ -718,8 +803,8 @@ static func spark(rig: BaselineHuman, site_id: String, strength := 1.0) -> void:
 	burst.scale_amount_min = 0.5
 	burst.scale_amount_max = 1.0
 	var bead := SphereMesh.new()
-	bead.radius = 0.006
-	bead.height = 0.012
+	bead.radius = 0.011
+	bead.height = 0.022
 	bead.radial_segments = 4
 	bead.rings = 2
 	var hot := StandardMaterial3D.new()

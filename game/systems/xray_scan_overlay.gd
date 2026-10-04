@@ -21,15 +21,31 @@ const SPARK := Color("ffcf6a")
 const SOOT := Color(0.05, 0.036, 0.028, 0.82)
 const STATE_TONES := {"OK": SCAN, "BRUISED": BRASS, "DAMAGED": Color("d06a2a"), "RUPTURED": HOT, "TAKEN": Color(0.5, 0.45, 0.4)}
 
+## Stroked type is not cheap: redrawn every frame the panel cost the lab ~60
+## fps. The tags follow the body at `TAG_HZ`; the column redraws only when
+## what it says changes.
+const TAG_HZ := 20.0
+const SCAN_EVERY := 0.2
+
 var rig: BaselineHuman
 var camera: Camera3D
 var report: Dictionary = {}
 var _clock := 0.0
+var _tag_clock := 0.0
+var _scan_clock := 0.0
+var _column: Control
+var _column_hash := 0
 
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_column = Control.new()
+	_column.name = "Column"
+	_column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_column)
+	_column.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_column.draw.connect(_draw_column)
 
 
 ## Point the scan at `target` (null clears it).
@@ -38,16 +54,36 @@ func show_scan(target: BaselineHuman, eye: Camera3D) -> void:
 	camera = eye
 	report = OrganSystem.scan(target) if target != null else {}
 	visible = target != null
+	_column_hash = 0
+	_refresh_column()
 	queue_redraw()
 
 
 func _process(delta: float) -> void:
 	_clock += delta
-	if rig != null and is_instance_valid(rig):
-		report = OrganSystem.scan(rig)
-		queue_redraw()
-	elif rig != null:
+	if rig == null:
+		return
+	if not is_instance_valid(rig):
 		show_scan(null, camera)
+		return
+	_scan_clock -= delta
+	if _scan_clock <= 0.0:
+		_scan_clock = SCAN_EVERY
+		report = OrganSystem.scan(rig)
+		_refresh_column()
+	_tag_clock -= delta
+	if _tag_clock <= 0.0:
+		_tag_clock = 1.0 / TAG_HZ
+		queue_redraw()
+
+
+func _refresh_column() -> void:
+	if _column == null:
+		return
+	var key := hash([report.get("organs", []), report.get("implants", []).size(), (report.get("plates", []) as Array).size(), report.get("value", 0)])
+	if key != _column_hash:
+		_column_hash = key
+		_column.queue_redraw()
 
 
 func _draw() -> void:
@@ -102,28 +138,29 @@ func _draw() -> void:
 		var at := camera.unproject_position(node.global_position)
 		var tone: Color = STATE_TONES.get(str(organ.state), HOT)
 		draw_arc(at, 9.0 + sin(_clock * 5.0) * 1.5, 0.0, TAU, 16, tone, 1.6)
-	_draw_column()
 
 
 func _draw_column() -> void:
+	if report.is_empty():
+		return
 	var organs: Array = report.get("organs", [])
-	var at := Vector2(size.x - 250.0, 110.0)
+	var at := Vector2(_column.size.x - 250.0, 110.0)
 	var height := 64.0 + organs.size() * 17.0 + 22.0
-	draw_rect(Rect2(at - Vector2(12, 12), Vector2(236, height)), SOOT)
-	draw_rect(Rect2(at - Vector2(12, 12), Vector2(236, height)), SCAN * Color(1, 1, 1, 0.5), false, 1.0)
-	CellOutzType.draw_text(self, at, "XRAY // SCAN", 13.0, HOT, 2.0)
+	_column.draw_rect(Rect2(at - Vector2(12, 12), Vector2(236, height)), SOOT)
+	_column.draw_rect(Rect2(at - Vector2(12, 12), Vector2(236, height)), SCAN * Color(1, 1, 1, 0.5), false, 1.0)
+	CellOutzType.draw_text(_column, at, "XRAY // SCAN", 13.0, HOT, 2.0)
 	var implants: Array = report.get("implants", [])
-	CellOutzType.draw_text(self, at + Vector2(0, 22), "%d IMPLANTS  %d PLATES" % [implants.size(), (report.get("plates", []) as Array).size()], 9.0, BONE, 1.0)
+	CellOutzType.draw_text(_column, at + Vector2(0, 22), "%d IMPLANTS  %d PLATES" % [implants.size(), (report.get("plates", []) as Array).size()], 9.0, BONE, 1.0)
 	var y := 46.0
 	for organ: Dictionary in organs:
 		var tone: Color = STATE_TONES.get(str(organ.state), BONE)
-		CellOutzType.draw_text(self, at + Vector2(0, y), str(organ.label), 9.0, BONE * Color(1, 1, 1, 0.85), 0.8)
+		CellOutzType.draw_text(_column, at + Vector2(0, y), str(organ.label), 9.0, BONE * Color(1, 1, 1, 0.85), 0.8)
 		var bar := Rect2(at + Vector2(104, y + 1), Vector2(60, 7))
-		draw_rect(bar, Color(0, 0, 0, 0.6))
-		draw_rect(Rect2(bar.position, Vector2(bar.size.x * float(organ.health), bar.size.y)), tone)
-		CellOutzType.draw_text(self, at + Vector2(170, y), str(organ.state), 8.0, tone, 0.8)
+		_column.draw_rect(bar, Color(0, 0, 0, 0.6))
+		_column.draw_rect(Rect2(bar.position, Vector2(bar.size.x * float(organ.health), bar.size.y)), tone)
+		CellOutzType.draw_text(_column, at + Vector2(170, y), str(organ.state), 8.0, tone, 0.8)
 		y += 17.0
-	CellOutzType.draw_text(self, at + Vector2(0, y + 6), "LOOT EST %d SCRIP" % int(report.get("value", 0)), 11.0, SPARK, 1.0)
+	CellOutzType.draw_text(_column, at + Vector2(0, y + 6), "LOOT EST %d SCRIP" % int(report.get("value", 0)), 11.0, SPARK, 1.0)
 
 
 func _where(entry: Dictionary) -> Vector3:

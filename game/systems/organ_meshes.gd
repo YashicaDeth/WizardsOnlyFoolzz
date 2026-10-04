@@ -74,8 +74,14 @@ static func wet_material(tint: Color, kind := "flesh", variation := 0) -> Standa
 	material.clearcoat = WET_CLEARCOAT
 	material.clearcoat_roughness = WET_CLEARCOAT_ROUGHNESS
 	material.rim_enabled = true
-	material.rim = 0.3
-	material.rim_tint = 0.6
+	material.rim = 0.12
+	material.rim_tint = 0.2
+	# The flesh kind's scatter, transmittance and backlight are sized for a
+	# limb with a lamp behind it; on an organ in the hand they wash it out to
+	# pink. Kept, much smaller.
+	material.subsurf_scatter_strength = 0.18
+	material.subsurf_scatter_transmittance_enabled = false
+	material.backlight = tint.darkened(0.6)
 	return material
 
 

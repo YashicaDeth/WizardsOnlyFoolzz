@@ -259,9 +259,14 @@ func _in_the_lab() -> void:
 	check(lab.organ_scan.visible and lab.organ_scan.rig != null, "X-ray on: a body in view is scanned")
 	var piece := (rig.parts.torso as Node3D).get_node_or_null("Implant_chest") as MeshInstance3D
 	check(piece != null and piece.visible, "its chest hardware shows under the X-ray")
+	var skin := rig.parts.torso as MeshInstance3D
+	check(skin.material_override == OrganSystem.xray_shell(), "the skin is the X-ray film")
+	check((rig.organ_parts.heart.mesh.surface_get_material(0) as StandardMaterial3D).emission_enabled, "the organs glow in it")
 	lab.bodies.press()
 	await get_tree().physics_frame
 	check(piece == null or not piece.visible, "and is inside the body again with the X-ray off")
+	check(skin.material_override != OrganSystem.xray_shell() and skin.material_override != null, "the skin gets its own flesh back")
+	check(not (rig.organ_parts.heart.mesh.surface_get_material(0) as StandardMaterial3D).emission_enabled, "and the organs stop glowing")
 
 	# The PRODSTAFF shorts it, with sparks.
 	var at: Vector3 = (rig.parts.torso as Node3D).global_position

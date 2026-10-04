@@ -910,6 +910,9 @@ func _put_in_hand(mesh: Mesh, material: Material, item: Dictionary, beating: boo
 
 
 func _tick_hand(delta: float) -> void:
+	if held_mount != null:
+		# One hand: what came out of somebody, or the weapon.
+		held_mount.visible = hand == null or not is_instance_valid(hand)
 	if hand == null or not is_instance_valid(hand):
 		return
 	_hand_age += delta

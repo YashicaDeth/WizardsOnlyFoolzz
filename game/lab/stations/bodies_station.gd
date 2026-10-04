@@ -24,6 +24,8 @@ const LOADOUTS := [
 var lab: Node3D
 var rows: Array[Dictionary] = []
 var xray := false
+const SWEEP_EVERY := 0.1
+var _sweep_clock := 0.0
 
 
 func build(owner_lab: Node3D) -> void:
@@ -96,7 +98,11 @@ func _process(delta: float) -> void:
 		rows[index].dead_for = float(rows[index].dead_for) + delta
 		if float(rows[index].dead_for) >= RESPAWN_SECONDS:
 			_spawn(index)
-	if xray:
+	# Lab-48: ten sweeps a second, not one a frame. Range falloff follows the
+	# player at walking pace; the sweep rewrites ~80 materials a body.
+	_sweep_clock -= delta
+	if xray and _sweep_clock <= 0.0:
+		_sweep_clock = SWEEP_EVERY
 		_sweep()
 
 
