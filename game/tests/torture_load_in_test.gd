@@ -55,7 +55,8 @@ func _ready() -> void:
 	check(texts.any(func(x): return x.begins_with("SIGNAL LOST // ARCHIVE")), "later passes are broken archive echoes, not duplicate copy")
 	load_in.step(0.2)
 	check(load_in.played.has("glitch"), "it glitches out")
-	for i in 60:
+	# Job 4: the reveal is a 3 s eye-opening now, not a 1.3 s fade.
+	for i in 120:
 		if not is_instance_valid(load_in) or load_in.done:
 			break
 		load_in.step(0.05)
@@ -78,7 +79,8 @@ func _ready() -> void:
 	key.pressed = true
 	fast._unhandled_input(key)
 	check(fast.skipped and fast.played.has("glitch"), "F cuts straight to the glitch")
-	for i in 60:
+	# Job 4: the reveal is a 3 s eye-opening now, not a 1.3 s fade.
+	for i in 120:
 		if not is_instance_valid(fast) or fast.done:
 			break
 		fast.step(0.05)

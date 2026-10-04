@@ -55,7 +55,9 @@ const BROADCAST_AT := 5.0
 const BROADCAST_PASS := 1.9
 const GLITCH_AT := 10.8
 const GLITCH_SECONDS := 0.9
-const REVEAL_SECONDS := 1.3
+## Job 4 (Greg: "you slowly open your eyes"): the hand-over is two lids
+## parting, a heavy blink, then open, not a fade.
+const REVEAL_SECONDS := 3.0
 const TOTAL := GLITCH_AT + GLITCH_SECONDS + REVEAL_SECONDS
 
 ## The headless suites predate the load-in and drive the intake from frame
@@ -106,7 +108,25 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	step(delta)
+	# Greg's playtest D: the intro played "ultra sped up". It started its clock
+	# in the scene's first frame, while the Interstitial plate still covered the
+	# screen (its minimum hold and fade-out), and the shader-compile hitches of a
+	# fresh room arrived as half-second deltas. The player saw only the tail end
+	# racing past. It now waits for the plate to lift and never steps more than
+	# one 30 Hz frame at a time, so every beat plays at its authored speed.
+	if behind_plate():
+		return
+	step(minf(delta, MAX_STEP))
+
+
+## One frame's worth at most: a hitch pauses the black, it does not skip it.
+const MAX_STEP := 1.0 / 30.0
+
+
+## True while the travel plate is still over the scene.
+func behind_plate() -> bool:
+	var plate := get_node_or_null("/root/Interstitial")
+	return plate != null and bool(plate.get("travelling"))
 
 
 ## Advances the load-in; tests drive it directly.
@@ -189,6 +209,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		# Nothing reaches the tank or the form behind the black.
 		if key.keycode != KEY_ESCAPE:
 			get_viewport().set_input_as_handled()
+	# Pad first (BUILD_BRIEFS rule 3): Cross or Options cuts to the glitch.
+	elif event is InputEventJoypadButton:
+		var button := event as InputEventJoypadButton
+		if button.pressed and button.button_index in [JOY_BUTTON_A, JOY_BUTTON_START]:
+			skip()
+		get_viewport().set_input_as_handled()
 
 
 func _finish() -> void:
@@ -252,11 +278,12 @@ func reveal() -> float:
 func _draw() -> void:
 	var area := Rect2(Vector2.ZERO, size)
 	var open := reveal()
-	draw_rect(area, Color(BLACK, 1.0 - ease(open, 0.6)))
 	if open > 0.0:
 		# The fluid comes up first: red across what you can see, draining off.
 		draw_rect(area, Color(BLOOD, 0.34 * (1.0 - open)))
+		_draw_lids(eyes_open(open))
 		return
+	draw_rect(area, BLACK)
 	var centre := size * 0.5
 	var unit := minf(size.x, size.y)
 	# Your own pulse behind your eyes, the only light there is.
@@ -288,6 +315,44 @@ func _draw() -> void:
 		CellOutzType.draw_string_compat(self, at, line, HORIZONTAL_ALIGNMENT_CENTER, size.x, font_size, Color(BONE, 0.82 - 0.14 * pass_index))
 	if clock >= GLITCH_AT:
 		_draw_glitch(area, clamp((clock - GLITCH_AT) / GLITCH_SECONDS, 0.0, 1.0))
+
+
+## How far open the eyes are (0 shut, 1 open) across the reveal: a crack of
+## light, a heavy blink back down, then they open and stay open.
+static func eyes_open(t: float) -> float:
+	if t < 0.3:
+		return ease(t / 0.3, 0.5) * 0.35
+	if t < 0.45:
+		return lerpf(0.35, 0.06, ease((t - 0.3) / 0.15, 1.6))
+	return lerpf(0.06, 1.0, ease((t - 0.45) / 0.55, 0.45))
+
+
+## Upper and lower lids, curved like a real eye opening, soft at the edge.
+func _draw_lids(amount: float) -> void:
+	var gap := size.y * 0.5 * amount
+	var middle := size.y * 0.5
+	var steps := 24
+	for lid in [-1.0, 1.0]:
+		var points := PackedVector2Array()
+		var edge := size.y if lid > 0.0 else 0.0
+		points.append(Vector2(0, edge))
+		for index in steps + 1:
+			var x := size.x * float(index) / float(steps)
+			var across := (x / size.x) * 2.0 - 1.0
+			# Fuller at the middle, closed at the corners, like an eyelid.
+			var reach := gap * (1.0 - across * across * 0.55) + size.y * 0.04 * (1.0 - amount)
+			points.append(Vector2(x, middle + lid * maxf(reach, 0.0)))
+		points.append(Vector2(size.x, edge))
+		draw_colored_polygon(points, BLACK)
+		# A soft dark rim inside the lid line.
+		for band in 6:
+			var shade := PackedVector2Array()
+			for index in steps + 1:
+				var x := size.x * float(index) / float(steps)
+				var across := (x / size.x) * 2.0 - 1.0
+				var reach := gap * (1.0 - across * across * 0.55) + size.y * 0.04 * (1.0 - amount)
+				shade.append(Vector2(x, middle + lid * maxf(reach - float(band) * 9.0, 0.0)))
+			draw_polyline(shade, Color(BLACK, 0.16 * (1.0 - amount * 0.7)), 9.0)
 
 
 ## Him, for one frame: the surgical mask, the eyes above it, too close.

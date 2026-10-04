@@ -68,7 +68,7 @@ func _ready() -> void:
 	opening._update_sequence(0.05)
 	check(opening.phase == "wired", "a drained tank leaves the player hanging in the wires")
 	check(opening.title.visible and opening.title.text == "END ALL SUFFERING", "the wired beat opens under END ALL SUFFERING")
-	check(opening.umbilicals.size() == 4 and opening.vat_glass.visible and not opening.breakout_complete, "the wires are still in and the glass still holds")
+	check(opening.umbilicals.size() == 4 and not opening.glass_tank.broken and not opening.breakout_complete, "the wires are still in and the glass still holds")
 	var held_clock: float = opening.clock
 	opening._physics_process(3.0)
 	check(opening.clock == held_clock and opening.phase == "wired", "nothing moves on until the player acts")
@@ -90,18 +90,19 @@ func _ready() -> void:
 	check(opening.title.text == "GET REVENGE" and opening.opening_audio.played_cues.has("revenge"), "the last wire turns the screen to GET REVENGE")
 	var wound_labels: Array = (WorldHistory.subject("player").get("wounds", []) as Array).map(func(wound): return WOUND_CATALOG.label(wound))
 	check(wound_labels.has("torn wire sockets"), "the torn wire sockets are recorded as a wound on the body")
-	check(opening.vat_glass.visible and not opening.breakout_complete, "GET REVENGE holds before the glass goes")
+	check(not opening.glass_tank.broken and not opening.breakout_complete, "GET REVENGE holds before the glass goes")
 	opening._physics_process(opening.REVENGE_HOLD + 0.1)
-	check(opening.phase == "floor" and not opening.vat_glass.visible, "the glass goes after GET REVENGE")
+	check(opening.phase == "floor" and opening.glass_tank.broken, "the glass goes after GET REVENGE")
 	check(opening.opening_audio.played_cues.has("glass"), "the breach has its own sound event")
-	var puddle := opening.get_node_or_null("Puddle") as MeshInstance3D
-	var spill: StandardMaterial3D = puddle.mesh.material if puddle != null else null
-	check(spill != null and spill.albedo_texture == null and spill.albedo_color.v < 0.1 and spill.roughness < 0.2,
-		"the spilled fluid is dark and wet, not the grained floor texture that lit up as a pale pixel disc")
+	# Job 4: the glass is GlassTank and the spill a FluidBody (real fluid that
+	# pools), dark blood red rather than the old grained floor disc.
+	opening.spill.simulate(2.0)
+	check(opening.spill.volume() > 0.0 and opening.spill.colour.v < 0.5,
+		"the spilled fluid pools as dark red liquid (%.3f m3)" % opening.spill.volume())
 	check(opening.breakout_complete and opening.first_acquisition_complete, "the soul/implant breakout completes instead of stalling in the vat")
 	check(OpeningDirector.reached("broke_free"), "breakout is persisted as an opening stage")
 	var carried: Array = WorldHistory.subject("inventory").get("items", [])
-	check(carried.any(func(item): return str((item as Dictionary).get("label", "")).contains("MEDICAL RESTRAINT")), "the first physical acquisition uses the shared inventory")
+	check(not carried.any(func(item): return str((item as Dictionary).get("label", "")).contains("MEDICAL RESTRAINT")), "no belt in your hand out of the vat (Greg, playtest B)")
 	check(str(WorldHistory.subject("player").get("status", "")) == "broke free", "the player's body and history record the breakout")
 
 	# K3.2. The opening reframed: CellOutz grew you, which is why the debt is

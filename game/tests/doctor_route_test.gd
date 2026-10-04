@@ -32,6 +32,9 @@ func _ready() -> void:
 
 ## The real opening, filed and torn out of, up to the first steps.
 func _opening() -> Node:
+	# Job 4: the game no longer hands you the broken restraint (Greg: "I have
+	# no hands"); this suite covers it as a door weapon through the dial.
+	preload("res://vat_chamber.gd").grant_restraint = true
 	var vat = VAT.instantiate()
 	add_child(vat)
 	await get_tree().process_frame

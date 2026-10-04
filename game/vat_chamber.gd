@@ -97,9 +97,26 @@ const CORD_TUGS := 4
 const GLASS_BLOWS := 4
 ## How long getting up off your knees takes, turning to his door as you rise.
 ## Crawl through the spill, then pull yourself up on the tank (28 September).
-const RISE_SECONDS := 3.4
-const CRAWL_SHARE := 0.4
-const CRAWL_DISTANCE := 1.3
+## Job 4 (Greg, 4 Oct: "crawl a few metres, pull up on the tank, stand"):
+## the crawl is most of the rise now, then you haul up on what is left of it.
+const RISE_SECONDS := 5.2
+const CRAWL_SHARE := 0.55
+const CRAWL_DISTANCE := 2.6
+## The burst throws you out with the medium: seconds from the glass going to
+## landing on your hands in the spill, and how far it carries you.
+const FALL_SECONDS := 0.7
+const FALL_DISTANCE := 0.9
+var fall_clock := 0.0
+var fall_from := Vector3.ZERO
+var fall_eye := 0.0
+## Greg, playtest B: "why am I holding this stupid piece of a belt? I have no
+## hands". The breakout no longer puts the broken restraint in your hand. Dial
+## kept so the older restraint route can be switched back on in one place.
+static var grant_restraint := false
+## Greg, 4 Oct: "actual liquid with physics". The real glass (crack stages,
+## burst, shards that stay) and the real spill from the mechanics lab (lab-46).
+var glass_tank: GlassTank
+var spill: FluidBody
 var cord_pulls := 0
 var glass_blows := 0
 var mouth_cord: Node3D
@@ -666,6 +683,38 @@ func _build_vat() -> void:
 	glow.light_energy = 4.6
 	glow.omni_range = 6.0
 	add_child(glow)
+	_build_glass_tank()
+
+
+## The tank wall is GlassTank's real glass: it refracts, it cracks where each
+## blow lands, and it bursts into shards that stay on the floor. The medium
+## pours out of it into a FluidBody that pools, ripples and drains to a grate.
+## The old smoke-brown wall is kept as a node (older readers hold it) but no
+## longer drawn; the inside-facing medium column still gives the red from in.
+func _build_glass_tank() -> void:
+	glass_tank = GlassTank.new()
+	glass_tank.name = "TankGlass"
+	glass_tank.radius = 0.95
+	glass_tank.height = 3.1
+	glass_tank.fill = 0.94
+	glass_tank.blows = GLASS_BLOWS
+	glass_tank.pour_seconds = 4.5
+	glass_tank.spill_volume = 0.16
+	glass_tank.position = VAT_POSITION
+	add_child(glass_tank)
+	# You hang inside it: its wall must not shove your capsule about, and his
+	# door is behind it, so the broken stub never blocks the walk there either
+	# (the old tank had no collider at all).
+	glass_tank.body.collision_layer = 0
+	vat_glass.visible = false
+	spill = FluidBody.new()
+	spill.name = "VatSpill"
+	spill.colour = Color(0.42, 0.04, 0.03)
+	spill.position = Vector3(VAT_POSITION.x, 0.0, VAT_POSITION.z)
+	add_child(spill)
+	# The grate is behind the tank, off the aisle you crawl down.
+	spill.setup(self, 3.84, Vector2(0.0, 2.6))
+	glass_tank.fluid = spill
 
 
 ## AX3.1/AX3.2. One dedicated failure-tank, off the repeating decorative row
@@ -1505,6 +1554,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if intake != null:
 		return
+	if _pad_input(event):
+		get_viewport().set_input_as_handled()
+		return
 	# Greg, 25 September: speedrunners. F, Enter or Space during his walk out
 	# sends him through his door now; the door still shuts and is heard.
 	if phase == "departure" and event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_F, KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
@@ -1560,6 +1612,74 @@ func _unhandled_input(event: InputEvent) -> void:
 		pitch = clampf(pitch - LOOK.dy(event.relative) * 0.0024, -1.2, 1.0)
 
 
+## Pad first (BUILD_BRIEFS rule 3), the same verbs the keys have: Cross skips
+## a scene and gets you up, Square tears and uses, R1 hits the glass. True
+## when the event was spent.
+func _pad_input(event: InputEvent) -> bool:
+	if not (event is InputEventJoypadButton) or not event.pressed:
+		return false
+	var button := (event as InputEventJoypadButton).button_index
+	var accept := button in [JOY_BUTTON_A, JOY_BUTTON_START]
+	var use := event.is_action_pressed("interact")
+	var hit := event.is_action_pressed("attack")
+	match phase:
+		"departure":
+			if accept:
+				departure_clock = maxf(departure_clock, DEPARTURE_SECONDS - 0.001)
+				WorldHistory.record_event("opening_departure_skipped", {})
+				return true
+		"hacked":
+			if accept:
+				brain_hack.call("skip_hack")
+				return true
+		"wired":
+			if use or hit:
+				_tug_wire(_aimed_wire(PAD_WIRE_CONE))
+				return true
+		"cord":
+			if use or hit or accept:
+				tug_cord()
+				return true
+		"smash":
+			if use or hit:
+				strike_glass()
+				return true
+		"knees":
+			if accept or use:
+				get_up()
+				return true
+	if not can_move:
+		return false
+	if hit and breakout_complete and vat_smash != null:
+		var tank: int = vat_smash.aimed(camera)
+		if tank >= 0:
+			vat_smash.strike(tank, doctor_route.held_weapon() if doctor_route != null else "")
+			return true
+	if event.is_action_pressed("jump"):
+		JUMP_CLIMB.press(player, yaw, float(anatomy.call("mobility_ratio")), "vat_room_climbed")
+		return true
+	if use:
+		_interact()
+		return true
+	return false
+
+
+## A stick is coarser than a mouse: the wire nearest the middle of the view
+## within this wider cone is the one Square takes.
+const PAD_WIRE_CONE := 0.8
+
+
+## "[E]" on the keyboard, "[PS5 SQUARE]" on the pad: whatever was used last.
+func _key(action: String) -> String:
+	var profile := get_node_or_null("/root/InputProfile")
+	return "[%s]" % (str(profile.call("glyph", action)) if profile != null else action.to_upper())
+
+
+func _on_pad() -> bool:
+	var profile := get_node_or_null("/root/InputProfile")
+	return profile != null and bool(profile.get("using_pad"))
+
+
 ## Greg, 28 September: one line at each beat, in your own head, first
 ## person, short and panicked. It says why, what you are, and what to do.
 const THOUGHTS := {
@@ -1578,7 +1698,16 @@ var thought_life := 0.0
 
 ## The music bed rises through the escape (Greg, 28 September).
 const VAT_TENSION := {"intake": 0.25, "departure": 0.4, "hacked": 0.9, "submerged": 0.6, "voiding": 0.55, "wired": 0.7, "cord": 0.8, "smash": 0.95, "rising": 0.6, "knees": 0.45, "floor": 0.45, "aisle": 0.35}
-const TANK_PANIC := {"intake": 0.2, "departure": 0.45, "hacked": 1.0, "submerged": 0.75}
+const TANK_PANIC := {"intake": 0.2, "departure": 0.45, "brain_screen": 0.5, "hacked": 1.0, "submerged": 0.75}
+const HANDS_PANIC := 0.85
+
+
+## Under the medium: every beat before the glass goes when the tank floods
+## out on the burst, only the early ones on the old drain-first path.
+func in_fluid() -> bool:
+	if TANK_PANIC.has(phase):
+		return true
+	return hands_on_breakout and phase in ["wired", "cord", "smash"]
 
 
 func _physics_process(delta: float) -> void:
@@ -1592,12 +1721,12 @@ func _physics_process(delta: float) -> void:
 	# Greg, 28 September: the tank you are in (TankView) until it drains.
 	_pin_tank_body()
 	if tank_view != null:
-		tank_view.in_tank = TANK_PANIC.has(phase)
-		tank_view.panic = float(TANK_PANIC.get(phase, 0.0))
+		tank_view.in_tank = in_fluid()
+		tank_view.panic = float(TANK_PANIC.get(phase, HANDS_PANIC if in_fluid() else 0.0))
 	var bed := get_node_or_null("AmbientBed")
 	if bed != null:
 		bed.set("tension", float(VAT_TENSION.get(phase, 0.35)))
-		bed.set("heart_muted", tank_view != null and TANK_PANIC.has(phase))
+		bed.set("heart_muted", tank_view != null and in_fluid())
 	if room_lights != null:
 		room_lights.tension = float(VAT_TENSION.get(phase, 0.35))
 	if phase == "intake":
@@ -1607,8 +1736,9 @@ func _physics_process(delta: float) -> void:
 			return
 		_update_arrival(delta)
 		return
-	# The hack draws itself; the body just hangs in the fluid under it.
-	if phase == "hacked":
+	# The hack and the brain screen draw themselves; the body just hangs in
+	# the fluid under them.
+	if phase in ["hacked", "brain_screen"]:
 		camera.rotation = Vector3(-0.1 + sin(Time.get_ticks_msec() * 0.0007) * 0.03, 0, 0)
 		_update_hud()
 		return
@@ -1620,6 +1750,8 @@ func _physics_process(delta: float) -> void:
 		return
 	# The tank's clock stops while you hang in the wires. Nothing moves on
 	# until the player does it themselves.
+	if phase in ["wired", "cord", "smash", "knees"]:
+		_stick_look(delta)
 	if phase in ["wired", "cord", "smash"]:
 		wired_clock += delta
 		_update_wired(delta)
@@ -1657,6 +1789,13 @@ func _physics_process(delta: float) -> void:
 		camera.rotation.y += sin(clock * 38.0) * force
 		camera.rotation.z += sin(clock * 53.0) * force * 1.4
 	_update_hud()
+
+## The right stick looks wherever the mouse does.
+func _stick_look(delta: float) -> void:
+	var profile := get_node_or_null("/root/InputProfile")
+	if profile != null:
+		profile.call("apply_stick_look", self, delta, -1.2, 1.0)
+
 
 ## From his door behind the vat, round the tank's right side, to his terminal
 ## (`inbound`), or the reverse. `t` is 0..1 along the whole walk.
@@ -1822,14 +1961,40 @@ func _update_departure(delta: float) -> void:
 	if departure_clock >= DEPARTURE_SECONDS:
 		subtitle.text = ""
 		WorldHistory.record_event("opening_examiner_departed", {"location": "growing_floor"})
-		# Greg: he leaves, the screaming starts, and the sigil takes your brain.
-		if BRAIN_HACK.wanted():
-			phase = "hacked"
-			brain_hack.call("begin_hack")
-		else:
-			phase = "submerged"
-			clock = 0.0
-			line_index = -1
+		# Job 4, Greg's order: the intake, the brain screen, then the hack.
+		if BrainScreen.wanted():
+			_open_brain_screen()
+			return
+		_begin_hack_or_wake()
+
+
+## Greg: he leaves, the screaming starts, and the sigil takes your brain.
+func _begin_hack_or_wake() -> void:
+	if BRAIN_HACK.wanted():
+		phase = "hacked"
+		brain_hack.call("begin_hack")
+	else:
+		phase = "submerged"
+		clock = 0.0
+		line_index = -1
+
+
+## Pick 2 of 2 disciplines on the chip (BrainScreen); third person comes on.
+var brain_screen: Control
+
+
+func _open_brain_screen() -> void:
+	phase = "brain_screen"
+	brain_screen = BrainScreen.new()
+	$HUD.add_child(brain_screen)
+	brain_screen.finished.connect(_on_brain_screen_done)
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+
+func _on_brain_screen_done(_disciplines: Array) -> void:
+	brain_screen = null
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	_begin_hack_or_wake()
 
 
 ## BRAIN HACKED / SOUL OVERTAKEN on the END ALL SUFFERING card, and the tank
@@ -1896,6 +2061,13 @@ func _update_sequence(_delta: float) -> void:
 			player.position.y = 1.35 + sin(clock * 0.8) * 0.06
 			opening_audio.set_phase("submerged", t)
 			if clock >= 3.2:
+				# Greg, 4 Oct: the fluid floods the floor when the glass goes and
+				# you fall with it, so in the game the tank stays full while you
+				# tear yourself loose. The drain-first order stays for old suites.
+				if hands_on_breakout:
+					clock = DRAINED_AT
+					_begin_wired()
+					return
 				phase = "voiding"
 				opening_audio.cue("drain")
 		"voiding":
@@ -1969,10 +2141,10 @@ func _update_wired(delta: float) -> void:
 
 
 ## The wire nearest the centre of view, or null when none is being looked at.
-func _aimed_wire() -> Node3D:
+func _aimed_wire(cone := 0.94) -> Node3D:
 	var forward := -camera.global_transform.basis.z
 	var best: Node3D = null
-	var best_dot := 0.94
+	var best_dot := cone
 	for cable in umbilicals:
 		for link in cable.get_children():
 			var to_link := ((link as Node3D).global_position - camera.global_position).normalized()
@@ -2121,11 +2293,26 @@ func strike_glass() -> void:
 	jolt = 1.4
 	anatomy.call("apply_hit", "right_arm", 4.0, 0.0, "blunt")
 	WorldHistory.record_event("opening_glass_struck", {"blow": glass_blows})
+	if glass_tank != null:
+		var ahead := _glass_ahead()
+		glass_tank.strike(ahead, (ahead - camera.global_position).normalized())
+		if tank_view != null:
+			tank_view.bleed(0.05)
 	if glass_blows < GLASS_BLOWS:
 		opening_audio.cue("tug")
 		_crack_glass(glass_blows)
 		return
 	_breach()
+
+
+## Where a fist lands: the wall straight ahead at the eye's height.
+func _glass_ahead() -> Vector3:
+	var forward := -camera.global_transform.basis.z
+	forward.y = 0.0
+	if forward.length() < 0.01:
+		forward = Vector3(0, 0, -1)
+	forward = forward.normalized()
+	return VAT_POSITION + forward * 0.95 + Vector3(0, clampf(camera.global_position.y, 0.5, 2.6), 0)
 
 
 ## Cracks radiating from where the fist landed, on the tank wall ahead.
@@ -2136,6 +2323,15 @@ func _crack_glass(blow: int) -> void:
 		forward = Vector3(0, 0, -1)
 	forward = forward.normalized()
 	var hit := VAT_POSITION + forward * 0.9 + Vector3(0, camera.global_position.y - 0.1, 0)
+	if glass_tank != null:
+		# The cracks are drawn in the glass itself now (GlassTank's shader,
+		# grown from each impact). What is kept here is where the blow landed.
+		var mark := Marker3D.new()
+		mark.name = "GlassBlow%d" % blow
+		add_child(mark)
+		mark.global_position = hit
+		glass_cracks.append(mark)
+		return
 	var crack_material := StandardMaterial3D.new()
 	crack_material.albedo_color = Color(0.95, 0.85, 0.8, 0.8)
 	crack_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -2158,6 +2354,7 @@ func _crack_glass(blow: int) -> void:
 ## implant is taken while you are down there, and the HUD boots.
 func _begin_knees() -> void:
 	clock = DRAINED_AT
+	fall_clock = 0.0 if glass_tank != null else FALL_SECONDS
 	player.position.y = BODY_HALF_HEIGHT
 	camera.position.y = 0.62 - BODY_HALF_HEIGHT
 	# Down on the grating, the broken tank around you and the aisle ahead.
@@ -2174,6 +2371,18 @@ func _begin_knees() -> void:
 
 func _update_knees(delta: float) -> void:
 	player.rotation.y = yaw
+	if phase == "knees" and fall_clock < FALL_SECONDS and glass_tank != null:
+		# Thrown forward with the medium and down onto your hands in it.
+		fall_clock += delta
+		var f := clampf(fall_clock / FALL_SECONDS, 0.0, 1.0)
+		var ahead := Vector3(-sin(yaw), 0.0, -cos(yaw))
+		var flat := fall_from + ahead * FALL_DISTANCE * ease(f, 0.5)
+		player.global_position = Vector3(flat.x, BODY_HALF_HEIGHT, flat.z)
+		camera.position.y = lerpf(fall_eye + (fall_from.y - BODY_HALF_HEIGHT), 0.62 - BODY_HALF_HEIGHT, ease(f, 2.2))
+		camera.rotation = Vector3(lerpf(0.0, pitch, f), 0, lerpf(0.0, 0.18, f))
+		if f >= 1.0 and spill != null:
+			spill.splash(Vector3(player.global_position.x, 0.0, player.global_position.z) + ahead * 0.5, 1.0)
+		return
 	if phase == "knees":
 		# Heaving on the grating, looking at the puddle.
 		camera.position.y = 0.62 - BODY_HALF_HEIGHT + sin(clock * 2.6) * 0.02
@@ -2257,6 +2466,15 @@ func _flood() -> void:
 	if tank_body != null and is_instance_valid(tank_body):
 		tank_body.queue_free()
 		tank_body = null
+	if spill != null:
+		# The medium comes out over seconds through the broken wall (GlassTank's
+		# pour), and what you are thrown out with lands under you first.
+		var out := Vector3(-sin(yaw), 0.0, -cos(yaw))
+		for index in 24:
+			var from := VAT_POSITION + out * 0.9 + Vector3(randf_range(-0.3, 0.3), randf_range(0.3, 1.4), randf_range(-0.3, 0.3))
+			spill.emit(from, out * randf_range(1.5, 3.2) + Vector3(randf_range(-0.6, 0.6), randf_range(-0.2, 0.6), randf_range(-0.6, 0.6)), 0.0009)
+		spill.deposit(VAT_POSITION + out * 1.6, 0.03)
+		return
 	var pool := MeshInstance3D.new()
 	pool.name = "SpilledMedium"
 	# This used to be a 1x1 PlaneMesh scaled to 5.5. It made the escaped medium
@@ -2312,12 +2530,19 @@ func _breach() -> void:
 	opening_audio.cue("glass")
 	if room_lights != null:
 		room_lights.burst(STROBES)
+	fall_from = player.global_position
+	fall_eye = camera.position.y
 	vat_glass.visible = false
 	fluid.visible = false
+	submerge_tint.color.a = 0.0
 	for cable in umbilicals:
 		cable.queue_free()
 	umbilicals.clear()
 	WorldHistory.record_event("opening_tank_breached", {"tank": "0C-7"})
+	if glass_tank != null and not glass_tank.broken:
+		# The older automatic breach never struck it: the last blows land now.
+		var ahead := _glass_ahead()
+		glass_tank.strike(ahead, (ahead - camera.global_position).normalized(), glass_tank.blows)
 	_flood()
 	# Glass and fluid go outward across the grating.
 	#
@@ -2329,7 +2554,7 @@ func _breach() -> void:
 	# know something broke. The struts stay up, so what is left afterwards is a
 	# broken tank rather than an empty floor.
 	breach_shake = 0.9
-	for index in 46:
+	for index in (0 if glass_tank != null else 46):
 		var shard := MeshInstance3D.new()
 		var mesh := BoxMesh.new()
 		# Wide size spread and real thinness: 46 shards all within a whisker of
@@ -2357,7 +2582,10 @@ func _breach() -> void:
 		add_child(shard)
 		var out := Vector3(cos(around), randf_range(0.05, 0.55), sin(around)).normalized()
 		glass_shards.append({"node": shard, "velocity": out * randf_range(3.2, 7.5), "life": 3.4})
-	# Spreading puddle.
+	# Spreading puddle (the old disc, when there is no real spill).
+	if spill != null:
+		_finish_breach()
+		return
 	var puddle := MeshInstance3D.new()
 	var disc := CylinderMesh.new()
 	disc.top_radius = 1.7
@@ -2378,6 +2606,10 @@ func _breach() -> void:
 	puddle.mesh = disc
 	puddle.position = VAT_POSITION + Vector3(0, 0.02, 0)
 	add_child(puddle)
+	_finish_breach()
+
+
+func _finish_breach() -> void:
 	for crack in glass_cracks:
 		crack.queue_free()
 	glass_cracks.clear()
@@ -2422,17 +2654,21 @@ func _record_breakout() -> void:
 		# way. What a player who never refused does not get is the chip.
 		memory = "The vat broke. The chip still answers to them."
 	WorldHistory.amend_subject("player", {"status": "broke free", "anatomy": anatomy_state, "anatomy_state": anatomy.call("snapshot"), "memory": memory, "implant_seized": bool(seizure.get("ok", false))})
-	var carry := CARRY.new()
-	var item := {"label": "BROKEN MEDICAL RESTRAINT", "kind": "tool", "mass": 0.0, "perishes": false, "age": 0.0, "from": "growing_floor"}
-	carry.items.append(item)
-	carry.save_to_history()
+	# What came out of the vat with you is the chip in your head. The broken
+	# restraint is only put in your hand when the old route is switched on.
+	var item := {"label": "WETWIRE CHIP", "kind": "implant", "from": "growing_floor"}
+	if grant_restraint:
+		var carry := CARRY.new()
+		item = {"label": "BROKEN MEDICAL RESTRAINT", "kind": "tool", "mass": 0.0, "perishes": false, "age": 0.0, "from": "growing_floor"}
+		carry.items.append(item)
+		carry.save_to_history()
 	first_acquisition_complete = true
 	PLAYER_ACTION_LEDGER.record("opening_breakout", {"location": "growing_floor", "implant": "wetwire chip", "acquisition": item.label})
 	OPENING.advance("broke_free")
 	WorldHistory.record_event("opening_breakout", {"location": "growing_floor", "implant": "wetwire chip", "item": item})
 	WorldHistory.commit_ledger_batch()
 	VAT_REBIRTH.complete()
-	subtitle.text = "THE WETWIRE ANSWERS  //  RESTRAINT BROKEN"
+	subtitle.text = "THE WETWIRE ANSWERS  //  RESTRAINT BROKEN" if grant_restraint else ""
 
 
 func _update_shards(delta: float) -> void:
@@ -2447,6 +2683,9 @@ func _update_shards(delta: float) -> void:
 
 
 func _update_movement(delta: float) -> void:
+	if spill != null:
+		spill.wade(player, player.global_position - Vector3(0, BODY_HALF_HEIGHT, 0), player.velocity, delta)
+	_stick_look(delta)
 	if JUMP_CLIMB.busy(player):
 		camera.rotation = Vector3(pitch, 0, 0)
 		return
@@ -2548,7 +2787,8 @@ func _near_first_objects() -> bool:
 func _try_pry_stuck_tank() -> bool:
 	if stuck_tank_marker == null or stuck_tank_opened:
 		return false
-	if not _carries_restraint() or not _near_first_objects():
+	var by_hand := not grant_restraint and not _carries_restraint()
+	if (not _carries_restraint() and not by_hand) or not _near_first_objects():
 		return false
 	stuck_tank_opened = true
 	# The shell that hid the occupant is what the restraint actually defeats;
@@ -2557,8 +2797,8 @@ func _try_pry_stuck_tank() -> bool:
 	stuck_tank_shell.visible = false
 	if stuck_tank_culture != null:
 		stuck_tank_culture.visible = false
-	subtitle.text = "THE BROKEN RESTRAINT BITES THE SEAM AND IT GIVES"
-	WorldHistory.record_event("opening_first_object_used", {"tool": RESTRAINT_LABEL, "target": FAILED_SUBJECT_ID})
+	subtitle.text = "" if by_hand else "THE BROKEN RESTRAINT BITES THE SEAM AND IT GIVES"
+	WorldHistory.record_event("opening_first_object_used", {"tool": "hands" if by_hand else RESTRAINT_LABEL, "target": FAILED_SUBJECT_ID})
 	return true
 
 
@@ -2605,24 +2845,24 @@ func _update_hud() -> void:
 		$HUD/Objective.text = ""
 		if revenge_at >= 0.0:
 			prompt.text = ""
-		elif _aimed_wire() != null:
-			prompt.text = "[E] RIP IT OUT   //   %d LEFT" % umbilicals.size()
-			osd.point_at((_aimed_wire().get_child(3) as Node3D).global_position)
+		elif _aimed_wire(PAD_WIRE_CONE if _on_pad() else 0.94) != null:
+			prompt.text = "%s RIP IT OUT   //   %d LEFT" % [_key("interact"), umbilicals.size()]
+			osd.point_at((_aimed_wire(PAD_WIRE_CONE if _on_pad() else 0.94).get_child(3) as Node3D).global_position)
 		else:
-			prompt.text = "MOUSE LOOK   //   FIND THE WIRES   //   %d LEFT" % umbilicals.size()
+			prompt.text = "%s   //   FIND THE WIRES   //   %d LEFT" % ["RIGHT STICK LOOK" if _on_pad() else "MOUSE LOOK", umbilicals.size()]
 		return
 	match phase:
 		"cord":
 			$HUD/Objective.text = ""
-			prompt.text = "[E] TEAR THE CORD OUT OF YOUR MOUTH   //   %d" % (CORD_TUGS - cord_pulls)
+			prompt.text = "%s TEAR THE CORD OUT OF YOUR MOUTH   //   %d" % [_key("interact"), CORD_TUGS - cord_pulls]
 			return
 		"smash":
 			$HUD/Objective.text = ""
-			prompt.text = "[CLICK] SMASH THE GLASS   //   %d" % (GLASS_BLOWS - glass_blows)
+			prompt.text = "%s SMASH THE GLASS   //   %d" % [_key("attack"), GLASS_BLOWS - glass_blows]
 			return
 		"knees":
 			$HUD/Objective.text = ""
-			prompt.text = "[SPACE] GET UP" if boot_hud != null and boot_hud.done else ""
+			prompt.text = ("%s GET UP" % _key("jump")) if boot_hud != null and boot_hud.done else ""
 			return
 		"rising":
 			prompt.text = ""
@@ -2641,8 +2881,8 @@ func _update_hud() -> void:
 	if inspect_held:
 		prompt.text = _inspect_text()
 		return
-	if not stuck_tank_opened and _carries_restraint() and _near_first_objects():
-		prompt.text = "[E] PRY THE JAMMED TANK WITH THE BROKEN RESTRAINT"
+	if not stuck_tank_opened and (_carries_restraint() or not grant_restraint) and _near_first_objects():
+		prompt.text = "%s PRY THE JAMMED TANK %s" % [_key("interact"), "WITH THE BROKEN RESTRAINT" if _carries_restraint() else "OPEN WITH YOUR FINGERS"]
 		osd.point_at(stuck_tank_marker.global_position + Vector3(0, 1.3, 0))
 		return
 	if stuck_tank_opened and CLOTHING.worn("player") == "bare" and CLOTHING.worn(FAILED_SUBJECT_ID) != "bare" and _near_first_objects():
