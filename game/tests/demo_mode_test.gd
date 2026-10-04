@@ -36,7 +36,7 @@ func _ready() -> void:
 	check(WorldHistory.event_count("demo_only_marker") == 0, "the DEMO history did not leak into PLAY")
 
 	WorldHistory.begin_demo()
-	check(WorldHistory.event_count("demo_only_marker") == 1, "the dedicated DEMO slot resumes")
+	check(WorldHistory.event_count("demo_only_marker") == 0, "every START DEMO is a fresh start (Greg, 4 Oct)")
 
 	print("DEMO_MODE_TEST_RESULT failures=%d" % failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

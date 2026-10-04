@@ -1047,9 +1047,9 @@ func _ready() -> void:
 	demo_wall.name = "DemoWall"
 	$HUD.add_child(demo_wall)
 	demo_wall.front_door_requested.connect(_leave_demo_wall)
-	# An ended demo remains ended when its dedicated save is resumed. The front
-	# door routes a won opening to this real scene, which immediately restores
-	# the wall instead of dropping the player back behind the authored stop.
+	# An ended demo remains ended if this scene is rebuilt inside the same demo
+	# session. A new START DEMO clears that isolated history before reaching the
+	# Hunt, so it cannot restore the previous session's wall.
 	if WorldHistory.is_demo() and str(WorldHistory.subject("demo_run").get("status", "")) == "ended":
 		demo_wall.call_deferred("open_wall")
 	# AG1.7, from the first playtest: "when I'm looking through the Tree section

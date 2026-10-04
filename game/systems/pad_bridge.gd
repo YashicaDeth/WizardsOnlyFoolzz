@@ -138,6 +138,13 @@ func _input(event: InputEvent) -> void:
 			using_pad = false
 	if event is InputEventJoypadButton:
 		var pad := event as InputEventJoypadButton
+		# D-pad drives menus whenever a control has focus (the gameplay keys
+		# K/J/4/I would do nothing there).
+		var dpad := {JOY_BUTTON_DPAD_UP: KEY_UP, JOY_BUTTON_DPAD_DOWN: KEY_DOWN, JOY_BUTTON_DPAD_LEFT: KEY_LEFT, JOY_BUTTON_DPAD_RIGHT: KEY_RIGHT}
+		if dpad.has(pad.button_index) and get_viewport().gui_get_focus_owner() != null:
+			if pad.pressed:
+				_tap(dpad[pad.button_index])
+			return
 		if BUTTON_KEYS.has(pad.button_index):
 			_send_key(BUTTON_KEYS[pad.button_index], pad.pressed)
 		elif BUTTON_MOUSE.has(pad.button_index):
