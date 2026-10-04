@@ -7,9 +7,16 @@ design decision, it is listed under OPEN; stop and report instead of choosing.
 ## Read before any job
 
 - `DESIGN/BUILD_PLAN.html` (scope of v0.1: what is in, what is switched off).
-- `P:/GameDev/AgentHub/data/greg_direction_2026-10-04_controller_combat.md`
-  and `P:/GameDev/AgentHub/data/greg_playtest_b_2026-10-04.md`: Greg's newest
-  words. They win over every older document, including this one.
+- `P:/GameDev/AgentHub/data/greg_playtest_b_2026-10-04.md` (short): what Greg
+  hit when he played. Greg's newest words win over every older document,
+  including this one.
+- **Spend tokens on building, not reading.** Your job section already carries
+  the decisions you need. Do not read the long files end to end:
+  `greg_direction_2026-10-04_controller_combat.md` (all of Greg's decisions),
+  `data/session_2026-10-04_chat.md` (the full planning chat) and `DESIGN.md`.
+  Search them (`rg -n "<word>"`) only when you need one specific decision.
+  To find code, use the knowledge graph in `graphify-out/` or `rg` for the
+  paths your brief names; do not crawl the repo.
 - Skills to load by name: `wof-lane-hygiene`, `wof-wire-before-polish`,
   `wof-verify-by-looking`, `running-headless-godot`, plus the ones named in
   your job.
@@ -33,6 +40,9 @@ design decision, it is listed under OPEN; stop and report instead of choosing.
 4. **One game.** Work in your own worktree off `claude/launch-latest`; run
    `--headless --import` once before anything else. Merge happens through the
    hub gate. Commit small and often so a usage limit cannot lose work.
+   If your branch already has a `WIP <task>` commit, a usage limit cut off an
+   earlier attempt: read `git log -3` and `git show --stat HEAD` and continue that
+   work instead of starting over.
 5. **Look at it.** A change that affects what the player sees is not done
    until you rendered it (capture harness under `game/tests/*_capture.tscn`, or
    one windowed run on the right monitor) and opened the PNG. Say which PNGs in
