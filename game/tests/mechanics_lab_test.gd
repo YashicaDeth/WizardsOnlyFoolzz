@@ -100,14 +100,15 @@ func _destruction() -> void:
 	await _press("attack")
 	await _seconds(0.3)
 	check(lab.ballistics.marks.any(func(mark: Node) -> bool: return is_instance_valid(mark) and mark.name.begins_with("GroundHole")), "a round into the open ground digs a hole")
-	# The cleaver on the wall.
-	lab.arsenal.select_weapon("sword")
+	# The cleaver on the wall (job 3: the HOTLINE CLEAVER replaced the sword,
+	# and a swing now has a windup before it lands).
+	lab.arsenal.select_weapon("cleaver")
 	var panel: BreakableProp = station._wall[Vector2i(1, 0)]
 	lab.player.global_position = panel.global_position + Vector3(0, 0.5, 1.6)
 	await _frames(2)
 	await _aim(panel.global_position)
 	await _press("attack")
-	await _frames(2)
+	await _seconds(0.6)
 	check(panel.integrity < panel.max_integrity, "the cleaver damages a wall panel")
 	await _press("interact")
 	check(station.broken_count() == 0, "USE on the destruction plinth rebuilds it all")
@@ -120,15 +121,14 @@ func _bodies() -> void:
 	check(lab.bodies.xray, "USE on the bodies plinth turns the X-ray on")
 	var rig: BaselineHuman = lab.bodies.rigs()[1]
 	var before := rig.zone_health("torso")
-	# Past the cleaver's cooldown, which the arsenal keeps across a swap.
 	await _seconds(0.7)
-	lab.arsenal.select_weapon("shiv")
+	lab.arsenal.select_weapon("cleaver")
 	lab.player.global_position = rig.global_position + Vector3(0, 1.0, 1.4)
 	await _frames(2)
 	await _aim(rig.global_position + Vector3(0, 1.2, 0))
 	await _press("attack")
-	await _frames(2)
-	check(str(lab.last_hit.get("what", "")) == "body", "the shiv lands on a dummy")
+	await _seconds(0.6)
+	check(str(lab.last_hit.get("what", "")) == "body", "the cleaver lands on a dummy")
 	var zone := str(lab.last_hit.get("zone", "torso"))
 	check(rig.zone_health(zone) < (before if zone == "torso" else 1000.0), "and wounds it (%s)" % zone)
 
