@@ -88,7 +88,8 @@ var rebirth_request: Dictionary = {}
 var holding_ram := false
 ## Which heavy thing is in hand, best first.
 var held_tool := ""
-const HEAVY_TOOLS := ["BREACH TOOL", "FIRE AXE", "BROKEN MEDICAL RESTRAINT"]
+## FIRE AXE stays for saves made before the HOTLINE CLEAVER replaced it.
+const HEAVY_TOOLS := ["BREACH TOOL", "HOTLINE CLEAVER", "FIRE AXE", "BROKEN MEDICAL RESTRAINT"]
 var tool_visual: Node3D
 var director: AlarmDirector
 var cameras: Array[SecurityCamera] = []
@@ -404,8 +405,8 @@ func _build_player() -> void:
 
 func _refresh_tool() -> void:
 	# The doctor's route never passes the Service Arcade, where the breach tool
-	# comes from: you arrive with the restraint off your own vat and perhaps his
-	# fire axe. Either is something to meet Hollis with; without this the
+	# comes from: you arrive with the restraint off your own vat and perhaps the
+	# HOTLINE CLEAVER off his wall. Either is something to meet Hollis with; without this the
 	# third route ended at his gate ("YOU HAVE NOTHING TO MEET HIM WITH").
 	held_tool = ""
 	for label in HEAVY_TOOLS:
@@ -414,9 +415,13 @@ func _refresh_tool() -> void:
 			break
 	holding_ram = not held_tool.is_empty()
 	if holding_ram and tool_visual == null:
-		tool_visual = LabSurface.breach_tool()
+		# The cleaver is shown as itself (DoctorRoute's in-hand model); every
+		# other heavy tool still reads as the breach tool.
+		tool_visual = DoctorRoute.cleaver_model() if held_tool in ["HOTLINE CLEAVER", "FIRE AXE"] else LabSurface.breach_tool()
 		add_child(tool_visual)
 		LabSurface.hold_in_view(camera, tool_visual)
+		if held_tool in ["HOTLINE CLEAVER", "FIRE AXE"]:
+			tool_visual.rotation_degrees = DoctorRoute.AXE_REST
 	elif not holding_ram and tool_visual != null:
 		tool_visual.queue_free()
 		tool_visual = null
