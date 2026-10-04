@@ -1,298 +1,189 @@
 extends Node3D
 
-## Station 1: a glass tank of red fluid. Hit it (any weapon, or the button)
-## and the glass goes: GPU particles with collision pour out across the
-## floor, the spill spreads as `BloodPool` stains (the pooling the gore stack
-## already uses), and walking through or shooting into the spill splashes.
-## The button refills a broken tank so it can be broken again.
+## Station 1: a glass tank of red fluid, on the shared GlassTank + FluidBody
+## (the same pair the opening vat adopts in Job 4).
+##
+## Greg (5 Oct): "it shouldn't instantly dissipate and it should be an actual
+## fluid as well as an actual glass." Each blow cracks the glass a stage; the
+## last bursts it outward with the fluid's pressure behind it; the tank pours
+## for several seconds into a pool that stays and creeps to the grate; wading
+## ripples, splashes and prints; the button shocks the spill (a test shock
+## until the shock staff lands in Job 3): a dummy standing in it is hit, the
+## one on dry floor is not.
+##
+## USE cycles: smash the tank -> shock the spill -> refill.
 
-const LIQUID := preload("res://lab/stations/lab_liquid.gdshader")
 const TITLE := "LIQUID"
-const VERB := "BREAK / REFILL THE TANK"
-const RADIUS := 0.7
-const HEIGHT := 2.0
+const VERB := "SMASH / SHOCK / REFILL"
 const PLINTH := 0.35
-const BLOWS := 2
-## How long the tank takes to empty, how far the spill reaches and how much
-## blood-pool volume it lays down in that time (900 drops is about a full
-## `BloodPool.MAX_RADIUS` stain; this is several of those meeting).
-const SPILL_SECONDS := 3.6
-const SPILL_REACH := 2.8
-const SPILL_VOLUME := 5200.0
-const FLUID := Color(0.42, 0.04, 0.03)
+const TANK_AT := Vector3(0, 0, -2.0)
+const BODIES := preload("res://lab/stations/bodies_station.gd")
 
 var lab: Node3D
-var glass: MeshInstance3D
+var tank: GlassTank
+var fluid: FluidBody
 var glass_body: StaticBody3D
-var fluid: MeshInstance3D
-var fluid_material: ShaderMaterial
-var pour: GPUParticles3D
-var splash: GPUParticles3D
-var hits := 0
-var broken := false
-var since := 0.0
-var poured := 0.0
-var splashes := 0
-var _slosh := 0.0
-var _splash_clock := 0.0
-var _shards: Array[Node] = []
+var wet_dummy: BaselineHuman
+var dry_dummy: BaselineHuman
+var player_shock_taken := 0.0
+var last_shocked: Array[Node3D] = []
+var _bump_clock := 0.0
+var _shocked_since_break := false
+
+
+var broken: bool:
+	get: return tank.broken
+var hits: int:
+	get: return tank.hits
+var splashes: int:
+	get: return fluid.splashes
 
 
 func build(owner_lab: Node3D) -> void:
 	lab = owner_lab
 	var plinth := MeshInstance3D.new()
 	var base := CylinderMesh.new()
-	base.top_radius = RADIUS + 0.12
-	base.bottom_radius = RADIUS + 0.18
+	base.top_radius = 0.82
+	base.bottom_radius = 0.88
 	base.height = PLINTH
 	base.material = _metal(Color("2a2420"))
 	plinth.mesh = base
-	plinth.position = Vector3(0, PLINTH * 0.5, -2.0)
+	plinth.position = TANK_AT + Vector3(0, PLINTH * 0.5, 0)
 	add_child(plinth)
+	var foot := StaticBody3D.new()
+	foot.position = plinth.position
+	var foot_shape := CollisionShape3D.new()
+	var foot_cylinder := CylinderShape3D.new()
+	foot_cylinder.radius = 0.85
+	foot_cylinder.height = PLINTH
+	foot_shape.shape = foot_cylinder
+	foot.add_child(foot_shape)
+	add_child(foot)
 
-	fluid = MeshInstance3D.new()
-	fluid.name = "Fluid"
-	var column := CylinderMesh.new()
-	column.top_radius = RADIUS - 0.04
-	column.bottom_radius = RADIUS - 0.04
-	column.height = HEIGHT * 0.9
-	column.radial_segments = 32
-	column.rings = 8
-	fluid_material = ShaderMaterial.new()
-	fluid_material.shader = LIQUID
-	fluid_material.set_shader_parameter("half_height", column.height * 0.5)
-	column.material = fluid_material
-	fluid.mesh = column
-	fluid.position = Vector3(0, PLINTH + column.height * 0.5, -2.0)
+	fluid = FluidBody.new()
+	fluid.name = "Spill"
+	fluid.position = TANK_AT
 	add_child(fluid)
+	fluid.setup(lab, 3.84, Vector2(2.6, 0.6))
+
+	tank = GlassTank.new()
+	tank.name = "Tank"
+	tank.position = TANK_AT + Vector3(0, PLINTH, 0)
+	tank.fluid = fluid
+	add_child(tank)
+	glass_body = tank.body
+	glass_body.set_meta("lab_station", self)
+	tank.burst.connect(_on_burst)
 	# Something pale hanging in it, so the depth tint has a thing to swallow.
 	var specimen := MeshInstance3D.new()
+	specimen.name = "Specimen"
 	var lump := CapsuleMesh.new()
 	lump.radius = 0.16
 	lump.height = 0.8
 	lump.material = _metal(Color("b39684"))
 	specimen.mesh = lump
-	specimen.position = Vector3(0.12, PLINTH + 1.0, -2.05)
-	specimen.rotation = Vector3(0.4, 0, 0.5)
-	specimen.name = "Specimen"
-	add_child(specimen)
+	tank.hold(specimen, Vector3(0.12, 1.0, -0.05))
 
-	glass_body = StaticBody3D.new()
-	glass_body.name = "Glass"
-	glass_body.position = Vector3(0, PLINTH + HEIGHT * 0.5, -2.0)
-	glass_body.set_meta("lab_station", self)
-	add_child(glass_body)
-	var shape := CollisionShape3D.new()
-	var cylinder := CylinderShape3D.new()
-	cylinder.radius = RADIUS
-	cylinder.height = HEIGHT
-	shape.shape = cylinder
-	glass_body.add_child(shape)
-	glass = MeshInstance3D.new()
-	var tube := CylinderMesh.new()
-	tube.top_radius = RADIUS
-	tube.bottom_radius = RADIUS
-	tube.height = HEIGHT
-	tube.radial_segments = 32
-	tube.cap_top = false
-	tube.cap_bottom = false
-	var pane := StandardMaterial3D.new()
-	pane.albedo_color = Color(0.7, 0.78, 0.76, 0.12)
-	pane.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	pane.roughness = 0.04
-	pane.metallic_specular = 0.9
-	pane.cull_mode = BaseMaterial3D.CULL_DISABLED
-	tube.material = pane
-	glass.mesh = tube
-	glass_body.add_child(glass)
-	var rim := MeshInstance3D.new()
-	var cap := TorusMesh.new()
-	cap.inner_radius = RADIUS - 0.02
-	cap.outer_radius = RADIUS + 0.07
-	cap.material = _metal(Color("3a2f27"))
-	rim.mesh = cap
-	rim.position = Vector3(0, HEIGHT * 0.5, 0)
-	glass_body.add_child(rim)
-
-	pour = _particles("Pour", 900, 2.4, false)
-	pour.position = Vector3(0, PLINTH + 0.5, -2.0)
-	var flow := pour.process_material as ParticleProcessMaterial
-	flow.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
-	flow.emission_ring_axis = Vector3.UP
-	flow.emission_ring_radius = RADIUS
-	flow.emission_ring_inner_radius = RADIUS * 0.6
-	flow.emission_ring_height = 0.8
-	flow.direction = Vector3(0, 0.3, 0)
-	flow.spread = 180.0
-	flow.initial_velocity_min = 1.2
-	flow.initial_velocity_max = 3.4
-	flow.collision_mode = ParticleProcessMaterial.COLLISION_RIGID
-	flow.collision_bounce = 0.05
-	flow.collision_friction = 0.6
-	add_child(pour)
-	splash = _particles("Splash", 60, 0.7, true)
-	var spray := splash.process_material as ParticleProcessMaterial
-	spray.direction = Vector3.UP
-	spray.spread = 55.0
-	spray.initial_velocity_min = 1.5
-	spray.initial_velocity_max = 3.2
-	spray.collision_mode = ParticleProcessMaterial.COLLISION_HIDE_ON_CONTACT
-	add_child(splash)
+	# Two dummies for the current: one where the spill will run, one dry.
+	wet_dummy = BODIES.dummy(self, "liquid_wet_dummy", TANK_AT + Vector3(-1.1, 0, 1.0), PI * 0.8)
+	dry_dummy = BODIES.dummy(self, "liquid_dry_dummy", TANK_AT + Vector3(-4.6, 0, 0.6), PI * 0.6)
 
 
 func press() -> String:
-	if broken:
-		_refill()
-		return "TANK REFILLED"
-	strike(glass_body.global_position + Vector3(0, 0, RADIUS), Vector3.FORWARD, BLOWS)
-	return "GLASS BROKEN"
+	if not tank.broken:
+		tank.strike(glass_body.global_position + Vector3(0, 0, tank.radius), Vector3.FORWARD, tank.blows)
+		return "GLASS BURST"
+	if not _shocked_since_break and fluid.wet_cells() > 0:
+		var struck := shock(fluid.global_position + Vector3(0, 0, 1.0))
+		return "SPILL SHOCKED  %d STANDING IN IT" % struck.size()
+	_refill()
+	return "TANK REFILLED"
 
 
-## A blow or a round on the glass. `weight` blows at once (the button is two).
+## The shock staff's hook (Job 3): current into the wet floor at `at`.
+func shock(at: Vector3) -> Array[Node3D]:
+	_shocked_since_break = true
+	var extra: Array = []
+	if lab != null and lab.get("player") != null:
+		extra.append(lab.player)
+	last_shocked = fluid.shock(at, extra)
+	if lab != null and last_shocked.has(lab.get("player")):
+		player_shock_taken += fluid.shock_damage
+	return last_shocked
+
+
+## A blow or a round on the glass.
 func strike(at: Vector3, direction: Vector3, weight := 1) -> Dictionary:
-	if broken:
-		touch(at, 1.0)
-		return {"hit": true, "broken": true}
-	hits += weight
-	_slosh = 0.06
-	if hits < BLOWS:
-		(glass.mesh.surface_get_material(0) as StandardMaterial3D).albedo_color.a = 0.3
-		return {"hit": true, "broken": false}
-	_break(direction)
-	return {"hit": true, "broken": true}
+	var result := tank.strike(at, direction, weight)
+	if result.broken:
+		fluid.splash(at * Vector3(1, 0, 1) + Vector3(0, fluid.global_position.y, 0), 1.0)
+	return result
 
 
 ## Feet or a round at `at`: a splash if there is spill under it.
 func touch(at: Vector3, strength := 1.0) -> bool:
-	if lab == null or BloodPool.volume_at(lab, at) <= 0.0:
-		return false
-	splash.global_position = Vector3(at.x, 0.05, at.z)
-	splash.amount_ratio = clampf(strength, 0.2, 1.0)
-	splash.restart()
-	splashes += 1
-	return true
+	return fluid.splash(at, strength)
 
 
-## Called by the lab every physics frame with the player's feet and speed.
-func wade(feet: Vector3, speed: float, delta: float) -> void:
-	_splash_clock -= delta
-	if speed > 1.0 and _splash_clock <= 0.0 and touch(feet, speed / 6.0):
-		_splash_clock = 0.32
+## Called by the lab every physics frame with the walker, feet and velocity.
+func wade(walker: Node3D, feet: Vector3, velocity: Vector3, delta: float) -> void:
+	fluid.wade(walker, feet, velocity, delta)
+	GlassTank.kick(feet, velocity)
+	# Walking into the tank sloshes it.
+	_bump_clock -= delta
+	var local := tank.to_local(feet)
+	var flat := Vector2(local.x, local.z)
+	if _bump_clock <= 0.0 and flat.length() < tank.radius + 0.45 and Vector2(velocity.x, velocity.z).length() > 1.0:
+		_bump_clock = 0.6
+		tank.slosh(Vector3(local.x, 0, local.z), 0.35)
+
+
+func pouring() -> bool:
+	return fluid.blob_count() > 0
 
 
 func status() -> String:
-	if not broken:
-		return "TANK FULL   %d/%d BLOWS" % [hits, BLOWS]
-	return "SPILLED %d%%   POOLS %d   SPLASHES %d" % [roundi(poured / SPILL_VOLUME * 100.0), BloodPool.pool_count(lab), splashes]
+	if not tank.broken:
+		return "TANK FULL   CRACKS %d/%d" % [tank.hits, tank.blows - 1]
+	return "LEVEL %d%%  POOL %.0f L  DRAINED %.1f L  SPLASH %d  SHOCKS %d" % [roundi(tank.level * 100.0), fluid.volume() * 1000.0, fluid.drained * 1000.0, fluid.splashes, fluid.shocks]
 
 
-func _process(delta: float) -> void:
-	_slosh = move_toward(_slosh, 0.0, delta * 0.05)
-	fluid_material.set_shader_parameter("slosh", _slosh)
-	if not broken:
-		return
-	since += delta
-	var drained := clampf(since / SPILL_SECONDS, 0.0, 1.0)
-	var level := maxf(0.0, 1.0 - drained)
-	fluid.scale.y = maxf(level, 0.001)
-	fluid.position.y = PLINTH + HEIGHT * 0.9 * 0.5 * level
-	fluid.visible = level > 0.01
-	pour.emitting = drained < 1.0
-	if drained < 1.0 and poured < SPILL_VOLUME:
-		# The stain spreads from the tank's foot outward as the tank empties.
-		var share := SPILL_VOLUME * delta / SPILL_SECONDS
-		var reach := lerpf(RADIUS + 0.3, SPILL_REACH, ease(drained, 0.6))
-		var angle := randf() * TAU
-		var from := global_position + Vector3(0, 0.0, -2.0)
-		var at := from + Vector3(cos(angle), 0, sin(angle)) * randf_range(RADIUS, reach)
-		BloodPool.keep(lab, Vector3(at.x, 0.0, at.z), share)
-		poured += share
-
-
-func _break(direction: Vector3) -> void:
-	broken = true
-	since = 0.0
-	poured = 0.0
-	glass.visible = false
-	(glass_body.get_child(0) as CollisionShape3D).set_deferred("disabled", true)
-	_slosh = 0.12
-	pour.restart()
-	pour.emitting = true
-	var shard_material := StandardMaterial3D.new()
-	shard_material.albedo_color = Color(0.7, 0.78, 0.76, 0.35)
-	shard_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	shard_material.roughness = 0.05
-	shard_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	for index in 18:
-		var shard := RigidBody3D.new()
-		shard.mass = 0.05
-		shard.collision_layer = 1 << 3
-		shard.collision_mask = 1
+func _on_burst(direction: Vector3) -> void:
+	_shocked_since_break = false
+	# Debris carried out with the pour, to float on the spill.
+	for index in 3:
+		var chunk := RigidBody3D.new()
+		chunk.name = "Floater"
+		chunk.mass = 0.05
+		chunk.collision_layer = 1 << 3
+		chunk.collision_mask = 1
 		var piece := MeshInstance3D.new()
-		var prism := PrismMesh.new()
-		prism.size = Vector3(randf_range(0.08, 0.3), randf_range(0.12, 0.4), 0.01)
-		prism.material = shard_material
-		piece.mesh = prism
-		shard.add_child(piece)
+		var box := BoxMesh.new()
+		box.size = Vector3(0.09, 0.03, 0.06) * (1.0 + index * 0.3)
+		box.material = _metal(Color("b39684").darkened(0.2 * index))
+		piece.mesh = box
+		chunk.add_child(piece)
 		var hull := CollisionShape3D.new()
-		var box := BoxShape3D.new()
-		box.size = prism.size
-		hull.shape = box
-		shard.add_child(hull)
-		add_child(shard)
-		var around := TAU * randf()
-		var out := Vector3(cos(around), 0, sin(around))
-		shard.global_position = glass_body.global_position + out * RADIUS + Vector3(0, randf_range(-0.8, 0.9), 0)
-		shard.linear_velocity = (out + direction * 0.4 + Vector3(0, randf_range(0.1, 0.6), 0)).normalized() * randf_range(1.5, 4.5)
-		shard.angular_velocity = Vector3(randf_range(-9, 9), randf_range(-9, 9), randf_range(-9, 9))
-		_shards.append(shard)
-	WorldHistory.record_event("mechanics_lab_tank_broken", {"blows": hits})
+		var shape := BoxShape3D.new()
+		shape.size = box.size
+		hull.shape = shape
+		chunk.add_child(hull)
+		add_child(chunk)
+		var around := atan2(-direction.z, -direction.x) + randf_range(-0.8, 0.8)
+		chunk.global_position = tank.to_global(Vector3(cos(around) * 0.8, 0.6, sin(around) * 0.8))
+		chunk.linear_velocity = Vector3(cos(around), 0.5, sin(around)) * 2.0
+		fluid.add_floater(chunk)
+	WorldHistory.record_event("mechanics_lab_tank_broken", {"blows": tank.hits})
 
 
 func _refill() -> void:
-	broken = false
-	hits = 0
-	since = 0.0
-	glass.visible = true
-	(glass.mesh.surface_get_material(0) as StandardMaterial3D).albedo_color.a = 0.12
-	(glass_body.get_child(0) as CollisionShape3D).set_deferred("disabled", false)
-	fluid.scale.y = 1.0
-	fluid.position.y = PLINTH + HEIGHT * 0.9 * 0.5
-	fluid.visible = true
-	pour.emitting = false
-	for shard in _shards:
-		if is_instance_valid(shard):
-			shard.queue_free()
-	_shards.clear()
+	tank.refill()
+	fluid.clear()
+	for child in get_children():
+		if child.name.begins_with("Floater"):
+			child.queue_free()
 	BloodPool.clear()
-
-
-func _particles(label: String, amount: int, life: float, one_shot: bool) -> GPUParticles3D:
-	var particles := GPUParticles3D.new()
-	particles.name = label
-	particles.amount = amount
-	particles.lifetime = life
-	particles.one_shot = one_shot
-	particles.explosiveness = 1.0 if one_shot else 0.0
-	particles.emitting = false
-	particles.visibility_aabb = AABB(Vector3(-6, -2, -6), Vector3(12, 6, 12))
-	var process := ParticleProcessMaterial.new()
-	process.gravity = Vector3(0, -9.8, 0)
-	process.scale_min = 0.6
-	process.scale_max = 1.4
-	particles.process_material = process
-	var drop := SphereMesh.new()
-	drop.radius = 0.025
-	drop.height = 0.05
-	drop.radial_segments = 6
-	drop.rings = 3
-	var wet := StandardMaterial3D.new()
-	wet.albedo_color = FLUID
-	wet.roughness = 0.08
-	wet.metallic_specular = 0.8
-	drop.material = wet
-	particles.draw_pass_1 = drop
-	return particles
+	Footprints.clear()
 
 
 func _metal(colour: Color) -> StandardMaterial3D:
