@@ -13,6 +13,13 @@ extends Node3D
 
 signal zone_exit_reached()
 
+## Job 5's cut-down v0.1 route. Turning this off restores the older room
+## scenes and their optional puzzles without deleting them.
+const V01_ONE_MAP := true
+## OPEN dial: keep removed branches visibly sealed instead of presenting
+## misleading dead ends. Greg can flip this without restoring their puzzles.
+const V01_DISABLED_ROUTES_AS_SEALED := true
+
 const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
 const BODY_CAM := preload("res://systems/body_cam_feel.gd")
 const LOOK := preload("res://systems/look_settings.gd")
@@ -41,42 +48,54 @@ var tunnels: Node3D
 var prompt: Label
 var where: Label
 var exit_reached := false
+## When embedded in vat_chamber the authored opening keeps its one player,
+## camera and HUD. This node contributes the connected geometry and lifts.
+var embedded := false
 ## Set by tests and the playbot: a world point to walk to, sprinting.
 var bot_goal = null
 
 
 func _ready() -> void:
-	var environment := Environment.new()
-	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = Color("050404")
-	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color("2a2018")
-	environment.ambient_light_energy = 0.35
-	var world := WorldEnvironment.new()
-	world.environment = environment
-	add_child(world)
+	if not embedded:
+		var environment := Environment.new()
+		environment.background_mode = Environment.BG_COLOR
+		environment.background_color = Color("050404")
+		environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+		environment.ambient_light_color = Color("2a2018")
+		environment.ambient_light_energy = 0.35
+		var world := WorldEnvironment.new()
+		world.environment = environment
+		add_child(world)
 	_build_level_0c()
 	_build_level_0d()
-	_build_doctor_line()
+	if not embedded:
+		_build_doctor_line()
 	_build_surface()
 	for lift: FacilityElevator in lifts.values():
 		TUNNEL_KIT.dress_lift(lift)
-	_build_player()
-	_build_hud()
+	if not embedded:
+		_build_player()
+		_build_hud()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func attach_player(body: CharacterBody3D, view: Camera3D) -> void:
+	player = body
+	camera = view
 
 
 # --- 0C: Growing Floor, Examination Room, service artery, Service Arcade -----
 
 func _build_level_0c() -> void:
 	# Growing Floor (vat_chamber.tscn), origin at the vat.
-	_room("GROWING FLOOR", 0.0, Vector2(-8, 8), Vector2(-26, 3.6), 4.4,
-		{"e": [[-2.5, 3.0, 3.0]], "s": [[1.6, 1.2, 2.3]]})
-	_box(Vector3(2.2, 3.2, 2.2), Vector3(0, 1.6, 0.0), Color("3a1410"))
-	_sign("YOUR VAT", Vector3(0, 3.5, -1.2))
-	# Examination Room behind the vat (doctor_route.gd), his door in the wall.
-	_room("EXAMINATION ROOM", 0.0, Vector2(-3.5, 4.5), Vector2(3.6, 10.5), 3.1,
-		{"s": [[0.5, 1.6, 2.3]]}, ["n"])
+	if not embedded:
+		_room("GROWING FLOOR", 0.0, Vector2(-8, 8), Vector2(-26, 3.6), 4.4,
+			{"e": [[-2.5, 3.0, 3.0]], "s": [[1.6, 1.2, 2.3]]})
+		_box(Vector3(2.2, 3.2, 2.2), Vector3(0, 1.6, 0.0), Color("3a1410"))
+		_sign("YOUR VAT", Vector3(0, 3.5, -1.2))
+		# Examination Room behind the vat (doctor_route.gd), his door in the wall.
+		_room("EXAMINATION ROOM", 0.0, Vector2(-3.5, 4.5), Vector2(3.6, 10.5), 3.1,
+			{"s": [[0.5, 1.6, 2.3]]}, ["n"])
 	# Service artery and its side tunnels: the tunnel kit network, staff door
 	# east to the arcade's west wall (facility_tunnel_network.gd).
 	tunnels = TUNNEL_NETWORK.instantiate()
@@ -101,9 +120,9 @@ func _build_level_0d() -> void:
 	lifts["transit"] = lift_a
 	_corridor_z(-12.0, 26.5, 29.5, -66.0, -63.8, 3.0)
 	# Lower Works (buried_city.tscn), origin (28, -12, -84).
+	var drain_hole := Rect2() if embedded and V01_DISABLED_ROUTES_AS_SEALED else Rect2(36, -120, 2, 2)
 	_room("LOWER WORKS", -12.0, Vector2(13, 43), Vector2(-136, -66), 11.8,
-		{"s": [[28.0, 3.0, 3.0]]}, [], Rect2(36, -120, 2, 2), Rect2(26.2, -123.8, 3.6, 3.6))
-	_sign("DRAIN GRATE // OLD DRAINS", Vector3(37, -10.6, -119))
+		{"s": [[28.0, 3.0, 3.0]]}, [], drain_hole, Rect2(26.2, -123.8, 3.6, 3.6))
 	var heat := FacilityElevator.new()
 	heat.name = "HeatElevator"
 	heat.position = Vector3(28, 0, -122)
@@ -111,9 +130,11 @@ func _build_level_0d() -> void:
 	heat.setup([-12.0, SURFACE_Y], ["0D LOWER WORKS", "SURFACE"], [1, -1], 0)
 	lifts["heat"] = heat
 	_sign("HEAT ELEVATOR", Vector3(28, -8.6, -119.9))
-	# Old Drains (old_drains.tscn) under the east floor, 8 m below the grate.
-	_room("OLD DRAINS", -20.0, Vector2(34, 40), Vector2(-180, -114), 4.2, {"n": [[37.0, 3.0, 3.0]]})
-	_sign("STORM OUTFALL", Vector3(37, -17.0, -179))
+	if not embedded:
+		_sign("DRAIN GRATE // OLD DRAINS", Vector3(37, -10.6, -119))
+		# Old Drains are a later route, outside the v0.1 one-map spine.
+		_room("OLD DRAINS", -20.0, Vector2(34, 40), Vector2(-180, -114), 4.2, {"n": [[37.0, 3.0, 3.0]]})
+		_sign("STORM OUTFALL", Vector3(37, -17.0, -179))
 
 
 # --- The doctor's line: Lift D, Support Unit, Vehicle Bay -------------------
@@ -207,6 +228,12 @@ func interact() -> bool:
 
 
 func _physics_process(delta: float) -> void:
+	if player == null:
+		return
+	if embedded:
+		if not exit_reached and player.global_position.y > SURFACE_Y - 1.0 and player.global_position.z < GATE_Z:
+			_leave()
+		return
 	var input := Vector3(Input.get_axis("move_left", "move_right"), 0.0, Input.get_axis("move_forward", "move_back"))
 	var direction := (Basis(Vector3.UP, yaw) * input).normalized()
 	var sprinting := Input.is_action_pressed("sprint")
@@ -239,6 +266,22 @@ func _update_hud() -> void:
 			break
 	prompt.text = line
 	where.text = "SUBLEVEL %s" % ("SURFACE" if at.y > SURFACE_Y - 2.0 else "0C" if at.y > -6.0 else "0E" if at.y < -18.0 else "0D")
+
+
+## One actionable line for the shared opening HUD. It describes the next
+## physical threshold, rather than resurrecting the removed puzzle chain.
+func objective_for(at: Vector3) -> String:
+	if at.y > SURFACE_Y - 2.0:
+		return "OPEN THE SURFACE GATE"
+	if at.y < -6.0:
+		if at.z > -118.0:
+			return "CROSS LOWER WORKS TO THE HEAT ELEVATOR"
+		return "RIDE THE HEAT ELEVATOR TO DAYLIGHT"
+	if at.x < 8.0:
+		return "GO THROUGH THE EAST STAFF DOOR"
+	if at.z > -57.0:
+		return "CROSS THE SERVICE ARCADE TO THE TRANSIT LIFT"
+	return "RIDE THE TRANSIT LIFT DOWN"
 
 
 ## The Surface Gate: the first zone exit. Same ledger as the Lower Works' own

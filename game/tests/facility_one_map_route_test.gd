@@ -1,0 +1,41 @@
+extends Node
+
+## Job 5 production wiring: the real opening owns the one player while the
+## facility map supplies every internal corridor and lift. No room handoff is
+## needed before the true surface boundary.
+
+const VAT := preload("res://vat_chamber.tscn")
+
+var failures: Array[String] = []
+
+
+func check(condition: bool, label: String) -> void:
+	print("PASS " if condition else "FAIL ", label)
+	if not condition:
+		failures.append(label)
+
+
+func _ready() -> void:
+	if OS.get_environment("ATG_TEST_MODE") != "1":
+		get_tree().quit(2)
+		return
+	var scene_at_start := get_tree().current_scene
+	var vat := VAT.instantiate()
+	add_child(vat)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var facility: Node3D = vat.facility_map
+	check(facility != null and bool(facility.embedded), "the production vat embeds the one-map facility")
+	check(facility.player == vat.player and facility.camera == vat.camera, "the opening player and camera persist into the facility")
+	check(facility.tunnels != null and facility.lifts.has("transit") and facility.lifts.has("heat"), "the service artery and both v0.1 lifts are live")
+	check(not facility.lifts.has("doctor"), "the out-of-scope doctor branch is switched off")
+	check(str(facility.objective_for(Vector3(14, 0, -2.5))).contains("SERVICE ARCADE"), "0C names the next walkable threshold")
+	check(str(facility.objective_for(Vector3(28, -12, -90))).contains("HEAT ELEVATOR"), "0D names the heat elevator")
+	check(str(facility.objective_for(Vector3(28, 20, -130))).contains("SURFACE GATE"), "the surface objective names its door")
+	vat._open_staff_door(false)
+	check(vat.staff_door_open and vat.staff_door_panel.position.z > vat.STAFF_DOOR_AT.z + 1.0, "the east staff door physically clears the artery opening")
+	var objective: Label = vat.get_node("HUD/Objective")
+	check(objective.autowrap_mode != TextServer.AUTOWRAP_OFF and objective.anchor_left < 1.0, "the one objective line wraps inside a responsive screen region")
+	check(get_tree().current_scene == scene_at_start and not Interstitial.travelling, "wiring the production map causes no scene change or interstitial")
+	print("FACILITY_ONE_MAP_ROUTE_RESULT failures=%d" % failures.size())
+	get_tree().quit(1 if failures.size() > 0 else 0)
