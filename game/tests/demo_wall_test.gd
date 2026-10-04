@@ -47,7 +47,7 @@ func _ready() -> void:
 	check(WorldHistory.event_count() == demo_event_count + 1, "promotion preserves the completed history before adding its receipt")
 
 	WorldHistory.begin_demo()
-	check(str(WorldHistory.subject("demo_run").get("status", "")) == "ended", "the dedicated demo save remains ended and untouched")
+	check(str(WorldHistory.subject("demo_run").get("status", "")) != "ended", "a new demo start does not inherit the ended run (Greg, 4 Oct)")
 	check(WorldHistory.event_count("demo_world_continued") == 0, "PLAY continuation does not leak back into DEMO")
 	check(WorldHistory.load_slot(slot_id), "the promoted PLAY slot loads from disk")
 	check(str(WorldHistory.subject("demo_run").get("continued_as", "")) == slot_id, "the complete promoted world survives reload")

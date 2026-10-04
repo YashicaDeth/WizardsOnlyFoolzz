@@ -1159,10 +1159,10 @@ func _on_freed_subject_struck(damage: float) -> void:
 	breach_shake = maxf(breach_shake, 0.2)
 
 
-## A seated BaselineHuman makes the first visible other subjects recognisably
-## part of the same world as the player: hands, face, feet, clothing and a
-## body which could be wounded later.  Their frozen pose costs no AI, physics
-## thinking, or animation work while they remain background specimens.
+## A standing-layout BaselineHuman makes the first visible other subjects part
+## of the same world as the player without folding them into the derby driver's
+## seated pose. VatFloat keeps each complete, gore-capable body suspended in
+## its own glass volume.
 func _build_cradled_vat_subject(at: Vector3, seed_value: int, parent_node: Node3D = null) -> Node3D:
 	var identity := "vat_subject_%d_%d" % [seed_value, int(absf(at.x) * 10.0)]
 	var rig = BASELINE_HUMAN.new()
@@ -1179,25 +1179,19 @@ func _build_cradled_vat_subject(at: Vector3, seed_value: int, parent_node: Node3
 		# of the four places it is supposed to. It now reads the same global
 		# setting the other scenes read, so OFF still turns it off.
 		"gore": BASELINE_HUMAN.apply_gore_setting(),
-		"seated": true,
+		"seated": false,
 		"flesh": Color("6a4a43") if seed_value == 1 else Color("4d3833"),
 		"variation": 4 + seed_value * 5 + int(absf(at.x)),
 		"build": 0.92 + float(seed_value) * 0.04,
 	})
 	HUNTER_APPEARANCE.style_world_rig(rig, identity, false)
-	# Fold the seated pose inward around the tank's centre instead of presenting
-	# two relaxed mannequins.  One is still alive; the other is visibly failed.
-	for side in [-1.0, 1.0]:
-		var arm := rig.parts.get("left_arm" if side < 0.0 else "right_arm") as Node3D
-		if arm != null:
-			arm.rotation_degrees.z += side * 54.0
-			arm.rotation_degrees.x += 24.0
-	for leg_id in ["left_leg", "right_leg"]:
-		var leg := rig.parts.get(leg_id) as Node3D
-		if leg != null:
-			leg.rotation_degrees.x -= 38.0
 	if seed_value == 2:
 		rig.behead()
+	var float_motion = preload("res://systems/vat_float.gd").new()
+	rig.add_child(float_motion)
+	var tank_floor := 0.0 if parent_node != null else at.y
+	var tank_ceiling := 2.8 if parent_node != null else at.y + 2.4
+	float_motion.setup(rig, Vector3(at.x, 0.0, at.z), 0.72, tank_floor, tank_ceiling, seed_value)
 	return rig
 
 

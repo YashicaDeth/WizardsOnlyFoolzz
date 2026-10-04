@@ -1,5 +1,9 @@
 # Living design notes
 
+4 October menu/demo decision: choosing START DEMO always begins a fresh demo
+world. The isolated demo save is wiped before the opening loads; an ended or
+partially played demo is never resumed by pressing START DEMO again.
+
 20 September implementation note: the opening's missing later procedure reveal
 now comes from the body rather than a flashback or lore card. Filing the intake
 sheet installs CellOutz's existing wetwire hardware in the player's real head

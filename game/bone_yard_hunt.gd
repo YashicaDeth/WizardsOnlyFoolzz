@@ -871,6 +871,11 @@ var inspect_blend := 0.0
 var inspect_time := 0.0
 var inspection_light: OmniLight3D
 var pending_attack: Dictionary = {}
+## The authored pad-first melee clock existed in the sandbox but the production
+## Hunt still used one legacy wind-up and one generic arm sweep. Third person
+## owns this instance; first-person drag swings keep their established path.
+var third_person_moveset := SwordMoveset.new()
+var third_person_strike_resolved := false
 ## AN2.3. Set by `_attack_nearest_encounter_actor()` right before it returns
 ## true, read once by `_resolve_strike()` immediately after — a throat and a
 ## skull do not stop a blade the same amount, and `arm.strike()` was never
@@ -916,6 +921,21 @@ var xray_active := false
 var captivity_procedure_notice := 0.0
 ## How long the button has to be down before the segment becomes the radial.
 const XRAY_HOLD_TO_WHEEL := 0.35
+## Aimed X-ray (Greg, 2026-10-04): slowed time, one body's parts as targets.
+## Pad: L2 and R2 together and held. Mouse: aiming (RMB) and Q.
+var vats := VatsTargeting.new()
+var vats_overlay: VatsOverlay = null
+## The actor record VATS is open on, and the part the next round is sent to.
+var vats_actor: Dictionary = {}
+var vats_shot_part: Dictionary = {}
+## Real seconds since each button went down; -1 when up. The chord is read
+## from these, so a quick aim-then-fire stays a shot.
+var _vats_rmb_down := -1.0
+var _vats_lmb_down := -1.0
+## R2 came down inside the chord window: held on, it is VATS; let go, the
+## shot it was holding back fires.
+var _vats_chord_pending := false
+var _vats_mouse_sweep := 0.0
 
 @onready var camera: Camera3D = $CameraRig/Camera3D
 ## Agent 1 brief. "Do not solve darkness by merely increasing ambient
@@ -1032,9 +1052,9 @@ func _ready() -> void:
 	demo_wall.name = "DemoWall"
 	$HUD.add_child(demo_wall)
 	demo_wall.front_door_requested.connect(_leave_demo_wall)
-	# An ended demo remains ended when its dedicated save is resumed. The front
-	# door routes a won opening to this real scene, which immediately restores
-	# the wall instead of dropping the player back behind the authored stop.
+	# An ended demo remains ended if this scene is rebuilt inside the same demo
+	# session. A new START DEMO clears that isolated history before reaching the
+	# Hunt, so it cannot restore the previous session's wall.
 	if WorldHistory.is_demo() and str(WorldHistory.subject("demo_run").get("status", "")) == "ended":
 		demo_wall.call_deferred("open_wall")
 	# AG1.7, from the first playtest: "when I'm looking through the Tree section
@@ -1071,6 +1091,9 @@ func _ready() -> void:
 	lock_readout = LockReadout.new()
 	lock_readout.name = "LockReadout"
 	$HUD.add_child(lock_readout)
+	vats_overlay = VatsOverlay.new()
+	vats_overlay.name = "VatsOverlay"
+	$HUD.add_child(vats_overlay)
 	_carry_current_weapon()
 	# AF1. Rounds and brass live in the world, not in the HUD.
 	ballistics = BALLISTICS.new()
@@ -1605,6 +1628,9 @@ func _register_people() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if resolution_ui.visible or kill_cam.active:
 		return
+	if _vats_input(event):
+		get_viewport().set_input_as_handled()
+		return
 	if panel_mode == "hub" and brain_hub != null and brain_hub.handle_input(event):
 		get_viewport().set_input_as_handled()
 		return
@@ -1680,6 +1706,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
 			return
 	if event is InputEventKey and event.keycode == KEY_Q and not event.echo:
+		if event.pressed and firearm_aiming and vats_open():
+			q_tap_pending = false
+			return
 		if event.pressed:
 			q_tap_pending = panel_mode.is_empty() and not resolution_ui.visible
 		else:
@@ -1694,8 +1723,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			if event.pressed:
 				if smoke_trick_window > 0.0:
 					_shape_smoke_trick()
+				elif _vats_holds_trigger():
+					pass
 				else:
 					_attack()
+			elif _vats_chord_pending:
+				# R2 let go before the chord held: it was a shot after all.
+				_vats_chord_pending = false
+				_attack()
 	# Greg, 28 September: middle mouse is the heavy. Tap = a heavy swing; hold
 	# = a guard break (randomly knocks their guard open or throws them).
 	# Lock-on is Z.
@@ -2087,6 +2122,7 @@ func _physics_process(delta: float) -> void:
 		if body_motion != null:
 			body_motion.set_guard(0.0, "melee")
 			body_motion.set_lean(0.0)
+	_advance_third_person_melee(player_delta)
 	_update_player(delta)
 	cost = ScriptCost.lap("_update_player", cost)
 	_enforce_demo_territory()
@@ -2111,7 +2147,7 @@ func _physics_process(delta: float) -> void:
 	# *hold* — you are meant to be moving while you do it. Greg: "make the b
 	# slider change to like e or idk r or q"; E is interact and R is reload, so
 	# Q is the one of the three that is actually free.
-	_update_xray(delta, Input.is_key_pressed(KEY_Q))
+	_update_xray(delta, Input.is_key_pressed(KEY_Q) and not vats.is_active())
 	cost = ScriptCost.lap("_update_xray", cost)
 	# Reports walk home in real time; F1.3's window only exists if it ticks.
 	# A report that reaches the faction holding the ground is also the only door
@@ -2276,6 +2312,7 @@ func _update_player(delta: float) -> void:
 		return
 	var move := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var direction: Vector3 = HUNTER_MOTOR.wish_direction(move, yaw)
+	_update_third_person_stance(move, direction)
 	crouching = Input.is_action_pressed("crouch") and dodge_remaining <= 0.0
 	# AG4.1. TaKeS, second playtest: *"when running and the stamina bar depletes,
 	# the screen becomes super jittery — i assume since its trying to set it to
@@ -2316,7 +2353,7 @@ func _update_player(delta: float) -> void:
 		speed *= 0.68
 	# A melee press is one committed swing, not an automatic attack repeated by
 	# holding the mouse. You can still steer it, but not sprint through its tell.
-	speed *= COMBAT_RESPONSE.movement_scale(pending_attack, strike_windup)
+	speed *= 0.2 if third_person_moveset.is_attacking() else COMBAT_RESPONSE.movement_scale(pending_attack, strike_windup)
 	player_capsule.height = move_toward(player_capsule.height, 1.2 if crouching else 1.8, delta * 4.0)
 	player_collider.position.y = (player_capsule.height - 1.8) * 0.5
 	# AD1.1. Handed to move_body() rather than applied after it: is_on_floor()
@@ -2424,7 +2461,7 @@ func _enforce_demo_territory() -> void:
 func _movement_stamina_rate(sprinting: bool) -> float:
 	if sprinting:
 		return -26.0
-	if guarding or not grapple_target.is_empty() or strike_windup >= 0.0 or dodge_remaining > 0.0:
+	if guarding or not grapple_target.is_empty() or strike_windup >= 0.0 or third_person_moveset.is_attacking() or dodge_remaining > 0.0:
 		return 0.0
 	return 18.0
 
@@ -2498,6 +2535,7 @@ func _cycle_grip() -> void:
 	arsenal.apply_grip(current_grip)
 	PLAYER_ACTION_LEDGER.record("grip_changed", {"weapon": id, "grip": current_grip, "location": HUNT_LOCATION})
 	_carry_current_weapon(true)
+	_sync_third_person_moveset()
 
 
 func _carry_current_weapon(force := false) -> void:
@@ -2598,6 +2636,86 @@ func _pose_weapon() -> void:
 	_restore_grip_hand(model.get_node_or_null("LeftGripHand") as Node3D, left_pose)
 
 
+func _uses_third_person_moveset() -> bool:
+	return third_person and arsenal != null and not bare_handed and carried_limb_index < 0 and str(arsenal.current().get("kind", "")) == "melee"
+
+
+## Keep the production body and the authored per-weapon table on the same grip.
+## Half-sword is supported with both hands, so it takes the two-hand body base;
+## its puncture type and shorter reach still come from HeldGear in `_attack()`.
+func _sync_third_person_moveset() -> void:
+	if body_motion == null:
+		return
+	if not _uses_third_person_moveset():
+		body_motion.clear_weapon_stance()
+		return
+	var held := str(arsenal.current_id)
+	var weapon_id := held if SwordMoveset.WEAPON_TABLES.has(held) else "sword"
+	var stance_id := "two_hand" if current_grip in ["two_hand", "half_sword"] else "one_hand"
+	if not third_person_moveset.is_attacking() and (third_person_moveset.weapon_id != weapon_id or third_person_moveset.stance != stance_id):
+		third_person_moveset.configure(weapon_id, stance_id)
+	body_motion.set_weapon_stance(weapon_id, stance_id)
+
+
+## Locked combat is target-relative. The same values feed CombatStance's
+## crossing steps that already exist for NPCs and the sandbox; without this
+## production third person ran its ordinary forward gait while orbiting.
+func _update_third_person_stance(_move: Vector2, direction: Vector3) -> void:
+	_sync_third_person_moveset()
+	if body_motion == null:
+		return
+	var target := _lock_node() if third_person else null
+	if target == null or direction.length_squared() <= 0.0001:
+		body_motion.set_strafe(0.0, 0.0)
+		return
+	var toward: Vector3 = target.global_position - player
+	toward.y = 0.0
+	if toward.length_squared() <= 0.0001:
+		body_motion.set_strafe(0.0, 0.0)
+		return
+	toward = toward.normalized()
+	var right := Vector3(-toward.z, 0.0, toward.x)
+	body_motion.set_strafe(clampf(direction.dot(right), -1.0, 1.0), clampf(direction.dot(toward), -1.0, 1.0))
+
+
+## The direction is chosen when the button is pressed and survives to contact.
+## A lock wins, as it does in the sandbox; otherwise third person follows the
+## movement push and first person follows the view.
+func _combat_strike_direction() -> Vector3:
+	var locked := _lock_node()
+	if locked != null:
+		var toward: Vector3 = locked.global_position - player
+		toward.y = 0.0
+		if toward.length_squared() > 0.0001:
+			return toward.normalized()
+	var view := Vector3(sin(yaw), 0.0, cos(yaw)).normalized()
+	var move := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+	return StrikeHeading.heading(view, HUNTER_MOTOR.wish_direction(move, yaw), third_person)
+
+
+## Tick the already-authored sword/shiv phases in the real Hunt. Contact is
+## resolved once on the first active sweep; recovery remains committed and the
+## full packet continues driving HunterBodyMotion until it is complete.
+func _advance_third_person_melee(step: float) -> void:
+	if not third_person_moveset.is_attacking():
+		if body_motion != null and not body_motion.moveset_phase.is_empty():
+			body_motion.clear_moveset_pose()
+		return
+	var committed: Vector3 = pending_attack.get("strike_direction", _combat_strike_direction())
+	var body_yaw := atan2(committed.x, committed.z) + PI if committed.length_squared() > 0.0001 else yaw + PI
+	var report: Dictionary = third_person_moveset.tick(step, player, body_yaw)
+	if body_motion != null:
+		if third_person_moveset.is_attacking():
+			var motion_id := "thrust" if current_grip == "half_sword" else str(report.get("motion", ""))
+			body_motion.set_moveset_pose(str(report.get("phase", "")), float(report.get("phase_progress", 0.0)), str(report.get("side", "")), str(report.get("attack", "")), str(report.get("weapon", "")), motion_id)
+		else:
+			body_motion.clear_moveset_pose()
+	var points: PackedVector3Array = report.get("hit_points", PackedVector3Array())
+	if not third_person_strike_resolved and not points.is_empty():
+		third_person_strike_resolved = true
+		_resolve_strike()
+
+
 func _attack(heavy := false) -> void:
 	if resolution_ui.visible or kill_cam.active or player_rig.is_downed() or player_rig.anatomy.dead:
 		return
@@ -2620,13 +2738,34 @@ func _attack(heavy := false) -> void:
 	# `is_lit()` uses for the lamp, so a hand is busy exactly when the light is on.
 	if handheld.raised > 0.5:
 		return
+	var use_third_person_moveset := _uses_third_person_moveset()
+	var moveset_request: Dictionary = {}
+	if use_third_person_moveset:
+		_sync_third_person_moveset()
+		if third_person_moveset.is_attacking():
+			return
+		moveset_request = third_person_moveset.request_heavy(stamina) if heavy else third_person_moveset.request_light(stamina)
+		if not bool(moveset_request.get("accepted", false)):
+			prompt.text = "TOO WINDED TO COMMIT TO THE BLOW" if stamina < float(third_person_moveset.attack_definition(str(moveset_request.get("attack", "light_1"))).get("stamina_cost", INF)) else "STILL COMMITTED TO THE LAST BLOW"
+			return
 	var report: Dictionary = _begin_carried_limb_attack(heavy) if carried_limb_index >= 0 else arsenal.begin_attack(heavy)
 	if not bool(report.get("accepted", false)):
+		if use_third_person_moveset:
+			third_person_moveset.reset()
 		if str(report.get("reason", "")) == "empty":
 			prompt.text = "DRY / [R] RELOAD"
 		elif str(report.get("reason", "")) == "jammed":
 			prompt.text = "JAMMED / [R] CLEAR"
 		return
+	if use_third_person_moveset:
+		var attack_id := str(moveset_request.get("attack", ""))
+		var definition: Dictionary = third_person_moveset.attack_definition(attack_id)
+		report["moveset_attack"] = attack_id
+		report["packet"] = definition
+		report["windup"] = float(definition.get("windup", report.get("windup", 0.0)))
+		report["range"] = float(definition.get("reach", report.get("range", 3.0)))
+		report["cooldown"] = float(definition.get("windup", 0.0)) + float(definition.get("active", 0.0)) + float(definition.get("recovery", 0.0))
+		report["stamina"] = float(moveset_request.get("stamina_cost", report.get("stamina", 0.0)))
 	var cost := float(report.get("stamina", 0.0))
 	if stamina < cost:
 		# Refund a firearm round if a future ranged weapon gains a stamina cost.
@@ -2635,6 +2774,8 @@ func _attack(heavy := false) -> void:
 			rounds.loaded = int(rounds.loaded) + 1
 			arsenal.ammo[arsenal.current_id] = rounds
 		prompt.text = "TOO WINDED TO COMMIT TO THE BLOW"
+		if use_third_person_moveset:
+			third_person_moveset.reset()
 		return
 	stamina -= cost
 	# B6.5/B6.6. The same `combat_ratio` that already slows a one-armed NPC now
@@ -2657,6 +2798,8 @@ func _attack(heavy := false) -> void:
 		var grip_spec: Dictionary = HeldGear.GRIPS.get(current_grip, {})
 		if grip_spec.has("damage_type"):
 			report["damage_type"] = grip_spec["damage_type"]
+	if str(report.get("kind", "")) != "firearm":
+		report["strike_direction"] = _combat_strike_direction()
 	var swing := _player_swing_scale()
 	# O5.1. The body's own motion is part of the blow.
 	var momentum := swing_momentum(player_body.velocity)
@@ -2688,14 +2831,22 @@ func _attack(heavy := false) -> void:
 	register_swing()
 	attack_cooldown = float(report.get("cooldown", arsenal.cooldown)) / maxf(0.35, swing) * float(momentum["recovery"])
 	pending_attack = report
-	body_motion.trigger_attack(maxf(float(report.get("windup", 0.0)), attack_cooldown * 0.62), str(report.kind))
+	if use_third_person_moveset:
+		third_person_strike_resolved = false
+		strike_windup = -1.0
+		var committed_direction: Vector3 = report.get("strike_direction", Vector3.ZERO)
+		if committed_direction.length_squared() > 0.0001:
+			strike_face_yaw = atan2(committed_direction.x, committed_direction.z) + PI
+			strike_face_time = attack_cooldown
+	else:
+		body_motion.trigger_attack(maxf(float(report.get("windup", 0.0)), attack_cooldown * 0.62), str(report.kind))
 	if str(report.weapon) == "severed_limb":
 		_wear_carried_limb(bool(report.get("heavy", false)))
 	if str(report.kind) == "firearm":
 		body_motion.trigger_recoil(float(report.impulse))
 		_resolve_firearm(report)
 		pending_attack = {}
-	else:
+	elif not use_third_person_moveset:
 		strike_windup = float(report.windup)
 
 
@@ -2782,7 +2933,7 @@ func _resolve_strike() -> void:
 			arm.strike(_last_melee_resistance, Vector3(sin(yaw), 0.0, cos(yaw)))
 		connected = true
 		return
-	var wall_hit := _attack_wall(float(report.get("range", 4.1)))
+	var wall_hit := _attack_wall(float(report.get("range", 4.1)), report.get("strike_direction", Vector3.ZERO))
 	if not wall_hit.is_empty():
 		# AN2.3. The half that stayed open: a wall answers too, harder than
 		# any body zone, and takes the same kind of edge off the weapon
@@ -2863,8 +3014,11 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	var best_aim_score := INF
 	var reach := float(attack.get("range", 4.1))
 	var view := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
-	# Omnidirectional in third person: the blow follows the push, not the camera.
-	var strike_dir := StrikeHeading.heading(view, HUNTER_MOTOR.wish_direction(Input.get_vector("move_left", "move_right", "move_forward", "move_back"), yaw), third_person)
+	# Read the direction committed on the button press. Re-reading the left
+	# stick here made circling a locked target turn the eventual contact sideways.
+	var strike_dir: Vector3 = attack.get("strike_direction", _combat_strike_direction())
+	strike_dir.y = 0.0
+	strike_dir = strike_dir.normalized() if strike_dir.length_squared() > 0.0001 else Vector3(sin(yaw), 0.0, cos(yaw)).normalized()
 	for index in encounter_actors.size():
 		var candidate: Dictionary = encounter_actors[index]
 		var node := candidate.get("node") as Node3D
@@ -2921,7 +3075,9 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	var unaware_behind := _unaware_and_behind(actor)
 	_provoke_actor(actor)
 	var target: Node3D = actor.node as Node3D
-	var facing := strike_dir.dot((target.global_position - player).normalized())
+	var flat_target := target.global_position - player
+	flat_target.y = 0.0
+	var facing := strike_dir.dot(flat_target.normalized()) if flat_target.length_squared() > 0.0001 else 1.0
 	if facing < 0.12:
 		return false
 	# Greg, 24 September: they defend by tier. A fighter inside their own
@@ -2981,7 +3137,7 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		# Where you are looking decides what you open. The zone used to come from
 		# (event_count + index) % 6 — a round-robin, so aiming at a head and
 		# aiming at a knee produced the same sequence of wounds.
-		var look := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
+		var look := Vector3(strike_dir.x * cos(pitch), sin(pitch), strike_dir.z * cos(pitch)).normalized() if third_person else Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
 		# A melee swing connects with the body in front of you; what the aim
 		# chooses is *where on that body*. Resolving a free world-space point
 		# instead made the zone depend on how far off-axis or how much higher
@@ -3157,7 +3313,13 @@ func _resolve_body_hit(struck: Node, hit: Dictionary, payload: Dictionary) -> bo
 	# A delayed round is resolved on its impact frame, but its anatomy, response,
 	# death and loot still form one physical outcome on that frame.
 	WorldHistory.begin_ledger_batch()
-	var result := rig.hit_at(hit.get("position", actor.node.global_position), damage, impulse, damage_type, direction)
+	var vats_part: Dictionary = payload.get("vats_part", {})
+	if str(payload.get("vats_subject", "")) != str(actor.subject_id):
+		vats_part = {}
+	var result := VatsTargeting.strike(rig, vats_part, damage, impulse, direction, damage_type) if not vats_part.is_empty() \
+		else rig.hit_at(hit.get("position", actor.node.global_position), damage, impulse, damage_type, direction)
+	if not vats_part.is_empty():
+		_apply_vats_break(actor, vats_part, result)
 	var zones: Array[String] = [str(result.get("zone", "torso"))]
 	var severed: Array[String] = []
 	var ruptures: Array[String] = []
@@ -3285,8 +3447,15 @@ func _settle_shot(shot_id: int, hit_body: bool, subject_id := "") -> void:
 
 func _resolve_firearm(attack: Dictionary) -> void:
 	var forward := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
+	# Aimed X-ray: the round goes to the chosen part, and carries which part
+	# it was sent to so the body it reaches can be told.
+	var vats_payload := {}
+	var vats_rig := vats_actor.get("rig") as BaselineHuman if not vats_actor.is_empty() else null
+	if not vats_shot_part.is_empty() and vats_rig != null and is_instance_valid(vats_rig):
+		forward = (VatsTargeting.anchor(vats_rig, vats_shot_part) - camera.global_position).normalized()
+		vats_payload = {"vats_part": vats_shot_part.duplicate(), "vats_subject": str(vats_actor.subject_id)}
 	var origin := camera.global_position + forward * 0.48
-	var directions: Array[Vector3] = arsenal.shot_directions(forward, Vector3.UP, 0.38 if firearm_aiming else 1.0)
+	var directions: Array[Vector3] = arsenal.shot_directions(forward, Vector3.UP, 0.15 if not vats_payload.is_empty() else (0.38 if firearm_aiming else 1.0))
 	# AF1.1. A round is a thing that travels, and now so is what it does: the
 	# damage payload rides on the round itself and is only ever spent when
 	# `_on_round_hit()`/`_on_round_expired()` reports that round's own real
@@ -3319,6 +3488,7 @@ func _resolve_firearm(attack: Dictionary) -> void:
 			"weapon": str(attack.weapon),
 			"heavy": bool(attack.get("heavy", false)),
 		}
+		payload.merge(vats_payload)
 		ballistics.fire(origin, direction, calibre, 0.0, 1, "player", payload)
 	# The trigger going down is not an anatomy question — it happens here,
 	# on this frame, same as it always did. What it hit is a separate record
@@ -3357,8 +3527,10 @@ func _trace_actor(origin: Vector3, direction: Vector3, distance: float) -> Dicti
 ## than mirroring `_trace_actor()` — every zone hitbox in this game is an
 ## `Area3D` (AF1.1's own finding), so leaving areas out of the query entirely
 ## is what keeps a body from ever being mistaken for a wall here.
-func _attack_wall(reach: float) -> Dictionary:
-	var look := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
+func _attack_wall(reach: float, committed_direction := Vector3.ZERO) -> Dictionary:
+	var flat: Vector3 = committed_direction
+	flat.y = 0.0
+	var look := Vector3(flat.x * cos(pitch), sin(pitch), flat.z * cos(pitch)).normalized() if flat.length_squared() > 0.0001 else Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
 	var query := PhysicsRayQueryParameters3D.create(player, player + look * reach)
 	query.exclude = _player_collision_exclusions()
 	query.collide_with_areas = false
@@ -3396,6 +3568,10 @@ func _put_the_weapons_down() -> void:
 			(model as Node3D).visible = false
 	pending_attack = {}
 	strike_windup = -1.0
+	third_person_moveset.reset()
+	third_person_strike_resolved = false
+	if body_motion != null:
+		body_motion.clear_weapon_stance()
 	prompt.text = "HANDS"
 
 
@@ -4339,6 +4515,10 @@ func _equip_weapon(slot: int) -> void:
 		smoke_weapon_drawn = preserve_mouth_smoke
 		pending_attack = {}
 		strike_windup = -1.0
+		third_person_moveset.reset()
+		third_person_strike_resolved = false
+		if body_motion != null:
+			body_motion.clear_moveset_pose()
 		# The ammo well and the model in the player's hand already show the new
 		# weapon. A persistent READY subtitle duplicated both of them.
 		prompt.text = ""
@@ -4862,7 +5042,7 @@ func _dodge() -> void:
 		return
 	if dodge_cooldown > 0.0 or dodge_remaining > 0.0 or stamina < 25.0 or not player_body.is_on_floor():
 		return
-	if strike_windup >= 0.0 or not pending_attack.is_empty():
+	if strike_windup >= 0.0 or not pending_attack.is_empty() or third_person_moveset.is_attacking():
 		prompt.text = "COMMITTED TO THE SWING"
 		return
 	dodge_cooldown = 0.75
@@ -5979,7 +6159,8 @@ func _update_encounter_actors(delta: float) -> void:
 		actor["footing"] = clampf(_actor_footing(actor) + FOOTING_RECOVERY * actor_delta, 0.0, 1.0)
 		# O6.1. A grip regained rather than a weapon regained — the same
 		# threshold that took it decides when it comes back.
-		if bool(actor.get("disarmed", false)) and float(actor.footing) >= STUMBLE_AT:
+		# A hand whose arm was shot to pieces in aimed X-ray does not regrip.
+		if bool(actor.get("disarmed", false)) and not bool(actor.get("vats_disarmed", false)) and float(actor.footing) >= STUMBLE_AT:
 			actor["disarmed"] = false
 			prompt.text = "%s RECOVERS THEIR GRIP" % str(actor.display_name).to_upper()
 		if anatomy.downed:
@@ -7648,7 +7829,9 @@ func _lock_node() -> Node3D:
 	var actor := _actor_by_id(lock_target)
 	if not actor.is_empty():
 		var node := actor.node as Node3D
-		if is_instance_valid(node) and not bool(actor.get("dead", false)):
+		var anatomy = actor.get("anatomy")
+		var incapacitated := anatomy != null and (bool(anatomy.dead) or bool(anatomy.downed))
+		if is_instance_valid(node) and not bool(actor.get("dead", false)) and not incapacitated:
 			return node
 	if lock_target == CAST.id_for(CAPTAIN_SLOT) and enemy != null and is_instance_valid(enemy) and enemy.visible and not enemy_retreating:
 		return enemy
@@ -7673,7 +7856,9 @@ func _lock_candidates() -> Array:
 	var found: Array = []
 	for actor in encounter_actors:
 		var node := actor.get("node") as Node3D
-		if node == null or not is_instance_valid(node) or bool(actor.get("dead", false)):
+		var anatomy = actor.get("anatomy")
+		var incapacitated := anatomy != null and (bool(anatomy.dead) or bool(anatomy.downed))
+		if node == null or not is_instance_valid(node) or bool(actor.get("dead", false)) or incapacitated:
 			continue
 		var gap: float = player.distance_to(node.global_position)
 		if gap <= 26.0:
@@ -8244,6 +8429,208 @@ func _update_xray(delta: float, holding: bool) -> void:
 		WorldXray.sweep(player, _all_rigs(), false)
 		if handheld.radial.is_open:
 			handheld.close_radial()
+
+
+## Aimed X-ray runs on real time: the world is slowed, choosing is not, and
+## physics ticks too rarely at a fifth of speed to read a stick from.
+func _process(delta: float) -> void:
+	_update_vats(delta / maxf(Engine.time_scale, 0.001))
+
+
+func _exit_tree() -> void:
+	if vats.is_active():
+		Engine.time_scale = 1.0
+
+
+## R2 has just come down. True if it is the second half of the L2+R2 chord
+## (L2 inside the window, or squeezed with it and not yet past the bridge's
+## press point), in which case the shot is held back until the chord resolves.
+func _vats_holds_trigger() -> bool:
+	if vats.is_active() or not _vats_can_open():
+		return false
+	var l2_squeezed := Input.get_joy_axis(0, JOY_AXIS_TRIGGER_LEFT) > 0.25
+	var l2_fresh := _vats_rmb_down >= 0.0 and _vats_rmb_down <= VatsTargeting.CHORD_WINDOW
+	if l2_fresh or (l2_squeezed and _vats_rmb_down < 0.0):
+		_vats_chord_pending = true
+		return true
+	return false
+
+
+func _vats_can_open() -> bool:
+	return arsenal != null and not bare_handed and carried_limb_index < 0 and panel_mode.is_empty() \
+		and str(arsenal.current().get("kind", "")) == "firearm"
+
+
+## Whoever is locked, else whoever is most squarely in the sights.
+func _vats_target_actor() -> Dictionary:
+	if not lock_target.is_empty():
+		var locked := _actor_by_id(lock_target)
+		if not locked.is_empty() and not bool(locked.get("dead", false)) and locked.get("rig") is BaselineHuman:
+			return locked
+	var forward := -camera.global_transform.basis.z
+	var best: Dictionary = {}
+	var best_score := 0.8
+	for actor: Dictionary in encounter_actors:
+		var node := actor.get("node") as Node3D
+		if node == null or not is_instance_valid(node) or bool(actor.get("dead", false)) or not actor.get("rig") is BaselineHuman:
+			continue
+		var toward := node.global_position + Vector3.UP * 1.1 - camera.global_position
+		if toward.length() > 26.0:
+			continue
+		var score := forward.dot(toward.normalized()) - toward.length() * 0.004
+		if score > best_score:
+			best_score = score
+			best = actor
+	return best
+
+
+func vats_open() -> bool:
+	if vats.is_active():
+		return true
+	_vats_chord_pending = false
+	if not _vats_can_open():
+		_feedback("AIMED XRAY NEEDS A FIREARM IN HAND")
+		return false
+	var actor := _vats_target_actor()
+	if actor.is_empty() or not vats.begin(actor.rig as BaselineHuman):
+		_feedback("NOBODY IN THE SIGHTS TO OPEN")
+		return false
+	vats_actor = actor
+	firearm_aiming = true
+	Engine.time_scale = VatsTargeting.TIME_SCALE
+	var rig := actor.rig as BaselineHuman
+	rig.reveal_organs(true)
+	rig.see_through(true)
+	WorldHistory.record_event("vats_opened", {"subject_id": str(actor.subject_id), "parts": vats.parts.size(), "location": HUNT_LOCATION})
+	prompt.text = "XRAY AIMED // MOUSE PICKS A PART // LMB FIRES // RMB UP CANCELS"
+	return true
+
+
+func _vats_close() -> void:
+	if not vats.is_active():
+		return
+	var rig := vats_actor.get("rig") as BaselineHuman if not vats_actor.is_empty() else null
+	if rig != null and is_instance_valid(rig) and not xray_active:
+		rig.reveal_organs(false)
+		rig.see_through(false)
+	vats.end()
+	vats_actor = {}
+	vats_shot_part = {}
+	_vats_chord_pending = false
+	_vats_mouse_sweep = 0.0
+	if vats_overlay != null:
+		vats_overlay.clear()
+	# The kill cam a VATS round earned owns time from here.
+	if kill_cam == null or not kill_cam.active:
+		Engine.time_scale = 1.0
+
+
+## Consumes what VATS owns while it is open. Button state is tracked always,
+## because the chord is read from it.
+func _vats_input(event: InputEvent) -> bool:
+	if event is InputEventMouseButton:
+		var button := event as InputEventMouseButton
+		if button.button_index == MOUSE_BUTTON_RIGHT:
+			_vats_rmb_down = 0.0 if button.pressed else -1.0
+		elif button.button_index == MOUSE_BUTTON_LEFT:
+			_vats_lmb_down = 0.0 if button.pressed else -1.0
+	if not vats.is_active():
+		return false
+	if event is InputEventMouseMotion:
+		# The pad's stick is read directly in `_update_vats`; its synthetic
+		# mouse motion is only swallowed here so the camera holds still.
+		var motion := event as InputEventMouseMotion
+		if motion.device != PadBridgeScript.SYNTHETIC and not vats.is_resolving():
+			_vats_mouse_sweep += motion.relative.x + motion.relative.y
+			if absf(_vats_mouse_sweep) > 70.0:
+				vats.step(1 if _vats_mouse_sweep > 0.0 else -1)
+				_vats_mouse_sweep = 0.0
+		return true
+	if event is InputEventMouseButton:
+		var button := event as InputEventMouseButton
+		if button.pressed and not vats.is_resolving():
+			match button.button_index:
+				MOUSE_BUTTON_WHEEL_UP:
+					vats.step(-1)
+				MOUSE_BUTTON_WHEEL_DOWN:
+					vats.step(1)
+				MOUSE_BUTTON_LEFT:
+					_vats_fire()
+		elif not button.pressed and button.button_index == MOUSE_BUTTON_RIGHT:
+			firearm_aiming = false
+			if not vats.is_resolving():
+				_vats_close()
+		return true
+	return false
+
+
+func _vats_fire() -> void:
+	var part := vats.current()
+	if part.is_empty():
+		return
+	vats_shot_part = part.duplicate()
+	var fired_before := _shot_counter
+	_attack()
+	if _shot_counter != fired_before:
+		vats.follow = VatsTargeting.FOLLOW_SECONDS
+	vats_shot_part = {}
+
+
+func _update_vats(real_delta: float) -> void:
+	if _vats_rmb_down >= 0.0:
+		_vats_rmb_down += real_delta
+	if _vats_lmb_down >= 0.0:
+		_vats_lmb_down += real_delta
+	if _vats_chord_pending and _vats_lmb_down >= VatsTargeting.CHORD_WINDOW:
+		_vats_chord_pending = false
+		if _vats_rmb_down >= 0.0 or Input.get_joy_axis(0, JOY_AXIS_TRIGGER_LEFT) > 0.5:
+			vats_open()
+		else:
+			_attack()
+	if not vats.is_active():
+		return
+	var rig := vats_actor.get("rig") as BaselineHuman if not vats_actor.is_empty() else null
+	var gone := rig == null or not is_instance_valid(rig) or bool(vats_actor.get("dead", false))
+	if not vats.tick(real_delta) or (gone and not vats.is_resolving()):
+		_vats_close()
+		return
+	if not vats.is_resolving():
+		vats.read_stick(Vector2(Input.get_joy_axis(0, JOY_AXIS_RIGHT_X), Input.get_joy_axis(0, JOY_AXIS_RIGHT_Y)))
+		Engine.time_scale = VatsTargeting.TIME_SCALE
+	if vats_overlay == null or gone or camera == null:
+		return
+	var marks: Array = []
+	var chosen := -1
+	for position in vats.parts.size():
+		var part: Dictionary = vats.parts[position]
+		var at := VatsTargeting.anchor(rig, part)
+		if camera.is_position_behind(at):
+			continue
+		if position == vats.index:
+			chosen = marks.size()
+		marks.append({"at": camera.unproject_position(at), "part": part})
+	vats_overlay.show_parts(marks, chosen, vats.focus / VatsTargeting.FOCUS_SECONDS, str(vats_actor.get("display_name", "")))
+
+
+## A VATS round reached its part. What broke, what that does to them, and
+## the record of it.
+func _apply_vats_break(actor: Dictionary, part: Dictionary, result: Dictionary) -> void:
+	var name_upper := str(actor.get("display_name", "")).to_upper()
+	if not bool(result.get("broken", false)):
+		if str(part.get("kind", "")) == "implant" and float(result.get("implant_condition", 0.0)) > 0.0:
+			prompt.text = "%s // %s HOLDS // %d%% LEFT" % [name_upper, str(part.get("label", "")), roundi(float(result.implant_condition) * 100.0)]
+		return
+	var effect := str(result.get("effect", ""))
+	var landed := VatsTargeting.apply_effect(actor, effect)
+	WorldHistory.record_event("vats_part_broken", {
+		"subject_id": str(actor.get("subject_id", "")), "part": str(part.get("id", "")),
+		"kind": str(part.get("kind", "")), "effect": effect if landed else "",
+		"armour": float(part.get("armour", 0.0)), "location": HUNT_LOCATION,
+	})
+	var kind := str(part.get("kind", ""))
+	var verb := "BURSTS" if kind in ["organ", "sense"] else ("BLOWS APART" if kind == "implant" else "IS CRIPPLED")
+	var consequence := str({"slow": "SLOWED", "blind": "BLINDED", "disarm": "DISARMED"}.get(effect, "")) if landed else ""
+	prompt.text = "%s // %s %s%s" % [name_upper, str(part.get("label", "")), verb, (" // " + consequence) if not consequence.is_empty() else ""]
 
 
 ## The recollection is derived from real installed hardware and happens once.
@@ -9835,9 +10222,10 @@ func _update_perception(delta: float) -> void:
 		query.exclude = excluded
 		var obstruction := get_world_3d().direct_space_state.intersect_ray(query)
 		var cover := 0.0 if obstruction.is_empty() else 1.0
-		var body_visibility := PERCEPTION.visibility(light, player_noise, cover, distance, PERCEPTION_MAX_RANGE)
+		# Eyes shot out in aimed X-ray see a fifth of what they did.
+		var body_visibility := PERCEPTION.visibility(light, player_noise, cover, distance, PERCEPTION_MAX_RANGE) * VatsTargeting.sight(actor)
 		var saw_body: bool = body_visibility >= PERCEPTION.UNSEEN_THRESHOLD
-		var saw_light: bool = handheld.is_lit() and PERCEPTION.sees_emitted_light(distance, handheld.light_radius(), cover) and not saw_body
+		var saw_light: bool = handheld.is_lit() and PERCEPTION.sees_emitted_light(distance, handheld.light_radius(), cover) and not saw_body and not bool(actor.get("blinded", false))
 		var was_tracking_player := bool(actor.get("tracking_player", false))
 		var was_tracking_light := bool(actor.get("tracking_light", false))
 		actor["tracking_player"] = saw_body

@@ -150,6 +150,11 @@ func set_weapon_stance(weapon_id: String, stance_id: String) -> void:
 	weapon_stance_enabled = true
 
 
+func clear_weapon_stance() -> void:
+	weapon_stance_enabled = false
+	clear_moveset_pose()
+
+
 func set_moveset_pose(phase: String, progress: float, side: String, attack_id: String, weapon_id := "", motion_id := "") -> void:
 	moveset_phase = phase if phase in ["windup", "active", "recovery"] else ""
 	moveset_progress = clampf(progress, 0.0, 1.0)
