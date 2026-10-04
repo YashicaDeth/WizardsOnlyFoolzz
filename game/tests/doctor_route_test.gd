@@ -195,12 +195,13 @@ func _axe() -> void:
 	vat._unhandled_input(InputEventMouseMotion.new())
 	vat.player.global_position = Vector3(route.AXE_AT.x, vat.BODY_HALF_HEIGHT + 0.02, route.AXE_AT.z - 1.0)
 	await get_tree().physics_frame
-	check(route.prompt_text() == "[E] TAKE THE FIRE AXE", "the fire axe by the door can be taken")
+	# Job 3: the HOTLINE CLEAVER replaced the fire axe (internal id still `axe`).
+	check(route.prompt_text() == "[E] TAKE THE HOTLINE CLEAVER", "the cleaver by the door can be taken")
 	_press(vat, KEY_E)
 	check(route.carrying_axe and route.held_weapon() == "axe" and not route.axe_model.visible, "E takes it off the wall and into the hand")
 	check(route.held_restraint == null, "the axe replaces the restraint in the hand")
 	var labels := (WorldHistory.subject("inventory").get("items", []) as Array).map(func(item): return str(item.get("label", "")))
-	check(labels.has("FIRE AXE"), "the axe goes into Carry")
+	check(labels.has("HOTLINE CLEAVER"), "the cleaver goes into Carry")
 	var swings := await _batter(vat, func() -> void: _click(vat), 30)
 	check(route.door.broken and str(WorldHistory.subject(route.DOOR_ID).get("broken_by", "")).ends_with("axe"), "the axe breaks it (%d swings, %s)" % [swings, WorldHistory.subject(route.DOOR_ID).get("broken_by", "")])
 	check(route.door.fragments.size() > 0, "and leaves real debris")

@@ -8,7 +8,9 @@ extends Node3D
 ## Built onto the Growing Floor by `vat_chamber.gd`, which only forwards input
 ## and asks for a prompt line. This owns the near wall behind the player's vat
 ## (with the doorway and the observation glass he watched through), the door
-## itself (`BreakableDoor`), the fire axe beside it, the examination room, and
+## itself (`BreakableDoor`), the HOTLINE CLEAVER beside it (job 3: Greg
+## replaced the fire axe, "200 years in the future, why would they just have
+## an axe"; the internal id stays `axe`), the examination room, and
 ## a lift car with doors that rides down to the Support Unit.
 ##
 ## Everything the room holds beyond the desk, the monitor showing the vat feed
@@ -20,7 +22,9 @@ const ROUTE_ID := "doctor_pursuit"
 const ROOM_DISTRICT := "examination_room"
 const DESTINATION := "res://support_unit.tscn"
 const RESTRAINT_LABEL := "BROKEN MEDICAL RESTRAINT"
-const AXE_LABEL := "FIRE AXE"
+const AXE_LABEL := "HOTLINE CLEAVER"
+## What the same tool was called in saves made before job 3.
+const LEGACY_AXE_LABEL := "FIRE AXE"
 const GUN_LABEL := "CELL OUTZ BREACH NINE"
 const GENERATED_MODEL := preload("res://systems/generated_model.gd")
 
@@ -166,7 +170,7 @@ func prompt_text() -> String:
 	if _near_landing() and lift_state == "closed":
 		return "[E] CALL THE LIFT"
 	if _axe_in_reach():
-		return "[E] TAKE THE FIRE AXE"
+		return "[E] TAKE THE HOTLINE CLEAVER"
 	if not door.broken and _flat_distance(DOOR_AT) <= REACH + 0.6:
 		if not _dressed():
 			return "HIS DOOR  //  NOT LIKE THIS  //  NAKED AND SHAKING
@@ -174,7 +178,7 @@ FIND SOMETHING TO WEAR FIRST"
 		var tool := held_weapon()
 		var line := "[F] SHOULDER IT"
 		if tool == "axe":
-			line = "[CLICK] AXE THE DOOR   //   " + line
+			line = "[CLICK] CLEAVE THE DOOR   //   " + line
 		elif tool == "restraint":
 			line = "[CLICK] HIT IT WITH THE RESTRAINT   //   " + line
 		if _gun_rounds() > 0:
@@ -482,10 +486,8 @@ func _take_axe() -> void:
 	held_axe = _axe_mesh()
 	LabSurface.hold_in_view(chamber.camera, held_axe)
 	held_axe.rotation_degrees = AXE_REST
-	# Full size at arm's length filled a quarter of the first look at it.
-	held_axe.scale = Vector3.ONE * 0.75
-	held_axe.position += Vector3(0.06, -0.06, 0.0)
-	chamber.subtitle.text = "FIRE AXE  //  TAKEN OFF THE WALL"
+	held_axe.position += Vector3(0.04, -0.04, 0.04)
+	chamber.subtitle.text = "HOTLINE CLEAVER  //  TAKEN OFF THE WALL"
 
 
 func _swing_held() -> void:
@@ -610,10 +612,10 @@ func _build_door() -> void:
 	door.broke_open.connect(_on_door_broke)
 
 
-## A fire axe on a bracket by the door, where a facility keeps one.
+## The cleaver on a bracket by the door, a tool rack's lit backing behind it.
 func _build_axe() -> void:
 	axe_model = Node3D.new()
-	axe_model.name = "FireAxe"
+	axe_model.name = "HotlineCleaver"
 	axe_model.position = AXE_AT + Vector3(0, 1.25, 0)
 	add_child(axe_model)
 	var backing := MeshInstance3D.new()
@@ -627,7 +629,7 @@ func _build_axe() -> void:
 	hung.rotation_degrees = Vector3(0, 0, 12.0)
 	axe_model.add_child(hung)
 	var label := Label3D.new()
-	label.text = "FIRE AXE"
+	label.text = AXE_LABEL
 	label.font_size = 28
 	label.outline_size = 5
 	label.pixel_size = 0.004
@@ -642,35 +644,27 @@ func _build_axe() -> void:
 	lamp.omni_range = 1.4
 	lamp.position = Vector3(0, 0.6, -0.3)
 	axe_model.add_child(lamp)
-	if _carries(AXE_LABEL) or WorldHistory.event_count("doctor_route_axe_taken") > 0:
+	if _carries(AXE_LABEL) or _carries(LEGACY_AXE_LABEL) or WorldHistory.event_count("doctor_route_axe_taken") > 0:
 		axe_model.visible = false
 
 
+## The HOTLINE CLEAVER, the same model the arsenal and the mechanics lab hold
+## (`HeldGear`), stood edge-forward and nose-up like the axe it replaced so
+## the wall bracket and the in-hand rest pose read the same.
 func _axe_mesh() -> Node3D:
-	var axe := Node3D.new()
-	var handle := MeshInstance3D.new()
-	var handle_mesh := CylinderMesh.new()
-	handle_mesh.top_radius = 0.018
-	handle_mesh.bottom_radius = 0.022
-	handle_mesh.height = 0.9
-	handle_mesh.material = WorldLook.surface(Color("6b4a2a"), "paint", 1202)
-	handle.mesh = handle_mesh
-	axe.add_child(handle)
-	var head := MeshInstance3D.new()
-	var head_mesh := BoxMesh.new()
-	head_mesh.size = Vector3(0.24, 0.12, 0.025)
-	head_mesh.material = WorldLook.surface(Color("a3241a"), "paint", 1203)
-	head.mesh = head_mesh
-	head.position = Vector3(0.07, 0.4, 0)
-	axe.add_child(head)
-	var edge := MeshInstance3D.new()
-	var edge_mesh := BoxMesh.new()
-	edge_mesh.size = Vector3(0.04, 0.16, 0.02)
-	edge_mesh.material = LabSurface.material("plate")
-	edge.mesh = edge_mesh
-	edge.position = Vector3(0.2, 0.4, 0)
-	axe.add_child(edge)
-	return axe
+	return cleaver_model()
+
+
+static func cleaver_model() -> Node3D:
+	var holder := Node3D.new()
+	holder.name = "Cleaver"
+	var gear := HeldGear.build_weapon("cleaver")
+	gear.rotation = Vector3(PI * 0.5, 0.0, 0.0)
+	var grip := gear.get_node_or_null("anchor_grip") as Node3D
+	if grip != null:
+		gear.position = -(Basis.from_euler(gear.rotation) * grip.position) + Vector3(0, -0.05, 0)
+	holder.add_child(gear)
+	return holder
 
 
 ## His room: the desk facing the glass, the monitor on the vat feed, a lamp,

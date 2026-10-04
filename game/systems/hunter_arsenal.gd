@@ -27,6 +27,21 @@ const WEAPONS := {
 		"impulse": 8.0, "reach": 2.2, "cooldown": 0.3,
 		"windup": 0.12, "stamina": 9.0, "damage_type": "puncture",
 	},
+	# v0.1 Brawler (job 3). Greg, 5 Oct 02:20: weapons carry industrial
+	# product names in the CellOutz catalogue style; HOTLINE CLEAVER and
+	# PRODSTAFF are his working names. Move timings live in
+	# `SwordMoveset.WEAPON_TABLES`, hit feel (hitstop, heat, shock) in
+	# `MeleeDriver.FEEL`; these are the per-hit numbers the arsenal hands out.
+	"cleaver": {
+		"label": "HOTLINE CLEAVER", "kind": "melee", "damage": 38.0,
+		"impulse": 26.0, "reach": 2.5, "cooldown": 0.46,
+		"windup": 0.20, "stamina": 16.0, "damage_type": "cut",
+	},
+	"staff": {
+		"label": "PRODSTAFF", "kind": "melee", "damage": 24.0,
+		"impulse": 32.0, "reach": 3.5, "cooldown": 0.58,
+		"windup": 0.24, "stamina": 18.0, "damage_type": "blunt",
+	},
 	"shotgun": {
 		"label": "BONE YARD 12G", "kind": "firearm", "damage": 16.0,
 		"impulse": 34.0, "range": 42.0, "cooldown": 0.92,
@@ -741,7 +756,8 @@ func _build_weapon_model(weapon_id: String) -> Node3D:
 	root.add_child(right)
 	var off_anchor_name := "forend" if visual_id == "shotgun" else ("grip_support" if visual_id == "sidearm" else "grip_low")
 	var off_anchor := gear.get_node_or_null("anchor_%s" % off_anchor_name) as Node3D
-	if off_anchor != null:
+	# The cleaver is a one-hand tool; the off hand stays free.
+	if off_anchor != null and visual_id != "cleaver":
 		var left := HeldGear.build_humiliation_hand(-1)
 		left.name = "LeftGripHand"
 		HeldGear.set_pose(left, "cup" if visual_id == "sidearm" else "wrap")
