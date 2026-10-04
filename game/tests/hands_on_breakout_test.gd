@@ -84,18 +84,20 @@ func _ready() -> void:
 	for blow in range(1, vat.GLASS_BLOWS):
 		var previous_cracks: int = vat.glass_cracks.size()
 		vat._unhandled_input(_click())
-		check(vat.vat_glass.visible and not vat.breakout_complete and vat.glass_cracks.size() > previous_cracks,
-			"blow %d adds cracks but the glass still holds" % blow)
+		check(not vat.glass_tank.broken and vat.glass_tank.crack_stage() == blow and not vat.breakout_complete and vat.glass_cracks.size() > previous_cracks,
+			"blow %d cracks the real glass (stage %d) but it still holds" % [blow, vat.glass_tank.crack_stage()])
 	vat._unhandled_input(_click())
-	check(vat.breakout_complete and not vat.vat_glass.visible, "the final authored blow goes through")
+	check(vat.breakout_complete and vat.glass_tank.broken and not vat.glass_tank.shards.is_empty(), "the final authored blow bursts the glass into shards")
 	check(WorldHistory.event_count("opening_glass_struck") == vat.GLASS_BLOWS, "every blow is recorded exactly once")
-	var spilled := vat.get_node_or_null("SpilledMedium") as MeshInstance3D
-	var spill_mesh: CylinderMesh = spilled.mesh as CylinderMesh if spilled != null else null
-	var spill_material: StandardMaterial3D = spill_mesh.material as StandardMaterial3D if spill_mesh != null else null
-	check(spill_mesh != null and spill_material != null and not spill_material.emission_enabled and spill_material.albedo_color.v < 0.1,
-		"the flooding medium is a dark round spill, not a glowing green square")
+	# Greg, 4 Oct: "actual liquid with physics". The medium pours out of the
+	# broken wall into a FluidBody that pools on the floor and stays.
+	check(vat.spill != null and (vat.spill.blob_count() > 0 or vat.spill.volume() > 0.0), "the medium floods out as real fluid (%d blobs)" % (vat.spill.blob_count() if vat.spill != null else -1))
 	check(vat.phase == "knees" and not vat.can_move, "you come out on your knees, not moving yet")
-	check(vat.camera.position.y + vat.player.position.y < 1.0, "the eye is down at the puddle")
+	for _tick in 20:
+		vat._physics_process(0.05)
+	check(vat.camera.position.y + vat.player.position.y < 1.0, "thrown out with it, the eye is down at the puddle")
+	vat.spill.simulate(3.0)
+	check(vat.spill.wet_cells() > 20 and vat.spill.volume() > 0.01, "the flood pools across the floor (%d wet cells, %.3f m3)" % [vat.spill.wet_cells(), vat.spill.volume()])
 	check(vat.boot_hud != null and vat.boot_hud.running, "the implant boots the HUD while you're down")
 	if vat.boot_hud == null:
 		finish()

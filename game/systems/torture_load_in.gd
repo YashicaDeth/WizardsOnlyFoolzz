@@ -106,7 +106,25 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	step(delta)
+	# Greg's playtest D: the intro played "ultra sped up". It started its clock
+	# in the scene's first frame, while the Interstitial plate still covered the
+	# screen (its minimum hold and fade-out), and the shader-compile hitches of a
+	# fresh room arrived as half-second deltas. The player saw only the tail end
+	# racing past. It now waits for the plate to lift and never steps more than
+	# one 30 Hz frame at a time, so every beat plays at its authored speed.
+	if behind_plate():
+		return
+	step(minf(delta, MAX_STEP))
+
+
+## One frame's worth at most: a hitch pauses the black, it does not skip it.
+const MAX_STEP := 1.0 / 30.0
+
+
+## True while the travel plate is still over the scene.
+func behind_plate() -> bool:
+	var plate := get_node_or_null("/root/Interstitial")
+	return plate != null and bool(plate.get("travelling"))
 
 
 ## Advances the load-in; tests drive it directly.
@@ -189,6 +207,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		# Nothing reaches the tank or the form behind the black.
 		if key.keycode != KEY_ESCAPE:
 			get_viewport().set_input_as_handled()
+	# Pad first (BUILD_BRIEFS rule 3): Cross or Options cuts to the glitch.
+	elif event is InputEventJoypadButton:
+		var button := event as InputEventJoypadButton
+		if button.pressed and button.button_index in [JOY_BUTTON_A, JOY_BUTTON_START]:
+			skip()
+		get_viewport().set_input_as_handled()
 
 
 func _finish() -> void:

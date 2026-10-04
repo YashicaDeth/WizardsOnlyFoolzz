@@ -355,6 +355,19 @@ func _current_line() -> String:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Pad first (Job 4): the pad's buttons become the form's own keys, so every
+	# rule below holds for both. Triangle rerolls and Create renames here.
+	if event is InputEventJoypadButton or event is InputEventJoypadMotion:
+		if pad_keyboard != null and is_instance_valid(pad_keyboard):
+			return
+		var translated := _pad_to_key(event)
+		if translated == KEY_NONE:
+			get_viewport().set_input_as_handled()
+			return
+		var key_event := InputEventKey.new()
+		key_event.keycode = translated
+		key_event.pressed = true
+		event = key_event
 	# V is held, not pressed: the pickup listens while it is down.
 	if event is InputEventKey and event.keycode == KEY_V and not event.echo and intake_armed:
 		_think_key(event.pressed)
@@ -407,6 +420,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			_commit()
 		KEY_SPACE:
 			_confirm_as_is()
+		KEY_R:
+			reroll()
+		KEY_N:
+			open_rename()
 		KEY_1, KEY_2, KEY_3:
 			_answer(event.keycode - KEY_1)
 		KEY_F:
@@ -421,6 +438,119 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 	get_viewport().set_input_as_handled()
 	queue_redraw()
+
+
+## The pad's layout on this form (Job 4): bumpers change tab, the stick or
+## d-pad moves rows and turns values, Cross confirms (or answers him first),
+## Circle goes back, Square keeps the page as it is, Triangle rerolls, Options
+## files, Create renames. KEY_NONE when the event means nothing here.
+func _pad_to_key(event: InputEvent) -> Key:
+	if event is InputEventJoypadMotion:
+		var motion := event as InputEventJoypadMotion
+		if motion.axis != JOY_AXIS_LEFT_X and motion.axis != JOY_AXIS_LEFT_Y:
+			return KEY_NONE
+		var dir := 0 if absf(motion.axis_value) < 0.5 else (1 if motion.axis_value > 0.0 else -1)
+		var axis_key := "x" if motion.axis == JOY_AXIS_LEFT_X else "y"
+		var was := int(_stick_dir.get(axis_key, 0))
+		_stick_dir[axis_key] = dir
+		if dir == 0 or dir == was:
+			return KEY_NONE
+		if axis_key == "y":
+			return KEY_DOWN if dir > 0 else KEY_UP
+		return _value_key()
+	if not (event is InputEventJoypadButton) or not event.pressed:
+		return KEY_NONE
+	var button := (event as InputEventJoypadButton).button_index
+	# His question first: Cross, Square, Triangle are the three things an eye
+	# can do, in the order they are listed.
+	if not answers.is_empty() and procedure.is_empty():
+		match button:
+			JOY_BUTTON_A:
+				return KEY_1
+			JOY_BUTTON_X:
+				return KEY_2
+			JOY_BUTTON_Y:
+				return KEY_3
+	if not procedure.is_empty() or verdict_started:
+		match button:
+			JOY_BUTTON_A, JOY_BUTTON_START:
+				return KEY_ENTER
+			JOY_BUTTON_B:
+				return KEY_ESCAPE
+		return KEY_NONE
+	match button:
+		JOY_BUTTON_LEFT_SHOULDER:
+			return KEY_LEFT
+		JOY_BUTTON_RIGHT_SHOULDER:
+			return KEY_RIGHT
+		JOY_BUTTON_DPAD_UP:
+			return KEY_UP
+		JOY_BUTTON_DPAD_DOWN:
+			return KEY_DOWN
+		JOY_BUTTON_DPAD_LEFT, JOY_BUTTON_DPAD_RIGHT:
+			return _value_key()
+		JOY_BUTTON_A:
+			return KEY_ENTER
+		JOY_BUTTON_B:
+			return KEY_LEFT
+		JOY_BUTTON_X:
+			return KEY_SPACE
+		JOY_BUTTON_Y:
+			return KEY_R
+		JOY_BUTTON_START:
+			return KEY_F
+		JOY_BUTTON_BACK:
+			return KEY_N
+	return KEY_NONE
+
+
+var _stick_dir := {}
+
+
+## Sideways on the stick turns the value on a page whose rows are values
+## (the face and body dials); elsewhere a row is a choice, not a dial.
+func _value_key() -> Key:
+	return KEY_ENTER if page in [3, 4] else KEY_NONE
+
+
+## Triangle: a whole new body from the lottery, every page filled.
+func reroll() -> void:
+	sheet.randomise()
+	sheet.route = "random"
+	for index in PAGES.size():
+		touched_pages[index] = true
+	transcript = "WROTE: REROLLED // %s" % str(sheet.race).to_upper()
+	transcript_life = 3.0
+	_doctor_observe()
+	_speak("chose")
+
+
+## Create: rename with the on-screen keyboard (a real keyboard types too).
+var pad_keyboard: Control
+
+
+func open_rename() -> void:
+	if pad_keyboard != null and is_instance_valid(pad_keyboard):
+		return
+	pad_keyboard = PadKeyboard.new()
+	add_child(pad_keyboard)
+	pad_keyboard.call("open", str(sheet.display_name), "WHAT DOES HE WRITE AT THE TOP")
+	pad_keyboard.connect("submitted", _on_renamed)
+
+
+func _on_renamed(text: String) -> void:
+	sheet.display_name = text.to_upper()
+	transcript = "WROTE: %s" % sheet.display_name
+	transcript_life = 3.0
+	queue_redraw()
+
+
+## Device-aware key names for the hints drawn on the form.
+func _hint_key(keyboard: String, pad_button: JoyButton) -> String:
+	var profile := get_node_or_null("/root/InputProfile")
+	if profile == null or not bool(profile.get("using_pad")):
+		return keyboard
+	return str(profile.call("_joy_button_name", pad_button, str(profile.call("device_family")))).replace("PAD ", "")
 
 
 func _unconfirmed() -> Array[String]:
@@ -875,12 +1005,14 @@ func _draw_clipboard(rect: Rect2) -> void:
 	var keep_hot := _keep_hit.has_point(_board_xform.affine_inverse() * get_local_mouse_position())
 	draw_rect(_keep_hit, HOT * Color(1, 1, 1, 0.28 if keep_hot else 0.12))
 	draw_rect(_keep_hit, (MOSS if touched_pages.has(page) else HOT) * Color(1, 1, 1, 0.7), false, 1.0)
-	var keep := "[SPACE]  CONFIRM %s AS IS" % PAGES[page]
+	var keep := "[%s]  CONFIRM %s AS IS" % [_hint_key("SPACE", JOY_BUTTON_X), PAGES[page]]
 	var keep_size := minf(15.0, 15.0 * (_keep_hit.size.x - 20.0) / CellOutzType.width_condensed(keep, 15.0, 0.8))
 	CellOutzType.draw_condensed(self, _keep_hit.position + Vector2(10, (_keep_hit.size.y - keep_size) * 0.5), keep, keep_size, ink, 0.8)
 	CellOutzType.draw_condensed(self, Vector2(26, footer + 36), "%s // %s RISING // %s" % [sheet.sun_sign(), sheet.ascendant(), sheet.modality().to_upper()], 9.0, ink * Color(1, 1, 1, 0.55), 0.7)
 	var done := touched_pages.size()
-	var hint := ("CONFIRMED %d/%d  //  ENTER OR CLICK CHANGES A ROW  //  HOLD V TO SPEAK" % [done, PAGES.size()]) if done < PAGES.size() else "ALL %d CONFIRMED  //  F FILES YOU" % PAGES.size()
+	var on_pad := _hint_key("K", JOY_BUTTON_A) != "K"
+	var change := ("%s CHANGES A ROW  //  %s %s TAB  //  %s REROLL  //  %s RENAME" % [_hint_key("", JOY_BUTTON_A), _hint_key("", JOY_BUTTON_LEFT_SHOULDER), _hint_key("", JOY_BUTTON_RIGHT_SHOULDER), _hint_key("", JOY_BUTTON_Y), _hint_key("", JOY_BUTTON_BACK)]) if on_pad else "ENTER OR CLICK CHANGES A ROW  //  R REROLL  //  N RENAME  //  HOLD V TO SPEAK"
+	var hint := ("CONFIRMED %d/%d  //  %s" % [done, PAGES.size(), change]) if done < PAGES.size() else "ALL %d CONFIRMED  //  %s FILES YOU" % [PAGES.size(), _hint_key("F", JOY_BUTTON_START)]
 	var hint_room := rect.size.x - 52.0
 	var hint_size := minf(15.0, 15.0 * hint_room / CellOutzType.width_condensed(hint, 15.0, 0.8))
 	CellOutzType.draw_condensed(self, Vector2(rect.size.x - 26 - CellOutzType.width_condensed(hint, hint_size, 0.8), footer + 50), hint, hint_size, HOT if done < PAGES.size() else MOSS, 0.8)
@@ -1386,7 +1518,8 @@ func _draw_handler(_viewport: Vector2) -> void:
 		draw_rect(button, HOT * Color(1, 1, 1, 0.7), false, 1.0)
 		# Each answer is something an eye does (Greg, 24 September).
 		var icon_end := _draw_blink_icon(button.position + Vector2(12, 14), str(answers[index]), hot)
-		draw_string(font, Vector2(icon_end + 10, button.position.y + 19), "%d   %s" % [index + 1, str(answers[index])], HORIZONTAL_ALIGNMENT_LEFT, text_width - (icon_end - button.position.x) - 20, 15, INK)
+		var answer_key := _hint_key(str(index + 1), [JOY_BUTTON_A, JOY_BUTTON_X, JOY_BUTTON_Y][mini(index, 2)])
+		draw_string(font, Vector2(icon_end + 10, button.position.y + 19), "%s   %s" % [answer_key, str(answers[index])], HORIZONTAL_ALIGNMENT_LEFT, text_width - (icon_end - button.position.x) - 20, 15, INK)
 		y += 34.0
 
 	if thought_life > 0.0 and thought != "":

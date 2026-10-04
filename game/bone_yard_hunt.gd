@@ -8891,7 +8891,8 @@ func _finish_grapple(actor: Dictionary) -> void:
 ## once combat has physically happened, F is available. This remains a read of
 ## history rather than a save flag and works for either melee or firearms.
 func third_person_unlocked() -> bool:
-	return WorldHistory.event_count("melee_body_hit") > 0 or WorldHistory.event_count("firearm_anatomy_hit") > 0
+	# Job 4: slotting the disciplines on the brain screen switches it on.
+	return WorldHistory.event_count("melee_body_hit") > 0 or WorldHistory.event_count("firearm_anatomy_hit") > 0 or WorldHistory.event_count("brain_disciplines_slotted") > 0
 
 
 ## AD1.3. "Earned the way third person is earned rather than given" — the
