@@ -6,7 +6,7 @@ extends Node3D
 ## apply that to the actual full game."
 ##
 ## A 40 m greybox yard: the north half (-Z) under a roof, the south half open
-## to the sky, so weather can be compared under cover and out of it. Five
+## to the sky, so weather can be compared under cover and out of it. Six
 ## stations, each a plinth with a label and one button (USE), each running the
 ## same system the game runs. Free walk on the facility's own body (JumpClimb,
 ## BodyCam, and job 3's `SoulsMover`: tilt to walk or run, Circle/Ctrl to roll
@@ -25,6 +25,7 @@ const LIQUID := preload("res://lab/stations/liquid_station.gd")
 const WEATHER := preload("res://lab/stations/weather_station.gd")
 const DESTRUCTION := preload("res://lab/stations/destruction_station.gd")
 const BODIES := preload("res://lab/stations/bodies_station.gd")
+const DISCIPLINES := preload("res://lab/stations/discipline_station.gd")
 const SPARRING := preload("res://lab/sparring_partner.gd")
 ## Where the sparring partner (job 3) stands: the covered half, clear of the
 ## stations, so a fight has room to move.
@@ -58,6 +59,7 @@ var mover := SoulsMover.new()
 var ads := AimDownSights.new()
 var held_mount: Node3D
 var aiming := false
+var pad_aim_held := false
 var aim_blend := 0.0
 var player_health := 100.0
 var sparring: Node3D
@@ -71,6 +73,7 @@ var liquid: Node3D
 var weather: Node3D
 var destruction: Node3D
 var bodies: Node3D
+var disciplines: Node3D
 ## A destruction tool in hand (`DESTRUCTION.TOOLS`) instead of a weapon, or "".
 var tool := ""
 var menu_open := false
@@ -114,6 +117,7 @@ func _ready() -> void:
 	bodies = _station(BODIES, Vector3(10, 0, -8), Vector3(0, 0, 0))
 	weather = _station(WEATHER, Vector3(0, 0, 2), Vector3(0, 0, 0))
 	destruction = _station(DESTRUCTION, DESTRUCTION_AT, DESTRUCTION.PLINTH)
+	disciplines = _station(DISCIPLINES, Vector3(12, 0, 2), Vector3(0, 0, 0))
 	_vehicle_pad(Vector3(12, 0, 12))
 	_build_player()
 	ballistics = Ballistics.new()
@@ -151,6 +155,7 @@ func _ready() -> void:
 	_hold_current()
 	_build_hud()
 	_build_organ_kit()
+	PadBridge.set_combat_receiver(self)
 	if OS.get_environment("ATG_TEST_MODE") != "1":
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -385,6 +390,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if _movement_input(event):
 		return
+	if disciplines.active == "shade" and _shade_keyboard(event):
+		return
 	if melee.handle_input(event):
 		return
 	if event.is_action_pressed("interact"):
@@ -412,6 +419,72 @@ func _unhandled_input(event: InputEvent) -> void:
 		_note(bodies.press())
 	elif JUMP_CLIMB.is_jump_key(event):
 		JUMP_CLIMB.press(player, yaw, 1.0, "mechanics_lab_climbed")
+
+
+func _exit_tree() -> void:
+	if PadBridge != null:
+		PadBridge.clear_combat_receiver(self)
+		PadBridge.reset_combat_layer()
+
+
+func _discipline_changed(id: String) -> void:
+	PadBridge.set_combat_layer(id, CombatInputLayer.DUELIST if id == "duelist" else (CombatInputLayer.SHADE if id == "shade" else {}))
+	_note("DISCIPLINE // %s" % id.to_upper())
+
+
+## Semantic pad receiver: each discipline owns its shoulder meanings while
+## Circle/R3 remain the shared Souls evade and lock controls.
+func _pad_combat_verb(verb: String, pressed: bool) -> void:
+	match verb:
+		"duelist_attack":
+			if pressed: melee.press_light()
+		"duelist_heavy":
+			if pressed: melee.press_heavy()
+			else: melee.release_heavy()
+		"duelist_block": melee.set_guard(pressed)
+		"duelist_parry":
+			if pressed: melee.press_parry()
+		"shade_takedown":
+			if pressed: _shade_takedown()
+		"shade_throw":
+			if pressed:
+				disciplines.throw_from_camera()
+				_note("SHADE // THROW")
+		"shade_darkness":
+			if pressed: _note("SHADE // DARKNESS %s" % ("ON" if disciplines.toggle_darkness() else "OFF"))
+		"shade_stalk": mover.crouched = pressed
+		"light":
+			if pressed: attack(false)
+		"heavy":
+			if pressed: melee.press_heavy()
+			else: melee.release_heavy()
+		"block": melee.set_guard(pressed)
+		"parry":
+			if pressed: melee.press_parry()
+		"fire":
+			if pressed: attack(false)
+		"aim": pad_aim_held = pressed
+
+
+func _shade_keyboard(event: InputEvent) -> bool:
+	if event.is_action_pressed("attack"):
+		_shade_takedown()
+	elif event.is_action_pressed("heavy"):
+		disciplines.throw_from_camera()
+		_note("SHADE // THROW")
+	elif event.is_action_pressed("guard"):
+		_note("SHADE // DARKNESS %s" % ("ON" if disciplines.toggle_darkness() else "OFF"))
+	elif event.is_action("parry"):
+		mover.crouched = event.is_pressed()
+	else:
+		return false
+	return true
+
+
+func _shade_takedown() -> Dictionary:
+	var report: Dictionary = disciplines.takedown()
+	_note("SHADE // TAKEDOWN" if bool(report.get("accepted", false)) else "SHADE // GET BEHIND")
+	return report
 
 
 ## Evade (Circle / Ctrl), sprint (L3 / Shift). On the pad Circle also
@@ -526,7 +599,7 @@ func _pose_held(delta: float) -> void:
 	if held_mount == null or not is_instance_valid(held_mount):
 		return
 	var firearm := str(arsenal.current().kind) == "firearm"
-	aiming = firearm and (Input.is_action_pressed("parry") or Input.is_action_pressed("guard"))
+	aiming = firearm and (pad_aim_held or Input.is_action_pressed("parry") or Input.is_action_pressed("guard"))
 	ads.advance(delta, aiming)
 	aim_blend = move_toward(aim_blend, 1.0 if aiming else 0.0, delta * 7.0)
 	if not firearm:
@@ -738,12 +811,16 @@ func _pose_execution() -> void:
 ## A blow from `MeleeDriver` met something. Cuts slice along the swing: a
 ## level blade for a side swing, a downward one over the top.
 func _on_melee_struck(collider: Object, at: Vector3, direction: Vector3, packet: Dictionary) -> void:
+	var rig := MeleeDriver.rig_of(collider) as BaselineHuman
+	packet = disciplines.modify_melee(packet, rig)
 	var definition: Dictionary = packet.get("attack_data", {})
 	var swing := -camera.global_basis.y if str(definition.get("side", "")) == "high" else camera.global_basis.x * (-1.0 if bool(packet.get("mirror", false)) else 1.0)
 	var plane: Variant = null
 	if bool(definition.get("cuts", false)):
 		plane = BodySlice.plane_from_swing(at, at - swing * 0.4, swing * 6.0)
 	_land(collider, at, direction, packet, "melee", plane)
+	if bool(packet.get("riposte", false)):
+		_note("DUELIST // RIPOSTE")
 	if bool(packet.get("shock", false)):
 		_note("SHOCK")
 	liquid.touch(at, 0.5)
@@ -841,7 +918,12 @@ func _update_hud() -> void:
 	var extra := ""
 	if arsenal.current_id == "cleaver":
 		extra = "   HEAT %d%%%s" % [roundi(melee.heat * 100.0), "  VENTING" if melee.vent_left > 0.0 else ""]
-	lines.append("HP %d   STAMINA %d%s   [%s] BLOCK  [%s] PARRY/AIM  [%s] LOCK  [%s] ROLL" % [roundi(player_health), roundi(melee.stamina), extra, InputProfile.glyph("guard"), InputProfile.glyph("parry"), InputProfile.glyph("lock_on"), InputProfile.glyph("crouch" if InputProfile.device_family() == "keyboard" else "dodge")])
+	if disciplines.active == "duelist":
+		lines.append("DUELIST  R1 STRIKE  R2 HEAVY  L1 BLOCK  L2 PARRY -> RIPOSTE  R3 LOCK  CIRCLE ROLL")
+	elif disciplines.active == "shade":
+		lines.append("SHADE  R1 TAKEDOWN  R2 THROW  L1 DARKNESS  L2 STALK")
+	else:
+		lines.append("HP %d   STAMINA %d%s   [%s] BLOCK  [%s] PARRY/AIM  [%s] LOCK  [%s] ROLL" % [roundi(player_health), roundi(melee.stamina), extra, InputProfile.glyph("guard"), InputProfile.glyph("parry"), InputProfile.glyph("lock_on"), InputProfile.glyph("crouch" if InputProfile.device_family() == "keyboard" else "dodge")])
 	if player_body != null:
 		lines.append(_body_line())
 	if _note_age < 3.0 and not last_note.is_empty():

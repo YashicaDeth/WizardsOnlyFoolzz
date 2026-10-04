@@ -163,3 +163,12 @@ Defaults set behind dials, all in `OrganSystem` unless named. None of these is G
 - Measured headless (CPU only): 17 pistol rounds 1.7 ms total; charge on brick 8 ms (203 cells); grenade crater 17 ms; drill 0.16 ms a frame; debris settled with 83 cubes: physics 1.0 ms, process 2.2 ms a frame.
 - Not looked at: no render_one.cmd, so no PNGs (`tests/destruction_capture.tscn -- --shots=DIR` takes all six) and no real-GPU fps.
 - Weak: falling pieces collide as their convex hull; voxel faces are not greedy-merged; the dig patch draws one vertex colour, no texture; explosions are a light flash and the debris, no smoke or sparks yet.
+
+## 2026-10-05, lab-52 Duelist and Shade disciplines (Codex)
+
+- Wired only into the mechanics lab as a sixth station, cycling `OFF -> DUELIST -> SHADE -> OFF`; no facility or opening scene references it, and OFF remains the default.
+- Duelist layers R1 strike, R2 heavy, L1 block and L2 parry over the job3 combat base; the shared R3 lock and Circle roll stay intact, and a successful parry opens one target-specific riposte.
+- Shade layers R1 rear-only takedown, R2 physical throwable, L1 booth darkness and held L2 stalking crouch. The takedown uses the real rig/anatomy hit path and the throwable resolves physical collision before damage.
+- Provisional dials, all centralized in `discipline_station.gd`: 1.0 s riposte, x2.0 damage, 2.15 m takedown reach, -0.55 rear dot, 8 s darkness, 13 m/s throw. Greg has not balanced these.
+- Headless proof: `discipline_lab_test`, `mechanics_lab_test`, `v01_weapons_test`, `sparring_test`, `pad_bridge_test`, `souls_roll_test`, `souls_pad_test` and `combat_stance_test` pass. `discipline_lab_capture` loads and exits cleanly headless.
+- Visual proof must be recaptured after this work was rebased onto the current mechanics lab; `render_one.cmd` is now available.
