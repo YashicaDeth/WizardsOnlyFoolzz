@@ -197,8 +197,12 @@ func _ready() -> void:
 	mark_rig.hit("torso", 20.0, 30.0, "blunt", "", Vector3(1, 0, 0))
 	mark_rig.anatomy.finish("test")
 	await _frames(120)
-	check(mark_rig.anatomy.dead and mark_rig.ragdoll_body != null, "killed, the body hands its parts to a ragdoll")
-	if mark_rig.ragdoll_body != null:
+	# Job 2: sandbox bodies are rigged, and a rigged body falls as a
+	# PhysicalBone3D ragdoll on its own skeleton (`RiggedBody.die`) instead of
+	# handing its zone parts to the boxed RagdollBody. Either is a ragdoll.
+	var ragdolled: bool = mark_rig.ragdoll_body != null or (mark_rig.rigged != null and mark_rig.rigged.ragdolled)
+	check(mark_rig.anatomy.dead and ragdolled, "killed, the body hands its parts to a ragdoll")
+	if ragdolled:
 		var torso := mark_rig.parts.get("torso") as Node3D
 		check(torso != null and torso.global_position.x > stood_at.x + 0.1, "and falls along the blow (torso %.2f m toward +X, y %.2f)" % [(torso.global_position.x - stood_at.x) if torso != null else 0.0, torso.global_position.y if torso != null else 0.0])
 

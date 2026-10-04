@@ -246,6 +246,10 @@ var _knockdown_tween: Tween
 ## that actually dies can hand these exact zone nodes to physics instead.
 var _ragdoll_enabled := false
 var ragdoll_body: RagdollBody
+## Job 2. The rigged skeleton this body's zones ride, when it has one
+## (`RiggedBody.attach`, or `"rigged": true` in the build config). Null keeps
+## every zone where the layout put it, exactly as before.
+var rigged: RiggedBody
 var _last_hit_direction := Vector3.ZERO
 var _last_hit_impulse := 0.0
 var _last_hit_zone := "torso"
@@ -376,6 +380,8 @@ func build(id: String, config: Dictionary = {}) -> void:
 				_hide_organ(str(organ_id))
 	# A body nobody has dressed is naked: its forms, and their censor.
 	BodyForms.refresh(self)
+	if bool(config.get("rigged", false)) and not _seated:
+		RiggedBody.attach(self)
 
 
 ## The old torso ended at a vertical wall and the arm began as another separate
@@ -922,6 +928,11 @@ func _on_died(_report: Dictionary) -> void:
 		return
 	if not _ragdoll_enabled:
 		_on_went_down()
+		return
+	# A rigged body falls on its own skeleton: same zones, same wounds, joints
+	# that hold (Job 2).
+	if rigged != null and is_instance_valid(rigged):
+		rigged.die(_last_hit_zone, _last_hit_impulse, _last_hit_direction, _last_hit_attack_id)
 		return
 	var holder := get_parent()
 	if holder == null:
@@ -1901,6 +1912,8 @@ func _throw_limb(zone_id: String, hit_direction := Vector3.ZERO) -> void:
 	shape_node.shape = shape
 	limb.add_child(shape_node)
 	GoreChunks.register_whole_limb(limb, zone_id, anatomy.subject_id)
+	if rigged != null and is_instance_valid(rigged):
+		rigged.skin_severed_limb(zone_id, limb, visual)
 	var launch := hit_direction.normalized() if hit_direction.length_squared() > 0.001 else Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0)).normalized()
 	limb.apply_central_impulse((launch * 2.25 + Vector3.UP * 2.1) * limb.mass)
 	limb.apply_torque_impulse(Vector3(randf_range(-3.0, 3.0), randf_range(-3.0, 3.0), randf_range(-3.0, 3.0)))
