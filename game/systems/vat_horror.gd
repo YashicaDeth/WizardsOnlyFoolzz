@@ -59,6 +59,14 @@ func _process(delta: float) -> void:
 	if vat == null or subjects.is_empty():
 		return
 	clock += delta
+	# Passive buoyancy and horror are two layers of one pose. Clear only the
+	# transient horror layer each frame; permanent drain/slump changes stay in
+	# VatFloat's rest pose.
+	for entry: Dictionary in subjects:
+		var subject := entry.rig as BaselineHuman
+		var float_motion := _float_for(subject)
+		if float_motion != null:
+			float_motion.clear_part_offsets()
 	var phase := str(vat.get("phase"))
 	# The chamber's seeds: 1 is the one still alive, 2 the one that failed.
 	var alive := _subject(1)
@@ -91,6 +99,12 @@ func _entry(seed_value: int) -> Dictionary:
 	return {}
 
 
+func _float_for(rig: BaselineHuman) -> Node:
+	if rig == null or not is_instance_valid(rig):
+		return null
+	return rig.get_node_or_null("VatFloat")
+
+
 ## Twitches that come in fits: mostly still, then a seizure through the limbs.
 func _convulse(rig: BaselineHuman, strength: float) -> void:
 	var fit := pow(maxf(0.0, sin(clock * 0.9 + float(rig.get_instance_id() % 7))), 8.0)
@@ -100,7 +114,12 @@ func _convulse(rig: BaselineHuman, strength: float) -> void:
 			continue
 		var rest: Vector3 = _rest[part.get_instance_id()]
 		var jitter := sin(clock * 31.0 + float(part_id.length()) * 2.3) * 0.35 * fit * strength
-		part.rotation = rest + Vector3(jitter, jitter * 0.5, -jitter * 0.6)
+		var offset := Vector3(jitter, jitter * 0.5, -jitter * 0.6)
+		var float_motion := _float_for(rig)
+		if float_motion != null:
+			float_motion.set_part_offset(part_id, offset)
+		else:
+			part.rotation = rest + offset
 
 
 ## Awake and drowning: a fist against the glass every second or so, and the
@@ -112,7 +131,12 @@ func _hammer(rig: BaselineHuman, delta: float) -> void:
 	if arm != null and _rest.has(arm.get_instance_id()):
 		var rest: Vector3 = _rest[arm.get_instance_id()]
 		var swing := sin(beat * PI) if beat < 0.5 else 0.0
-		arm.rotation = rest + Vector3(-1.6 * swing, 0.0, 0.0)
+		var offset := Vector3(-1.6 * swing, 0.0, 0.0)
+		var float_motion := _float_for(rig)
+		if float_motion != null:
+			float_motion.set_part_offset("right_arm", offset)
+		else:
+			arm.rotation = rest + offset
 	if beat < delta / 1.1 and vat.get("opening_audio") != null:
 		vat.opening_audio.cue("tug")
 	_grow_cloud(1, delta * 0.06)
@@ -147,11 +171,19 @@ func drain_failed() -> void:
 	drained = true
 	var failed := _subject(2)
 	if failed != null:
-		failed.rotation.x += 0.55
-		failed.position.y -= 0.25
+		var float_motion := _float_for(failed)
+		if float_motion != null:
+			float_motion.add_rest_rotation(Vector3(0.55, 0.0, 0.0))
+			float_motion.nudge_anchor(Vector3.DOWN * 0.25)
+		else:
+			failed.rotation.x += 0.55
+			failed.position.y -= 0.25
 		var head := failed.parts.get("head") as Node3D
 		if head != null:
-			head.rotation.x += 0.7
+			if float_motion != null:
+				float_motion.add_part_rest_rotation("head", Vector3(0.7, 0.0, 0.0))
+			else:
+				head.rotation.x += 0.7
 	_grow_cloud(2, 0.45)
 	WorldHistory.record_event("vat_subject_drained", {"location": "growing_floor"})
 
