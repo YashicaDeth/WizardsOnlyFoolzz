@@ -7,9 +7,16 @@ design decision, it is listed under OPEN; stop and report instead of choosing.
 ## Read before any job
 
 - `DESIGN/BUILD_PLAN.html` (scope of v0.1: what is in, what is switched off).
-- `P:/GameDev/AgentHub/data/greg_direction_2026-10-04_controller_combat.md`
-  and `P:/GameDev/AgentHub/data/greg_playtest_b_2026-10-04.md`: Greg's newest
-  words. They win over every older document, including this one.
+- `P:/GameDev/AgentHub/data/greg_playtest_b_2026-10-04.md` (short): what Greg
+  hit when he played. Greg's newest words win over every older document,
+  including this one.
+- **Spend tokens on building, not reading.** Your job section already carries
+  the decisions you need. Do not read the long files end to end:
+  `greg_direction_2026-10-04_controller_combat.md` (all of Greg's decisions),
+  `data/session_2026-10-04_chat.md` (the full planning chat) and `DESIGN.md`.
+  Search them (`rg -n "<word>"`) only when you need one specific decision.
+  To find code, use the knowledge graph in `graphify-out/` or `rg` for the
+  paths your brief names; do not crawl the repo.
 - Skills to load by name: `wof-lane-hygiene`, `wof-wire-before-polish`,
   `wof-verify-by-looking`, `running-headless-godot`, plus the ones named in
   your job.
