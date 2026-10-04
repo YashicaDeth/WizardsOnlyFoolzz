@@ -544,6 +544,9 @@ func begin_demo() -> void:
 	_reset_memory()
 	run_mode = RUN_MODE_DEMO
 	active_slot_id = ""
+	# Greg: every START DEMO is a fresh start. A leftover demo save carried the
+	# old run's progress past the vat and broke everything after it.
+	_wipe_demo_saves()
 	_load_history()
 	if run_salt == 0:
 		run_salt = randi() | 1
@@ -551,6 +554,15 @@ func begin_demo() -> void:
 		chaos_magick_at_minute = world_minute
 	CellOutzGrunge.remember_run(run_salt)
 	record_event("demo_session_started", {"stage": str(subject("opening_run").get("stage", "none"))})
+
+
+func _wipe_demo_saves() -> void:
+	var dir_path := _current_path().get_base_dir()
+	var dir := DirAccess.open(dir_path)
+	if dir == null:
+		return
+	for file_name in dir.get_files():
+		dir.remove(file_name)
 
 
 ## Put the ledger back on the full-game side before a PLAY branch is selected.
