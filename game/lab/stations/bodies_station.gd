@@ -43,6 +43,7 @@ static func dummy(parent: Node3D, id: String, at: Vector3, facing: float, variat
 		"blood": 4300.0,
 		"knockdown_travel": 0.42,
 		"ragdoll": true,
+		"rigged": true,
 	})
 	HunterAppearance.style_world_rig(rig, id, false)
 	return rig

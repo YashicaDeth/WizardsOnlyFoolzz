@@ -14,8 +14,8 @@ extends Node3D
 ##
 ##  - The mannequin's skinned mesh is split into the rig's six zones by bone
 ##    weight (the same split ModelSkin does for the examiner). A zone shows the
-##    skin while it is pristine; the first wound, exposed layer, prosthetic,
-##    sever or X-ray hands that zone straight back to the rig's own body.
+##    skin while it is pristine; the first wound, exposed layer, sever or
+##    X-ray hands that zone straight back to the rig's own body.
 ##  - Every zone rides the animated skeleton. Each zone part (and its hitbox)
 ##    is placed every frame along the chord between two BoneAttachment3Ds
 ##    (shoulder to palm, hip to sole, pelvis to neck, neck to crown), so
@@ -141,7 +141,16 @@ const RAGDOLL_FREEZE_SECONDS := 4.0
 ## What the rig keeps showing on a zone the skin covers, besides anything this
 ## file does not recognise as body (held weapons, tools, gear): nothing.
 const BODY_PIECE_PREFIXES := ["Shoulder_", "Clavicle_", "Garment", "Censor_", "Nude_", "Tattoo_", "ForcedJester", "CollarLock", "BloodStreak"]
+## Distance from the camera past which a body animates and moves its zones at
+## a lower rate (every 2nd, 4th, then 8th frame). Thirteen bodies at full
+## rate cost ~5 ms a frame, most of the 144 fps budget; nobody can see a
+## 30 Hz idle sway at thirty metres.
+const SYNC_EVERY := 4
+const LOD_NEAR := 12.0
+const LOD_FAR := 24.0
+const LOD_DISTANT := 40.0
 const HIT_LEAN_SECONDS := 0.42
+const DOWN_THEN_DEAD_MSEC := 400
 const HIT_LEAN_ANGLE := 0.42
 
 
@@ -178,6 +187,10 @@ var attachments: Dictionary = {}
 var segment_hitboxes: Dictionary = {}
 var physical_bones: Dictionary = {}
 var zone_meshes: Dictionary = {}
+## Each zone's skin bounds in the model's rest (T-pose) space, and the scale
+## that fits the rig's zone node to that skin while it shows it.
+var zone_extents: Dictionary = {}
+var zone_fit: Dictionary = {}
 var triangles_by_zone: Dictionary = {}
 var modes: Dictionary = {}
 var ragdolled := false
@@ -198,6 +211,23 @@ var _seen_attack := 0.0
 var _lean_time := 0.0
 var _quiet := 0.0
 var _ragdoll_time := 0.0
+var _motion_search := 0
+var _lod_tick := 0
+var _lod_delta := 0.0
+var _zone_children: Dictionary = {}
+var _severed_seen := 0
+var _sync_tick := 0
+var _synced_hit := Vector4.ZERO
+var _synced_arms := true
+var _synced_xray: Variant = false
+var _shown: Dictionary = {}
+var _downed_at_msec := -100000
+## The skeleton's final pose once it is a ragdoll, per bone, as drawn.
+## `get_bone_global_pose` outside the update reads the pose before the
+## modifiers (the animation's), which put a limb cut off a corpse back where
+## the body had stood. Living bodies bake from the animation pose, which is
+## what they draw (give or take a hit lean).
+var _final_pose: Array[Transform3D] = []
 
 
 ## The rigged body for `host`, or null (nothing touched) when the model is
@@ -239,25 +269,75 @@ func build(host: BaselineHuman) -> bool:
 	if skeleton == null or player == null or source == null:
 		return false
 	model.rotation.y = PI
-	model_scale = 1.0 if OS.get_environment("JOB2_NOSCALE") == "1" else _rig_height() / maxf(source.mesh.get_aabb().end.y, 0.5)
+	model_scale = _rig_height() / maxf(source.mesh.get_aabb().end.y, 0.5)
 	model.scale = Vector3.ONE * model_scale
 	if not _split(source):
 		return false
+	_measure_fit()
+	player.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
 	for clip_name in ["Idle", "Walk", "Jog_Fwd", "Sprint", "Crouch_Idle", "Crouch_Fwd", "Jump", "Sword_Idle", "Pistol_Idle", "Spell_Simple_Idle"]:
 		if player.has_animation(clip_name):
 			player.get_animation(clip_name).loop_mode = Animation.LOOP_LINEAR
 	_build_attachments()
+	# The rig's own zone hitboxes ride the skeleton now, so they move every
+	# frame: same reason as the segment hitboxes. Nothing listens to them
+	# (they are found by rays and `body_zone`), so they stop watching and
+	# stop masking anything; their own layer is unchanged, so every ray that
+	# found them still does.
+	for zone: String in ZONES:
+		var zone_hitbox := body.get_node_or_null("%s_hitbox" % zone) as Area3D
+		if zone_hitbox != null:
+			zone_hitbox.monitoring = false
+			zone_hitbox.collision_mask = 0
 	hit_lean = HitLean.new()
 	hit_lean.name = "HitLean"
+	# Off until a blow lands: an active GDScript modifier is called on every
+	# skeleton update of every body.
+	hit_lean.active = false
 	skeleton.add_child(hit_lean)
+	body.went_down.connect(func(): _downed_at_msec = Time.get_ticks_msec())
 	motion_source = _find_motion_source()
 	_last_position = body.global_position if body.is_inside_tree() else Vector3.ZERO
+	# Spread the reduced-rate frames of distant bodies over the frames
+	# between, rather than all of them landing on the same one.
+	_lod_tick = absi(hash(body.subject_id + str(get_instance_id()))) % 8
 	_seen_hit = _hit_signature()
 	_play("Idle", 1.0)
+	# Pose the first idle frame now: driving the zones off the bind pose would
+	# leave a body nobody animates standing in a T.
+	player.advance(0.0)
 	skeleton.force_update_all_bone_transforms()
 	_drive_zones()
 	_zones()
 	return true
+
+
+## Everything dressed onto a zone (face, implant hardware, outfit extras,
+## held tools) was placed on the procedural zone, which is wider and deeper
+## than the skin. While the skin shows, the zone node is scaled across to the
+## skin's own cross-section so those pieces sit on it rather than floating a
+## few centimetres off it; along the zone it keeps its length.
+func _measure_fit() -> void:
+	var layout: Dictionary = body.get("_layout") if body.get("_layout") != null else {}
+	for zone: String in ZONES:
+		var spec: Dictionary = layout.get(zone, {})
+		var extent: AABB = zone_extents.get(zone, AABB())
+		if spec.is_empty() or extent.size == Vector3.ZERO:
+			zone_fit[zone] = Vector3.ONE
+			continue
+		var size: Vector3 = spec.size
+		var across := Vector2.ZERO
+		match zone:
+			"head", "torso":
+				across = Vector2(extent.size.x, extent.size.z)
+			"left_arm", "right_arm":
+				# Lying along X in the T-pose; the hand is wider than the arm.
+				across = Vector2(extent.size.z, extent.size.z) * 0.85
+			_:
+				# Standing along Y; the foot is longer than the leg is deep.
+				across = Vector2(extent.size.x, extent.size.x) * 0.9
+		across *= model_scale
+		zone_fit[zone] = Vector3(clampf(across.x / maxf(size.x, 0.01), 0.5, 1.2), 1.0, clampf(across.y / maxf(size.z, 0.01), 0.5, 1.2))
 
 
 ## Where the rig's head ends, from the same layout its parts were built from.
@@ -269,12 +349,17 @@ func _rig_height() -> float:
 	return float((head.at as Vector3).y + (head.size as Vector3).y * 0.5)
 
 
+## The HunterBodyMotion driving this body, if any: a sibling whose `rig` is
+## this body. Owners often add it after building the body, so this is asked
+## again until it answers.
 func _find_motion_source() -> Node:
 	var holder := body.get_parent()
 	if holder == null:
 		return null
-	var found := holder.get_node_or_null("HunterBodyMotion")
-	return found if found != null and "state" in found else null
+	for child in holder.get_children():
+		if child != body and "state" in child and "rig" in child and child.get("rig") == body:
+			return child
+	return null
 
 
 ## One BoneAttachment3D per bone a zone or a segment needs; the zone's back
@@ -312,6 +397,12 @@ func _build_attachments() -> void:
 		if not str(spec[1]).is_empty():
 			length = _rest_distance(bone_name, str(spec[1]))
 		var area := Area3D.new()
+		# Found by rays and shapes, never watching for anything itself: a
+		# hitbox that monitors or masks layer 1 is broadphase-paired with
+		# every other hitbox it touches, and they all move every step (about
+		# 5 ms of physics for 13 bodies).
+		area.monitoring = false
+		area.collision_mask = 0
 		area.name = "%s_hitbox_%s" % [spec[0], bone_name]
 		area.set_meta("body_zone", str(spec[0]))
 		area.set_meta("bone", bone_name)
@@ -396,6 +487,10 @@ func _split(source: MeshInstance3D) -> bool:
 			zone_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, zone_arrays, [], {}, flags)
 			var zone: String = ZONES[zone_index]
 			triangles_by_zone[zone] = int(triangles_by_zone[zone]) + list.size() / 3
+			var extent: AABB = zone_extents.get(zone, AABB(vertices[list[0]], Vector3.ZERO))
+			for corner in list:
+				extent = extent.expand(vertices[corner])
+			zone_extents[zone] = extent
 			var instance := MeshInstance3D.new()
 			instance.name = "Skin_%s_%d" % [zone, surface]
 			instance.mesh = zone_mesh
@@ -427,10 +522,51 @@ func _zone_of_bone(bone: int) -> String:
 func _process(delta: float) -> void:
 	if body == null or not is_instance_valid(body) or model == null:
 		return
+	_lod_delta += delta
+	_lod_tick += 1
+	var interval := _lod_interval()
+	if interval > 1 and _lod_tick % interval != 0 and not ragdolled:
+		return
+	var step := _lod_delta
+	_lod_delta = 0.0
 	if not ragdolled:
-		_animate(delta)
+		_animate(step)
+	if not ragdolled:
+		player.advance(step)
 	_drive_zones()
-	_zones()
+	# The full skin check reads a dozen things per zone off the rig; nothing
+	# it reads changes between blows, so it runs at ~15 Hz, and at once
+	# whenever a blow lands, the arms change hands or a limb comes off. The
+	# part's own visibility (the first-person head) is mirrored every frame.
+	_sync_tick += 1
+	var signature := _hit_signature()
+	if _sync_tick >= SYNC_EVERY or signature != _synced_hit or arms_driven != _synced_arms or body.severed.size() != _severed_seen or body.get("_xray") != _synced_xray:
+		_sync_tick = 0
+		_synced_hit = signature
+		_synced_arms = arms_driven
+		_synced_xray = body.get("_xray")
+		_zones()
+	else:
+		_mirror_visibility()
+
+
+## 1 near the camera (and whenever there is no camera, as in tests), then 2,
+## 4 and 8 past LOD_NEAR, LOD_FAR and LOD_DISTANT. A body that was just hit,
+## or is playing an action, runs at full rate.
+func _lod_interval() -> int:
+	if _lean_time > 0.0 or not _action.is_empty() or not is_inside_tree():
+		return 1
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		return 1
+	var distance := camera.global_position.distance_to(body.global_position)
+	if distance > LOD_DISTANT:
+		return 8
+	if distance > LOD_FAR:
+		return 4
+	if distance > LOD_NEAR:
+		return 2
+	return 1
 
 
 ## Picks the clip from the motion source when there is one (the player), from
@@ -448,12 +584,32 @@ func _animate(delta: float) -> void:
 		_lean_time = maxf(0.0, _lean_time - delta)
 		var t := 1.0 - _lean_time / HIT_LEAN_SECONDS
 		hit_lean.amount = sin(t * PI) * HIT_LEAN_ANGLE * (1.0 - t * 0.4)
-	else:
+		hit_lean.active = true
+	elif hit_lean.active:
 		hit_lean.amount = 0.0
+		hit_lean.active = false
 	if body.anatomy != null and (body.anatomy.dead or body.is_downed()):
 		player.pause()
 		return
-	arms_driven = not (motion_source != null and bool(motion_source.get("first_person")))
+	if motion_source == null or not is_instance_valid(motion_source):
+		_motion_search -= 1
+		if _motion_search <= 0:
+			_motion_search = 30
+			motion_source = _find_motion_source()
+	var driven_now := not (motion_source != null and bool(motion_source.get("first_person")))
+	if arms_driven and not driven_now:
+		# Handed back to the first-person rig where it left them: at the
+		# layout, which is what its poses are offsets from.
+		for zone in ["left_arm", "right_arm"]:
+			var arm := body.parts.get(zone) as Node3D
+			if arm != null and is_instance_valid(arm) and arm.get_parent() == body:
+				arm.position = arm.get_meta("rest_position", arm.position)
+				arm.rotation = arm.get_meta("rest_rotation", Vector3.ZERO)
+				var arm_hitbox := body.get_node_or_null("%s_hitbox" % zone) as Node3D
+				if arm_hitbox != null:
+					arm_hitbox.position = arm.position
+					arm_hitbox.rotation = arm.rotation
+	arms_driven = driven_now
 	if not _action.is_empty():
 		if player.is_playing() and player.current_animation == _action:
 			return
@@ -556,9 +712,11 @@ func _drive_zones() -> void:
 			continue
 		var part := body.parts.get(zone) as Node3D
 		if part != null and is_instance_valid(part) and part.get_parent() == body:
-			var keep := part.scale
-			part.global_transform = placed
-			part.scale = keep
+			var now := part.global_transform
+			if now.origin.distance_squared_to(placed.origin) > 0.0000004 or not now.basis.orthonormalized().is_equal_approx(placed.basis):
+				var keep := part.scale
+				part.global_transform = placed
+				part.scale = keep
 		var hitbox := body.get_node_or_null("%s_hitbox" % zone) as Node3D
 		if hitbox != null and hitbox.get_parent() == body:
 			hitbox.global_transform = placed
@@ -609,15 +767,15 @@ func _point(bone_name: String, ext: float, toward: Vector3) -> Vector3:
 	return node.global_position + toward * ext
 
 
-## True while `zone` may show the skin: nothing gory has happened to it, it
-## carries no prosthetic, nobody is looking through it, and whoever owns the
-## part has not hidden it (the first-person camera hides the head).
+## True while `zone` may show the skin: nothing gory has happened to it,
+## nobody is looking through it, and whoever owns the part has not hidden it
+## (the first-person camera hides the head). Installed hardware does not end
+## it: the skin wears the zone's chrome exactly as the rig's flesh would, and
+## the hardware piece itself stays on the part, riding the bone.
 func in_skin_mode(zone: String) -> bool:
 	if body.get("_xray") == true or body.severed.has(zone):
 		return false
 	if not arms_driven and zone.ends_with("_arm"):
-		return false
-	if body.anatomy != null and body.anatomy.installed_parts.has(zone):
 		return false
 	if not (body.wound_marks.get(zone, []) as Array).is_empty() or int(body.zone_depth.get(zone, 0)) > 0:
 		return false
@@ -629,26 +787,49 @@ func _zones() -> void:
 		var skin_mode := in_skin_mode(zone)
 		var part := body.parts.get(zone) as MeshInstance3D
 		var shown := skin_mode and part != null and is_instance_valid(part) and part.visible
+		_shown[zone] = skin_mode
+		var material: Material = _skin_material(zone, part) if shown else null
 		for instance: MeshInstance3D in zone_meshes[zone]:
-			instance.visible = shown
-			if shown:
-				instance.material_override = _skin_material(zone, part)
+			if instance.visible != shown:
+				instance.visible = shown
+			if shown and instance.material_override != material:
+				instance.material_override = material
 		if part != null and is_instance_valid(part):
 			if skin_mode:
 				# BaselineHuman rewrites transparency on every zone refresh, so
-				# this is asserted every frame.
-				part.transparency = 1.0
-				_hide_rig_pieces(zone, part)
+				# this is asserted every frame (only written when it changed).
+				if part.transparency != 1.0:
+					part.transparency = 1.0
+				# Dressing is added and rebuilt by other systems; rescan the
+				# zone's pieces only when its children changed or it just
+				# entered skin mode, not every frame (~76 pieces a person).
+				var count := part.get_child_count()
+				if modes[zone] != "skin" or int(_zone_children.get(zone, -1)) != count:
+					_zone_children[zone] = count
+					_hide_rig_pieces(zone, part)
+				var fitted: Vector3 = (part.get_meta("rest_scale", Vector3.ONE) as Vector3) * (zone_fit.get(zone, Vector3.ONE) as Vector3)
+				if not part.scale.is_equal_approx(fitted):
+					part.scale = fitted
 			elif modes[zone] == "skin":
 				_give_back(zone, part)
 		modes[zone] = "skin" if skin_mode else "body"
-	var segments_on := {}
+	if body.severed.size() != _severed_seen:
+		_severed_seen = body.severed.size()
+		for area: Area3D in segment_hitboxes.values():
+			area.monitorable = not body.severed.has(str(area.get_meta("body_zone")))
+
+
+## Between full syncs: a zone in skin mode shows its skin exactly while its
+## part is visible (the Hunt hides the head part at the eye every frame).
+func _mirror_visibility() -> void:
 	for zone: String in ZONES:
-		segments_on[zone] = not body.severed.has(zone)
-	for area: Area3D in segment_hitboxes.values():
-		var on: bool = segments_on.get(str(area.get_meta("body_zone")), true)
-		if area.monitorable != on:
-			area.monitorable = on
+		if not bool(_shown.get(zone, false)):
+			continue
+		var part := body.parts.get(zone) as Node3D
+		var visible_now := part != null and is_instance_valid(part) and part.visible
+		for instance: MeshInstance3D in zone_meshes[zone]:
+			if instance.visible != visible_now:
+				instance.visible = visible_now
 
 
 ## The skin wears what the zone wears: its garment where it has one, otherwise
@@ -673,6 +854,10 @@ func _hide_rig_pieces(zone: String, part: Node3D) -> void:
 
 
 func _is_body_piece(piece_name: String) -> bool:
+	# Outfit extras (the jester's bell cap, the collar) are worn over the body,
+	# not part of its surface: they stay, riding the zone.
+	if piece_name.begins_with("GarmentExtra_"):
+		return false
 	for prefix: String in BODY_PIECE_PREFIXES:
 		if piece_name.begins_with(prefix):
 			return true
@@ -686,6 +871,7 @@ func _give_back(zone: String, part: Node3D) -> void:
 		if is_instance_valid(piece):
 			(piece as Node3D).visible = true
 	hidden.clear()
+	part.scale = part.get_meta("rest_scale", Vector3.ONE)
 	(part as GeometryInstance3D).transparency = 0.62 if body.get("_xray") == true else 0.0
 	if body.get("_xray") != true:
 		body.call("_refresh_zone", zone)
@@ -693,7 +879,7 @@ func _give_back(zone: String, part: Node3D) -> void:
 
 ## Called by BaselineHuman when a limb leaves whole: the thrown limb carries
 ## the zone's skin in the pose it was cut in, and the rig's own limb mesh
-## steps back (its wounds, ink and bone stub stay on it and stay visible).
+## steps back (ink and the bone stub stay on it and stay visible).
 func skin_severed_limb(zone: String, limb: Node3D, visual: GeometryInstance3D) -> void:
 	if limb == null or not is_instance_valid(limb):
 		return
@@ -711,8 +897,19 @@ func skin_severed_limb(zone: String, limb: Node3D, visual: GeometryInstance3D) -
 		limb.add_child(copy)
 		copy.global_transform = skeleton.global_transform
 		baked_any = true
-	if baked_any and visual != null and modes.get(zone, "") == "skin":
+	# The rig's thrown copy never carried the zone's wound decals (those stay on
+	# the part), so the skin in the pose it was cut in, wearing the zone's
+	# damage tint, loses nothing; ink and the bone stub stay as they were.
+	if baked_any and visual != null:
 		visual.transparency = 1.0
+
+
+func _remember_pose() -> void:
+	var count := skeleton.get_bone_count()
+	if _final_pose.size() != count:
+		_final_pose.resize(count)
+	for bone in count:
+		_final_pose[bone] = skeleton.get_bone_global_pose(bone)
 
 
 ## The zone's skin, skinned on the CPU in the skeleton's current pose, in the
@@ -735,7 +932,10 @@ func _bake_pose(instance: MeshInstance3D) -> ArrayMesh:
 	for bind in skin.get_bind_count():
 		var bone_name := skin.get_bind_name(bind)
 		var bone := skeleton.find_bone(bone_name) if not bone_name.is_empty() else skin.get_bind_bone(bind)
-		bind_pose.append(skeleton.get_bone_global_pose(bone) * skin.get_bind_pose(bind) if bone >= 0 else Transform3D.IDENTITY)
+		var pose := Transform3D.IDENTITY
+		if bone >= 0:
+			pose = _final_pose[bone] if bone < _final_pose.size() else skeleton.get_bone_global_pose(bone)
+		bind_pose.append(pose * skin.get_bind_pose(bind))
 	var remap := {}
 	var out_vertices := PackedVector3Array()
 	var out_normals := PackedVector3Array()
@@ -778,6 +978,17 @@ func die(hit_zone: String, impulse: float, direction: Vector3, attack_id := "") 
 		return
 	ragdolled = true
 	arms_driven = true
+	# The killing blow usually knocks the body down first, and the authored
+	# knockdown tips the whole rig over about its feet in one frame: a ragdoll
+	# started from that pose began with a leg already through the floor and
+	# lay propped on it. A death in the same moment as the fall falls from
+	# standing; a body that went down earlier keeps the pose it lies in.
+	if Time.get_ticks_msec() - _downed_at_msec < DOWN_THEN_DEAD_MSEC:
+		var tween: Variant = body.get("_knockdown_tween")
+		if tween is Tween and (tween as Tween).is_valid():
+			(tween as Tween).kill()
+		body.rotation.x = 0.0
+		skeleton.force_update_all_bone_transforms()
 	player.pause()
 	hit_lean.amount = 0.0
 	hit_lean.active = false
@@ -792,6 +1003,9 @@ func die(hit_zone: String, impulse: float, direction: Vector3, attack_id := "") 
 		if made != null:
 			physical_bones[bone_name] = made
 	simulator.physical_bones_start_simulation()
+	# From here the drawn pose is the physics', not the animation's: a limb
+	# cut off the corpse is baked from what the skeleton last drew.
+	skeleton.skeleton_updated.connect(_remember_pose)
 	_ignore_loose_gore()
 	body.limb_severed.connect(func(_zone: String, _report: Dictionary): _ignore_loose_gore.call_deferred())
 	if body.anatomy != null:

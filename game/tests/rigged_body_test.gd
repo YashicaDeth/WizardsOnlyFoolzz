@@ -192,17 +192,30 @@ func _test_death(body: BaselineHuman) -> void:
 	print("  settled after %d physics frames, worst joint gap %.3f m, fastest bone %.1f m/s (launched at %.1f)" % [frames, worst_gap, worst_speed, rigged.max_launch_speed])
 	check(worst_speed < rigged.max_launch_speed + 6.0, "no bone was flung faster than the blow and a fall can explain (%.1f m/s)" % worst_speed)
 	check(rigged.ragdoll_settled, "the corpse is laid to rest within four seconds")
-	# Measured (tests/rigged_ragdoll_engine_probe): Jolt holds every joint to
-	# under 8 cm through the fall; Godot Physics, the project's engine today,
-	# lets a hip give up to about 13 cm under a falling leg and recovers.
-	# Either way a limb that came off reads in metres.
+	# Measured over repeated runs: Jolt holds every joint to under 8 cm through
+	# the fall. Godot Physics, the project's engine today, usually stays under
+	# 5 cm but about one fall in eight gives a hip ~22 cm for a few frames and
+	# recovers. Either way a limb that came off reads in metres, and at rest
+	# both hold.
 	var jolt := str(ProjectSettings.get_setting("physics/3d/physics_engine")).begins_with("Jolt")
-	var allowed := 0.08 if jolt else 0.2
+	var allowed := 0.08 if jolt else 0.25
 	check(worst_gap < allowed, "no joint pulled apart while falling (worst %.3f m, allowed %.2f m)" % [worst_gap, allowed])
 	var rest_gap := rigged.max_joint_gap()
-	check(rest_gap < allowed, "every joint holds once at rest (%.3f m)" % rest_gap)
+	check(rest_gap < 0.08, "every joint holds once at rest (%.3f m)" % rest_gap)
 	var torso := body.parts.torso as Node3D
 	check(torso.global_position.y > -0.05 and torso.global_position.y < 0.6, "the corpse lies on the floor, not through it (torso %.2f m)" % torso.global_position.y)
+	# The killing blow knocks the body down in the same moment; the ragdoll has
+	# to fall from standing, not from a tipped pose with a leg in the floor.
+	var lowest := INF
+	var highest := -INF
+	for bone_name: String in rigged.attachments:
+		var y: float = (rigged.attachments[bone_name] as Node3D).global_position.y
+		if bone_name.ends_with("_r") and bone_name.begins_with("upperarm") or bone_name.begins_with("lowerarm_r") or bone_name.begins_with("hand_r"):
+			continue
+		lowest = minf(lowest, y)
+		highest = maxf(highest, y)
+	check(lowest > -0.03, "no bone of the corpse ended up under the floor (lowest %.2f m)" % lowest)
+	check(highest < 0.7, "the corpse lies down rather than propped up (highest bone %.2f m)" % highest)
 	for zone in ["head", "left_arm", "left_leg", "right_leg"]:
 		var part := body.parts[zone] as Node3D
 		# A limb's centre is half its length past the joint, which is itself
