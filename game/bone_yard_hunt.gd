@@ -871,6 +871,11 @@ var inspect_blend := 0.0
 var inspect_time := 0.0
 var inspection_light: OmniLight3D
 var pending_attack: Dictionary = {}
+## The authored pad-first melee clock existed in the sandbox but the production
+## Hunt still used one legacy wind-up and one generic arm sweep. Third person
+## owns this instance; first-person drag swings keep their established path.
+var third_person_moveset := SwordMoveset.new()
+var third_person_strike_resolved := false
 ## AN2.3. Set by `_attack_nearest_encounter_actor()` right before it returns
 ## true, read once by `_resolve_strike()` immediately after — a throat and a
 ## skull do not stop a blade the same amount, and `arm.strike()` was never
@@ -2117,6 +2122,7 @@ func _physics_process(delta: float) -> void:
 		if body_motion != null:
 			body_motion.set_guard(0.0, "melee")
 			body_motion.set_lean(0.0)
+	_advance_third_person_melee(player_delta)
 	_update_player(delta)
 	cost = ScriptCost.lap("_update_player", cost)
 	_enforce_demo_territory()
@@ -2306,6 +2312,7 @@ func _update_player(delta: float) -> void:
 		return
 	var move := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var direction: Vector3 = HUNTER_MOTOR.wish_direction(move, yaw)
+	_update_third_person_stance(move, direction)
 	crouching = Input.is_action_pressed("crouch") and dodge_remaining <= 0.0
 	# AG4.1. TaKeS, second playtest: *"when running and the stamina bar depletes,
 	# the screen becomes super jittery — i assume since its trying to set it to
@@ -2346,7 +2353,7 @@ func _update_player(delta: float) -> void:
 		speed *= 0.68
 	# A melee press is one committed swing, not an automatic attack repeated by
 	# holding the mouse. You can still steer it, but not sprint through its tell.
-	speed *= COMBAT_RESPONSE.movement_scale(pending_attack, strike_windup)
+	speed *= 0.2 if third_person_moveset.is_attacking() else COMBAT_RESPONSE.movement_scale(pending_attack, strike_windup)
 	player_capsule.height = move_toward(player_capsule.height, 1.2 if crouching else 1.8, delta * 4.0)
 	player_collider.position.y = (player_capsule.height - 1.8) * 0.5
 	# AD1.1. Handed to move_body() rather than applied after it: is_on_floor()
@@ -2454,7 +2461,7 @@ func _enforce_demo_territory() -> void:
 func _movement_stamina_rate(sprinting: bool) -> float:
 	if sprinting:
 		return -26.0
-	if guarding or not grapple_target.is_empty() or strike_windup >= 0.0 or dodge_remaining > 0.0:
+	if guarding or not grapple_target.is_empty() or strike_windup >= 0.0 or third_person_moveset.is_attacking() or dodge_remaining > 0.0:
 		return 0.0
 	return 18.0
 
@@ -2528,6 +2535,7 @@ func _cycle_grip() -> void:
 	arsenal.apply_grip(current_grip)
 	PLAYER_ACTION_LEDGER.record("grip_changed", {"weapon": id, "grip": current_grip, "location": HUNT_LOCATION})
 	_carry_current_weapon(true)
+	_sync_third_person_moveset()
 
 
 func _carry_current_weapon(force := false) -> void:
@@ -2628,6 +2636,86 @@ func _pose_weapon() -> void:
 	_restore_grip_hand(model.get_node_or_null("LeftGripHand") as Node3D, left_pose)
 
 
+func _uses_third_person_moveset() -> bool:
+	return third_person and arsenal != null and not bare_handed and carried_limb_index < 0 and str(arsenal.current().get("kind", "")) == "melee"
+
+
+## Keep the production body and the authored per-weapon table on the same grip.
+## Half-sword is supported with both hands, so it takes the two-hand body base;
+## its puncture type and shorter reach still come from HeldGear in `_attack()`.
+func _sync_third_person_moveset() -> void:
+	if body_motion == null:
+		return
+	if not _uses_third_person_moveset():
+		body_motion.clear_weapon_stance()
+		return
+	var held := str(arsenal.current_id)
+	var weapon_id := held if SwordMoveset.WEAPON_TABLES.has(held) else "sword"
+	var stance_id := "two_hand" if current_grip in ["two_hand", "half_sword"] else "one_hand"
+	if not third_person_moveset.is_attacking() and (third_person_moveset.weapon_id != weapon_id or third_person_moveset.stance != stance_id):
+		third_person_moveset.configure(weapon_id, stance_id)
+	body_motion.set_weapon_stance(weapon_id, stance_id)
+
+
+## Locked combat is target-relative. The same values feed CombatStance's
+## crossing steps that already exist for NPCs and the sandbox; without this
+## production third person ran its ordinary forward gait while orbiting.
+func _update_third_person_stance(_move: Vector2, direction: Vector3) -> void:
+	_sync_third_person_moveset()
+	if body_motion == null:
+		return
+	var target := _lock_node() if third_person else null
+	if target == null or direction.length_squared() <= 0.0001:
+		body_motion.set_strafe(0.0, 0.0)
+		return
+	var toward: Vector3 = target.global_position - player
+	toward.y = 0.0
+	if toward.length_squared() <= 0.0001:
+		body_motion.set_strafe(0.0, 0.0)
+		return
+	toward = toward.normalized()
+	var right := Vector3(-toward.z, 0.0, toward.x)
+	body_motion.set_strafe(clampf(direction.dot(right), -1.0, 1.0), clampf(direction.dot(toward), -1.0, 1.0))
+
+
+## The direction is chosen when the button is pressed and survives to contact.
+## A lock wins, as it does in the sandbox; otherwise third person follows the
+## movement push and first person follows the view.
+func _combat_strike_direction() -> Vector3:
+	var locked := _lock_node()
+	if locked != null:
+		var toward: Vector3 = locked.global_position - player
+		toward.y = 0.0
+		if toward.length_squared() > 0.0001:
+			return toward.normalized()
+	var view := Vector3(sin(yaw), 0.0, cos(yaw)).normalized()
+	var move := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+	return StrikeHeading.heading(view, HUNTER_MOTOR.wish_direction(move, yaw), third_person)
+
+
+## Tick the already-authored sword/shiv phases in the real Hunt. Contact is
+## resolved once on the first active sweep; recovery remains committed and the
+## full packet continues driving HunterBodyMotion until it is complete.
+func _advance_third_person_melee(step: float) -> void:
+	if not third_person_moveset.is_attacking():
+		if body_motion != null and not body_motion.moveset_phase.is_empty():
+			body_motion.clear_moveset_pose()
+		return
+	var committed: Vector3 = pending_attack.get("strike_direction", _combat_strike_direction())
+	var body_yaw := atan2(committed.x, committed.z) + PI if committed.length_squared() > 0.0001 else yaw + PI
+	var report: Dictionary = third_person_moveset.tick(step, player, body_yaw)
+	if body_motion != null:
+		if third_person_moveset.is_attacking():
+			var motion_id := "thrust" if current_grip == "half_sword" else str(report.get("motion", ""))
+			body_motion.set_moveset_pose(str(report.get("phase", "")), float(report.get("phase_progress", 0.0)), str(report.get("side", "")), str(report.get("attack", "")), str(report.get("weapon", "")), motion_id)
+		else:
+			body_motion.clear_moveset_pose()
+	var points: PackedVector3Array = report.get("hit_points", PackedVector3Array())
+	if not third_person_strike_resolved and not points.is_empty():
+		third_person_strike_resolved = true
+		_resolve_strike()
+
+
 func _attack(heavy := false) -> void:
 	if resolution_ui.visible or kill_cam.active or player_rig.is_downed() or player_rig.anatomy.dead:
 		return
@@ -2650,13 +2738,34 @@ func _attack(heavy := false) -> void:
 	# `is_lit()` uses for the lamp, so a hand is busy exactly when the light is on.
 	if handheld.raised > 0.5:
 		return
+	var use_third_person_moveset := _uses_third_person_moveset()
+	var moveset_request: Dictionary = {}
+	if use_third_person_moveset:
+		_sync_third_person_moveset()
+		if third_person_moveset.is_attacking():
+			return
+		moveset_request = third_person_moveset.request_heavy(stamina) if heavy else third_person_moveset.request_light(stamina)
+		if not bool(moveset_request.get("accepted", false)):
+			prompt.text = "TOO WINDED TO COMMIT TO THE BLOW" if stamina < float(third_person_moveset.attack_definition(str(moveset_request.get("attack", "light_1"))).get("stamina_cost", INF)) else "STILL COMMITTED TO THE LAST BLOW"
+			return
 	var report: Dictionary = _begin_carried_limb_attack(heavy) if carried_limb_index >= 0 else arsenal.begin_attack(heavy)
 	if not bool(report.get("accepted", false)):
+		if use_third_person_moveset:
+			third_person_moveset.reset()
 		if str(report.get("reason", "")) == "empty":
 			prompt.text = "DRY / [R] RELOAD"
 		elif str(report.get("reason", "")) == "jammed":
 			prompt.text = "JAMMED / [R] CLEAR"
 		return
+	if use_third_person_moveset:
+		var attack_id := str(moveset_request.get("attack", ""))
+		var definition: Dictionary = third_person_moveset.attack_definition(attack_id)
+		report["moveset_attack"] = attack_id
+		report["packet"] = definition
+		report["windup"] = float(definition.get("windup", report.get("windup", 0.0)))
+		report["range"] = float(definition.get("reach", report.get("range", 3.0)))
+		report["cooldown"] = float(definition.get("windup", 0.0)) + float(definition.get("active", 0.0)) + float(definition.get("recovery", 0.0))
+		report["stamina"] = float(moveset_request.get("stamina_cost", report.get("stamina", 0.0)))
 	var cost := float(report.get("stamina", 0.0))
 	if stamina < cost:
 		# Refund a firearm round if a future ranged weapon gains a stamina cost.
@@ -2665,6 +2774,8 @@ func _attack(heavy := false) -> void:
 			rounds.loaded = int(rounds.loaded) + 1
 			arsenal.ammo[arsenal.current_id] = rounds
 		prompt.text = "TOO WINDED TO COMMIT TO THE BLOW"
+		if use_third_person_moveset:
+			third_person_moveset.reset()
 		return
 	stamina -= cost
 	# B6.5/B6.6. The same `combat_ratio` that already slows a one-armed NPC now
@@ -2687,6 +2798,8 @@ func _attack(heavy := false) -> void:
 		var grip_spec: Dictionary = HeldGear.GRIPS.get(current_grip, {})
 		if grip_spec.has("damage_type"):
 			report["damage_type"] = grip_spec["damage_type"]
+	if str(report.get("kind", "")) != "firearm":
+		report["strike_direction"] = _combat_strike_direction()
 	var swing := _player_swing_scale()
 	# O5.1. The body's own motion is part of the blow.
 	var momentum := swing_momentum(player_body.velocity)
@@ -2718,14 +2831,22 @@ func _attack(heavy := false) -> void:
 	register_swing()
 	attack_cooldown = float(report.get("cooldown", arsenal.cooldown)) / maxf(0.35, swing) * float(momentum["recovery"])
 	pending_attack = report
-	body_motion.trigger_attack(maxf(float(report.get("windup", 0.0)), attack_cooldown * 0.62), str(report.kind))
+	if use_third_person_moveset:
+		third_person_strike_resolved = false
+		strike_windup = -1.0
+		var committed_direction: Vector3 = report.get("strike_direction", Vector3.ZERO)
+		if committed_direction.length_squared() > 0.0001:
+			strike_face_yaw = atan2(committed_direction.x, committed_direction.z) + PI
+			strike_face_time = attack_cooldown
+	else:
+		body_motion.trigger_attack(maxf(float(report.get("windup", 0.0)), attack_cooldown * 0.62), str(report.kind))
 	if str(report.weapon) == "severed_limb":
 		_wear_carried_limb(bool(report.get("heavy", false)))
 	if str(report.kind) == "firearm":
 		body_motion.trigger_recoil(float(report.impulse))
 		_resolve_firearm(report)
 		pending_attack = {}
-	else:
+	elif not use_third_person_moveset:
 		strike_windup = float(report.windup)
 
 
@@ -2812,7 +2933,7 @@ func _resolve_strike() -> void:
 			arm.strike(_last_melee_resistance, Vector3(sin(yaw), 0.0, cos(yaw)))
 		connected = true
 		return
-	var wall_hit := _attack_wall(float(report.get("range", 4.1)))
+	var wall_hit := _attack_wall(float(report.get("range", 4.1)), report.get("strike_direction", Vector3.ZERO))
 	if not wall_hit.is_empty():
 		# AN2.3. The half that stayed open: a wall answers too, harder than
 		# any body zone, and takes the same kind of edge off the weapon
@@ -2893,8 +3014,11 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	var best_aim_score := INF
 	var reach := float(attack.get("range", 4.1))
 	var view := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
-	# Omnidirectional in third person: the blow follows the push, not the camera.
-	var strike_dir := StrikeHeading.heading(view, HUNTER_MOTOR.wish_direction(Input.get_vector("move_left", "move_right", "move_forward", "move_back"), yaw), third_person)
+	# Read the direction committed on the button press. Re-reading the left
+	# stick here made circling a locked target turn the eventual contact sideways.
+	var strike_dir: Vector3 = attack.get("strike_direction", _combat_strike_direction())
+	strike_dir.y = 0.0
+	strike_dir = strike_dir.normalized() if strike_dir.length_squared() > 0.0001 else Vector3(sin(yaw), 0.0, cos(yaw)).normalized()
 	for index in encounter_actors.size():
 		var candidate: Dictionary = encounter_actors[index]
 		var node := candidate.get("node") as Node3D
@@ -2951,7 +3075,9 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	var unaware_behind := _unaware_and_behind(actor)
 	_provoke_actor(actor)
 	var target: Node3D = actor.node as Node3D
-	var facing := strike_dir.dot((target.global_position - player).normalized())
+	var flat_target := target.global_position - player
+	flat_target.y = 0.0
+	var facing := strike_dir.dot(flat_target.normalized()) if flat_target.length_squared() > 0.0001 else 1.0
 	if facing < 0.12:
 		return false
 	# Greg, 24 September: they defend by tier. A fighter inside their own
@@ -3011,7 +3137,7 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		# Where you are looking decides what you open. The zone used to come from
 		# (event_count + index) % 6 — a round-robin, so aiming at a head and
 		# aiming at a knee produced the same sequence of wounds.
-		var look := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
+		var look := Vector3(strike_dir.x * cos(pitch), sin(pitch), strike_dir.z * cos(pitch)).normalized() if third_person else Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
 		# A melee swing connects with the body in front of you; what the aim
 		# chooses is *where on that body*. Resolving a free world-space point
 		# instead made the zone depend on how far off-axis or how much higher
@@ -3401,8 +3527,10 @@ func _trace_actor(origin: Vector3, direction: Vector3, distance: float) -> Dicti
 ## than mirroring `_trace_actor()` — every zone hitbox in this game is an
 ## `Area3D` (AF1.1's own finding), so leaving areas out of the query entirely
 ## is what keeps a body from ever being mistaken for a wall here.
-func _attack_wall(reach: float) -> Dictionary:
-	var look := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
+func _attack_wall(reach: float, committed_direction := Vector3.ZERO) -> Dictionary:
+	var flat: Vector3 = committed_direction
+	flat.y = 0.0
+	var look := Vector3(flat.x * cos(pitch), sin(pitch), flat.z * cos(pitch)).normalized() if flat.length_squared() > 0.0001 else Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
 	var query := PhysicsRayQueryParameters3D.create(player, player + look * reach)
 	query.exclude = _player_collision_exclusions()
 	query.collide_with_areas = false
@@ -3440,6 +3568,10 @@ func _put_the_weapons_down() -> void:
 			(model as Node3D).visible = false
 	pending_attack = {}
 	strike_windup = -1.0
+	third_person_moveset.reset()
+	third_person_strike_resolved = false
+	if body_motion != null:
+		body_motion.clear_weapon_stance()
 	prompt.text = "HANDS"
 
 
@@ -4383,6 +4515,10 @@ func _equip_weapon(slot: int) -> void:
 		smoke_weapon_drawn = preserve_mouth_smoke
 		pending_attack = {}
 		strike_windup = -1.0
+		third_person_moveset.reset()
+		third_person_strike_resolved = false
+		if body_motion != null:
+			body_motion.clear_moveset_pose()
 		# The ammo well and the model in the player's hand already show the new
 		# weapon. A persistent READY subtitle duplicated both of them.
 		prompt.text = ""
@@ -4906,7 +5042,7 @@ func _dodge() -> void:
 		return
 	if dodge_cooldown > 0.0 or dodge_remaining > 0.0 or stamina < 25.0 or not player_body.is_on_floor():
 		return
-	if strike_windup >= 0.0 or not pending_attack.is_empty():
+	if strike_windup >= 0.0 or not pending_attack.is_empty() or third_person_moveset.is_attacking():
 		prompt.text = "COMMITTED TO THE SWING"
 		return
 	dodge_cooldown = 0.75
@@ -7693,7 +7829,9 @@ func _lock_node() -> Node3D:
 	var actor := _actor_by_id(lock_target)
 	if not actor.is_empty():
 		var node := actor.node as Node3D
-		if is_instance_valid(node) and not bool(actor.get("dead", false)):
+		var anatomy = actor.get("anatomy")
+		var incapacitated := anatomy != null and (bool(anatomy.dead) or bool(anatomy.downed))
+		if is_instance_valid(node) and not bool(actor.get("dead", false)) and not incapacitated:
 			return node
 	if lock_target == CAST.id_for(CAPTAIN_SLOT) and enemy != null and is_instance_valid(enemy) and enemy.visible and not enemy_retreating:
 		return enemy
@@ -7718,7 +7856,9 @@ func _lock_candidates() -> Array:
 	var found: Array = []
 	for actor in encounter_actors:
 		var node := actor.get("node") as Node3D
-		if node == null or not is_instance_valid(node) or bool(actor.get("dead", false)):
+		var anatomy = actor.get("anatomy")
+		var incapacitated := anatomy != null and (bool(anatomy.dead) or bool(anatomy.downed))
+		if node == null or not is_instance_valid(node) or bool(actor.get("dead", false)) or incapacitated:
 			continue
 		var gap: float = player.distance_to(node.global_position)
 		if gap <= 26.0:
