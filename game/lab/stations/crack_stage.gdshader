@@ -17,7 +17,8 @@ vec2 cell(vec2 p) {
 	for (int y = -1; y <= 1; y++) {
 		for (int x = -1; x <= 1; x++) {
 			vec2 g = vec2(float(x), float(y));
-			vec2 o = fract(sin(vec2(dot(i + g, vec2(127.1, 311.7)), dot(i + g, vec2(269.5, 183.3))) + seed) * 43758.5453);
+			vec2 h = vec2(dot(i + g, vec2(127.1, 311.7)), dot(i + g, vec2(269.5, 183.3)));
+			vec2 o = fract(sin(h) * 43758.5453 + seed);
 			float d = length(g + o - f);
 			if (d < best) { second = best; best = d; } else if (d < second) { second = d; }
 		}
