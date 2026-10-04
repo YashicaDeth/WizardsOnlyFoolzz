@@ -31,6 +31,11 @@ const KINDS := {
 	"jar": {"size": Vector3(0.3, 0.46, 0.3), "hp": 3.0, "colour": "a9c2ae", "surface": "glass", "shard": "glass", "pieces": 7, "mass": 0.08},
 	"monitor": {"size": Vector3(0.52, 0.44, 0.46), "hp": 8.0, "colour": "2b2824", "surface": "paint", "shard": "screen", "pieces": 6, "mass": 0.35},
 	"chair": {"size": Vector3(0.48, 0.92, 0.5), "hp": 9.0, "colour": "3b3731", "surface": "rust", "shard": "leg", "pieces": 6, "mass": 0.3},
+	# The mechanics lab's destruction station: a cinder wall built of panels,
+	# a window pane and a run of service pipe.
+	"wall_panel": {"size": Vector3(1.0, 1.0, 0.3), "hp": 60.0, "colour": "5b5750", "surface": "dirt", "shard": "panel", "pieces": 5, "mass": 3.0},
+	"glass_pane": {"size": Vector3(1.0, 1.2, 0.02), "hp": 2.0, "colour": "a9c2ae", "surface": "glass", "shard": "pane", "pieces": 7, "mass": 0.2},
+	"pipe": {"size": Vector3(0.24, 2.0, 0.24), "hp": 30.0, "colour": "4a3a2c", "surface": "rust", "shard": "stave", "pieces": 5, "mass": 1.2},
 }
 
 const MIN_DAMAGE_SPEED := 4.0
@@ -47,6 +52,11 @@ var broken := false
 var _solid: Node3D
 var _collision: CollisionShape3D
 var _fragments: Array[RigidBody3D] = []
+## Pre-fractured cells (a glb of unit-sized pieces, made in Blender by
+## `lab/stations/fracture/cell_fracture.py`) swapped in on the break instead of
+## the kind's primitive shards, scaled to this prop's size. Unset, a prop
+## breaks exactly as it always has.
+var prefractured: PackedScene
 
 
 static func fragment_budget() -> int:
@@ -187,6 +197,10 @@ func _build_look() -> void:
 		"monitor":
 			_part(_box(d), Vector3.ZERO, body)
 			_part(_box(Vector3(d.x * 0.78, d.y * 0.7, 0.02)), Vector3(0, d.y * 0.04, d.z * 0.5 + 0.006), _screen())
+		"wall_panel", "glass_pane":
+			_part(_box(d), Vector3.ZERO, body)
+		"pipe":
+			_part(_cylinder(d.x * 0.5, d.y), Vector3.ZERO, body)
 		"chair":
 			_part(_box(Vector3(d.x, 0.06, d.z * 0.92)), Vector3(0, -d.y * 0.02, 0), body)
 			_part(_box(Vector3(d.x, d.y * 0.44, 0.05)), Vector3(0, d.y * 0.27, -d.z * 0.44), body)
@@ -223,6 +237,9 @@ func _shard(index: int) -> PrimitiveMesh:
 				mesh = _sphere(d.x * 0.2)
 				mesh.material = _surface(Color("b39684"), "flesh")
 				return mesh
+			mesh = _glass_shard(d.x)
+			mesh.material = _surface(base)
+		"pane":
 			mesh = _glass_shard(d.x)
 			mesh.material = _surface(base)
 		"screen":
@@ -318,9 +335,53 @@ func _fracture(direction: Vector3, speed: float) -> void:
 	# Every break sheds its own pieces. A full pool gives up its oldest ones
 	# (`WORLD_DEBRIS.register`) rather than this one breaking into nothing,
 	# which is what the shared pool did once a handful of props had gone.
+	if prefractured != null:
+		_spawn_cells(direction, speed)
+		return
 	var pieces := int((KINDS.get(kind, {}) as Dictionary).get("pieces", 6))
 	for index in mini(pieces, fragment_budget()):
 		_spawn_fragment(index, direction, speed)
+
+
+## The Blender cells, each its own body where it sat inside the whole, so the
+## break opens along real fracture lines rather than shedding boxes.
+func _spawn_cells(direction: Vector3, speed: float) -> void:
+	var source := prefractured.instantiate()
+	var cells: Array[Node] = source.find_children("*", "MeshInstance3D", true, false)
+	var spec: Dictionary = KINDS.get(kind, {})
+	var base := Color(str(spec.colour)) if spec.has("colour") else Color("39352d")
+	var budget := mini(cells.size(), fragment_budget())
+	for index in budget:
+		var cell := cells[index] as MeshInstance3D
+		var fragment := RigidBody3D.new()
+		fragment.name = "%s_Cell_%02d" % [kind, index]
+		fragment.mass = maxf(0.05, float(spec.get("mass", 1.0)) * 6.0 / float(cells.size()))
+		fragment.collision_layer = 1 << 3
+		fragment.collision_mask = 1
+		var visual := MeshInstance3D.new()
+		visual.mesh = cell.mesh
+		visual.scale = dimensions
+		visual.material_override = _surface(base.lightened(0.05 * float(index % 3))) if not spec.is_empty() else _material(base)
+		fragment.add_child(visual)
+		var points := PackedVector3Array()
+		for point in cell.mesh.get_faces():
+			points.append(point * dimensions)
+		var shape := ConvexPolygonShape3D.new()
+		shape.points = points
+		var collision := CollisionShape3D.new()
+		collision.shape = shape
+		fragment.add_child(collision)
+		add_child(fragment)
+		var local := cell.position * dimensions
+		fragment.global_position = global_transform * local
+		fragment.global_basis = global_basis
+		var outward := (global_basis * local).normalized() if local.length_squared() > 0.0001 else Vector3.UP
+		var spray := (direction.normalized() * 0.7 + outward * 0.5 + Vector3(0, randf_range(0.1, 0.4), 0)).normalized()
+		fragment.linear_velocity = spray * (0.8 + speed * 0.08)
+		fragment.angular_velocity = Vector3(randf_range(-5, 5), randf_range(-5, 5), randf_range(-5, 5))
+		_fragments.append(fragment)
+		WORLD_DEBRIS.register(fragment, {"kind": kind, "part": "cell"}, FRAGMENT_POOL, fragment_budget())
+	source.free()
 
 
 func _spawn_fragment(index: int, direction: Vector3, speed: float) -> void:
