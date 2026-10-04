@@ -1,5 +1,7 @@
 extends Node
 
+const CombatLayer := preload("res://systems/combat_input_layer.gd")
+
 ## Greg: controller support, PlayStation layout. The game reads the keyboard
 ## and mouse directly in ~290 places and through six input actions; rather
 ## than rewrite every scene, this turns the pad into the keys and mouse they
@@ -7,11 +9,12 @@ extends Node
 ##
 ##   Left stick   move (the move_* actions), flicks = arrow keys in menus
 ##   Right stick  look (mouse motion)
-##   R2 attack (LMB)   L2 guard / aim (RMB)   R1 heavy (MMB)
+##   Souls combat layer: R1 light, R2 heavy, L1 block, L2 parry
+##   Firearm context: R2 fire, L2 aim; L2+R2 remains aimed X-ray / VATS
 ##   Cross jump / climb (Space)   Circle crouch / slide (Ctrl)
 ##   Square use (E)   Triangle shoulder / file (F)
-##   L1 wizard eyes (K)   L3 sprint (Shift)   R3 lock on (Z)
-##   D-pad: up K, down hold J depth scan, left hold 4 dress wound, right hold I inspect
+##   D-pad up wizard eyes (K)   L3 sprint (Shift)   R3 lock on (Z)
+##   D-pad: down hold J depth scan, left hold 4 dress wound, right hold I inspect
 ##   Touchpad inventory (Tab)   Create device (G)   Options pause (Esc)
 ##
 ## ponytail: synthetic key/mouse events, no per-scene pad code. Prompts
@@ -28,7 +31,6 @@ const BUTTON_KEYS := {
 	JOY_BUTTON_B: KEY_CTRL,           # Circle
 	JOY_BUTTON_X: KEY_E,              # Square
 	JOY_BUTTON_Y: KEY_F,              # Triangle
-	JOY_BUTTON_LEFT_SHOULDER: KEY_K,  # L1
 	JOY_BUTTON_LEFT_STICK: KEY_SHIFT, # L3
 	JOY_BUTTON_RIGHT_STICK: KEY_Z,    # R3
 	JOY_BUTTON_DPAD_UP: KEY_K,
@@ -39,18 +41,24 @@ const BUTTON_KEYS := {
 	JOY_BUTTON_BACK: KEY_G,           # Create / Share: the device (G had no button)
 	JOY_BUTTON_START: KEY_ESCAPE,     # Options
 }
-const BUTTON_MOUSE := {JOY_BUTTON_RIGHT_SHOULDER: MOUSE_BUTTON_MIDDLE}
-const TRIGGER_MOUSE := {JOY_AXIS_TRIGGER_RIGHT: MOUSE_BUTTON_LEFT, JOY_AXIS_TRIGGER_LEFT: MOUSE_BUTTON_RIGHT}
+const COMBAT_BUTTONS := {
+	JOY_BUTTON_RIGHT_SHOULDER: CombatLayer.R1,
+	JOY_BUTTON_LEFT_SHOULDER: CombatLayer.L1,
+}
+const COMBAT_TRIGGERS := {
+	JOY_AXIS_TRIGGER_RIGHT: CombatLayer.R2,
+	JOY_AXIS_TRIGGER_LEFT: CombatLayer.L2,
+}
 
 ## Our own synthetic events carry this device id, so they never count as
 ## the player going back to the keyboard.
 const SYNTHETIC := 99
 ## Keyboard word -> button, whole words only, prompt text only.
 const BUTTON_NAMES := {
-	"WASD": "L-STICK", "MOUSE": "R-STICK", "LMB": "R2", "RMB": "L2", "MMB": "R1",
+	"WASD": "L-STICK", "MOUSE": "R-STICK", "LMB": "R1", "RMB": "L2", "MMB": "R2",
 	"SPACE": "CROSS", "CTRL": "CIRCLE", "E": "SQUARE", "F": "TRIANGLE",
-	"K": "L1", "SHIFT": "L3", "Z": "R3", "J": "D-DOWN", "4": "D-LEFT", "I": "D-RIGHT",
-	"TAB": "TOUCHPAD", "ESC": "OPTIONS", "X": "L2", "G": "CREATE",
+	"K": "D-UP", "SHIFT": "L3", "Z": "R3", "J": "D-DOWN", "4": "D-LEFT", "I": "D-RIGHT",
+	"TAB": "TOUCHPAD", "ESC": "OPTIONS", "X": "L1", "G": "CREATE",
 }
 
 var using_pad := false
@@ -59,6 +67,13 @@ var _labels: Array[Label] = []
 var _swapped := {}
 var _trigger_down := {}
 var _flick := Vector2i.ZERO
+var combat_layer_id := "souls_base"
+var combat_layer: Dictionary = CombatLayer.souls_base()
+var combat_context := "melee"
+var _combat_receiver: Node = null
+## Physical action -> verb emitted at press time. Release uses this saved verb,
+## even if a discipline or weapon context changes while the control is held.
+var _combat_down: Dictionary = {}
 
 
 func _ready() -> void:
@@ -67,6 +82,7 @@ func _ready() -> void:
 	# After every scene script, so the swap sees this frame's prompt text.
 	process_priority = 1000
 	_bind_movement()
+	_bind_native_combat()
 	get_tree().node_added.connect(func(node: Node) -> void:
 		if node is Label:
 			_labels.append(node))
@@ -90,6 +106,70 @@ func keys(text: String) -> String:
 		if words[i] != "":
 			segment_start = words[i] == "//"
 	return " ".join(words)
+
+
+## Context-aware prompt conversion. `keys()` remains the generic fallback;
+## combat HUDs and the controls sheet pass their verb so FIRE never inherits
+## the melee LMB glyph and LIGHT never inherits the old trigger glyph.
+func hint(key_text: String, verb_text: String, context := "") -> String:
+	if not using_pad:
+		return key_text
+	var words := verb_text.to_upper()
+	var wanted := ""
+	var active_context := context if context != "" else combat_context
+	if words.contains("VATS") or words.contains("AIMED X-RAY"):
+		return "L2 + R2"
+	if words.contains("HEAVY") or words.contains("GUARD BREAK"):
+		wanted = "heavy"
+	elif words.contains("PARRY"):
+		wanted = "parry"
+	elif words.contains("BLOCK") or words.contains("GUARD"):
+		wanted = "block"
+	elif words.contains("AIM"):
+		wanted = "aim"
+	elif words.contains("FIRE") or words.contains("SHOOT"):
+		wanted = "fire"
+	elif words.contains("LIGHT") or words.contains("ATTACK") or words.contains("STRIKE") or words.contains("PRESS THE HOLD"):
+		wanted = "light"
+	if wanted != "":
+		var glyph := CombatLayer.glyph_for(combat_layer, wanted, active_context)
+		if glyph != "":
+			return ("HOLD " if key_text.begins_with("HOLD ") else "") + glyph
+	return keys(key_text)
+
+
+func set_combat_receiver(receiver: Node) -> void:
+	_combat_receiver = receiver
+
+
+func clear_combat_receiver(receiver: Node) -> void:
+	if _combat_receiver == receiver:
+		_release_combat_inputs()
+		_combat_receiver = null
+		combat_context = "melee"
+
+
+func set_combat_context(context: String) -> void:
+	if context == combat_context:
+		return
+	_release_combat_inputs()
+	combat_context = context
+
+
+## The discipline manager calls this with its sparse input-layer dictionary.
+## Releasing first is the no-stuck-action contract for a mid-input swap.
+func set_combat_layer(layer_id: String, overrides: Dictionary = {}) -> void:
+	_release_combat_inputs()
+	combat_layer_id = layer_id
+	combat_layer = CombatLayer.with_overrides(overrides)
+
+
+func reset_combat_layer() -> void:
+	set_combat_layer("souls_base")
+
+
+func combat_glyph(verb: String, context := "") -> String:
+	return CombatLayer.glyph_for(combat_layer, verb, context if context != "" else combat_context)
 
 
 static func is_prompt(text: String) -> bool:
@@ -130,6 +210,30 @@ func _bind_movement() -> void:
 			InputMap.action_add_event(pair[0], button)
 
 
+## Native physical actions are the stable bottom layer pad-04 intended. A
+## discipline remaps their verbs in data; legacy key/mouse synthesis happens
+## only after that resolution and only for scenes without a semantic receiver.
+func _bind_native_combat() -> void:
+	for action in CombatLayer.PHYSICAL_ACTIONS:
+		if not InputMap.has_action(action):
+			InputMap.add_action(action, 0.5)
+	for button_index in COMBAT_BUTTONS:
+		var button_action: String = COMBAT_BUTTONS[button_index]
+		if InputMap.action_get_events(button_action).any(func(event: InputEvent) -> bool: return event is InputEventJoypadButton):
+			continue
+		var button := InputEventJoypadButton.new()
+		button.button_index = button_index
+		InputMap.action_add_event(button_action, button)
+	for axis_index in COMBAT_TRIGGERS:
+		var trigger_action: String = COMBAT_TRIGGERS[axis_index]
+		if InputMap.action_get_events(trigger_action).any(func(event: InputEvent) -> bool: return event is InputEventJoypadMotion):
+			continue
+		var trigger := InputEventJoypadMotion.new()
+		trigger.axis = axis_index
+		trigger.axis_value = 1.0
+		InputMap.action_add_event(trigger_action, trigger)
+
+
 func _input(event: InputEvent) -> void:
 	if event.device != SYNTHETIC:
 		if event is InputEventJoypadButton or (event is InputEventJoypadMotion and absf((event as InputEventJoypadMotion).axis_value) > 0.5):
@@ -145,17 +249,47 @@ func _input(event: InputEvent) -> void:
 			if pad.pressed:
 				_tap(dpad[pad.button_index])
 			return
-		if BUTTON_KEYS.has(pad.button_index):
+		if COMBAT_BUTTONS.has(pad.button_index):
+			_dispatch_combat(COMBAT_BUTTONS[pad.button_index], pad.pressed)
+		elif BUTTON_KEYS.has(pad.button_index):
 			_send_key(BUTTON_KEYS[pad.button_index], pad.pressed)
-		elif BUTTON_MOUSE.has(pad.button_index):
-			_send_mouse(BUTTON_MOUSE[pad.button_index], pad.pressed)
 	elif event is InputEventJoypadMotion:
 		var axis := (event as InputEventJoypadMotion).axis
-		if TRIGGER_MOUSE.has(axis):
+		if COMBAT_TRIGGERS.has(axis):
 			var down := (event as InputEventJoypadMotion).axis_value > 0.5
 			if down != bool(_trigger_down.get(axis, false)):
 				_trigger_down[axis] = down
-				_send_mouse(TRIGGER_MOUSE[axis], down)
+				_dispatch_combat(COMBAT_TRIGGERS[axis], down)
+
+
+func _dispatch_combat(physical_action: String, pressed: bool) -> void:
+	var verb := ""
+	if pressed:
+		if _combat_down.has(physical_action):
+			return
+		verb = CombatLayer.verb(combat_layer, physical_action, combat_context)
+		_combat_down[physical_action] = verb
+	else:
+		if not _combat_down.has(physical_action):
+			return
+		verb = str(_combat_down[physical_action])
+		_combat_down.erase(physical_action)
+	if verb == "":
+		return
+	if is_instance_valid(_combat_receiver) and _combat_receiver.has_method("_pad_combat_verb"):
+		_combat_receiver.call("_pad_combat_verb", verb, pressed)
+		return
+	# Unmigrated scenes keep working through their established input path.
+	match verb:
+		"light", "fire": _send_mouse(MOUSE_BUTTON_LEFT, pressed)
+		"heavy": _send_mouse(MOUSE_BUTTON_MIDDLE, pressed)
+		"block": _send_key(KEY_X, pressed)
+		"parry", "aim": _send_mouse(MOUSE_BUTTON_RIGHT, pressed)
+
+
+func _release_combat_inputs() -> void:
+	for physical_action in _combat_down.keys().duplicate():
+		_dispatch_combat(str(physical_action), false)
 
 
 func _process(delta: float) -> void:

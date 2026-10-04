@@ -48,7 +48,7 @@ const CONTROL_LABELS := {
 	"dodge": "DODGE",
 	"interact": "USE",
 	"device": "DEVICE",
-	"guard": "GUARD",
+	"guard": "BLOCK",
 }
 
 var open := false
@@ -278,6 +278,11 @@ func _key_label(action: String) -> String:
 	return (events[0] as InputEventKey).as_text_physical_keycode()
 
 
+func _using_pad() -> bool:
+	var bridge := get_node_or_null("/root/PadBridge")
+	return bridge != null and bool(bridge.using_pad)
+
+
 ## Rows are rebuilt each frame the plate is open, because their labels carry
 ## live values. The row list is the menu — there is no scene to keep in sync.
 func _build_rows() -> void:
@@ -305,6 +310,14 @@ func _build_rows() -> void:
 		_rows.append({"id": "settings_back", "label": "BACK", "value": ""})
 		return
 	if page == "controls":
+		if _using_pad():
+			_rows.append({"id": "pad_r1", "label": "R1", "value": "LIGHT"})
+			_rows.append({"id": "pad_r2", "label": "R2", "value": "HEAVY / FIREARM FIRE"})
+			_rows.append({"id": "pad_l1", "label": "L1", "value": "BLOCK"})
+			_rows.append({"id": "pad_l2", "label": "L2", "value": "PARRY / FIREARM AIM"})
+			_rows.append({"id": "pad_vats", "label": "L2 + R2", "value": "AIMED X-RAY / VATS"})
+			_rows.append({"id": "ctrl_back", "label": "BACK", "value": "SOULS BASE // DISCIPLINES REMAP VERBS"})
+			return
 		for action in CONTROL_ACTIONS:
 			var label: String = str(CONTROL_LABELS.get(action, action.to_upper()))
 			var value := "PRESS KEY" if rebinding_action == action else _key_label(action)
@@ -526,7 +539,7 @@ func _draw_plate() -> void:
 	screen.draw_polyline(outline, COPPER * Color(1, 1, 1, 0.62 * eased), 2.0)
 
 	CellOutzType.draw_stamped(screen, Vector2(30, 26), "STOPPED", 30.0, ACID * Color(1, 1, 1, eased), ARTERIAL * Color(1, 1, 1, 0.3 * eased), 4.0)
-	var subtitle := "CAMERA / MOUSE" if page == "camera" else "DISPLAY / HUD" if page == "hud" else "SETTINGS" if page == "settings" else "KEYS // WHAT THIS PLACE ANSWERS TO" if page == "keys" else "CELLOUTZ / THE YARD IS STILL THERE"
+	var subtitle := "CONTROLS // SOULS BASE" if page == "controls" and _using_pad() else "CONTROLS // KEYBOARD" if page == "controls" else "CAMERA / MOUSE" if page == "camera" else "DISPLAY / HUD" if page == "hud" else "SETTINGS" if page == "settings" else "KEYS // WHAT THIS PLACE ANSWERS TO" if page == "keys" else "CELLOUTZ / THE YARD IS STILL THERE"
 	CellOutzType.draw_text(screen, Vector2(30, 68), subtitle, 10.0, INK * Color(1, 1, 1, 0.45 * eased), 1.4)
 	screen.draw_line(Vector2(30, 84), Vector2(DESIGN.x - 30, 84), COPPER * Color(1, 1, 1, 0.4 * eased), 1.0)
 
@@ -565,7 +578,8 @@ func _draw_plate() -> void:
 	if page == "hud":
 		CellOutzType.draw_text(screen, Vector2(34, 348), "OPACITY 25-100% / SAVED AUTOMATICALLY", 10.0, INK * Color(1, 1, 1, 0.5 * eased), 1.0)
 		CellOutzType.draw_text(screen, Vector2(34, 374), "REDUCED GLITCH CALMS CAMERA GRAIN", 10.0, INK * Color(1, 1, 1, 0.5 * eased), 1.0)
-	CellOutzType.draw_text(screen, Vector2(30, DESIGN.y - 28), "ESC RESUME  UP/DOWN MOVE  L/R ADJUST  ENTER SELECT", 9.0, INK * Color(1, 1, 1, 0.4 * eased), 1.0)
+	var footer := "OPTIONS/B BACK  STICK/D-PAD MOVE  CROSS/A SELECT" if _using_pad() else "ESC RESUME  UP/DOWN MOVE  L/R ADJUST  ENTER SELECT"
+	CellOutzType.draw_text(screen, Vector2(30, DESIGN.y - 28), footer, 9.0, INK * Color(1, 1, 1, 0.4 * eased), 1.0)
 	screen.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	# The live seal in the plate's corner, sized with it.
 	if seal != null:
@@ -625,6 +639,9 @@ func _draw_key_sheet(eased: float) -> void:
 			CellOutzType.draw_text(screen, Vector2(34, y), str(line.header), 11.0, ARTERIAL * Color(1, 1, 1, eased), 1.6)
 		else:
 			var cap := str(line.key)
+			var bridge := get_node_or_null("/root/PadBridge")
+			if bridge != null:
+				cap = bridge.hint(cap, str(line.action), "firearm" if str(line.action).to_upper().contains("FIREARM") else "melee")
 			var cap_width := CellOutzType.width_condensed(cap, 10.0, 0.8) + 12.0
 			screen.draw_rect(Rect2(34, y - 4, cap_width, 17), INK * Color(1, 1, 1, 0.1 * eased))
 			screen.draw_rect(Rect2(34, y - 4, cap_width, 17), COPPER * Color(1, 1, 1, 0.7 * eased), false, 1.0)

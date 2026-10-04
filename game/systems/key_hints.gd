@@ -90,7 +90,7 @@ func _process(delta: float) -> void:
 		age = 0.0
 		# On the pad, the button (PadBridge keeps the layout).
 		var pad := get_node_or_null("/root/PadBridge")
-		_key.text = pad.keys(str(current.key)) if pad != null else str(current.key)
+		_key.text = pad.hint(str(current.key), str(current.verb)) if pad != null else str(current.key)
 		_verb.text = str(current.verb).to_upper()
 		_layout()
 		_panel.visible = true

@@ -383,7 +383,7 @@ func _start_demo() -> void:
 		b.custom_minimum_size = Vector2(360, 48)
 		col.add_child(b)
 	var hint := Label.new()
-	hint.text = "controller: L-stick move  R-stick look  R2 attack  L2 guard  R1 heavy  CROSS jump  SQUARE use"
+	hint.text = "controller: L-stick move  R-stick look  R1 light  R2 heavy/fire  L1 block  L2 parry/aim  L2+R2 X-ray  CROSS jump  SQUARE use"
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.modulate = Color(1, 1, 1, 0.6)
 	col.add_child(hint)
