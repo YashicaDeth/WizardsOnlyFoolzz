@@ -1,0 +1,440 @@
+<title>Wizards Only Fools Game Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Stardos+Stencil:wght@400;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: a facility dossier. Sticky index rail on the left (chips on phones),
+   one long specimen file on the right, read top to bottom. Single dark world:
+   the game's own house palette. */
+:root{
+  color-scheme: dark;
+  --ground:#0b0908; --ground-2:#14100e; --ground-3:#1b1613;
+  --rule:#2c241e; --rule-soft:#1f1915;
+  --bone:#e6d4ac; --ink:#bcab8d; --ink-dim:#857660; --ink-faint:#5c5143;
+  --blood:#a8281a; --copper:#b0552a; --acid:#b4da48; --bile:#c9ad3c;
+  --display:"Stardos Stencil","Arial Black",Impact,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  --data:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --measure:68ch;
+}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.62;-webkit-font-smoothing:antialiased;margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:clamp(16px,4vw,48px);padding-block:clamp(24px,5vw,56px);display:grid;grid-template-columns:200px minmax(0,1fr);gap:clamp(24px,4vw,56px)}
+@media (max-width:860px){.wrap{grid-template-columns:minmax(0,1fr)}}
+
+/* index rail */
+nav.rail{position:sticky;top:calc(env(safe-area-inset-top,0px) + 20px);align-self:start;display:flex;flex-direction:column;gap:2px;font-family:var(--data);font-size:12px;letter-spacing:.06em}
+nav.rail a{color:var(--ink-dim);text-decoration:none;padding:5px 8px;border-left:2px solid transparent;display:grid;grid-template-columns:2.2em 1fr;gap:6px}
+nav.rail a span{color:var(--ink-faint)}
+nav.rail a:hover,nav.rail a:focus-visible{color:var(--bone);border-left-color:var(--copper);outline:none}
+nav.rail .railhead{font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--blood);padding:0 8px 10px}
+@media (max-width:860px){
+  nav.rail{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;flex-direction:row;overflow-x:auto;background:var(--ground);padding-block:10px;border-bottom:1px solid var(--rule);margin-inline:calc(-1 * clamp(16px,4vw,48px));padding-inline:clamp(16px,4vw,48px)}
+  nav.rail a{border-left:0;border-bottom:2px solid transparent;white-space:nowrap;display:block}
+  nav.rail a span{display:none}
+  nav.rail .railhead{display:none}
+}
+
+main{min-width:0;display:flex;flex-direction:column;gap:clamp(44px,6vw,72px)}
+
+/* masthead */
+.stamp{font-family:var(--data);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--blood);display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.stamp .bar{flex:1;min-width:24px;height:1px;background:var(--rule)}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(44px,9vw,96px);line-height:.9;margin:.25em 0 .2em;color:var(--bone);text-wrap:balance;letter-spacing:.01em}
+.lede{max-width:var(--measure);font-size:clamp(16px,1.9vw,19px);margin:0;color:var(--ink)}
+.lede b{color:var(--bone);font-weight:600}
+.canon{margin-top:22px;display:flex;flex-wrap:wrap;gap:8px}
+.canon span{font-family:var(--data);font-size:11px;letter-spacing:.12em;color:var(--bone);border:1px solid var(--rule);padding:4px 8px;background:var(--ground-2)}
+
+/* status strip: the one place figures lead */
+.strip{margin-top:28px;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule)}
+.strip div{background:var(--ground);padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.strip b{font-family:var(--data);font-weight:600;font-size:22px;color:var(--bone);font-variant-numeric:tabular-nums}
+.strip small{font-family:var(--data);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim);line-height:1.5}
+
+/* sections */
+section{display:flex;flex-direction:column;gap:18px;scroll-margin-top:72px}
+h2{font-family:var(--display);font-size:clamp(28px,4.4vw,42px);line-height:1;color:var(--bone);margin:0;display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;text-wrap:balance}
+h2 .no{font-family:var(--data);font-size:12px;letter-spacing:.2em;color:var(--copper)}
+h3{font-family:var(--data);font-size:12px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--bile);margin:10px 0 0}
+p{margin:0;max-width:var(--measure)}
+p b,li b,td b{color:var(--bone);font-weight:600}
+.quote{border-left:2px solid var(--blood);padding-left:16px;color:var(--bone);font-style:italic;max-width:var(--measure)}
+.quote cite{display:block;font-style:normal;font-family:var(--data);font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-dim);margin-top:6px}
+ul.plain{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:6px;max-width:var(--measure)}
+ul.plain li::marker{color:var(--copper)}
+
+/* tables */
+.tbl{overflow-x:auto;border:1px solid var(--rule)}
+table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:520px}
+th{font-family:var(--data);font-size:10.5px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim);text-align:left;padding:9px 12px;border-bottom:1px solid var(--rule);background:var(--ground-2)}
+td{padding:9px 12px;border-bottom:1px solid var(--rule-soft);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.k{font-family:var(--data);color:var(--bone);white-space:nowrap;font-size:13px}
+tr.void td{background:var(--ground-3)}
+tr.void td.k{color:var(--blood)}
+
+/* the two halves */
+.halves{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule)}
+.halves > div{background:var(--ground);padding:18px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.halves .tag{font-family:var(--data);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase}
+.below .tag{color:var(--blood)} .above .tag{color:var(--acid)} .middle .tag{color:var(--bile)}
+.halves h4{font-family:var(--display);font-size:24px;margin:0;color:var(--bone)}
+
+/* roadmap */
+.slices{display:flex;flex-direction:column;gap:0;border-top:1px solid var(--rule)}
+details.slice{border-bottom:1px solid var(--rule)}
+details.slice > summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:3.2rem minmax(0,1fr) auto;gap:14px;align-items:center;padding:14px 0}
+details.slice > summary::-webkit-details-marker{display:none}
+details.slice > summary:focus-visible{outline:2px solid var(--copper);outline-offset:3px}
+.sn{font-family:var(--display);font-size:28px;color:var(--ink-faint);line-height:1}
+details.slice.now .sn{color:var(--acid)}
+.st{display:flex;flex-direction:column;gap:2px;min-width:0}
+.st b{font-size:17px;color:var(--bone);font-weight:600}
+.st small{color:var(--ink-dim);font-size:13px}
+.pill{font-family:var(--data);font-size:10px;letter-spacing:.16em;text-transform:uppercase;padding:3px 8px;border:1px solid currentColor;white-space:nowrap}
+.pill.now{color:var(--acid)} .pill.next{color:var(--bile)} .pill.later{color:var(--ink-faint)}
+.items{list-style:none;margin:0 0 18px;padding:0;display:flex;flex-direction:column}
+.items li{display:grid;grid-template-columns:7.4rem minmax(0,1fr);gap:12px;padding:6px 0;border-bottom:1px solid var(--rule-soft);font-size:14.5px}
+.items li:last-child{border-bottom:0}
+.s{font-family:var(--data);font-size:10px;letter-spacing:.12em;text-transform:uppercase;align-self:start;padding-top:3px}
+.s.in{color:var(--acid)} .s.wire{color:var(--bile)} .s.build{color:var(--blood)} .s.check{color:var(--copper)}
+.legend{display:flex;flex-wrap:wrap;gap:16px;font-size:13px;color:var(--ink-dim)}
+.legend span{display:flex;gap:6px;align-items:baseline}
+
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px 28px}
+.grid2 > div{display:flex;flex-direction:column;gap:6px;min-width:0}
+.grid2 h4{margin:0;font-size:15.5px;color:var(--bone);font-weight:600}
+.grid2 p{font-size:14.5px}
+
+ol.laws{margin:0;padding:0;list-style:none;counter-reset:law;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px 28px}
+ol.laws li{counter-increment:law;display:grid;grid-template-columns:2.2rem minmax(0,1fr);gap:8px;font-size:14.5px;padding:6px 0;border-bottom:1px solid var(--rule-soft)}
+ol.laws li::before{content:counter(law,decimal-leading-zero);font-family:var(--data);font-size:12px;color:var(--copper);padding-top:2px}
+
+footer{border-top:1px solid var(--rule);padding-top:16px;font-family:var(--data);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);display:flex;flex-wrap:wrap;gap:8px 24px}
+code{font-family:var(--data);font-size:12.5px;background:var(--ground-3);padding:1px 5px;color:var(--ink);overflow-wrap:anywhere}
+a{color:var(--copper)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+<nav class="rail" aria-label="Sections">
+  <div class="railhead">Dossier</div>
+  <a href="#game"><span>I</span>The game</a>
+  <a href="#cosmos"><span>II</span>Cosmology</a>
+  <a href="#planes"><span>III</span>The planes</a>
+  <a href="#powers"><span>IV</span>Powers &amp; factions</a>
+  <a href="#body"><span>V</span>Body &amp; brain</a>
+  <a href="#combat"><span>VI</span>Combat</a>
+  <a href="#world"><span>VII</span>The world</a>
+  <a href="#laws"><span>VIII</span>Sixteen laws</a>
+  <a href="#facility"><span>IX</span>The facility</a>
+  <a href="#roadmap"><span>X</span>Roadmap</a>
+  <a href="#lab"><span>XI</span>Mechanics lab</a>
+  <a href="#higgs"><span>XII</span>Higgsfield</a>
+  <a href="#work"><span>XIII</span>How work runs</a>
+  <a href="#open"><span>XIV</span>Still open</a>
+</nav>
+
+<main>
+<header>
+  <div class="stamp"><span>CellOutz Industries · Growing Floor 0C</span><span class="bar"></span><span>Game plan · 4 Oct 2026</span></div>
+  <h1>Wizards Only Fools</h1>
+  <p class="lede">A first-person biopunk occult horror game in Godot. You are a <b>decanted clone owned by debt</b>, woken early in a CellOutz vat on a prison planet. Your soul hacks the chip in your skull, you tear yourself out, get revenge, escape the facility, and then you <b>fight God to make Him look at you</b>. This page is the whole game in one place: what it is, every system, and the order it gets built in.</p>
+  <div class="canon" aria-label="Canon lines">
+    <span>HUNDREDS OF YEARS OF THE PERPETUAL POST-APOCALYPSE…</span><span>WE OWN YOU. BRAIN CHIP.</span><span>END ALL SUFFERING.</span><span>GET REVENGE.</span><span>HE LEFT THROUGH THAT DOOR.</span><span>BRAIN HACKED / SOUL OVERTAKEN</span>
+  </div>
+  <div class="strip">
+    <div><b>Slice 1</b><small>Building now: the first ten minutes</small></div>
+    <div><b>1</b><small>Game folder: AllusionsTooGrandeur</small></div>
+    <div><b>790.67</b><small>Higgsfield credits left</small></div>
+    <div><b>236</b><small>Systems in code, 23+ not wired in</small></div>
+  </div>
+</header>
+
+<section id="game">
+  <h2><span class="no">I</span>The game</h2>
+  <p>Earth is an industry and prison planet in a <b>perpetual post-apocalypse</b>. The nuclear war is fake; an alien apocalypse took the planet and the government still lives under it, eating it. The game never confirms which story is true. You are a <b>captured spirit</b>: not powerful, unkillable. Death regrows you in the vat of whoever owns your body, and the world does not rewind.</p>
+  <p>The first 30 minutes are the <b>facility escape</b>, a subtle tutorial. The next 30 are the Ashbloom Expanse above it, still teaching quietly, then opening into free exploration. It is a save game with a main story, an ending and a post-game. Not a roguelike.</p>
+  <div class="grid2">
+    <div><h4>Tone</h4><p>Postal 2 deadpan meets Schedule 1 economy, with real political bite. The joke is always on an institution, never on a person. Horror first: Outlast, Alien Isolation, old Silent Hill, Cruelty Squad. Crunchy low-poly, grainy, modern lighting.</p></div>
+    <div><h4>Combat lineage</h4><p>Dark Souls 1–3 and Bloodborne for structure and bosses, Mordhau and Half Sword for weight, Doom for speed, Sniper Elite for the X-ray kill, Fallout for VATS, Nioh for stances. Controller first.</p></div>
+    <div><h4>World lineage</h4><p>Fallout 3 and New Vegas, Kenshi bodies, Shadow of Mordor nemesis, Far Cry outposts, RDR2 and GTA random events. No bigger than Fallout 4.</p></div>
+    <div><h4>Art rule</h4><p>Greg's own art is the foundation. Generated images guide models, textures and effects; they don't ship as final art. Palette: near-black, dried blood, arterial red, copper, bone, acid green.</p></div>
+  </div>
+</section>
+
+<section id="cosmos">
+  <h2><span class="no">II</span>Cosmology: as above, so below</h2>
+  <div class="halves">
+    <div class="below"><span class="tag">Below · Descent</span><h4>CellOutz</h4><p>The demons who got out of the cell. A corporation that sells you your own organs back. The HUD, the phone, the bounty platform and the liability notices are all its products. You have carried hell's merchandise since the first scene.</p></div>
+    <div class="middle"><span class="tag">The waist · Limbo</span><h4>You</h4><p>A CellOut wizard: half demon, half angel. Your alignment is one number between the two ends, starting at zero. You want freedom from rebirth and from the Godhead, and to force a hearing so the earth can be fixed.</p></div>
+    <div class="above"><span class="tag">Above · Ascent</span><h4>wizardsonlyfoolz</h4><p>The mage collective: higher-frequency entities, gods, the angelic register. A guild that won't take you seriously. Angels are proud, not automatically good. The game is named after the club you're locked out of.</p></div>
+  </div>
+  <h3>The four readings of one place</h3>
+  <div class="tbl"><table>
+    <tr><th>Reading</th><th>What becomes visible</th><th>How it looks</th></tr>
+    <tr><td class="k">Street</td><td>Jobs, routines, fights, trade, witnesses</td><td>Rust, wet concrete, organs, signal hardware</td></tr>
+    <tr><td class="k">Wire</td><td>Kinship, obligations, conversations and grudges as information you can travel</td><td>Copper threads, name chains, the pyramid rearranging</td></tr>
+    <tr><td class="k">Field</td><td>What a death, rite or promise did, without replacing the world</td><td>A torus around people and places, a small Samsara wheel</td></tr>
+    <tr><td class="k">Inverted Lattice</td><td>The descent: factions see you through fear, debt and ownership</td><td>Gravity-bent city fragments, crimson roots, CellOutz accounting marks</td></tr>
+  </table></div>
+  <h3>The hierarchy below</h3>
+  <div class="tbl"><table>
+    <tr><th>Tier</th><th>Who</th><th>How it plays</th></tr>
+    <tr><td class="k">Leadership</td><td>The Four Horsemen, rotating</td><td>Kill the one in charge and the next takes the post; Famine running CellOutz is a different world from War</td></tr>
+    <tr><td class="k">Princes</td><td>The Seven Deadly Sins</td><td>Each holds a faction and a channel: Ashline is Wrath, Black Mile is Greed, Soft Rot is Gluttony, the Choir of Marrow is Envy. Pride, Lust and Sloth still need factions</td></tr>
+    <tr><td class="k">Captains</td><td>Named rivals</td><td>The Hunt and nemesis system; killing one opens a real post</td></tr>
+    <tr><td class="k">Lesser demons</td><td>Roaming, generated</td><td>Born from recorded events, not a spawn table</td></tr>
+  </table></div>
+  <h3>Above it all</h3>
+  <ul class="plain">
+    <li><b>The Godhead</b> is not revealed. It taunts, it teaches, and its teaching is how it gets its hold. It summons you; you don't travel to it. The final fight is not a damage race.</li>
+    <li><b>The gods are what is actually worshipped</b>: markets, metrics, engagement, brands, each a real entity whose attention you can attract. A god for each planet, the moon and the sun, visible at their hours through a broken firmament.</li>
+    <li><b>Samsara wheel</b>: on a permanent death a small wheel rises and named powers argue whether the soul was freed or bound again. The game never rules.</li>
+    <li><b>Quantum immortality</b>: the universe restarts and you don't. What carries is scars, not statistics.</li>
+  </ul>
+</section>
+
+<section id="planes">
+  <h2><span class="no">III</span>The twelve planes</h2>
+  <p>The Tree of Life's ten sephiroth, plus the one that isn't on the map. You don't travel up; you <b>petition</b>, with a name, a seal, an offering and a licence to depart, and you are admitted or you are not. You reach the planes only through the brain, and the brain only through the chip.</p>
+  <div class="tbl"><table>
+    <tr><th>Plane</th><th>Sephirah</th><th>In the game</th></tr>
+    <tr><td class="k">3D</td><td>Malkuth · the Kingdom</td><td>The world. Where the game is played</td></tr>
+    <tr><td class="k">4D</td><td>Yesod · the Foundation</td><td><b>Wizard eyes.</b> Brief, earned, the only higher plane you see for free</td></tr>
+    <tr><td class="k">5D</td><td>Hod · Splendour</td><td>Structure and language; the Wire seen from above, posts made by something else</td></tr>
+    <tr><td class="k">6D</td><td>Netzach · Victory</td><td>Appetite and endurance; what a body wants</td></tr>
+    <tr><td class="k">7D</td><td>Tiferet · Beauty</td><td>The centre, where entities will actually speak with you</td></tr>
+    <tr><td class="k">8D</td><td>Gevurah · Severity</td><td>Judgement; the verdict on a kill lives here</td></tr>
+    <tr><td class="k">9D</td><td>Chesed · Mercy</td><td>The other half of that verdict, and it disagrees</td></tr>
+    <tr class="void"><td class="k">—</td><td>Da'ath · Knowledge</td><td><b>The Abyss.</b> Not on the map, can't be reached on purpose. Deliriants take you here and nothing comes back useful</td></tr>
+    <tr><td class="k">10D</td><td>Binah · Understanding</td><td>Form and limit, the shape of a thing</td></tr>
+    <tr><td class="k">11D</td><td>Chokmah · Wisdom</td><td>Force without form; very little survives</td></tr>
+    <tr><td class="k">12D</td><td>Keter · the Crown</td><td>The Godhead is on the other side of it</td></tr>
+  </table></div>
+  <p>The <b>four worlds</b> (Assiah, Yetzirah, Beriah, Atziluth) are registers each plane can be seen in, so one place looks different on mushrooms than on ketamine. Twelve planes through four registers is where "fifteen-plus dimensions" comes from.</p>
+  <h3>Altitude is the gate</h3>
+  <div class="tbl"><table>
+    <tr><th>To</th><th>You need</th></tr>
+    <tr><td class="k">See</td><td>Enough to perceive it. Wizard eyes are free and brief; everything above is bought</td></tr>
+    <tr><td class="k">Talk</td><td>Higher and sustained. Coming down mid-conversation is a real failure, and the entity remembers being left</td></tr>
+    <tr><td class="k">Conjure / evoke</td><td>Higher again, plus the sigil and the name</td></tr>
+    <tr><td class="k">Fight</td><td>The highest. You cannot fight the Godhead sober</td></tr>
+  </table></div>
+  <p>Entities are people in the world history: they remember you, can be wronged, and their distorted voices get clearer as your standing grows. Each plane is also a commission brief for a friend's art: one plane, one artist, one brief.</p>
+</section>
+
+<section id="powers">
+  <h2><span class="no">IV</span>Powers, factions and territory</h2>
+  <div class="tbl"><table>
+    <tr><th>Power</th><th>What they are</th></tr>
+    <tr><td class="k">CellOutz</td><td>The corporation of hell. Runs the facility, the vats, the bounty platform and the satellite map; issues repossession orders on you</td></tr>
+    <tr><td class="k">wizardsonlyfoolz</td><td>The ascending mage guild. Founder Orrin Vail, the First Frequency; its book is <i>The Unbroken Transmission</i></td></tr>
+    <tr><td class="k">Splinter monks</td><td>Left the guild believing they reached the last stage; the guild calls it heresy. Blood-stained Orthodox habits, destroyed sigils. Trade visions, maps, items and companions for blood and memories</td></tr>
+    <tr><td class="k">Sidereal Concordance</td><td>The agency that owns the sky. Owns the satellite in your phone; sees what you see; has work for you</td></tr>
+    <tr><td class="k">The bank</td><td>Writes liens against organs that the Choir prices. The tunnels under the street are how the collateral moves</td></tr>
+    <tr><td class="k">Ashline · Black Mile · Soft Rot · Choir of Marrow</td><td>Descending factions held by Wrath, Greed, Gluttony and Envy</td></tr>
+    <tr><td class="k">Gate Lanterns</td><td>An ascending faction on the surface</td></tr>
+    <tr><td class="k">Government, military, elites</td><td>Partnered but distinct; the elites force you into the jester outfit</td></tr>
+  </table></div>
+  <div class="grid2">
+    <div><h4>Signal territory</h4><p>Feeds, forums, masts, presses. Taken by out-publishing, discrediting, hijacking, flooding or cutting the mast. It controls what the world believes, and grudges spread through it.</p></div>
+    <div><h4>Ground territory</h4><p>Camps, towns, yards. Raided for things at a moment you choose, scouted against real schedules. Liberate, help the occupier (corruption), or arm the townspeople. Burned places stay burned; desolated land slowly recovers.</p></div>
+    <div><h4>Crew</h4><p>People join through history: bonds, shared enemies, debts, defections, hire or coercion. They can refuse, die permanently and betray.</p></div>
+    <div><h4>The pyramid</h4><p>A nemesis hierarchy of two halves, ascent above and corruption below, you at the waist. Power at both tips, the crowd in the middle. Spin, zoom and fly into it in the World Index.</p></div>
+  </div>
+</section>
+
+<section id="body">
+  <h2><span class="no">V</span>The body, the brain and the materia</h2>
+  <div class="grid2">
+    <div><h4>One anatomical rig</h4><p>Every person, demon and alien is the same body with different parameters, opened in the same detail. Skin, fat, muscle, bone, organs and cybernetics as layers; wounds recorded against zones; severed limbs you can pick up and swing.</p></div>
+    <div><h4>The vat and the intake</h4><p>Character creation is the examination. Four routes: preset, random, birth chart, personality instrument. Races: Decanted, Soft Rot, Marrow-Cut, Roadborn, Unreset, Lantern-Born. Traits with a point budget, and CLERICAL ERROR: part of your sheet is wrong and you aren't told which.</p></div>
+    <div><h4>WETWIRE</h4><p>Your brain, opened: a wet organ with a CRT bent into the cortex and a bloody wired chip bolted in while you were restrained. It is the index you open, the skill board and the bridge to the planes. The thing that connects you is the thing that is killing you.</p></div>
+    <div><h4>MATERIA</h4><p>Every substance class, each with real experiences, entities, tolerance and comedown on the world clock. Set and setting matter. Deliriants are horror and lead to Da'ath. No dosage or preparation detail anywhere. Lacing is possible, and the world records it as a crime.</p></div>
+    <div><h4>Death</h4><p>You regrow in the vat of whoever claims you. Your gear stays at your corpse, and your blood and soul fragments drop as a pulsing organ-sigil you hear before you see. Die again before you reach it and they're gone. The character preset is kept.</p></div>
+    <div><h4>The bingyang</h4><p>Vat madness. <b>Bingyangas</b> are held and tortured in the Support Unit; <b>bingyangers</b> are the ones you free: mutated, insane, randomly friendly or hostile each meeting. One old escapee hunts the drains.</p></div>
+  </div>
+</section>
+
+<section id="combat">
+  <h2><span class="no">VI</span>Combat</h2>
+  <p>Six <b>disciplines</b> live on the chip. They are playstyles, not weapon classes; any weapon works in any of them. You pick two on the brain screen after the breakout and unlock the rest during the escape, each with a chip-waking moment.</p>
+  <div class="tbl"><table>
+    <tr><th>Discipline</th><th>Feel</th></tr>
+    <tr><td class="k">Duelist</td><td>Soulslike: stamina, lock-on, roll, parry and riposte</td></tr>
+    <tr><td class="k">Brawler</td><td>Mordhau and Half Sword: free directional swings, weight, grapples</td></tr>
+    <tr><td class="k">Berserker</td><td>Doom: speed, aggression, momentum, health from kills</td></tr>
+    <tr><td class="k">Shade</td><td>Stealth: takedowns from behind, darkness and light, hacking cameras and doors; also throwables, traps and improvised weapons</td></tr>
+    <tr><td class="k">Chaos Wizard</td><td>Sigil casting paid in blood or sanity, casting through organs marked in VATS, summoning and binding (Hornee is a summon)</td></tr>
+    <tr><td class="k">Marksman</td><td>Slow-time X-ray targeting, long range, Sniper Elite kills</td></tr>
+  </table></div>
+  <ul class="plain">
+    <li><b>Controls:</b> Souls base everywhere (R1 light, R2 heavy, L1 block, L2 parry; with a gun R2 fires, L2 aims). Each discipline remaps its own layer, and on-screen hints follow it. Swapping costs chip heat; overheat glitches you.</li>
+    <li><b>Swap moment:</b> screen tear and CRT static, the HUD brain pulses, a modem chirp and a heartbeat.</li>
+    <li><b>Guns:</b> aim down the barrel, click the stick to zoom further. Bloodborne-style off-hand gun that staggers a windup. One-hand, two-hand and dual grips. Rib-cage weapon wheel around the HUD spine.</li>
+    <li><b>VATS:</b> squeeze L2 and R2 to slow time and pick parts. Arms disarm, legs, lungs and spine slow, eyes and head blind, ears deafen, jaw silences, hands fumble, spine hardware staggers.</li>
+    <li><b>Growth:</b> blood XP from kills, damage, your own blood and finishers. It feeds the brain board: one lobe per discipline, shared chip nodes in the middle, locked nodes visible but unreadable until you're near.</li>
+    <li><b>How you fight decides what survives:</b> overkill destroys the organs and cybernetics you'd loot; clean kills keep them.</li>
+    <li><b>Enemies use disciplines too</b> and are hard but fair: three to four hits, wounds that change how you fight, readable tells.</li>
+  </ul>
+</section>
+
+<section id="world">
+  <h2><span class="no">VII</span>The world</h2>
+  <div class="grid2">
+    <div><h4>The Black Mirror</h4><p>A stolen prototype phone with a jester on the back, and every route gives it to you. MAP, INDEX, WIRE, RADIO, CARRY, RITUAL, FIELD, camera with night vision, depth and photo mode. It's also a light, and light is what hunters see first.</p></div>
+    <div><h4>The Board</h4><p>No quest log. The story is a conspiracy wall you string together. Job posters with tear-off tabs and business cards from people feed it.</p></div>
+    <div><h4>The Wire</h4><p>The in-game internet: neocities-grade sites, personas with avatars, DMs, stalking a feed to find someone, a darkweb, a skin market. It's where the world's two records fight.</p></div>
+    <div><h4>Money and the law</h4><p>One currency with an issuer, bodies worth something by the part, liens and the bank. Witnesses carry what they saw, with a delay, to the faction that holds the ground.</p></div>
+    <div><h4>Time and weather</h4><p>One world clock that everything reads. A calendar of Ashfall, Emergence and Reaping, twelve thirty-day months and five Uncounted Days (Fool, Wound, Mirror, Wire, Flame). Rain, storms, acid rain.</p></div>
+    <div><h4>Destruction</h4><p>Walls, floors and props break in authored stages with real debris; ground takes holes sized by the round. It's recorded, and repaired over a month by whoever holds the ground.</p></div>
+    <div><h4>Random events</h4><p>Every one to two minutes, GTA-style: a crazed driver, monks casting spirit visions. Any can turn into a quest, a trade or a boss.</p></div>
+    <div><h4>Also in the world</h4><p>The derby and its tunnels (a secret route), the club and its substances, CS-style cases with gold at 0.01%, local-AI NPCs you talk to by voice, Hornee, and the art gallery of Greg's work.</p></div>
+  </div>
+</section>
+
+<section id="laws">
+  <h2><span class="no">VIII</span>Sixteen laws every feature obeys</h2>
+  <ol class="laws">
+    <li>One anatomical truth: no health bars, no special cases</li>
+    <li>The world keeps two records, and never arbitrates</li>
+    <li>Time is real, and everything reads one clock</li>
+    <li>Light is the resource</li>
+    <li>The blow is performed, not requested</li>
+    <li>A round is an object that travels and leaves brass</li>
+    <li>Everything breaks, and the world keeps the damage</li>
+    <li>The tutorial is a place, not a help screen</li>
+    <li>Two charts, one Board: the pyramid and the tree</li>
+    <li>Sigilisation is a real procedure</li>
+    <li>The gods are what is actually worshipped</li>
+    <li>The Godhead accumulates; it summons you</li>
+    <li>The universe restarts and you do not</li>
+    <li>Every screen is an object in the world</li>
+    <li>Sound is a property of the world</li>
+    <li>The psychedelic layer is a real pipeline</li>
+  </ol>
+</section>
+
+<section id="facility">
+  <h2><span class="no">IX</span>The facility, as one place</h2>
+  <p>One connected map with no loading screens. Elevators are real: the doors close and the cab rides a visible shaft. Origin is your vat; the surface is 20 m up.</p>
+  <div class="tbl"><table>
+    <tr><th>Level</th><th>Height</th><th>What is there</th></tr>
+    <tr><td class="k">Surface</td><td>+20 m</td><td>Heat-elevator head-house (first exit), top of the doctor's ramp</td></tr>
+    <tr><td class="k">0C</td><td>0 m</td><td>Growing Floor (the vats), Examination Room, service artery, Service Arcade</td></tr>
+    <tr><td class="k">0D</td><td>−12 m</td><td>Lower Works, foot of the heat elevator, drain grate</td></tr>
+    <tr><td class="k">0D east</td><td>−14 m</td><td>Support Unit (bingyangas, Hollis), the doctor's Vehicle Bay</td></tr>
+    <tr><td class="k">0E</td><td>−20 m</td><td>Old Drains, cistern, storm outfall; the colosseum is reserved below, to the west</td></tr>
+  </table></div>
+  <ul class="plain">
+    <li><b>Heat elevator:</b> arcade, transit lift down, Lower Works, then 32 m up to the surface.</li>
+    <li><b>Old drains:</b> through the grate, past the hunting bingyanger, out at the storm outfall.</li>
+    <li><b>Chase the doctor:</b> break his door, take his lift down, the Support Unit, his bay; he's a hologram. Up the ramp.</li>
+    <li><b>The derby</b> (secret): the colosseum, GTA tunnels, out at the blood waterfall.</li>
+  </ul>
+</section>
+
+<section id="roadmap">
+  <h2><span class="no">X</span>Roadmap</h2>
+  <p>Built in slices you play. Wire in what already exists before writing anything new. Nothing from the next slice starts until Greg has played this one and it feels right.</p>
+  <div class="legend"><span><span class="s in">In game</span> playable now</span><span><span class="s wire">Wire in</span> built and tested, not connected</span><span><span class="s build">Build</span> missing</span><span><span class="s check">Check</span> merged, not yet played</span></div>
+  <div class="slices">
+    <details class="slice now" open><summary><span class="sn">1</span><span class="st"><b>The first ten minutes</b><small>Title to standing up out of the vat</small></span><span class="pill now">Building</span></summary>
+      <ul class="items">
+        <li><span class="s in">In game</span><span>Title, logo burn-in and the intro cutscene (keep as is; fix it playing too fast)</span></li>
+        <li><span class="s in">In game</span><span>Torture load-in, examiner at the glass, the intake pages</span></li>
+        <li><span class="s build">Build</span><span>Wake slowly in first person inside real red liquid with physics; enlarge and declutter the lab</span></li>
+        <li><span class="s build">Build</span><span>Intake fully on the pad: tabs on the bumpers, button names on screen, pad push-to-talk, rename by pad</span></li>
+        <li><span class="s build">Build</span><span>Brain screen: pick two disciplines, third person turns on, mismatched pairs carry a trade-off</span></li>
+        <li><span class="s build">Build</span><span>Breakout: hands free, cords torn out, glass cracks with destruction physics, liquid floods the floor. No belt</span></li>
+        <li><span class="s check">Check</span><span>Menu on controller, input chooser on START, fresh demo on every start</span></li>
+      </ul></details>
+    <details class="slice"><summary><span class="sn">2</span><span class="st"><b>The facility escape</b><small>Minutes 10–30, one map</small></span><span class="pill next">Next</span></summary>
+      <ul class="items">
+        <li><span class="s check">Check</span><span>Facility skeleton scene, real lifts, seamless doors and the tunnel kit</span></li>
+        <li><span class="s build">Build</span><span>Cut the clutter: breach-tool puzzle, wall scan, vent, fuse hunt, wound minigame, text inspections, invisible demo wall</span></li>
+        <li><span class="s build">Build</span><span>The fire axe actually hits; one objective on screen, never clipped, that matches the doors</span></li>
+        <li><span class="s build">Build</span><span>The examiner as a real boss; his keycard drops and opens the staff door</span></li>
+        <li><span class="s wire">Wire in</span><span>Black Mirror on every route, bingyangas and Hollis, the den, wizard eyes (colours fixed)</span></li>
+        <li><span class="s wire">Wire in</span><span>Visible inventory from the start, built on the Wetwire inventory</span></li>
+      </ul></details>
+    <details class="slice"><summary><span class="sn">3</span><span class="st"><b>The combat core</b><small>Disciplines, guns, bodies, growth</small></span><span class="pill later">Later</span></summary>
+      <ul class="items">
+        <li><span class="s check">Check</span><span>Aim down the barrel, gun and sword remake, Souls pad base, native controller profile, VATS</span></li>
+        <li><span class="s build">Build</span><span>Six disciplines with their own button layers and chip heat</span></li>
+        <li><span class="s build">Build</span><span>Off-hand gun, grips, rib-cage wheel, peek while aiming</span></li>
+        <li><span class="s build">Build</span><span>Third-person Souls camera and lock-on that frames both fighters</span></li>
+        <li><span class="s wire">Wire in</span><span>Ragdolls, gore and destruction everywhere, not just the sandbox; fix detached limbs and arms</span></li>
+        <li><span class="s build">Build</span><span>Brain board with corrupted labels, blood XP, bloodstain death, enemies that use disciplines</span></li>
+      </ul></details>
+    <details class="slice"><summary><span class="sn">4</span><span class="st"><b>The first hour above ground</b><small>Minutes 30–60</small></span><span class="pill later">Later</span></summary>
+      <ul class="items">
+        <li><span class="s build">Build</span><span>Exit reveals per route; the Ashbloom made worth looking at</span></li>
+        <li><span class="s wire">Wire in</span><span>Random events, splinter monks, posters and cards to the Board, the Wire and phone, satellite map</span></li>
+        <li><span class="s build">Build</span><span>Hornee as a Chaos Wizard summon</span></li>
+      </ul></details>
+    <details class="slice"><summary><span class="sn">5</span><span class="st"><b>The world systems</b><small>After the first hour is right</small></span><span class="pill later">Later</span></summary>
+      <ul class="items">
+        <li><span class="s wire">Wire in</span><span>Nemesis pyramid (no Elo), territories, raids and crew, signal channels, money and liens, law and witnesses</span></li>
+        <li><span class="s build">Build</span><span>Procedural enterable towns, economies and armies</span></li>
+        <li><span class="s build">Build</span><span>The derby on open-source soft-body driving, tunnels and the blood waterfall</span></li>
+        <li><span class="s build">Build</span><span>The club and materia, cases and skins market, voice NPCs, chaos-magick planes, kinship brain web, the sky agency, the Godhead</span></li>
+      </ul></details>
+  </div>
+</section>
+
+<section id="lab">
+  <h2><span class="no">XI</span>The mechanics lab</h2>
+  <p>One small walkable test map <b>inside the same game</b>, not a separate project. Each station runs the real system the game uses, so anything proven here is already in the game. You walk around it with no story; nothing needs merging.</p>
+  <div class="tbl"><table>
+    <tr><th>Station</th><th>What it proves</th></tr>
+    <tr><td class="k">Liquid</td><td>A tank you break: liquid pours, flows, pools, splashes when walked or shot through</td></tr>
+    <tr><td class="k">Weather</td><td>Clear, rain, storm, acid rain on one button; wet surfaces, puddles, lightning; acid corrodes a prop and hurts a dummy</td></tr>
+    <tr><td class="k">Destruction</td><td>Walls, crates, glass, pipes and ground against every weapon, in stages with debris</td></tr>
+    <tr><td class="k">Bodies</td><td>Gore, ragdoll, dismemberment, X-ray and VATS on a row of dummies</td></tr>
+    <tr><td class="k">Vehicles</td><td>A pad for the derby's driving work</td></tr>
+  </table></div>
+  <p>Launch it with <code>Start-MechanicsLab.cmd</code> next to <code>PLAY.cmd</code> once it lands. The Psychofrenia sandbox stays the combat test bed.</p>
+</section>
+
+<section id="higgs">
+  <h2><span class="no">XII</span>Higgsfield</h2>
+  <p>Spent only on what is hard to make by hand: cutscenes and video, maps and terrain, gore, bone UI, transitions and sigil animations. Not characters or weapons unless Greg asks. Every job is priced first and logged in the ledger.</p>
+  <div class="tbl"><table>
+    <tr><th>Slice</th><th>Rough credits</th><th>For</th></tr>
+    <tr><td class="k">1</td><td>~150</td><td>Title and brain-hack videos, X-ray anatomy plates, vat-room textures, glass and blood decals</td></tr>
+    <tr><td class="k">2</td><td>~200</td><td>Room and tunnel kit (36 spent so far), hologram and 3D-call videos, exit reveals</td></tr>
+    <tr><td class="k">3</td><td>~120</td><td>Wound and organ textures, sigil and summon loops, bone UI frames, transitions</td></tr>
+    <tr><td class="k">4</td><td>~200</td><td>Terrain and map tiles, settlement kits, Wire personas, posters and cards</td></tr>
+    <tr><td class="k">Reserve</td><td>~120</td><td>Whatever the playtests show is missing</td></tr>
+  </table></div>
+</section>
+
+<section id="work">
+  <h2><span class="no">XIII</span>How work runs</h2>
+  <ul class="plain">
+    <li><b>One game:</b> <code>P:\GameDev\AllusionsTooGrandeur</code> on branch <code>claude/launch-latest</code>. Play it with <code>P:\GameDev\PLAY.cmd</code>.</li>
+    <li><b>Builders only.</b> One task per broken or missing piece of the current slice. No planning or orchestration agents.</li>
+    <li>Agents build in hidden slots under <code>P:\GameDev\.agents</code> and merge into the one game only when the tests pass.</li>
+    <li>A change isn't done until someone has looked at it rendered. Greg plays each wave and his words go into the direction file.</li>
+    <li>Codex accounts: tests and mechanical work. Claude accounts: anything that needs judgement or a look. Higgsfield runs on one account only.</li>
+  </ul>
+</section>
+
+<section id="open">
+  <h2><span class="no">XIV</span>Still open</h2>
+  <ul class="plain">
+    <li>The names of the six disciplines (working titles above).</li>
+    <li>The Four Horsemen's names in this world; factions for Pride, Lust and Sloth.</li>
+    <li>Whether the Gate Lanterns belong to wizardsonlyfoolz or rival it.</li>
+    <li>The doctor's name and lines (Greg writes them; his name is the reward for chasing him).</li>
+    <li>Who the failed subject in the den was.</li>
+    <li>Whether a bingyanger can be kept as a companion.</li>
+  </ul>
+</section>
+
+<footer><span>Sources: 1,900 of Greg's messages, DESIGN.md, the Dust to Bones plate, the 12 Sep build sheet, FACILITY.md, COSMOLOGY.md, THE_BRAIN.md, FINAL_V.md</span><span>Greg's newest word wins</span></footer>
+</main>
+</div>
