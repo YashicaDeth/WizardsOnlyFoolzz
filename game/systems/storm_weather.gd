@@ -30,6 +30,9 @@ var _strike_clock := 0.0
 var _next_strike := 2.0
 var _strike_elapsed := -1.0
 var _rng := RandomNumberGenerator.new()
+## A severity to read instead of chaos-magick (the mechanics lab's weather
+## dial). Below zero, the default, the storm follows the world as always.
+var severity_override := -1.0
 
 
 func _ready() -> void:
@@ -45,6 +48,8 @@ func _ready() -> void:
 ## never touched directly — only ever a read of the level WorldHistory is
 ## already keeping.
 func severity() -> float:
+	if severity_override >= 0.0:
+		return clampf(severity_override, 0.0, 1.0)
 	var level := WorldHistory.chaos_magick()
 	if level < SEVERITY_FLOOR:
 		return 0.0
