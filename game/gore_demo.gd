@@ -561,6 +561,9 @@ func _spawn_body(index: int) -> void:
 		# Greg, 30 September: a death falls as a ragdoll, along the blow
 		# (Codex's RagdollBody). Living knockdowns keep the authored tip-over.
 		"ragdoll": true,
+		# Job 2: a rigged skin on the zones, and the death ragdoll on its
+		# skeleton (joints that hold) instead of six loose boxes.
+		"rigged": true,
 		"cybernetics": {"torso": {"name": "ceramic sternum", "armor": 0.18}},
 	})
 	# Greg: *"the gore in the gore sandbox is not up to date with the gore in the

@@ -4,7 +4,7 @@ extends Node
 ## Windowed only (headless draws nothing and says so):
 ##   Godot --path game --resolution 1600x900 res://tests/mechanics_lab_capture.tscn -- --shots=P:/GameDev/Temp/mechanics_lab
 ## Writes yard.png, liquid.png, weather.png, destruction.png, bodies.png,
-## vehicle_pad.png into the folder.
+## bodies_rigged.png, bodies_wounded.png, vehicle_pad.png into the folder.
 
 const WORLD_BREAK := preload("res://systems/world_break.gd")
 
@@ -48,6 +48,8 @@ func _ready() -> void:
 	await _shot("destruction", station.to_global(Vector3(1.0, 2.4, 6.0)), station.to_global(Vector3(-0.5, 0.6, -0.5)))
 
 	# Bodies: an arm off, a dummy killed into its ragdoll, the X-ray on.
+	# Job 2: the rigged skins up close, standing and untouched, X-ray off.
+	await _shot("bodies_rigged", lab.bodies.to_global(Vector3(0.0, 1.5, 1.4)), lab.bodies.to_global(Vector3(0, 1.0, -1.6)))
 	var rigs: Array = lab.bodies.rigs()
 	var cut := Plane(Vector3.UP, (rigs[0] as BaselineHuman).parts["left_arm"].global_position)
 	(rigs[0] as BaselineHuman).hit_at((rigs[0] as BaselineHuman).parts["left_arm"].global_position, 90.0, 20.0, "cut", Vector3.LEFT, -1.0, cut)
@@ -56,6 +58,10 @@ func _ready() -> void:
 	lab.bodies.press()
 	await _seconds(2.0)
 	await _shot("bodies", lab.bodies.to_global(Vector3(0.5, 1.8, 3.4)), lab.bodies.to_global(Vector3(0, 0.9, -1.6)))
+	# The same wounds and ragdoll with the X-ray off: the skin is what reads.
+	lab.bodies.press()
+	await _seconds(0.5)
+	await _shot("bodies_wounded", lab.bodies.to_global(Vector3(-0.8, 1.4, 1.2)), lab.bodies.to_global(Vector3(-0.8, 0.7, -1.6)))
 
 	# Weather: acid rain long enough to eat the cabinet and burn the open dummy.
 	var weather = lab.weather

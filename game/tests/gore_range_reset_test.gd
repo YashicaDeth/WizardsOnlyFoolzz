@@ -57,4 +57,13 @@ func _ready() -> void:
 	check(int(demo.get("spent")) == 0 and int(demo.get("severed_total")) == 0, "the drill counters reset with the bodies")
 
 	print("GORE_RANGE_RESET_TEST_RESULT failures=", failures.size())
+	# Tear the range down before quitting rather than leaving engine shutdown
+	# to free seven fresh rigs, the retired ones and the static gore lists in
+	# whatever order it likes; that exit crashed (139) in 2 of 12 Jolt runs.
+	GoreChunks.clear()
+	BaselineHuman.clear_gore()
+	demo.queue_free()
+	await get_tree().process_frame
+	await get_tree().physics_frame
+	await get_tree().physics_frame
 	get_tree().quit(0 if failures.is_empty() else 1)
