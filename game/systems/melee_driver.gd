@@ -24,7 +24,7 @@ const INPUT_BUFFER := 0.15
 const MAX_STAMINA := 100.0
 const STAMINA_REGEN := 30.0
 const STAMINA_DELAY := 0.55
-const PARRY_WINDOW := 0.18
+const PARRY_WINDOW := 0.24
 const BLOCK_STAMINA_PER_DAMAGE := 0.9
 ## Below this stagger share a hit only flinches; at or above it the target
 ## reels. Heavy and charged blows clear it, lights mostly do not.
@@ -306,7 +306,7 @@ func _contact(collider: Object, at: Vector3, along: Vector3, definition: Diction
 	contacts += 1
 	last_packet = packet
 	struck.emit(collider, at, along, packet)
-	var rig := _rig_of(collider)
+	var rig := rig_of(collider)
 	if rig != null:
 		_stagger(rig, packet, definition, along)
 		if arsenal.current_id == "cleaver" and vent_left <= 0.0 and heat >= float(feel.burn_from_heat):
@@ -455,15 +455,19 @@ func _feel() -> Dictionary:
 
 
 func _target_key(collider: Object) -> int:
-	var rig := _rig_of(collider)
+	var rig := rig_of(collider)
 	return rig.get_instance_id() if rig != null else (collider.get_instance_id() if collider != null else 0)
 
 
-static func _rig_of(collider: Object) -> BaselineHuman:
+## The body a collider belongs to. A knocked-down or dead body's parts are
+## reparented under its `RagdollBody`, which remembers its `source`.
+static func rig_of(collider: Object) -> BaselineHuman:
 	var node := collider as Node
 	while node != null:
 		if node is BaselineHuman:
 			return node
+		if node is RagdollBody and (node as RagdollBody).source != null and is_instance_valid((node as RagdollBody).source):
+			return (node as RagdollBody).source
 		node = node.get_parent()
 	return null
 

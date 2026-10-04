@@ -25,6 +25,10 @@ const LIQUID := preload("res://lab/stations/liquid_station.gd")
 const WEATHER := preload("res://lab/stations/weather_station.gd")
 const DESTRUCTION := preload("res://lab/stations/destruction_station.gd")
 const BODIES := preload("res://lab/stations/bodies_station.gd")
+const SPARRING := preload("res://lab/sparring_partner.gd")
+## Where the sparring partner (job 3) stands: the covered half, clear of the
+## stations, so a fight has room to move.
+const SPARRING_AT := Vector3(0, 0, -12)
 
 const HALF := 20.0
 const ROOF_Y := 5.5
@@ -53,6 +57,8 @@ var ads := AimDownSights.new()
 var held_mount: Node3D
 var aiming := false
 var aim_blend := 0.0
+var player_health := 100.0
+var sparring: Node3D
 var lock_target: BaselineHuman
 var lock_ring: LockRing
 var _lock_flick := 0.0
@@ -99,6 +105,14 @@ func _ready() -> void:
 	arsenal.equipped.connect(func(_id: String) -> void: _hold_current())
 	lock_ring = LockRing.new()
 	add_child(lock_ring)
+	sparring = SPARRING.new()
+	sparring.name = "SparringPartner"
+	sparring.position = SPARRING_AT
+	add_child(sparring)
+	sparring.build(self)
+	melee.staggered.connect(func(rig: Node3D, _report: Dictionary) -> void:
+		if sparring.rig == rig:
+			sparring.interrupt())
 	_hold_current()
 	_build_hud()
 	if OS.get_environment("ATG_TEST_MODE") != "1":
@@ -599,6 +613,10 @@ func _on_round_hit(hit: Dictionary) -> void:
 func _land(collider: Object, at: Vector3, direction: Vector3, attack_data: Dictionary, kind: String, plane: Variant) -> void:
 	var damage := float(attack_data.get("damage", 20.0))
 	var node := collider as Node
+	# A knocked-down body's parts hang under its RagdollBody, not the rig.
+	var owner_rig := MeleeDriver.rig_of(collider)
+	if owner_rig != null:
+		node = owner_rig
 	while node != null and node != self:
 		if node is BaselineHuman:
 			var result := (node as BaselineHuman).hit_at(at, damage, float(attack_data.get("impulse", 0.0)), str(attack_data.get("damage_type", "blunt")), direction, -1.0, plane)
@@ -656,6 +674,10 @@ func _update_hud() -> void:
 		if entry.node != null:
 			lines.append("%s  %s" % [str(entry.title), entry.node.status()])
 	lines.append("ACID ON YOU %.1f  (x%.2f)" % [weather.player_acid_taken, weather.acid_player_scale])
+	var extra := ""
+	if arsenal.current_id == "cleaver":
+		extra = "   HEAT %d%%%s" % [roundi(melee.heat * 100.0), "  VENTING" if melee.vent_left > 0.0 else ""]
+	lines.append("HP %d   STAMINA %d%s   [%s] BLOCK  [%s] PARRY/AIM  [%s] LOCK  [%s] ROLL" % [roundi(player_health), roundi(melee.stamina), extra, InputProfile.glyph("guard"), InputProfile.glyph("parry"), InputProfile.glyph("lock_on"), InputProfile.glyph("crouch" if InputProfile.device_family() == "keyboard" else "dodge")])
 	if _note_age < 3.0 and not last_note.is_empty():
 		lines.append("> " + last_note)
 	_hud.text = "\n".join(lines)

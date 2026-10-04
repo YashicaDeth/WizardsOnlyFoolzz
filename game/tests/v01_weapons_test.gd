@@ -39,6 +39,7 @@ func _ready() -> void:
 	await _staff()
 	await _pistol()
 	await _roll_and_lock()
+	await _sparring()
 
 	Engine.time_scale = 1.0
 	print("V01_WEAPONS_TEST_RESULT failures=%d" % failures.size())
@@ -133,7 +134,64 @@ func _roll_and_lock() -> void:
 	check(lab.lock_target == null, "and R3 again lets go")
 
 
+## The fighting partner: its telegraphed swing is parried on L2, soaked on
+## L1, and a cleaver blow while it winds up interrupts it.
+func _sparring() -> void:
+	var partner = lab.sparring
+	check(partner != null and not partner.is_dead(), "a sparring partner stands in the lab")
+	await _button(JOY_BUTTON_DPAD_RIGHT)
+	await _frames(2)
+	check(str(lab.arsenal.current_id) == "cleaver", "back round to the cleaver")
+	await _face(partner.rig, 2.0)
+	# Parry: L2 late in its windup.
+	await _until(func() -> bool: return partner.state == "windup" and partner.clock >= WINDUP_PARRY_AT, 4.0)
+	var parried_before: int = partner.outcomes.size()
+	var parry := InputEventJoypadMotion.new()
+	parry.axis = JOY_AXIS_TRIGGER_LEFT
+	parry.axis_value = 1.0
+	Input.parse_input_event(parry)
+	await _until(func() -> bool: return partner.outcomes.size() > parried_before, 2.0)
+	parry.axis_value = 0.0
+	Input.parse_input_event(parry)
+	check(partner.outcomes.size() > parried_before and partner.outcomes[-1] == "parried", "L2 in time parries its swing (%s)" % str(partner.outcomes))
+	check(partner.state == "stunned", "and a parried partner is stunned")
+	# Block: hold L1 through the next swing.
+	await _face(partner.rig, 2.0)
+	var guard := InputEventJoypadButton.new()
+	guard.button_index = JOY_BUTTON_LEFT_SHOULDER
+	guard.pressed = true
+	Input.parse_input_event(guard)
+	var health: float = lab.player_health
+	var blocked_before: int = partner.outcomes.size()
+	await _until(func() -> bool: return partner.outcomes.size() > blocked_before, 6.0)
+	guard.pressed = false
+	Input.parse_input_event(guard)
+	check(partner.outcomes.size() > blocked_before and partner.outcomes[-1] == "blocked", "L1 held blocks it (%s)" % str(partner.outcomes))
+	check(lab.player_health > health - SparringDamage.FULL, "and the block soaks most of it")
+	# Interrupt: a heavy into its windup.
+	await _face(partner.rig, 1.4)
+	staggers.clear()
+	await _until(func() -> bool: return partner.state == "windup", 6.0)
+	await _trigger(JOY_AXIS_TRIGGER_RIGHT, 0.05)
+	await _until(func() -> bool: return partner.state == "stunned", 1.5)
+	check(partner.state == "stunned", "a cleaver heavy into its windup staggers it out of the swing")
+
+
 # --- helpers -----------------------------------------------------------------
+
+const WINDUP_PARRY_AT := 0.52
+
+
+class SparringDamage:
+	const FULL := 18.0
+
+
+func _until(condition: Callable, limit: float) -> void:
+	var waited := 0.0
+	while waited < limit and not condition.call():
+		await get_tree().physics_frame
+		waited += 1.0 / float(Engine.physics_ticks_per_second)
+
 
 func _face(rig: BaselineHuman, distance: float) -> void:
 	var at := rig.global_position
