@@ -345,18 +345,33 @@ func strike(player_position: Vector3) -> bool:
 	direction.y = 0.0
 	var result: Dictionary = guard.hit("torso", RAM_DAMAGE, 12.0, "blunt", "", direction.normalized())
 	struck.emit(_torso_position(), "torso", float(result.get("damage", RAM_DAMAGE)), "blunt")
-	WorldHistory.record_event("facility_guard_rammed", {"subject_id": guard_id, "downed": guard_down()})
+	_after_blow("facility_guard_rammed", "a breach ram")
+	return true
+
+
+## A held melee blade (job 3: the HOTLINE CLEAVER through MeleeDriver) met
+## the guard at `at`. Same history and reaction as the ram.
+func land_blow(at: Vector3, damage: float, impulse: float, damage_type: String, direction: Vector3, cut_plane: Variant = null) -> Dictionary:
+	if guard == null or guard.anatomy.dead:
+		return {}
+	var result: Dictionary = guard.hit_at(at, damage, impulse, damage_type, direction, -1.0, cut_plane)
+	struck.emit(at, str(result.get("zone", "torso")), float(result.get("damage", damage)), damage_type)
+	_after_blow("facility_guard_cut", "a cleaver")
+	return result
+
+
+func _after_blow(event_id: String, weapon: String) -> void:
+	WorldHistory.record_event(event_id, {"subject_id": guard_id, "downed": guard_down()})
 	WorldHistory.amend_subject(guard_id, {"anatomy_state": guard.anatomy.snapshot()})
 	if guard_down():
 		coerced = false
 		WorldHistory.amend_subject(guard_id, {
 			"status": "dead" if guard.anatomy.dead else "down",
-			"memory": "Put down at his own door by a decanted subject with a breach ram.",
+			"memory": "Put down at his own door by a decanted subject with %s." % weapon,
 		})
 		_say("")
 	else:
 		_say("%s: \"Hh--\"" % guard_name, 1.0)
-	return true
 
 
 ## E. One press, one act, in the order the situation asks for it.
