@@ -103,3 +103,9 @@ Greg: "it shouldn't instantly dissipate and it should be an actual fluid as well
   1. Queued `fix-hidden-cache-test` (70, codex) for when codex unparks.
   2. lab-48, then lab-47 with the PNG notes, on claude-alt2 from 10:04.
   3. job5 lands on codex-allusions-team at 09:56. Then job6, job9 and job7 at 13:04.
+
+## Manager notes, 2026-10-05 10:03
+- Nothing has merged since 09:05. No builders are running. All Claude accounts are parked (alt2 frees at 10:04, the others at 13:04). codex-allusions-team is ready and job5 is pending at priority 95, so no new task was queued.
+- No new merge, so nothing was rendered. The 09:05 recommendations still stand: lab-48 next, fix-hidden-cache-test, then remaster passes on job3 and job4.
+- Failed queue is unchanged (job2, job2b originals, lane-exit-routes). All of them were superseded by tasks that later landed.
+- v0.1 landed 4 of 10, so the game plan v2 draft waits.
