@@ -120,6 +120,7 @@ func _ready() -> void:
 	for spec in PROPS:
 		BreakableProp.place(self, spec[0], spec[1], spec[2], spec[3])
 	_build_player()
+	_arm_cleaver()
 	if arrive_by_duct:
 		arrive_by_duct = false
 		duct_arrival = true
@@ -369,8 +370,7 @@ func _restore_from_history() -> void:
 		weapon_visual.visible = false
 	if VAT_REBIRTH.carries(TOOL_LABEL):
 		weapon_taken = true
-		weapon_visual.visible = true
-		LabSurface.hold_in_view(camera, weapon_visual)
+		_hold_ram()
 	if WorldHistory.event_count("service_arcade_pressure_gate_opened") > 0:
 		_open_gate()
 
@@ -413,13 +413,62 @@ func _recover_remains(remains_id: String) -> bool:
 	card_taken = VAT_REBIRTH.carries(CARD_LABEL)
 	if VAT_REBIRTH.carries(TOOL_LABEL) and not weapon_taken:
 		weapon_taken = true
-		weapon_visual.visible = true
-		LabSurface.hold_in_view(camera, weapon_visual)
+		_hold_ram()
 	var tag: Label3D = remains_nodes[remains_id][1]
 	tag.text = "STRIPPED"
 	post_message = "TAKEN BACK OFF YOUR OLD BODY // %d THINGS" % int(result.get("items", 0))
 	post_message_timer = 2.4
 	return true
+
+
+## Job 3: the HOTLINE CLEAVER taken off the Growing Floor's wall is in your
+## hand here, swung through MeleeDriver (R1/LMB light, R2/MMB heavy held to
+## charge, L1/RMB block, L2/X parry). Without it the ram is the only weapon.
+var arsenal: HunterArsenal
+var melee: MeleeDriver
+var cleaver_held: Node3D
+
+func _arm_cleaver() -> void:
+	if not (VAT_REBIRTH.carries(DoctorRoute.AXE_LABEL) or VAT_REBIRTH.carries(DoctorRoute.LEGACY_AXE_LABEL)):
+		return
+	arsenal = HunterArsenal.new()
+	arsenal.name = "Arsenal"
+	add_child(arsenal)
+	arsenal.acquire_melee("cleaver")
+	arsenal.select_weapon("cleaver")
+	melee = MeleeDriver.new()
+	melee.name = "Melee"
+	add_child(melee)
+	melee.setup(arsenal, camera, [player.get_rid()])
+	melee.struck.connect(_on_cleaver_struck)
+	melee.kicked.connect(func(amount: float) -> void: BODY_CAM.hit(camera, amount))
+	cleaver_held = DoctorRoute.cleaver_model()
+	LabSurface.hold_in_view(camera, cleaver_held)
+	melee.set_model(cleaver_held)
+
+
+## The ram in view; beside the cleaver it moves to the off hand.
+func _hold_ram() -> void:
+	weapon_visual.visible = true
+	LabSurface.hold_in_view(camera, weapon_visual)
+	if melee != null:
+		weapon_visual.position.x = -weapon_visual.position.x
+
+
+## A cleaver blow met something: the guard takes it through his post (same
+## history as the ram), anything else breaks if it can. Cuts slice along the
+## swing, as in the mechanics lab.
+func _on_cleaver_struck(collider: Object, at: Vector3, direction: Vector3, packet: Dictionary) -> void:
+	var damage := float(packet.get("damage", 20.0))
+	if MeleeDriver.rig_of(collider) == guard_post.guard:
+		var definition: Dictionary = packet.get("attack_data", {})
+		var plane: Variant = null
+		if bool(definition.get("cuts", false)):
+			var swing := -camera.global_basis.y if str(definition.get("side", "")) == "high" else camera.global_basis.x * (-1.0 if bool(packet.get("mirror", false)) else 1.0)
+			plane = BodySlice.plane_from_swing(at, at - swing * 0.4, swing * 6.0)
+		guard_post.land_blow(at, damage, float(packet.get("impulse", 0.0)), str(packet.get("damage_type", "slash")), direction, plane)
+		return
+	WORLD_BREAK.hit(collider, damage, "melee", at, direction, "cleaver", "melee")
 
 
 func _carry_add(item: Dictionary) -> void:
@@ -464,6 +513,15 @@ func _unhandled_input(event: InputEvent) -> void:
 	# doors, not only interrupt the sentinel further down.
 	if event is InputEventKey and not event.echo and event.keycode == KEY_I:
 		inspect_held = event.pressed
+	# Job 3: with the cleaver in hand every melee verb is the cleaver's; the
+	# ram is still what opens the gate it is pressed at.
+	if melee != null:
+		if event is InputEventMouseMotion:
+			melee.set_swing_hint(Vector2(event.relative.x, -event.relative.y).limit_length(12.0) / 12.0)
+		if melee.handle_input(event):
+			if weapon_taken and event.is_action_pressed("attack"):
+				_discharge_at_gate()
+			return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and weapon_taken:
 		if not guard_post.strike(player.global_position):
 			if WORLD_BREAK.swing(camera, FacilityGuardPost.RAM_DAMAGE, "breach_tool", player).is_empty():
@@ -507,6 +565,10 @@ func _physics_process(delta: float) -> void:
 		if fall_hurt > 0.0:
 			blood = maxf(1.0, blood - fall_hurt)
 	meds.step(self, delta, func() -> void: blood = minf(100.0, blood + FIELD_MEDS.HEALS))
+	if melee != null:
+		if input.length_squared() > 0.25:
+			melee.set_swing_hint(Vector2(input.x, -input.z))
+		melee.tick(delta)
 	player.rotation.y = yaw
 	BODY_CAM.apply(camera, player, delta, pitch)
 	# The arcade is a route, not a lockout puzzle. If the card was collected,
@@ -571,7 +633,7 @@ func _interact() -> void:
 		weapon_on_floor = false
 		weapon_taken = true
 		# Taking it puts it in your hands, where you can see it.
-		LabSurface.hold_in_view(camera, weapon_visual)
+		_hold_ram()
 		weapon_label.visible = false
 		_carry_add({"label": TOOL_LABEL, "kind": "tool", "mass": 4.0, "perishes": false, "age": 0.0, "from": LOCATION})
 		WorldHistory.record_event("service_arcade_breach_tool_taken", {"location": "service_arcade"})

@@ -9,7 +9,10 @@ extends Node3D
 ## to the sky, so weather can be compared under cover and out of it. Five
 ## stations, each a plinth with a label and one button (USE), each running the
 ## same system the game runs. Free walk on the facility's own body (JumpClimb,
-## BodyCam); the four v0.1 weapons through `HunterArsenal` and `Ballistics`;
+## BodyCam, and job 3's `SoulsMover`: tilt to walk or run, Circle/Ctrl to roll
+## or crouch, sprint); the three v0.1 weapons through `HunterArsenal`,
+## `MeleeDriver` (swing timing, hitstop, heat, shock) and `Ballistics`, the
+## pistol aimed down its sights (`AimDownSights`), and R3 lock-on;
 ## START (pad) or TAB opens a menu that takes you to any plinth.
 ##
 ## Nothing here ships: `Start-MechanicsLab.ps1` opens it, the game does not.
@@ -22,20 +25,43 @@ const LIQUID := preload("res://lab/stations/liquid_station.gd")
 const WEATHER := preload("res://lab/stations/weather_station.gd")
 const DESTRUCTION := preload("res://lab/stations/destruction_station.gd")
 const BODIES := preload("res://lab/stations/bodies_station.gd")
+const SPARRING := preload("res://lab/sparring_partner.gd")
+## Where the sparring partner (job 3) stands: the covered half, clear of the
+## stations, so a fight has room to move.
+const SPARRING_AT := Vector3(0, 0, -12)
 
 const HALF := 20.0
 const ROOF_Y := 5.5
-const WALK := 3.4
-const SPRINT := 1.6
 const START := Vector3(0, 1.0, 17.0)
 ## The v0.1 weapons (job 3), in the order NEXT WEAPON steps through them.
-const WEAPONS := ["shiv", "sword", "sidearm", "sniper"]
+## Greg replaced the fire axe and the sword: Brawler carries the HOTLINE
+## CLEAVER and the PRODSTAFF, Marksman the MERCY NINE.
+const WEAPONS := ["cleaver", "staff", "sidearm"]
+const EYE_HEIGHT := 0.77
+const LOCK_RANGE := 14.0
+## Where a held weapon rests in view, before the swing or the sights move it.
+const HELD_REST := {
+	"cleaver": [Vector3(0.30, -0.30, -0.50), Vector3(0.10, 0.20, -0.35)],
+	"staff": [Vector3(0.26, -0.34, -0.42), Vector3(0.06, 0.10, -0.20)],
+	"sidearm": [Vector3(0.20, -0.22, -0.46), Vector3(0.0, 0.0, 0.0)],
+}
 
 var player: CharacterBody3D
 var camera: Camera3D
 var sun: DirectionalLight3D
 var ballistics: Ballistics
 var arsenal: HunterArsenal
+var melee: MeleeDriver
+var mover := SoulsMover.new()
+var ads := AimDownSights.new()
+var held_mount: Node3D
+var aiming := false
+var aim_blend := 0.0
+var player_health := 100.0
+var sparring: Node3D
+var lock_target: BaselineHuman
+var lock_ring: LockRing
+var _lock_flick := 0.0
 var yaw := 0.0
 var pitch := -0.05
 var stations: Array[Dictionary] = []
@@ -67,9 +93,27 @@ func _ready() -> void:
 	arsenal = HunterArsenal.new()
 	arsenal.name = "Arsenal"
 	add_child(arsenal)
-	arsenal.acquire_melee("shiv")
-	arsenal.acquire_sniper()
-	arsenal.select_weapon("sword")
+	arsenal.acquire_melee("cleaver")
+	arsenal.acquire_melee("staff")
+	arsenal.select_weapon("cleaver")
+	melee = MeleeDriver.new()
+	melee.name = "Melee"
+	add_child(melee)
+	melee.setup(arsenal, camera, [player.get_rid()])
+	melee.struck.connect(_on_melee_struck)
+	melee.kicked.connect(func(amount: float) -> void: BODY_CAM.hit(camera, amount))
+	arsenal.equipped.connect(func(_id: String) -> void: _hold_current())
+	lock_ring = LockRing.new()
+	add_child(lock_ring)
+	sparring = SPARRING.new()
+	sparring.name = "SparringPartner"
+	sparring.position = SPARRING_AT
+	add_child(sparring)
+	sparring.build(self)
+	melee.staggered.connect(func(rig: Node3D, _report: Dictionary) -> void:
+		if sparring.rig == rig:
+			sparring.interrupt())
+	_hold_current()
 	_build_hud()
 	if OS.get_environment("ATG_TEST_MODE") != "1":
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -252,7 +296,7 @@ func _build_player() -> void:
 	player.add_child(collider)
 	camera = Camera3D.new()
 	camera.fov = 88.0
-	camera.position.y = 0.77
+	camera.position.y = EYE_HEIGHT
 	player.add_child(camera)
 	camera.current = true
 
@@ -281,12 +325,24 @@ func _unhandled_input(event: InputEvent) -> void:
 			menu_open = false
 		get_viewport().set_input_as_handled()
 		return
+	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		# Directional swings follow the mouse's last move.
+		melee.set_swing_hint(Vector2(event.relative.x, -event.relative.y).limit_length(12.0) / 12.0)
+	if _movement_input(event):
+		return
+	if melee.handle_input(event):
+		return
 	if event.is_action_pressed("interact"):
 		use_nearest()
 	elif event.is_action_pressed("attack"):
 		attack(false)
 	elif event.is_action_pressed("heavy"):
 		attack(true)
+	elif event.is_action_pressed("lock_on"):
+		toggle_lock()
+	elif aiming and event.is_action_pressed("sprint"):
+		# L3 / Shift while aimed steps further down the sight.
+		ads.step_zoom()
 	elif event.is_action_pressed("reload"):
 		arsenal.reload()
 	elif event.is_action_pressed("inspect"):
@@ -297,6 +353,130 @@ func _unhandled_input(event: InputEvent) -> void:
 		_note(bodies.press())
 	elif JUMP_CLIMB.is_jump_key(event):
 		JUMP_CLIMB.press(player, yaw, 1.0, "mechanics_lab_climbed")
+
+
+## Evade (Circle / Ctrl), sprint (L3 / Shift). On the pad Circle also
+## carries `crouch` and `dodge`; one press must not count twice.
+func _movement_input(event: InputEvent) -> bool:
+	var pad := InputProfile.is_joy_event(event)
+	var evade_action := "dodge" if pad else "crouch"
+	if event.is_action_pressed(evade_action):
+		mover.evade_pressed(pad)
+		return true
+	if event.is_action_released(evade_action):
+		mover.evade_released(player, _move_input(), yaw, melee)
+		return true
+	if pad and (event.is_action("crouch") or event.is_action("grapple")):
+		return true
+	if not aiming and event.is_action("sprint") and not event.is_echo():
+		mover.set_sprint_key(event.is_pressed())
+		return event is InputEventKey or event is InputEventAction
+	return false
+
+
+func _move_input() -> Vector2:
+	return Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+
+
+## R3 / Z: lock on to the nearest standing body in front of you, or let go.
+func toggle_lock() -> BaselineHuman:
+	if lock_target != null:
+		lock_target = null
+		lock_ring.release()
+		return null
+	lock_target = _lock_candidate(0)
+	return lock_target
+
+
+func _lock_candidate(side: int) -> BaselineHuman:
+	var best: BaselineHuman = null
+	var best_score := INF
+	var forward := -camera.global_basis.z
+	var right := camera.global_basis.x
+	var from := lock_target.global_position if lock_target != null else Vector3.ZERO
+	for node in get_tree().get_nodes_in_group(&"lab_lockable"):
+		var rig := node as BaselineHuman
+		if rig == null or rig == lock_target or not rig.is_inside_tree() or rig.anatomy.dead:
+			continue
+		var to: Vector3 = rig.global_position + Vector3(0, 1.2, 0) - camera.global_position
+		if to.length() > LOCK_RANGE:
+			continue
+		var facing := forward.dot(to.normalized())
+		if side == 0:
+			if facing < 0.5:
+				continue
+			var score := to.length() * (2.0 - facing)
+			if score < best_score:
+				best_score = score
+				best = rig
+		else:
+			var across: float = right.dot(rig.global_position - from) * float(side)
+			if across <= 0.05 or facing < 0.0:
+				continue
+			if across < best_score:
+				best_score = across
+				best = rig
+	return best
+
+
+func _update_lock(delta: float) -> void:
+	if lock_target != null and (not is_instance_valid(lock_target) or lock_target.anatomy.dead):
+		lock_target = null
+	if lock_target == null:
+		lock_ring.release()
+		return
+	# Right stick flick switches target.
+	var flick := Input.get_axis("look_left", "look_right")
+	if absf(flick) > 0.75 and absf(_lock_flick) <= 0.75:
+		var next := _lock_candidate(1 if flick > 0.0 else -1)
+		if next != null:
+			lock_target = next
+	_lock_flick = flick
+	var aim_at := lock_target.global_position + Vector3(0, 1.25, 0)
+	var to := aim_at - camera.global_position
+	var want_yaw := atan2(-to.x, -to.z)
+	var want_pitch := atan2(to.y, Vector2(to.x, to.z).length())
+	var rate := clampf(delta * 10.0, 0.0, 1.0)
+	yaw = lerp_angle(yaw, want_yaw, rate)
+	pitch = lerpf(pitch, want_pitch, rate)
+	lock_ring.follow(lock_target.global_position)
+
+
+## Rebuild the held model for the current weapon, parented to the eye.
+func _hold_current() -> void:
+	if held_mount != null and is_instance_valid(held_mount):
+		held_mount.queue_free()
+	var id := str(arsenal.current_id)
+	held_mount = Node3D.new()
+	held_mount.name = "HeldMount"
+	camera.add_child(held_mount)
+	var gear := HeldGear.build_weapon(id)
+	held_mount.add_child(gear)
+	var grip := gear.get_node_or_null("anchor_grip") as Node3D
+	if grip != null:
+		gear.position = -(gear.transform.basis * grip.position)
+	var rest: Array = HELD_REST.get(id, HELD_REST.sidearm)
+	held_mount.position = rest[0]
+	held_mount.rotation = rest[1]
+	ads.reset()
+	aim_blend = 0.0
+	melee.set_model(held_mount if str(arsenal.current().kind) == "melee" else null)
+
+
+func _pose_held(delta: float) -> void:
+	if held_mount == null or not is_instance_valid(held_mount):
+		return
+	var firearm := str(arsenal.current().kind) == "firearm"
+	aiming = firearm and (Input.is_action_pressed("parry") or Input.is_action_pressed("guard"))
+	ads.advance(delta, aiming)
+	aim_blend = move_toward(aim_blend, 1.0 if aiming else 0.0, delta * 7.0)
+	if not firearm:
+		return
+	var rest: Array = HELD_REST.get(str(arsenal.current_id), HELD_REST.sidearm)
+	held_mount.position = rest[0]
+	held_mount.rotation = rest[1]
+	ads.pose(held_mount, camera.global_transform, str(arsenal.current_id), aim_blend)
+	camera.fov = lerpf(88.0, ads.fov(str(arsenal.current_id)), aim_blend)
 
 
 ## Stand in front of plinth `index`, facing what it shows.
@@ -333,21 +513,24 @@ func _nearest_plinth() -> Dictionary:
 
 
 func _physics_process(delta: float) -> void:
-	if not menu_open:
+	if not menu_open and lock_target == null:
 		InputProfile.apply_stick_look(self, delta)
-	var input := Vector3.ZERO
+	_update_lock(delta)
+	var input := Vector2.ZERO
 	if not menu_open:
-		input = Vector3(Input.get_axis("move_left", "move_right"), 0.0, Input.get_axis("move_forward", "move_back"))
-	var direction := (Basis(Vector3.UP, yaw) * input).normalized()
+		input = _move_input()
 	if not JUMP_CLIMB.busy(player):
-		var pace := WALK * (SPRINT if Input.is_action_pressed("sprint") else 1.0)
-		player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 26.0 * delta)
-		player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 26.0 * delta)
+		mover.tick(player, input, yaw, delta, melee)
 		JUMP_CLIMB.fall(player, delta)
 		player.move_and_slide()
 	player.rotation.y = yaw
+	camera.position.y = EYE_HEIGHT - mover.eye_drop
 	BODY_CAM.apply(camera, player, delta, pitch)
 	arsenal.tick(delta)
+	if input.length_squared() > 0.25:
+		melee.set_swing_hint(input * Vector2(1, -1))
+	melee.tick(delta)
+	_pose_held(delta)
 	var feet := player.global_position - Vector3(0, 0.85, 0)
 	liquid.wade(player, feet, player.velocity, delta)
 	_note_age += delta
@@ -359,6 +542,14 @@ func _physics_process(delta: float) -> void:
 ## One attack with the held weapon: a round per pellet for a gun, a blow
 ## along the view for a blade. Returns the arsenal's answer.
 func attack(heavy: bool) -> Dictionary:
+	if str(arsenal.current().kind) == "melee":
+		# Pressed outside the event path (a test, a script): the same verbs.
+		if heavy:
+			melee.press_heavy()
+			melee.release_heavy()
+		else:
+			melee.press_light()
+		return {"accepted": true, "kind": "melee", "weapon": arsenal.current_id}
 	var shot := arsenal.begin_attack(heavy)
 	if not bool(shot.get("accepted", false)):
 		if str(shot.get("reason", "")) == "empty":
@@ -369,8 +560,14 @@ func attack(heavy: bool) -> Dictionary:
 		# A test range: the magazine never runs dry.
 		var rounds: Dictionary = arsenal.ammo[arsenal.current_id]
 		rounds.loaded = int(arsenal.current().magazine)
-		for along in arsenal.shot_directions(forward, camera.global_basis.y):
-			ballistics.fire(camera.global_position + along * 0.5, along, str(shot.calibre), 0.0, 1, "lab_player", {
+		var origin := camera.global_position
+		if aiming and ads.has_line:
+			# Aimed rounds leave along the line through both sights.
+			forward = ads.line_direction
+			origin = ads.line_origin
+		ads.add_kick(1.0)
+		for along in arsenal.shot_directions(forward, camera.global_basis.y, 0.35 if aiming else 1.0):
+			ballistics.fire(origin + along * 0.5, along, str(shot.calibre), 0.0, 1, "lab_player", {
 				"damage": float(shot.damage), "impulse": float(shot.impulse),
 				"damage_type": str(shot.damage_type), "weapon": str(shot.weapon),
 			})
@@ -391,6 +588,20 @@ func attack(heavy: bool) -> Dictionary:
 	return shot
 
 
+## A blow from `MeleeDriver` met something. Cuts slice along the swing: a
+## level blade for a side swing, a downward one over the top.
+func _on_melee_struck(collider: Object, at: Vector3, direction: Vector3, packet: Dictionary) -> void:
+	var definition: Dictionary = packet.get("attack_data", {})
+	var swing := -camera.global_basis.y if str(definition.get("side", "")) == "high" else camera.global_basis.x * (-1.0 if bool(packet.get("mirror", false)) else 1.0)
+	var plane: Variant = null
+	if bool(definition.get("cuts", false)):
+		plane = BodySlice.plane_from_swing(at, at - swing * 0.4, swing * 6.0)
+	_land(collider, at, direction, packet, "melee", plane)
+	if bool(packet.get("shock", false)):
+		_note("SHOCK")
+	liquid.touch(at, 0.5)
+
+
 func _on_round_hit(hit: Dictionary) -> void:
 	var payload: Dictionary = hit.get("payload", {})
 	_land(hit.get("collider"), hit.get("position", Vector3.ZERO), hit.get("direction", Vector3.FORWARD), payload, "firearm", null)
@@ -402,6 +613,10 @@ func _on_round_hit(hit: Dictionary) -> void:
 func _land(collider: Object, at: Vector3, direction: Vector3, attack_data: Dictionary, kind: String, plane: Variant) -> void:
 	var damage := float(attack_data.get("damage", 20.0))
 	var node := collider as Node
+	# A knocked-down body's parts hang under its RagdollBody, not the rig.
+	var owner_rig := MeleeDriver.rig_of(collider)
+	if owner_rig != null:
+		node = owner_rig
 	while node != null and node != self:
 		if node is BaselineHuman:
 			var result := (node as BaselineHuman).hit_at(at, damage, float(attack_data.get("impulse", 0.0)), str(attack_data.get("damage_type", "blunt")), direction, -1.0, plane)
@@ -459,6 +674,10 @@ func _update_hud() -> void:
 		if entry.node != null:
 			lines.append("%s  %s" % [str(entry.title), entry.node.status()])
 	lines.append("ACID ON YOU %.1f  (x%.2f)" % [weather.player_acid_taken, weather.acid_player_scale])
+	var extra := ""
+	if arsenal.current_id == "cleaver":
+		extra = "   HEAT %d%%%s" % [roundi(melee.heat * 100.0), "  VENTING" if melee.vent_left > 0.0 else ""]
+	lines.append("HP %d   STAMINA %d%s   [%s] BLOCK  [%s] PARRY/AIM  [%s] LOCK  [%s] ROLL" % [roundi(player_health), roundi(melee.stamina), extra, InputProfile.glyph("guard"), InputProfile.glyph("parry"), InputProfile.glyph("lock_on"), InputProfile.glyph("crouch" if InputProfile.device_family() == "keyboard" else "dodge")])
 	if _note_age < 3.0 and not last_note.is_empty():
 		lines.append("> " + last_note)
 	_hud.text = "\n".join(lines)

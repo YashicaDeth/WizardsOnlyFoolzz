@@ -67,6 +67,30 @@ const WEAPON_TABLES := {
 		"running_attack": {"windup": 0.15, "active": 0.12, "recovery": 0.29, "stamina_cost": 13.0, "side": "right", "arc_start": -0.18, "arc_end": 0.18, "reach": 2.18, "height": 1.00, "knockback_multiplier": 1.05, "poise_multiplier": 0.9, "motion": "running_thrust", "damage_type": "puncture", "cuts": true},
 		"roll_attack": {"windup": 0.10, "active": 0.11, "recovery": 0.26, "stamina_cost": 12.0, "side": "low", "arc_start": 0.18, "arc_end": -0.18, "reach": 1.92, "height": 0.76, "knockback_multiplier": 0.9, "poise_multiplier": 0.8, "motion": "rising_thrust", "damage_type": "puncture", "cuts": true},
 	},
+	# v0.1 Brawler (job 3). HOTLINE CLEAVER: short and quick, a meat cutter's
+	# chop; the heavy is a two-hand overhead that bites deep. PRODSTAFF: reach
+	# first -- light thrusts, a wide heavy sweep and a charged shock that breaks
+	# poise (`shock` marks the blows `MeleeDriver` electrifies). Greg left the
+	# staff's moves past light/heavy/charged open: the running and roll
+	# attacks below are defaults, not his.
+	"cleaver": {
+		"light_1": {"windup": 0.15, "active": 0.12, "recovery": 0.26, "stamina_cost": 12.0, "side": "right", "arc_start": -0.84, "arc_end": 0.62, "reach": 2.20, "height": 1.08, "knockback_multiplier": 1.0, "poise_multiplier": 1.05, "motion": "chop", "damage_type": "cut", "cuts": true},
+		"light_2": {"windup": 0.16, "active": 0.12, "recovery": 0.27, "stamina_cost": 12.0, "side": "left", "arc_start": 0.80, "arc_end": -0.66, "reach": 2.20, "height": 1.04, "knockback_multiplier": 1.0, "poise_multiplier": 1.05, "motion": "chop", "damage_type": "cut", "cuts": true},
+		"light_3": {"windup": 0.20, "active": 0.14, "recovery": 0.36, "stamina_cost": 15.0, "side": "high", "arc_start": -0.40, "arc_end": 0.40, "reach": 2.30, "height": 1.20, "knockback_multiplier": 1.3, "poise_multiplier": 1.4, "motion": "overhead", "damage_type": "cut", "cuts": true},
+		"heavy": {"windup": 0.36, "active": 0.18, "recovery": 0.52, "stamina_cost": 24.0, "side": "high", "arc_start": -0.70, "arc_end": 0.60, "reach": 2.40, "height": 1.16, "knockback_multiplier": 3.2, "poise_multiplier": 3.0, "motion": "overhead", "damage_type": "cut", "cuts": true},
+		"charged_heavy": {"windup": 0.52, "active": 0.20, "recovery": 0.66, "stamina_cost": 32.0, "side": "high", "arc_start": -0.76, "arc_end": 0.66, "reach": 2.50, "height": 1.16, "knockback_multiplier": 4.2, "poise_multiplier": 3.6, "motion": "overhead", "damage_type": "cut", "cuts": true, "breaks_poise": true},
+		"running_attack": {"windup": 0.20, "active": 0.15, "recovery": 0.40, "stamina_cost": 17.0, "side": "right", "arc_start": -0.70, "arc_end": 0.52, "reach": 2.60, "height": 1.04, "knockback_multiplier": 2.2, "poise_multiplier": 1.8, "motion": "running_chop", "damage_type": "cut", "cuts": true},
+		"roll_attack": {"windup": 0.14, "active": 0.13, "recovery": 0.34, "stamina_cost": 15.0, "side": "low", "arc_start": 0.58, "arc_end": -0.58, "reach": 2.30, "height": 0.80, "knockback_multiplier": 2.4, "poise_multiplier": 2.0, "motion": "rising_chop", "damage_type": "cut", "cuts": true},
+	},
+	"staff": {
+		"light_1": {"windup": 0.17, "active": 0.12, "recovery": 0.28, "stamina_cost": 12.0, "side": "right", "arc_start": -0.10, "arc_end": 0.10, "reach": 3.30, "height": 1.10, "knockback_multiplier": 1.4, "poise_multiplier": 1.2, "motion": "thrust", "damage_type": "blunt", "cuts": false},
+		"light_2": {"windup": 0.17, "active": 0.12, "recovery": 0.28, "stamina_cost": 12.0, "side": "left", "arc_start": 0.10, "arc_end": -0.10, "reach": 3.30, "height": 1.06, "knockback_multiplier": 1.4, "poise_multiplier": 1.2, "motion": "thrust", "damage_type": "blunt", "cuts": false},
+		"light_3": {"windup": 0.24, "active": 0.16, "recovery": 0.38, "stamina_cost": 15.0, "side": "right", "arc_start": -0.95, "arc_end": 0.80, "reach": 3.10, "height": 1.04, "knockback_multiplier": 2.0, "poise_multiplier": 1.6, "motion": "sweep", "damage_type": "blunt", "cuts": false},
+		"heavy": {"windup": 0.40, "active": 0.20, "recovery": 0.56, "stamina_cost": 26.0, "side": "left", "arc_start": 1.05, "arc_end": -0.95, "reach": 3.20, "height": 1.00, "knockback_multiplier": 3.6, "poise_multiplier": 3.2, "motion": "sweep", "damage_type": "blunt", "cuts": false},
+		"charged_heavy": {"windup": 0.56, "active": 0.18, "recovery": 0.70, "stamina_cost": 34.0, "side": "high", "arc_start": -0.12, "arc_end": 0.12, "reach": 3.50, "height": 1.12, "knockback_multiplier": 3.0, "poise_multiplier": 4.0, "motion": "shock_thrust", "damage_type": "blunt", "cuts": false, "breaks_poise": true, "shock": true},
+		"running_attack": {"windup": 0.20, "active": 0.14, "recovery": 0.42, "stamina_cost": 17.0, "side": "right", "arc_start": -0.12, "arc_end": 0.12, "reach": 3.70, "height": 1.04, "knockback_multiplier": 2.6, "poise_multiplier": 1.9, "motion": "running_thrust", "damage_type": "blunt", "cuts": false},
+		"roll_attack": {"windup": 0.15, "active": 0.14, "recovery": 0.36, "stamina_cost": 15.0, "side": "low", "arc_start": 0.72, "arc_end": -0.72, "reach": 3.00, "height": 0.62, "knockback_multiplier": 2.2, "poise_multiplier": 2.4, "motion": "leg_sweep", "damage_type": "blunt", "cuts": false},
+	},
 	"fists": {
 		"light_1": {"windup": 0.10, "active": 0.09, "recovery": 0.18, "stamina_cost": 6.0, "side": "right", "arc_start": -0.12, "arc_end": 0.12, "reach": 1.08, "height": 1.05, "knockback_multiplier": 0.55, "poise_multiplier": 0.58, "motion": "jab", "damage_type": "blunt", "cuts": false},
 		"light_2": {"windup": 0.11, "active": 0.09, "recovery": 0.18, "stamina_cost": 6.0, "side": "left", "arc_start": 0.12, "arc_end": -0.12, "reach": 1.06, "height": 1.03, "knockback_multiplier": 0.55, "poise_multiplier": 0.58, "motion": "jab", "damage_type": "blunt", "cuts": false},
