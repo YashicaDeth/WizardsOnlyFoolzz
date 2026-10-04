@@ -1361,6 +1361,10 @@ func _build_player_rig() -> void:
 	var appearance: Dictionary = saved.get("appearance", {})
 	var config := BaselineHuman.config_from_subject(saved)
 	config["gore"] = viscera_fx
+	# Job 2: the third-person body is a rigged, animated skin over the zones
+	# (Greg: "no head and the shoulders are massive"). The same base body as
+	# the enemies (Greg, 5 Oct), until his character art replaces it.
+	config["rigged"] = true
 	player_rig.gore = viscera_fx
 	player_rig.build("player", config)
 	# DESIGN.md:245. The elites dress you, not the mirror: the player wakes in
@@ -10551,6 +10555,7 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> Dictionary:
 		"variation": int(encounter.get("variation", subject_id.length())),
 		"gore": viscera_fx,
 		"blood": float(encounter.get("blood", 5200.0 if str(encounter.kind) == "boss" else 4300.0)),
+		"rigged": true,
 	}
 	# Named, not just an armour number. Before B2 an implant *was* its armour
 	# value, so this passed an anonymous dictionary and every Ashline body
