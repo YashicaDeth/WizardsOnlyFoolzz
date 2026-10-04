@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_sever(body)
 	await _test_death(body)
 	await _test_unrigged_unchanged()
+	await _test_xray()
 	print("RIGGED_BODY_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
 
@@ -246,3 +247,35 @@ func _test_unrigged_unchanged() -> void:
 	await _frames(2)
 	check(plain.rigged == null, "no config, no rig")
 	check((plain.parts.head as Node3D).position.is_equal_approx((BaselineHuman.STANDING.head as Dictionary).at), "an unrigged head stays at its layout")
+
+
+## Rule: the X-ray must never get worse under a skin. While a body is seen
+## through, the skin steps back and the zones show at the X-ray's transparency
+## with the organs inside; switched off, the skin comes back.
+func _test_xray() -> void:
+	print("RIGGED BODY - the X-ray sees through the skin")
+	var body := _body("rigged_xray")
+	await _frames(4)
+	WorldXray.sweep(body.global_position, [body], true)
+	await _frames(RiggedBody.SYNC_EVERY + 2)
+	var skin_hidden := true
+	var parts_see_through := true
+	for zone: String in RiggedBody.ZONES:
+		for instance: MeshInstance3D in body.rigged.zone_meshes[zone]:
+			skin_hidden = skin_hidden and not instance.visible
+		var part := body.parts.get(zone) as GeometryInstance3D
+		parts_see_through = parts_see_through and part != null and is_equal_approx(part.transparency, 0.62)
+	var organ_shown := false
+	for organ: Node3D in body.organ_parts.values():
+		organ_shown = organ_shown or (is_instance_valid(organ) and organ.visible)
+	check(skin_hidden, "X-ray on: no zone shows the rigged skin")
+	check(parts_see_through, "X-ray on: every zone is drawn see-through, as on an unrigged body")
+	check(organ_shown, "X-ray on: the organs show inside the rigged body")
+	WorldXray.sweep(body.global_position, [body], false)
+	await _frames(RiggedBody.SYNC_EVERY + 2)
+	var skin_back := true
+	for zone: String in RiggedBody.ZONES:
+		if body.rigged.in_skin_mode(zone):
+			for instance: MeshInstance3D in body.rigged.zone_meshes[zone]:
+				skin_back = skin_back and instance.visible
+	check(skin_back, "X-ray off: the skin comes back on every untouched zone")
