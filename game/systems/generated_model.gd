@@ -85,6 +85,58 @@ const FIT := {
 		"forward": Vector3(0.0, 0.0, 1.0),
 		"pivot": Vector3(-0.105, 0.0, 0.0),
 	},
+	# The tunnel kit (art-tunnels-07, systems/facility_tunnel_kit.gd), measured
+	# with --mode=axes: every flat piece is thin along model X (axis2 = +X) and
+	# square in Y/Z, Y up, so its face normal X becomes +Z (the kit turns +Z to
+	# face along the tunnel). These scale per axis (metres along the game's
+	# X, Y, Z) to sit on the 4 m grid. The rib's inner opening is 0.566 x 0.603
+	# units: x6 keeps a 3.4 m clear width and 3.6 m clear height, posts and
+	# beams buried in the walls, floor and ceiling. Pivot = the inner bottom.
+	"tunnel_rib": {
+		"file": "tunnels/tunnel_rib.glb", "scale": Vector3(6.0, 6.0, 1.5),
+		"right": Vector3(0, 0, -1), "up": Vector3(0, 1, 0), "forward": Vector3(1, 0, 0),
+		"pivot": Vector3(0.0, -0.287, 0.0),
+	},
+	# The door frame's inner opening (0.595 x 0.648 units) stretched to the
+	# door's 2.6 x 3.0 m doorway, sill at the floor; 0.6 m deep so it sleeves
+	# the 0.5 m bulkhead the kit builds for collision.
+	"tunnel_door_frame": {
+		"file": "tunnels/tunnel_door_frame.glb", "scale": Vector3(4.37, 4.63, 2.0),
+		"right": Vector3(0, 0, -1), "up": Vector3(0, 1, 0), "forward": Vector3(1, 0, 0),
+		"pivot": Vector3(0.0, -0.339, 0.0),
+	},
+	# Dead-end bulkhead: fills the 4 x 4 m end wall, 0.48 m deep.
+	"tunnel_bulkhead": {
+		"file": "tunnels/tunnel_bulkhead.glb", "scale": Vector3(4.0, 4.0, 1.2),
+		"right": Vector3(0, 0, -1), "up": Vector3(0, 1, 0), "forward": Vector3(1, 0, 0),
+		"pivot": Vector3(0.0, -0.497, 0.0),
+	},
+	# Vent grate: 1.5 m square, 0.3 m deep, pivot at its centre.
+	"tunnel_vent": {
+		"file": "tunnels/tunnel_vent.glb", "scale": Vector3(1.5, 1.5, 1.2),
+		"right": Vector3(0, 0, -1), "up": Vector3(0, 1, 0), "forward": Vector3(1, 0, 0),
+		"pivot": Vector3.ZERO,
+	},
+	# Pipe run: long axis model Z (1.0) becomes one 4 m cell along +Z; the
+	# three-pipe stack (0.44 units, Y) 1.15 m tall, 0.5 m off the wall.
+	"tunnel_pipe_run": {
+		"file": "tunnels/tunnel_pipe_run.glb", "scale": Vector3(2.0, 2.6, 4.0),
+		"right": Vector3(1, 0, 0), "up": Vector3(0, 1, 0), "forward": Vector3(0, 0, 1),
+		"pivot": Vector3.ZERO,
+	},
+	# Lamp cage, hung from its mounting plate (model top, y 0.431): 0.6 m.
+	"tunnel_lamp": {
+		"file": "tunnels/tunnel_lamp.glb", "scale": 0.7,
+		"right": Vector3(1, 0, 0), "up": Vector3(0, 1, 0), "forward": Vector3(0, 0, 1),
+		"pivot": Vector3(0.0, 0.431, 0.0),
+	},
+	# Lift cage: open along model X, so X turns to +Z (FacilityElevator's door
+	# faces). 2.06 x 2.65 x 2.06 m sits just inside the 2.2 m car's walls.
+	"tunnel_lift_cab": {
+		"file": "tunnels/tunnel_lift_cab.glb", "scale": Vector3(2.45, 2.65, 2.7),
+		"right": Vector3(0, 0, -1), "up": Vector3(0, 1, 0), "forward": Vector3(1, 0, 0),
+		"pivot": Vector3(0.0, -0.5, 0.0),
+	},
 }
 
 ## Greg, 30 September: sword variation, "if Dark Souls and cyberpunk had a
@@ -180,8 +232,9 @@ static func make(model_name: String) -> Node3D:
 		return null
 	# Rows are the three source directions, so this maps them onto X, Y and Z.
 	var turn := Basis(entry.right, entry.up, entry.forward).transposed()
-	var size := float(entry.scale)
-	model.transform = Transform3D(turn.scaled(Vector3.ONE * size), -(turn * (entry.pivot as Vector3)) * size)
+	# A number scales evenly; a Vector3 stretches along the game's X, Y, Z.
+	var size: Vector3 = entry.scale if entry.scale is Vector3 else Vector3.ONE * float(entry.scale)
+	model.transform = Transform3D(turn.scaled(size), -(turn * (entry.pivot as Vector3)) * size)
 	tame_metal(model)
 	var holder := Node3D.new()
 	holder.name = "generated_" + model_name

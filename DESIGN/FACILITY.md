@@ -127,6 +127,23 @@ built rooms, so only it is placed.
   landing; a motor hum; the player is carried physically by the moving floor.
 - `game/tests/facility_walk_test.tscn`: walks a body from the vat to the
   Surface Gate through both lifts with zero `Interstitial.travel`.
+- **Tunnel kit** (`art-tunnels-07`): `game/systems/facility_tunnel_kit.gd`
+  builds pieces on the 4 m grid (straight, corner, T, cross, dead end, door,
+  pipe run, vent) as exact shells with collision, wearing the house-style
+  tileable textures (`art/generated/textures/tunnel_*_512.png`, world-mapped
+  so tiling runs on across joints) and dressed with Higgsfield models
+  (`art/generated/tunnels/`: a steel rib on every joint, lamp cages, pipe run,
+  vent grate, bulkhead, door frame; FIT entries in `generated_model.gd`).
+  `facility_tunnel_door.gd` is the in-world sliding door (opens as a body
+  comes near, shuts behind it). `dress_lift()` puts the wall texture on each
+  lift shaft and the generated cage inside each car.
+- `game/facility_tunnel_network.tscn` (assistant layout, inside
+  `facility.tscn`): the service artery from the staff door through a
+  crossroads and a sliding door to the arcade's west wall, plus side tunnels
+  (south vent, north pipe run to a T, west bulkhead, east corner to a second
+  vent). Lamps alternate with dark cells: light pools for the Shade.
+  `tests/facility_tunnel_network_test.tscn` checks joints, floors and walls and
+  walks every cell.
 
 ## Not done yet (honest boundary)
 
@@ -135,5 +152,7 @@ built rooms, so only it is placed.
   the cutscenes and the intro live in `vat_chamber.tscn` and are untouched.
   Moving each room's content into its cell (one shared player) is the next
   step, room by room, and is where `tunnels-06-seamless-facility` overlaps.
-- The art-tunnels-07 kit replaces the placeholder corridor and shaft boxes
-  piece for piece once it lands.
+- The tunnel kit now builds the service artery and dresses all three lift
+  shafts. The other corridors (Lift A and heat-elevator vestibules) and the
+  room shells are still placeholder boxes on the grid; the kit can replace
+  them cell by cell (`KIT.build(kind, open_sides)`).

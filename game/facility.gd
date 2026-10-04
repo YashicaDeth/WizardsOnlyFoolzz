@@ -17,6 +17,8 @@ const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
 const BODY_CAM := preload("res://systems/body_cam_feel.gd")
 const LOOK := preload("res://systems/look_settings.gd")
 const FACILITY_ROUTES := preload("res://systems/facility_routes.gd")
+const TUNNEL_NETWORK := preload("res://facility_tunnel_network.tscn")
+const TUNNEL_KIT := preload("res://systems/facility_tunnel_kit.gd")
 
 ## The vat. The player wakes in front of it, facing deeper in (-Z).
 const START := Vector3(0, 1.0, -2.4)
@@ -35,6 +37,7 @@ var camera: Camera3D
 var yaw := 0.0
 var pitch := -0.04
 var lifts := {}
+var tunnels: Node3D
 var prompt: Label
 var where: Label
 var exit_reached := false
@@ -56,6 +59,8 @@ func _ready() -> void:
 	_build_level_0d()
 	_build_doctor_line()
 	_build_surface()
+	for lift: FacilityElevator in lifts.values():
+		TUNNEL_KIT.dress_lift(lift)
 	_build_player()
 	_build_hud()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -72,9 +77,10 @@ func _build_level_0c() -> void:
 	# Examination Room behind the vat (doctor_route.gd), his door in the wall.
 	_room("EXAMINATION ROOM", 0.0, Vector2(-3.5, 4.5), Vector2(3.6, 10.5), 3.1,
 		{"s": [[0.5, 1.6, 2.3]]}, ["n"])
-	# Service artery: from the staff door east to the arcade's west wall.
-	_corridor_x(0.0, 8.0, 20.75, -2.5, 4.0, 3.4)
-	_sign("SERVICE ARTERY", Vector3(14, 2.9, -2.5))
+	# Service artery and its side tunnels: the tunnel kit network, staff door
+	# east to the arcade's west wall (facility_tunnel_network.gd).
+	tunnels = TUNNEL_NETWORK.instantiate()
+	add_child(tunnels)
 	# Service Arcade (service_arcade.tscn), origin (28, 0, 0).
 	_room("SERVICE ARCADE", 0.0, Vector2(20.75, 35.25), Vector2(-58.5, 5.5), 8.2,
 		{"w": [[-2.5, 4.0, 3.4]], "n": [[28.0, 3.0, 3.0]]})
