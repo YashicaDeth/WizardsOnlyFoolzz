@@ -137,6 +137,8 @@ bones and builds ragdolls.
    and damping that fold and sprawl believably, weighty not floaty. Compare
    Godot Physics and Jolt (built in since Godot 4.4) in the mechanics lab and
    write the result into your report before proposing a project-wide switch.
+   **Decided (Greg, 5 Oct):** the project runs Jolt Physics, and the player
+   uses the same rigged base body as the enemies.
 5. Apply the existing PS1-style material so it reads as the game.
 
 **PROOF.** PNGs: front, side, first-person arms, third-person over the

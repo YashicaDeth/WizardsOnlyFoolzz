@@ -1362,7 +1362,8 @@ func _build_player_rig() -> void:
 	var config := BaselineHuman.config_from_subject(saved)
 	config["gore"] = viscera_fx
 	# Job 2: the third-person body is a rigged, animated skin over the zones
-	# (Greg: "no head and the shoulders are massive").
+	# (Greg: "no head and the shoulders are massive"). The same base body as
+	# the enemies (Greg, 5 Oct), until his character art replaces it.
 	config["rigged"] = true
 	player_rig.gore = viscera_fx
 	player_rig.build("player", config)
