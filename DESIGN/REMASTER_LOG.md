@@ -252,3 +252,15 @@ Defaults set behind dials, all in `OrganSystem` unless named. None of these is G
 - **Controls:** R2 throttle, L2 brake then reverse, left stick steers; W/S/A/D on keyboard. USE on the plinth or beside a car gets in; USE gets out (refused above 5 m/s).
 - **Measured (lab-53 capture, RTX 2060 SUPER, vsync off, ~7 other Godot processes running):** 282 fps mean and 236 minimum, per-second averages, over the wall hit and the SUV ram with both cars moving. One crumple pass costs 2.9-3.5 ms on the impact frame (the kit body is split once into 4x faces so creases show). That fits inside a 144 fps frame, but it is a one-frame spike the per-second counter hides. PNGs: `P:/GameDev/Temp/lab53/1_before.png`, `2_after_wall.png`, `3_after_ram.png`, `4_pad_wide.png`, `fps.txt`.
 - **Limits:** the crumple reads as a flattened, shortened nose with a wrinkle, not BeamNG's folded metal. The pad gives a 13 m run-up, too short to reach steel's ram tier, so the capture starts each car at 15 m/s. In play, take a lap of the yard first. **lab53b:** the pad is now a ~24 m lane on the yard's east side (start line by the south wall, crash wall under the roof); full throttle from parked reaches the wall at 15.5 m/s (steel needs 13.8 for the sedan) and the front bumper comes off (`mechanics_lab_test`). The menu teleport now takes you out of the car at any speed, and melee on a car counts as melee (dents, breaks glass, never takes steel off). Doors only come off from side hits or gunfire.
+
+## Manager notes, 2026-10-05 21:08
+
+- **Merged since 19:08:** lab53b-land-vehicles (9a2df731: 24 m run-up lane, car exits on menu teleport, melee counts as melee) and job7-death-saves-screen (8c6c3e45: persisted subtitles/censor/graphics settings, device-aware inventory hints, blood-sigil capture; blood-fragment spending made a dial in e1031994). Both gates green.
+- **Running:** job6-the-examiner on claude-alt2 (since 20:32). Every other account is parked (claude-default and claude-alt until 23:04, codex until 10-06 02:51 or later). 12 tasks pending, so no idle fills were needed.
+- **Rendering:** a windowed Godot ("Current Version") is already open, so I didn't launch one. I opened the builder's `P:/GameDev/Temp/job7-death-saves-screen/blood_sigil.png` instead.
+- **Still weak (job7):** the bloodstain is a glowing, translucent orange ghost body with two floating red discs and an orange ring. It sits on a bare plane under warm brown fog, which is off-palette and doesn't read as a bloodstain. A floating "YOUR OLD BODY" label hangs over it like debug text. The capture isn't in facility light.
+- **Failures:** none new (job2, job2b and lane-exit-routes are old ones).
+- **Top three:**
+  1. Queued `remaster-job7-p1` (70, claude) to make the sigil a dark pooled blood decal, swap the floating label for an in-reach prompt (or a dial that defaults to off), and re-render it in facility light.
+  2. job6 must fix the examiner-office overlay blur and use the low-poly base for the examiner, not the Higgsfield skin (carried; it's running now).
+  3. Render the fix-56 ADS capture, and get a real-GPU fps number for lab-46/47/48 (carried).
