@@ -90,10 +90,7 @@ const WEAPONS := {
 ## `facility_sidearm` is not: it is a weapon you come into possession of, and
 ## a rifle that reaches across the whole bone yard is not something the game
 ## should hand you at spawn.
-## imp-64, Greg 5 Oct ~19:00: the Hunt must stop giving the old sword; the
-## HOTLINE CLEAVER is the issued blade. `sword` stays in `WEAPONS` for the
-## rooms and tests that still name it.
-const SLOT_ORDER := ["cleaver", "shotgun", "sidearm"]
+const SLOT_ORDER := ["sword", "shotgun", "sidearm"]
 ## AF10.10. These are attachment points on the object, not perks on its
 ## holder. The future crafting screen may decide where a part comes from, but
 ## it must install through this vocabulary so the Hunt, range and cab all read
@@ -111,7 +108,7 @@ const CUSTOMIZATION_SCALES := {
 	"reload_scale": Vector2(0.5, 2.0),
 }
 
-var current_id := "cleaver"
+var current_id := "sword"
 var cooldown := 0.0
 var reload_remaining := 0.0
 var shot_serial := 0

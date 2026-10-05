@@ -43,7 +43,7 @@ const ARCS := {
 		"follow": {"swing": Vector3(-0.30, 0.70, 0.20), "wrist": Vector3(-0.95, 0.85, 1.30), "reach": Vector3(-0.04, -0.06, -0.08)},
 	},
 	"overhead": {
-		"windup": {"swing": Vector3(0.42, -0.10, 0.0), "wrist": Vector3(0.90, 0.0, 0.10), "reach": Vector3(0.02, 0.06, -0.04)},
+		"windup": {"swing": Vector3(0.55, -0.10, 0.0), "wrist": Vector3(0.90, 0.0, 0.10), "reach": Vector3(0.02, 0.10, 0.06)},
 		"strike": {"swing": Vector3(-0.05, 0.08, 0.0), "wrist": Vector3(-0.60, 0.0, 0.0), "reach": Vector3(-0.04, 0.02, -0.16)},
 		"follow": {"swing": Vector3(-0.55, 0.15, 0.05), "wrist": Vector3(-1.00, 0.10, 0.0), "reach": Vector3(-0.05, -0.06, -0.08)},
 	},
@@ -58,7 +58,7 @@ const ARCS := {
 const BACKHAND := 0.6
 const GUARD := {"swing": Vector3(0.30, 0.30, 0.0), "wrist": Vector3(-0.55, 1.25, 0.25), "reach": Vector3(-0.04, 0.10, 0.04)}
 const PARRY := {"swing": Vector3(0.22, 0.30, 0.15), "wrist": Vector3(-0.30, 0.90, 0.60), "reach": Vector3(0.0, 0.05, -0.06)}
-const INSPECT := {"swing": Vector3(0.18, 0.25, 0.0), "wrist": Vector3(-0.60, 1.35, 1.10), "reach": Vector3(-0.06, 0.04, -0.06)}
+const INSPECT := {"swing": Vector3(0.25, 0.25, 0.0), "wrist": Vector3(-0.60, 1.35, 1.10), "reach": Vector3(-0.08, 0.08, 0.10)}
 const INSPECT_SECONDS := 2.4
 const RELOAD := {"swing": Vector3(-0.20, -0.20, 0.0), "wrist": Vector3(0.55, 0.35, 0.75), "reach": Vector3(-0.05, -0.04, 0.06)}
 const MAGAZINE_DROP := Vector3(0, -0.145, 0.012)
@@ -88,10 +88,6 @@ var _last_forward := Vector3.ZERO
 var _magazine: Node3D
 var _magazine_rest := Vector3.ZERO
 var _guard_amount := 0.0
-## Own blows (no driver) whoosh through their own `FpCombatAudio`.
-var _audio: FpCombatAudio
-var _whoosh_due := false
-var _heavy_due := false
 
 
 func _init() -> void:
@@ -155,11 +151,7 @@ func take(id: String) -> void:
 ## A blow with no `MeleeDriver` behind it (bare hands, a scripted room).
 func strike(heavy := false) -> bool:
 	var result := moveset.request_heavy(100.0) if heavy else moveset.request_light(100.0)
-	var accepted := bool(result.get("accepted", false))
-	if accepted:
-		_whoosh_due = true
-		_heavy_due = heavy
-	return accepted
+	return bool(result.get("accepted", false))
 
 
 func inspect() -> void:
@@ -194,12 +186,6 @@ func _process(delta: float) -> void:
 		take("")
 	if driver == null:
 		moveset.tick(delta)
-		if _whoosh_due and moveset.phase() == "active":
-			_whoosh_due = false
-			if _audio == null:
-				_audio = FpCombatAudio.new()
-				add_child(_audio)
-			_audio.whoosh("bare" if weapon_id.is_empty() else weapon_id, _heavy_due)
 	pose(delta)
 
 

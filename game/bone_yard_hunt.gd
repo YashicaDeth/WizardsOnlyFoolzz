@@ -2605,7 +2605,6 @@ func apply_look(turn: Vector2) -> void:
 ## A bare hand is about 0.4kg, a cleaver 1.4, a sledge 6.
 const ARM_WEIGHTS := {
 	"sword": {"mass": 1.45, "reach": 0.62},
-	"cleaver": {"mass": 1.4, "reach": 0.5},
 	"shotgun": {"mass": 3.2, "reach": 0.5},
 	"sidearm": {"mass": 0.95, "reach": 0.22},
 	"severed_limb": {"mass": 2.6, "reach": 0.58},
@@ -4480,7 +4479,7 @@ func _update_held_inspection(delta: float) -> void:
 	var right_hand := model.get_node_or_null("RightGripHand") as Node3D
 	var left_hand := model.get_node_or_null("LeftGripHand") as Node3D
 	match weapon_id:
-		"sword", "cleaver":
+		"sword":
 			# Present the edge diagonally, then let the off hand open and travel a
 			# short safe distance toward the forte as if checking damage by light.
 			model.position += Vector3(-0.035, 0.090, -0.105) * inspect_blend

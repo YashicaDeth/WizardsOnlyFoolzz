@@ -417,18 +417,11 @@ func _refresh_tool() -> void:
 	if holding_ram and tool_visual == null:
 		# The cleaver is shown as itself (DoctorRoute's in-hand model); every
 		# other heavy tool still reads as the breach tool.
-		# imp-64: the cleaver is carried by the animated arms; every other
-		# heavy tool still reads as the breach tool.
+		tool_visual = DoctorRoute.cleaver_model() if held_tool in ["HOTLINE CLEAVER", "FIRE AXE"] else LabSurface.breach_tool()
+		add_child(tool_visual)
+		LabSurface.hold_in_view(camera, tool_visual)
 		if held_tool in ["HOTLINE CLEAVER", "FIRE AXE"]:
-			var arms := FirstPersonArms.new()
-			arms.body = player
-			camera.add_child(arms)
-			arms.take("cleaver")
-			tool_visual = arms
-		else:
-			tool_visual = LabSurface.breach_tool()
-			add_child(tool_visual)
-			LabSurface.hold_in_view(camera, tool_visual)
+			tool_visual.rotation_degrees = DoctorRoute.AXE_REST
 	elif not holding_ram and tool_visual != null:
 		tool_visual.queue_free()
 		tool_visual = null
@@ -835,9 +828,7 @@ func swing() -> String:
 	swing_cooldown = SWING_COOLDOWN
 	var damage := RAM_DAMAGE if holding_ram else FIST_DAMAGE
 	var method := "breach_tool" if holding_ram else "fists"
-	if tool_visual is FirstPersonArms:
-		(tool_visual as FirstPersonArms).strike()
-	elif tool_visual != null:
+	if tool_visual != null:
 		var kick := create_tween()
 		kick.tween_property(tool_visual, "position:z", tool_visual.position.z - 0.22, 0.05)
 		kick.tween_property(tool_visual, "position:z", tool_visual.position.z, 0.25)
