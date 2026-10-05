@@ -2,7 +2,7 @@
 
 Started by the hourly build manager, 2026-10-05 15:10. This is a draft. It does not change GAME_PLAN.html or BUILD_PLAN.html, and no v0.2 job has been queued from it. Anything not taken from Greg's recorded decisions is marked **proposal, needs Greg**.
 
-## 1. What v0.1 "Escape" actually delivered (as of 02:10, 6 Oct)
+## 1. What v0.1 "Escape" actually delivered (as of 05:10, 6 Oct)
 
 6 of the 10 v0.1 jobs have landed on `claude/launch-latest`. Details are in DESIGN/REMASTER_LOG.md.
 
@@ -16,7 +16,7 @@ Started by the hourly build manager, 2026-10-05 15:10. This is a draft. It does 
 | job4 waking in the vat | yes | First-person wake in red liquid, real glass and a flood. | It was not rendered at landing. `remaster-job4-p1` is pending. |
 | job5 one facility map | running | | Greg's top priority ("the map is the main thing"). |
 | job6 examiner | landed (39782473, 6 Oct) | A fair, telegraphed boss on the rigged base body. His keycard always drops and opens the staff door. | His head is still a placeholder (Greg's call). The open doorway reads flat, and there is red light that isn't a danger cue (fix-72 queued). |
-| job9 enemies | pending | | |
+| job9 enemies | landed (2efeed7b, 6 Oct) | 2-3 CellOutz guards (staff and pistol; block, parry, call each other), the freed vat subject and the Lower Works sentinel (X-ray plates, weak core). Each one has a telegraph and a headless duel test, and a careful player wins with every weapon. 110-200 fps per room. | A guard turns his back to you during the shock wind-up. The sentinel's ram telegraph is faint from range. A kill subtitle stays up between rooms. The subject is lost in the red vat room. v01_weapons_test has 6 failures (cause unknown). fix-73 queued. |
 | job7 death, saves, HUD | pending | | |
 
 Fixes that also landed: fix-hidden-cache-test, fix-58 (an execution on a downed body is one beat and ends with them dead), and fix-55 (the examiner no longer uses the Higgsfield skin).
@@ -25,7 +25,7 @@ Fixes that also landed: fix-hidden-cache-test, fix-58 (an execution on a downed 
 
 These come from Greg's notes, in his order:
 - The facility map (job5) and the examiner (job6). Without these, START to surface cannot be played.
-- Enemies (job9) and death, saves and HUD (job7).
+- Death, saves and HUD (job7). Enemies (job9) landed 6 Oct.
 - Job 8 "play it, fix it" with Greg on the pad, then the `v0.1-escape` tag.
 - Pending fixes Greg asked for: ADS sights blocking the screen plus the VATS kill cam (fix-56), and the wizard-eyes colour (fix-57).
 - Nothing has been checked against the 144 fps target on the RTX 2060 SUPER yet. There is no GPU number for any lab system.
