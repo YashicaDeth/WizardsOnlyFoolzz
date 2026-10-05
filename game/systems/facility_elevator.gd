@@ -208,17 +208,19 @@ func _build_shaft() -> void:
 	# Light strips passing the car's slots: an amber bar every few metres on
 	# both side walls, and a real light every other one.
 	var strip := StandardMaterial3D.new()
-	strip.albedo_color = Color("d2ecc0")
+	strip.albedo_color = Color("3a4434")
 	strip.emission_enabled = true
-	strip.emission = Color("b8e0a0")
-	strip.emission_energy_multiplier = 5.0
+	strip.emission = Color("8fb07c")
+	# Remaster job5 p1: at 5x a strip a metre past the slot burned to a flat
+	# white bar across the ride; this keeps it a lit tube with its colour.
+	strip.emission_energy_multiplier = 0.6
 	var y := bottom + 1.5
 	var count := 0
 	while y < top - 0.5:
 		for side: int in [-1, 1]:
 			var bar := MeshInstance3D.new()
 			var mesh := BoxMesh.new()
-			mesh.size = Vector3(0.05, 0.08, SHAFT_HALF.y * 1.6)
+			mesh.size = Vector3(0.04, 0.05, SHAFT_HALF.y * 1.2)
 			bar.mesh = mesh
 			bar.material_override = strip
 			bar.position = Vector3(side * (SHAFT_HALF.x - 0.03), y, 0)
@@ -281,7 +283,14 @@ func _build_cab() -> void:
 	var back := _label(cab, Vector3(0, DOOR_HEIGHT + 0.2, CAR_HALF.y - 0.1), PI)
 	back.name = "IndicatorBack"
 	indicator.text = str(stop_names[stop])
-	indicator.set_meta("twin", back)
+	# A readout over each side slot too: a rider watching the shaft go by
+	# reads the floor there instead of craning at the lintel.
+	var twins: Array = [back]
+	for side: int in [-1, 1]:
+		var over_slot := _label(cab, Vector3(side * (CAR_HALF.x - 0.02), 2.12, 0), -side * PI * 0.5)
+		over_slot.name = "IndicatorSlot"
+		twins.append(over_slot)
+	indicator.set_meta("twins", twins)
 	_hum = AudioStreamPlayer3D.new()
 	_hum.name = "Hum"
 	var generator := AudioStreamGenerator.new()
@@ -325,8 +334,9 @@ func _feed_hum() -> void:
 
 
 func _process(_delta: float) -> void:
-	if indicator != null and indicator.has_meta("twin"):
-		(indicator.get_meta("twin") as Label3D).text = indicator.text
+	if indicator != null and indicator.has_meta("twins"):
+		for twin: Label3D in indicator.get_meta("twins"):
+			twin.text = indicator.text
 
 
 func _leaf(parent: Node3D, at: Vector3, color: Color) -> AnimatableBody3D:
@@ -341,9 +351,11 @@ func _leaf(parent: Node3D, at: Vector3, color: Color) -> AnimatableBody3D:
 
 func _label(parent: Node3D, at: Vector3, turn: float) -> Label3D:
 	var label := Label3D.new()
+	# House non-danger palette (bone/amber, as the facility signs); red is for
+	# danger only. Sized so "DOWN 0D LOWER WORKS" fits inside the 2.2 m car.
 	label.font_size = 48
-	label.pixel_size = 0.004
-	label.modulate = Color("ff5a2a")
+	label.pixel_size = 0.0021
+	label.modulate = Color("c8a070")
 	label.outline_size = 0
 	label.position = at
 	label.rotation.y = turn

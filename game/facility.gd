@@ -47,6 +47,12 @@ const SCREEN_COLOR := Color("b8d49f")
 const DANGER_COLOR := Color("a52d20")
 ## Fittings in tall halls hang on rods to this height above the floor.
 const LAMP_HANG := 4.6
+## Dial (DESIGN/REMASTER_LOG.md, job5 p1): "worn" lays the route as a broken,
+## scuffed painted floor line; "off" drops it (the lit thresholds still lead).
+const ROUTE_LINE := "worn"
+## Dial: caged wall lamps that wash the hall walls at each pool row, so the
+## arcade and Lower Works show their bounds. 0 turns them off.
+const WALL_WASH_ENERGY := 7.0
 
 var player: CharacterBody3D
 var camera: Camera3D
@@ -197,8 +203,21 @@ func _build_surface() -> void:
 	white.emission = Color("fff4e0")
 	white.emission_energy_multiplier = 6.0
 	glare.material_override = white
-	glare.position = Vector3(28, SURFACE_Y + 3.0, -141.0)
+	# Just past the threshold, so the white fills the doorway down to the
+	# floor instead of hanging as a card over a dark strip of ground.
+	glare.position = Vector3(28, SURFACE_Y + 3.0, -136.3)
+	glare.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(glare)
+	# Daylight spilling back through the gate lights its jambs and the
+	# head-house wall, so the white-out reads as a doorway, not a floating card.
+	var spill := OmniLight3D.new()
+	spill.name = "GateSpill"
+	spill.light_color = Color("fff1d8")
+	spill.light_energy = 2.4
+	spill.omni_range = 7.0
+	spill.omni_attenuation = 1.2
+	spill.position = Vector3(28, SURFACE_Y + 2.2, -133.6)
+	add_child(spill)
 	var shaft := SpotLight3D.new()
 	shaft.name = "DaylightShaft"
 	shaft.light_color = Color("fff1d8")
@@ -555,6 +574,7 @@ func _build_service_arcade_dressing() -> void:
 	# Cameras over each threshold: someone watches the route you take.
 	_story_cctv(Vector3(21.2, 4.6, -0.6), Vector3(26.0, 0.0, -4.0), "service_arcade")
 	_story_cctv(Vector3(30.6, 2.8, -58.2), Vector3(28.0, 0.0, -52.0), "service_arcade")
+	_dress_walls("service_arcade", 0.0, Vector2(20.75, 35.25), [-4.0, -14.5, -25.5, -36.0, -46.5, -55.0], 6.4)
 
 
 ## Lower Works reads across its full height: a clear painted run to the heat
@@ -574,10 +594,120 @@ func _build_lower_works_dressing() -> void:
 	_danger_light(Vector3(28.0, -3.0, -119.0), 9.0)
 	_story_cctv(Vector3(30.4, -9.2, -66.6), Vector3(28.0, -12.0, -74.0), "lower_works")
 	_story_cctv(Vector3(31.4, -8.4, -119.6), Vector3(28.0, -12.0, -112.0), "lower_works")
+	_dress_walls("lower_works", -12.0, Vector2(13.0, 43.0), [-70.0, -78.0, -86.0, -94.0, -102.0, -110.0, -118.0, -126.0], 9.0)
 
 
+## The painted route line, worn: dashes of uneven length with scuffed-out
+## breaks, on the concrete texture so the grime shows through the paint.
 func _route_strip(at: Vector3, size: Vector3) -> void:
-	_story_box("RouteStripe", size, at, "route", "route", "route")
+	if ROUTE_LINE == "off":
+		return
+	var end := at.z + size.z * 0.5
+	var z := at.z - size.z * 0.5
+	var index := 0
+	while z < end - 0.4:
+		var roll := _wear(index)
+		var length := minf(1.2 + roll * 2.2, end - z)
+		# About one dash in five is worn clean away.
+		if roll > 0.18 or index == 0:
+			var width := size.x * (0.75 + _wear(index + 31) * 0.25)
+			var drift := (_wear(index + 7) - 0.5) * 0.05
+			_story_box("RouteStripe", Vector3(width, size.y, length), Vector3(at.x + drift, at.y, z + length * 0.5), "route", "route", "route")
+		z += length + 0.35 + _wear(index + 13) * 1.1
+		index += 1
+
+
+## A fixed scatter in 0..1, the same every run (captures compare).
+func _wear(index: int) -> float:
+	return fposmod(sin(float(index) * 12.9898) * 43758.5453, 1.0)
+
+
+## Each hall wall shows at its pool rows: a caged wall lamp washes the wall
+## face, and a service prop stands in that wash, alternating sides, so the dark
+## frames a run of bays instead of hiding the room. Kit models and plain
+## shapes only; nothing here is named or written on.
+func _dress_walls(zone: String, y: float, xs: Vector2, rows: Array, height: float) -> void:
+	var kinds := ["pipes", "drums", "crates", "junction", "vent", "pipes", "crates", "drums"]
+	for index in rows.size():
+		var z: float = rows[index]
+		for side: int in [-1, 1]:
+			var wall_x := xs.x + 0.15 if side < 0 else xs.y - 0.15
+			var inward := float(-side)
+			if WALL_WASH_ENERGY > 0.0:
+				_wall_lamp(Vector3(wall_x + inward * 0.12, y + minf(height - 1.0, 3.4), z), inward)
+			if (index + (0 if side < 0 else 1)) % 2 == 0:
+				_wall_prop(kinds[(index * 2 + (side + 1) / 2) % kinds.size()], Vector3(wall_x, y, z - 2.0), inward, zone)
+
+
+func _wall_lamp(at: Vector3, inward: float) -> void:
+	var fitting := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(0.18, 0.12, 0.7)
+	fitting.mesh = box
+	fitting.material_override = _prop_material("wall_tube")
+	fitting.position = at
+	add_child(fitting)
+	var hood := MeshInstance3D.new()
+	var shade := BoxMesh.new()
+	shade.size = Vector3(0.3, 0.06, 0.9)
+	hood.mesh = shade
+	hood.material_override = _prop_material("duct")
+	hood.position = at + Vector3(-inward * 0.04, 0.09, 0)
+	add_child(hood)
+	var wash := OmniLight3D.new()
+	wash.name = "WallWash"
+	wash.light_color = LAMP_COLOR
+	wash.light_energy = WALL_WASH_ENERGY
+	wash.omni_range = 7.5
+	wash.omni_attenuation = 0.8
+	wash.distance_fade_enabled = true
+	wash.distance_fade_begin = 30.0
+	wash.distance_fade_length = 8.0
+	wash.position = at + Vector3(inward * 0.9, -0.3, 0)
+	add_child(wash)
+
+
+func _wall_prop(kind: String, at: Vector3, inward: float, zone: String) -> void:
+	var out := Vector3(inward, 0, 0)
+	match kind:
+		"pipes":
+			# The kit's pipe run, two lengths end to end along the wall.
+			for step: float in [-2.0, 2.0]:
+				var model := TUNNEL_KIT.GENERATED_MODEL.make("tunnel_pipe_run")
+				if model == null:
+					continue
+				model.name = "WallPipes"
+				model.transform = Transform3D(Basis.looking_at(Vector3(0, 0, inward), Vector3.UP), at + out * 0.27 + Vector3(0, 2.4, step))
+				_register_story_prop(model, zone, "pipes")
+		"vent":
+			var vent := TUNNEL_KIT.GENERATED_MODEL.make("tunnel_vent")
+			if vent != null:
+				vent.name = "WallVent"
+				vent.transform = Transform3D(Basis.looking_at(-out, Vector3.UP), at + out * 0.14 + Vector3(0, 1.05, 0))
+				_register_story_prop(vent, zone, "vent")
+		"drums":
+			for spot: Vector3 in [Vector3(0.55, 0, -0.5), Vector3(0.6, 0, 0.25), Vector3(1.25, 0, -0.1)]:
+				var drum := MeshInstance3D.new()
+				drum.name = "Drum"
+				var cylinder := CylinderMesh.new()
+				cylinder.top_radius = 0.3
+				cylinder.bottom_radius = 0.3
+				cylinder.height = 0.9
+				cylinder.radial_segments = 10
+				drum.mesh = cylinder
+				drum.material_override = _prop_material("drum")
+				drum.position = at + Vector3(spot.x * inward, 0.45, spot.z)
+				drum.rotation.y = spot.z * 3.0
+				_register_story_prop(drum, zone, "drums")
+		"crates":
+			_story_box("Crate", Vector3(1.1, 0.9, 1.1), at + Vector3(0.75 * inward, 0.45, -0.4), "crate", zone, "crates")
+			_story_box("Crate", Vector3(1.0, 0.8, 1.0), at + Vector3(0.8 * inward, 1.3, -0.3), "crate", zone, "crates")
+			_story_box("Crate", Vector3(0.9, 0.7, 0.9), at + Vector3(0.7 * inward, 0.35, 0.8), "crate", zone, "crates")
+		"junction":
+			# A fuse cabinet with its conduit climbing to the ceiling services.
+			_story_box("Junction", Vector3(0.35, 1.1, 0.8), at + Vector3(0.18 * inward, 1.5, 0), "console", zone, "junction")
+			for offset: float in [-0.25, 0.25]:
+				_story_box("Conduit", Vector3(0.1, 4.2, 0.1), at + Vector3(0.1 * inward, 4.15, offset), "cable", zone, "junction")
 
 
 func _story_tank(at: Vector3, radius: float, height: float, zone: String) -> void:
@@ -638,10 +768,12 @@ func _story_monitor(at: Vector3, heading: float, zone: String, danger: bool) -> 
 	var spill := OmniLight3D.new()
 	spill.name = "ScreenSpill"
 	spill.light_color = DANGER_COLOR if danger else SCREEN_COLOR
-	spill.light_energy = 1.4
-	spill.omni_range = 3.0
+	# Low and close: the console body round the screen shows, so the screen
+	# sits in a cabinet instead of floating as a pale card.
+	spill.light_energy = 0.9
+	spill.omni_range = 2.4
 	spill.omni_attenuation = 1.2
-	spill.position = Vector3(0, 0.3, -0.7)
+	spill.position = Vector3(0, -0.1, -0.45)
 	console.add_child(spill)
 
 
@@ -681,30 +813,43 @@ func _prop_material(key: String) -> StandardMaterial3D:
 	material.roughness = 0.82
 	match key:
 		"route":
-			material.albedo_color = ROUTE_COLOR
-			material.roughness = 0.62
+			# Paint over the floor's own concrete: grime and wear show through.
+			material = TUNNEL_KIT.material("floor").duplicate() as StandardMaterial3D
+			material.albedo_color = ROUTE_COLOR.lerp(Color("6a6258"), 0.45).darkened(0.2)
 		"screen":
-			material.albedo_color = SCREEN_COLOR
+			# A dim CRT, not a lamp: at 1.8x the screens floated as white quads.
+			material.albedo_color = Color("1c2418")
 			material.emission_enabled = true
 			material.emission = SCREEN_COLOR
-			material.emission_energy_multiplier = 1.8
+			material.emission_energy_multiplier = 0.12
+			# Rolling bands on the tube, so it reads as a screen, not a slab.
+			var bands := NoiseTexture2D.new()
+			bands.width = 64
+			bands.height = 64
+			bands.noise = FastNoiseLite.new()
+			bands.noise.frequency = 0.08
+			material.emission_texture = bands
+			material.uv1_scale = Vector3(0.4, 3.0, 1.0)
 		"danger_screen":
-			material.albedo_color = DANGER_COLOR
+			material.albedo_color = Color("2a0d0a")
 			material.emission_enabled = true
 			material.emission = DANGER_COLOR
-			material.emission_energy_multiplier = 2.4
+			material.emission_energy_multiplier = 0.9
+		"wall_tube":
+			material.albedo_color = LAMP_COLOR
+			material.emission_enabled = true
+			material.emission = LAMP_COLOR
+			material.emission_energy_multiplier = 1.2
 		"cable":
 			material.albedo_color = Color("0b0c0a")
 			material.roughness = 0.72
-		"duct":
-			material.albedo_color = Color("322f2a")
-			material.metallic = 0.65
-		"tank":
-			material.albedo_color = Color("40372f")
-			material.metallic = 0.4
-		"console":
-			material.albedo_color = Color("292722")
-			material.metallic = 0.25
+		# Props wear the kit's ambientCG grime, not flat colour.
+		"duct", "console":
+			material = TUNNEL_KIT.material("ceiling").duplicate() as StandardMaterial3D
+			material.albedo_color = Color("5a554c") if key == "duct" else Color("7a7468")
+		"tank", "drum", "crate":
+			material = TUNNEL_KIT.material("door").duplicate() as StandardMaterial3D
+			material.albedo_color = {"tank": Color("6e6052"), "drum": Color("5a5c48"), "crate": Color("6a5a48")}[key]
 		_:
 			material = TUNNEL_KIT.material("wall")
 	_prop_materials[key] = material

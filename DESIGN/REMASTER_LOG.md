@@ -189,3 +189,55 @@ Defaults set behind dials, all in `OrganSystem` unless named. None of these is G
   1. Queued `remaster-lab-47-p1` (70, claude). It covers the GPU render, explosion smoke and sparks, soil texture, a lab HUD that keeps red for danger only, and hiding the acid line.
   2. job5 lands, then the examiner office overlay blur goes into job6.
   3. Get a real-GPU fps number for lab-46, lab-47 and lab-48. None exists yet against the 144 fps target.
+
+## Manager notes, 2026-10-05 16:10
+
+- **Merged since 15:10:** job5 the facility, one map (d5a224af, merged 70430fe8); fix-57 wizard eyes in the house palette (1e344b86).
+- **Landed so far:** 7 of 10 v0.1 jobs. Still to land: job6 examiner, job9 enemies, job7 death/saves/HUD (all pending; job7 bounced off a codex limit at 15:37).
+- **Running:** fix-56 ADS sights and VATS killcam on claude-alt2 since 15:37. Every other account is parked (Claude until 18:04, codex until 20:16-20:33, sircuteskingdom-plus until 10-11).
+- **Rendering:** skipped; the fix-56 builder has Godot running. Reviewed job5's own PNGs (`P:/GameDev/Temp/job5_sheet5.png`, `P:/GameDev/Temp/job5-facility-one-map/`).
+- **Good in job5:** the green-white pools on the floor are the right mood; the zone stamp in the body-cam OSD and objective box read well; capture runs 330-357 fps at 1280x720.
+- **Weak in job5:**
+  - Arcade and Lower Works are black voids: floor pools only, no walls, ceiling or props visible between them. The story-prop frames show one or two dark boxes.
+  - Bright unlit white rectangles float in mid-air (arcade right edge, transit, surface gate).
+  - Lift rides show a flat white bar and red "DOWN"/"UP" lettering clipped off the frame; red is not danger there.
+  - A flat green guide stripe runs down every floor and reads as a debug line.
+- **Failures:** none new.
+- **Top three:**
+  1. Queued `remaster-job5-p1` (70, claude): walls and story props, the floating quads and lift signage, the guide stripe behind a dial.
+  2. job6 must fix the examiner-office overlay blur when it runs (carried from 15:10).
+  3. A real-GPU fps number for lab-46, lab-47 and lab-48 (carried).
+
+## Manager notes, 2026-10-05 17:08
+
+- **Merged since 16:10:** fix-56 ADS sights small and centred, hands seated on the pistol and 12G (8532801d); RoundCam: the killing round replayed slowed into the X-ray (15c3a1f0); merged 267b2107, gate green.
+- **Running:** lab-53 BeamNG-style vehicles on claude-alt2 since 16:47 (priority 98, Greg's bump). Claude accounts parked until 18:04, codex until 20:16-20:33, sircuteskingdom-plus until 10-11.
+- **Rendering:** skipped; lab-53 has Godot running. The ADS check is `res://tests/aim_down_sights_capture.tscn`; render it next run.
+- **Queue order fix:** Greg said at midday that the facility map is the top priority, but `remaster-job5-p1` was at 70, behind job6/job9/job7/v02-51/art-49. Raised it to 96, so the first Claude account to unpark at 18:04 gets it. lab-53 stays at 98 (Greg's number).
+- **Covered from Greg's midday notes:** examiner reskin (fix-55 done), ADS/VATS (fix-56 done), eyes (fix-57 done), execution (fix-58 done), Black Mirror and depth map (in v02-51 pending).
+- **Open question for Greg:** `queue/questions/execution-58-01.md`. Should executed bodies in the Hunt and the arcade ragdoll? Default for now: no change, so they stay in the stiff downed pose.
+- **Failures:** none new.
+- **Top three:**
+  1. remaster-job5-p1 at 18:04 (walls, story props, floating quads, lift signage).
+  2. job6 must fix the examiner-office overlay blur (carried).
+  3. Render the fix-56 ADS capture and check that the sights no longer fill the screen.
+
+## remaster-job5-p1, 2026-10-05: the facility halls show their walls
+
+- **Walls and props:** the Service Arcade (6 rows) and Lower Works (8 rows) get a caged wall lamp on each long wall at every pool row, washing the wall face, plus one service prop in that wash on alternating sides: the kit's pipe runs and vent, drum clusters, crate stacks, a fuse cabinet with conduit to the ceiling (`facility.gd` `_dress_walls`). Nothing named or written on. Tanks, consoles, ducts, drums and crates now wear the kit's ambientCG painted-metal / metal-plate grime instead of flat colour.
+- **Floating quads:** the "white rectangles" in the arcade and Lower Works were the service-monitor screens (1.8x emission) seen at the frame edge; now a dim banded CRT (0.12x) with a close, low spill on its cabinet. The surface-gate white-out moved to just past the threshold (no shadow) so it fills the doorway to the floor instead of hanging over a dark strip; a daylight spill lights the jambs.
+- **Lift rides:** shaft strips 5x -> 0.6x, thinner, so they read as lit tubes rather than a flat white bar; floor indicators in the house bone/amber (`c8a070`), about half the size, plus a readout over each side slot so a rider watching the shaft reads the floor in frame. The lintel indicator still runs off the top edge when you look out of the slot (it is above the door).
+- **Dials (Greg can flip):** `facility.gd` `ROUTE_LINE` = `"worn"` (default: broken, scuffed painted dashes on the concrete texture, muted) or `"off"`; `WALL_WASH_ENERGY` = 7.0 (0 turns the wall lamps off).
+- **Proof:** `render_one.cmd facility_one_map_capture`, before `P:/GameDev/Temp/job5-p1-before/`, after `P:/GameDev/Temp/job5-p1-after/` (sheet `job5_p1_after_sheet.png`). fps 1280x720: average 313, min 5 (first-frame shader compile).
+
+## Manager notes, 2026-10-05 19:08
+
+- **Merged since 17:08:** remaster-job5-p1. The facility halls now show walls, caged wall lamps, service props and grimy materials. The floating white quads are gone. Merged e7fd15dd (18:38), gate green.
+- **Running:** nothing. Every account is parked: claude-default and claude-alt until 23:04, claude-alt2 until 20:04, codex until 20:16-20:33, sircuteskingdom-plus until 10-11. 14 tasks are pending, so no idle fills were needed.
+- **Rendering:** I didn't launch a render. I opened the builder's after-shots in `P:/GameDev/Temp/job5-p1-after/` instead.
+- **Still weak (job5):** in the lift ride (04), the floor readout is a big curved "DOWN 0C SERVICE ARCADE" floating in the black. The lintel text overlaps the HUD objective box, and the shaft strip is still one flat green bar. The arcade (03b) is mostly empty floor and black, with one drum and one pipe run as its whole story. The `worn` route dashes still read as a debug stripe.
+- **Failures:** none new (job2, job2b and lane-exit-routes are old ones).
+- **Top three:**
+  1. Queued `remaster-job5-p2` (70, claude) to fix the lift readout and HUD overlap, add story clusters and pool light in the arcade, and default the route line to "off" (dial kept).
+  2. job6 must fix the examiner-office overlay blur (carried).
+  3. Render the fix-56 ADS capture, and get a real-GPU fps number for lab-46/47/48 (carried).

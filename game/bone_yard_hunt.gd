@@ -791,6 +791,8 @@ const CAMERA_CLEARANCE_RATE := 4.0
 ## WorldHistory event is cheap and cannot miss the moment or refire it.
 var _unlock_feel_timer := 0.0
 var kill_cam: Control
+## Fix-56: the firearm's slowed round-and-X-ray cutscene (`RoundCam`).
+var round_cam: RoundCam
 var voice_channel: Node
 var spoken: SpokenContact = null
 ## Whether the V being held is a sentence rather than the reliquary. Held as
@@ -1147,11 +1149,14 @@ func _ready() -> void:
 	impact_feel = IMPACT_FEEL.new()
 	# The kill cam already owns time deliberately; an impact inside one is part
 	# of its timing, not a competitor for it.
-	impact_feel.blocked_by = func() -> bool: return kill_cam != null and kill_cam.active
+	impact_feel.blocked_by = func() -> bool: return _cinematic_active()
 	add_child(impact_feel)
 	kill_cam = preload("res://systems/kill_cam.gd").new()
 	kill_cam.name = "KillCam"
 	$HUD.add_child(kill_cam)
+	round_cam = RoundCam.new()
+	round_cam.name = "RoundCam"
+	add_child(round_cam)
 	field_lens = FIELD_LENS.new()
 	field_lens.name = "FieldLens"
 	$HUD.add_child(field_lens)
@@ -1658,7 +1663,7 @@ func _register_people() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if resolution_ui.visible or kill_cam.active or (execution != null and execution.active):
+	if resolution_ui.visible or _cinematic_active() or (execution != null and execution.active):
 		return
 	if _vats_input(event):
 		get_viewport().set_input_as_handled()
@@ -2112,7 +2117,7 @@ func _physics_process(delta: float) -> void:
 	_sync_pad_combat_context()
 	_tick_k_hold(delta)
 	_tick_fight(delta)
-	if kill_cam.active:
+	if _cinematic_active():
 		return
 	# The resolution window does not stop the world. Standing over someone
 	# deciding what to do with them is supposed to be a risk, so everyone else
@@ -2855,7 +2860,7 @@ func _advance_third_person_melee(step: float) -> void:
 
 
 func _attack(heavy := false) -> void:
-	if resolution_ui.visible or kill_cam.active or player_rig.is_downed() or player_rig.anatomy.dead:
+	if resolution_ui.visible or _cinematic_active() or player_rig.is_downed() or player_rig.anatomy.dead:
 		return
 	if execution != null and execution.active:
 		return
@@ -3496,9 +3501,15 @@ func _resolve_body_hit(struck: Node, hit: Dictionary, payload: Dictionary) -> bo
 		"location": HUNT_LOCATION,
 	})
 	var fake_attack := {"damage": damage, "impulse": impulse, "damage_type": damage_type, "weapon": weapon, "heavy": bool(payload.get("heavy", false))}
-	if actor.anatomy.dead:
+	var killed: bool = actor.anatomy.dead
+	if killed:
 		_try_skull_burst(actor, zone_id, damage, damage_type, direction, anatomy_snapshot)
-		_try_firearm_killcam(actor, weapon, zone_id, direction, anatomy_snapshot)
+	# Fix-56: the round cam is tried before the plate; a shot that earns it
+	# does not also get the plate.
+	if not _try_round_cam(actor, shot_id, hit, vats_part, result, zone_id, killed, weapon):
+		if killed:
+			_try_firearm_killcam(actor, weapon, zone_id, direction, anatomy_snapshot)
+	if killed:
 		_kill_encounter_actor(encounter_actors.find(actor), weapon)
 	elif actor.anatomy.downed:
 		actor.state = "downed"
@@ -3530,11 +3541,47 @@ func _try_skull_burst(actor: Dictionary, zone_id: String, damage: float, damage_
 	SKULL_BURST.open(rig, direction)
 
 
+func _cinematic_active() -> bool:
+	return (kill_cam != null and kill_cam.active) or (round_cam != null and round_cam.active)
+
+
+## Fix-56. A VATS round that lands, or (on `RoundCam.kill_chance`) a killing
+## shot, replays its flight from the muzzle, slowed, into the X-ray. The organ
+## shown is the one the round was sent to or the one it burst; a limb or
+## hardware hit shows the bone.
+func _try_round_cam(actor: Dictionary, shot_id: int, hit: Dictionary, vats_part: Dictionary, result: Dictionary, zone_id: String, killed: bool, weapon: String) -> bool:
+	if round_cam == null or _cinematic_active():
+		return false
+	var vats_landed := not vats_part.is_empty()
+	if not RoundCam.wanted(vats_landed, killed, randf(), RoundCam.seconds_since_last()):
+		return false
+	var rig := actor.get("rig") as BaselineHuman
+	var organ_id := ""
+	if str(vats_part.get("kind", "")) == "organ":
+		organ_id = str(vats_part.get("id", ""))
+	elif rig != null and is_instance_valid(rig):
+		var finish := KILL_SHOT.earned("sniper", zone_id, rig.snapshot())
+		organ_id = str(finish.get("organ", ""))
+		if organ_id.is_empty():
+			# The organ the round went through, matched off the anatomy's own
+			# record (the hit returns the organ's state, not its id).
+			var struck_organ := result.get("organ", {}) as Dictionary
+			for candidate in rig.organ_parts:
+				if not struck_organ.is_empty() and struck_organ == rig.anatomy.organs.get(candidate, {}):
+					organ_id = str(candidate)
+	var impact: Vector3 = hit.get("position", actor.node.global_position)
+	var pending: Dictionary = _pending_shots.get(shot_id, {})
+	var muzzle: Vector3 = pending.get("muzzle", camera.global_position)
+	var label := "%s // %s" % ["VATS" if vats_landed else str(arsenal.current().get("label", weapon)).to_upper(),
+		(organ_id if not organ_id.is_empty() else zone_id).to_upper().replace("_", " ")]
+	return round_cam.trigger(muzzle, impact, rig, organ_id, zone_id, label, $HUD as CanvasLayer, xray_active)
+
+
 ## The round decides this only after the rig has resolved the hit.  A sniper
 ## camera is earned by a real immediate vital rupture, never merely because a
 ## rifle was fired or because somebody was already bleeding out.
 func _try_firearm_killcam(actor: Dictionary, weapon: String, zone_id: String, direction: Vector3, snapshot: Dictionary) -> void:
-	if kill_cam == null or kill_cam.active:
+	if kill_cam == null or _cinematic_active():
 		return
 	var finish := KILL_SHOT.earned(weapon, zone_id, snapshot)
 	if finish.is_empty():
@@ -3617,6 +3664,7 @@ func _resolve_firearm(attack: Dictionary) -> void:
 		"remaining": directions.size(),
 		"hit_ids": [],
 		"aimed": firearm_aiming,
+		"muzzle": origin,
 	}
 	if ballistics == null or not is_instance_valid(ballistics):
 		# No projectile system to hand this to, and so no round that could
@@ -4511,6 +4559,12 @@ func _pose_first_person_forearm(hand: Node3D) -> void:
 	# hand do not share an elbow. The hand supplies its authored off-screen entry;
 	# old callers retain the former corner as a safe default.
 	var entry: Vector3 = hand.get_meta("forearm_entry", Vector3(0.43 * float(side), -0.49, -0.30))
+	# Fix-56: shouldered, both arms run straight down and back from the grip,
+	# under the gun, instead of sweeping in across the sight picture from the
+	# hip corners.
+	if firearm_aim_blend > 0.0 and arsenal != null and hand.get_parent() == arsenal.models.get(str(arsenal.current_id)):
+		var wrist := camera.to_local(hand.global_position)
+		entry = entry.lerp(wrist + Vector3(0.07 * float(side), -0.46, 0.20), firearm_aim_blend)
 	var start := camera.to_global(entry)
 	var end := hand.to_global(Vector3(0.0, 0.0, -0.035))
 	var along := end - start
@@ -5184,7 +5238,7 @@ func _dodge() -> void:
 	# in mid-air, through a grapple, or halfway through a melee wind-up. That
 	# made the nominally deliberate combat loop cancel itself whenever SPACE
 	# was pressed and let several incompatible poses own the body at once.
-	if not panel_mode.is_empty() or resolution_ui.visible or not grapple_target.is_empty() or kill_cam.active:
+	if not panel_mode.is_empty() or resolution_ui.visible or not grapple_target.is_empty() or _cinematic_active():
 		return
 	if dodge_cooldown > 0.0 or dodge_remaining > 0.0 or stamina < 25.0 or not player_body.is_on_floor():
 		return
@@ -8208,7 +8262,7 @@ func _grapple_candidate() -> Dictionary:
 
 
 func _start_grapple() -> void:
-	if not grapple_target.is_empty() or resolution_ui.visible or kill_cam.active:
+	if not grapple_target.is_empty() or resolution_ui.visible or _cinematic_active():
 		return
 	if player_rig.is_downed() or player_rig.anatomy.dead or stamina < 20.0:
 		prompt.text = "NOT ENOUGH LEFT IN YOU TO TAKE HOLD"
@@ -8717,7 +8771,7 @@ func _vats_close() -> void:
 	if vats_overlay != null:
 		vats_overlay.clear()
 	# The kill cam a VATS round earned owns time from here.
-	if kill_cam == null or not kill_cam.active:
+	if not _cinematic_active():
 		Engine.time_scale = 1.0
 
 

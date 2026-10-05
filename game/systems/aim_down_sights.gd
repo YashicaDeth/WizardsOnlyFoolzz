@@ -33,8 +33,14 @@ const SIGHTS := {
 ## Eye relief (metres from the rear sight back to the eye) and field of view,
 ## per stage. A pistol is held out at arm's length; a long gun is welded to
 ## the cheek, so its rear sight is almost at the eye.
+##
+## Fix-56 (Greg, 5 Oct: "the iron sights block the whole screen"): the pistol
+## was pulled to 0.34 / 0.24 m, so its two grip hands, their cuffs and both
+## sleeves filled the lower two thirds of the view. Out at a real two-hand
+## extension (0.50 / 0.40 m) the sight picture is a small notch-and-post at
+## the centre, as in a modern shooter, and the hands sit under it.
 const STAGES := {
-	"pistol": {"relief": [0.34, 0.24], "fov": [56.0, 40.0]},
+	"pistol": {"relief": [0.50, 0.40], "fov": [56.0, 44.0]},
 	"long": {"relief": [0.13, 0.085], "fov": [54.0, 40.0]},
 	"rifle": {"relief": [0.13, 0.085], "fov": [42.0, 20.0]},
 }
