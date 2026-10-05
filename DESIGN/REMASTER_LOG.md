@@ -310,3 +310,11 @@ Defaults set behind dials, all in `OrganSystem` unless named. None of these is G
   2. Make the syringe and scalpel visible in his hand during the telegraph (job6 remaster pass).
   3. Measure fps in the examiner office on the RTX 2060 SUPER (none measured yet).
 - **Failures:** no new ones (job2, job2b and lane-exit-routes are old ones, already handled).
+
+## Job 9 (v0.1 enemies), 2026-10-06: dials and defaults
+
+None of these are Greg's decisions; all are defaults behind constants, tuned so the headless duel bots (careful play) win with each weapon and mashing loses.
+- **Guards** (`systems/v01_guard.gd`): health staff 230 / pistol 170; staff pattern light, light_2, heavy, light, shock; blood share per hit 7% light, 11% heavy, 14% shock, 9% shot; block 3 stamina, regenerates every 3 s; he parries after 2 lights in a row; pistol aim 1.05 s, locks at 72%, 5-round magazine, 1.7 s reload.
+- **Freed subject** (`systems/v01_freed_subject.gd`): health 130; pounce windup 0.62 s (red); claw flurry of 3 (copper, 4% each); dazed 1.8 s after breaking out.
+- **Sentinel** (`systems/v01_sentinel.gd`): health 320; ram windup 1.0 s (red), 17%, then 2 s vent; slam 0.85 s (copper, blockable), 11%; light blows chip plates x0.35, heavies x1.2; core x2.0 melee, x2.5 shot; staff shock stuns 2.6 s; an eye shot blinds 3 s.
+- **Measured** (render_one, RTX 2060 SUPER, 1280x720, vsync off, across three runs): growing floor with the subject loose 110-125 fps; service arcade with three guards awake 116-142; lower works with the sentinel awake 111-200. One 72 ms spike on the growing floor in one run.

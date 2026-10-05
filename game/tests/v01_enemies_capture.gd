@@ -44,6 +44,7 @@ func _ready() -> void:
 	enc = vat.encounters
 	vat.doctor_route._take_axe()
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+	fps_lines.append("GPU %s (%s)" % [RenderingServer.get_video_adapter_name(), RenderingServer.get_video_adapter_vendor()])
 	await _growing_floor()
 	await _arcade()
 	await _lower_works()
@@ -88,8 +89,11 @@ func _growing_floor() -> void:
 	await _hold(foe, "claw", {"windup": 0.24, "colour": V01Foe.COPPER, "parryable": true, "blockable": true, "share": 0.04, "clip": "punch_jab"}, 0.75)
 	await _capture("v01_subject_2_claw_telegraph")
 	foe.cancel_windup()
+	var fought_at: Vector3 = vat.player.global_position - Vector3(0, vat.BODY_HALF_HEIGHT + 0.02, 0)
 	await _kill(foe, "cleaver")
-	_stand(foe.global_position + Vector3(0.4, 0, 2.4), foe.global_position + Vector3(0, 0.2, 0))
+	# From where the fight was, down at the body wherever it fell.
+	var torso := (foe.body as BaselineHuman).parts.get("torso") as Node3D
+	_stand(fought_at, torso.global_position if torso != null else foe.global_position)
 	for _frame in 20:
 		await get_tree().process_frame
 	await _capture("v01_subject_3_killed")
@@ -207,6 +211,10 @@ func _stand(at: Vector3, look: Vector3) -> void:
 func _hold(foe: V01Foe, move_id: String, spec: Dictionary, amount: float, pose: Callable = Callable()) -> void:
 	enc.set_physics_process(false)
 	foe.begin(move_id, spec)
+	# The hint line the real fight shows for this colour, not a stale one.
+	enc._taught.clear()
+	enc._teach_colour(spec)
+	fps_lines.append("HOLD %s %s: facing the player %.2f" % [foe.foe_id, move_id, foe.forward().dot((vat.player.global_position - foe.global_position).normalized())])
 	var frames := int(foe.windup_needed * amount * 60.0)
 	for _frame in frames:
 		foe.windup += 1.0 / 60.0
