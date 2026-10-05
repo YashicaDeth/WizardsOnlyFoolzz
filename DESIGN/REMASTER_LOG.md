@@ -365,6 +365,18 @@ Rendered with `render_one.cmd facility_one_map_capture`: before `P:/GameDev/Temp
 - Dials (defaults mine; Greg has not set them): `facility.gd` `ZONE_IDENTITY` true (false = the shared kit look and the arcade tanks back); `FacilityZoneIdentity.HEAT_GLOW_ENERGY` 1.4 (0 = no heat glow), `HEAT_COLOR` `b0782e`, `SIGN_FLICKER` true, `ROUTE_PAINT` 0.3 (how much paint colour shows over each floor); `SURFACES` and `WALL_SLOTS` tables pick each zone's set and which wall pools hold a prop.
 - Still weak: the halls are still mostly dark between pools, so the crane and the stalls read at the entry but small (16-25 m away); the shutters and props are Poly Haven's clean industrial look dimmed, not authored for this place; the surface head-house keeps the kit concrete; nothing here was checked on a pad walk, only the scripted capture walk.
 
+## Manager notes, 2026-10-06 07:15
+- **Merged since 05:10:** car-71 GTA door entry (25bb9561, merge 2a0b750a), imp-64 first-person arms (merge 66650270), imp-67 facility zone identity (a9ea21fe, merge fef433f0). All gates were green. imp-60 body look is running on claude-alt2. Every other account is parked (Claude until 09:04, Codex 11:52 to 10-11).
+- **Looked at** the builders' sheets from the merged commits: `P:/GameDev/Temp/imp67-final-after4/sheet.png` and `P:/GameDev/Temp/imp64/R_cleaver_combo.png`. I didn't do a fresh render, and no Godot window was open.
+  - imp-67: the artery and the arcade read better (each has its own tile and grime, the stalls and the route stripe). The Lower Works, the heat lift and the surface head-house are almost black: the crane and the vessels are only silhouettes between pools.
+  - imp-67 (and job9): the HUD prompt "RED GLINT // STEP OUT OR DODGE" stays up across every zone with no enemy nearby. I added it to `fix-73-enemy-reads`.
+  - imp-64: the sleeves are a purple checker, the gloves are blocky, and the cleaver is a flat slab with an orange edge. The Hunt still uses the old hands.
+- **Top 3:**
+  1. A second imp-64 pass: Hunt hands onto FirstPersonArms, a real sleeve and glove material, and the heated-cleaver glow. Queued as `remaster-imp-64-p1` (priority 70, claude).
+  2. fix-73 enemy reads and stale prompts (pending, 70).
+  3. Lower Works fill light. The 0.3-1 lux between pools hides imp-67's landmarks. Leave it to imp-62 lab look or a later imp-67 pass.
+- **Failures:** no new ones.
+
 ## 2026-10-06, imp-60 body look: flesh, faces, posture (Claude, Opus)
 Greg, 5 Oct ~19:00: *"Improve the bodies further (checker skin, helmet heads, hunched idle, ankle gaps)."* Follows the job2b retry entry's "Weak" list; `fix-job2-body-look` never ran, so this covers it too.
 Rendered with `render_one.cmd body_look_capture --out=DIR` (new capture: player base bare and dressed, guard 07, freed subject, examiner; front, side and face each). Before: `P:/GameDev/Temp/imp60/before/` (sheet `before_sheet.png`). After: `P:/GameDev/Temp/imp60/final/` (sheet `final_sheet.png`); the same capture with the dials off: `P:/GameDev/Temp/imp60/perf_off/` (`perf_off_sheet.png`); intermediate passes `after1`..`after6`.
