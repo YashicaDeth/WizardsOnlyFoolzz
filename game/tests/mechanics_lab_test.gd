@@ -43,8 +43,8 @@ func _ready() -> void:
 	get_tree().quit(0 if failures.is_empty() else 1)
 
 
-## Car-71: the plinth points at the cars; only USE at the driver's handle starts
-## the continuous door entry. R2 drives it, a round dents it, USE gets out.
+## Car-71: the plinth points at the cars; USE at a door handle starts the
+## continuous entry. R2 drives it, a round dents it, USE gets out.
 func _vehicles() -> void:
 	lab.go_to(4)
 	await _frames(2)
@@ -54,7 +54,9 @@ func _vehicles() -> void:
 	lab.player.global_position = lab.vehicles.driver.standing_point(car, VehicleDriver.DOOR_LEFT)
 	await _frames(2)
 	await _press("interact")
-	await _seconds(1.35)
+	await _seconds(0.3)
+	check(lab.player_body.rigged != null and lab.player_body.rigged._clip == "Interact", "the free rig animation reaches for the door during entry")
+	await _seconds(1.1)
 	check(lab.vehicles.driving(), "USE at the driver handle opens the door and seats you")
 	Input.action_press("pad_combat_r2")
 	var first_peak := 0.0

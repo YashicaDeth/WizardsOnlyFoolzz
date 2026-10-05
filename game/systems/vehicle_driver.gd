@@ -64,6 +64,8 @@ var _jam_pulls: Dictionary = {}
 var _horn: AudioStreamPlayer3D
 var _seat_avatar: BaselineHuman
 var _visual_layers: Dictionary = {}
+var _entry_handle_animated := false
+var _exit_brace_animated := false
 
 static var _carried: RigidBody3D = null
 
@@ -172,6 +174,8 @@ func begin_entry(vehicle: RigidBody3D, side := DOOR_LEFT) -> bool:
 			_set_phase("jam_pull")
 			last_message = "JAMMED // PULL %d/3" % pulls
 			return true
+		damage.free_door_latch(seat_side)
+		_jam_pulls.erase(key)
 		last_message = "JAMMED // KICKED FREE"
 	else:
 		last_message = "GETTING IN"
@@ -179,6 +183,7 @@ func begin_entry(vehicle: RigidBody3D, side := DOOR_LEFT) -> bool:
 	_camera_from = _walker_camera.global_transform
 	_set_walker_collision(false)
 	_show_walker_visual(true)
+	_entry_handle_animated = false
 	phase_time = 0.0
 	_set_phase("enter")
 	return true
@@ -197,6 +202,7 @@ func get_out(force := false) -> bool:
 	_camera_from = _active_camera().global_transform
 	_walker.global_transform = _seat_body_transform()
 	_show_walker_visual(false)
+	_exit_brace_animated = false
 	phase_time = 0.0
 	_set_phase("exit")
 	return true
@@ -310,6 +316,9 @@ func _tick_transition(delta: float) -> void:
 func _tick_enter(t: float, damage: VehicleDamage) -> void:
 	var missing := damage == null or damage.door_missing(seat_side)
 	var handle_pose := _standing_transform()
+	if t >= 0.18 and not _entry_handle_animated:
+		_entry_handle_animated = true
+		_play_walker_action("interact", 1.45)
 	if t < 0.22:
 		_walker.global_transform = _walker_from.interpolate_with(handle_pose, _smooth(t / 0.22))
 	elif t < 0.43:
@@ -355,6 +364,9 @@ func _tick_exit(t: float, damage: VehicleDamage) -> void:
 		_show_walker_visual(false)
 		_seat_avatar.visible = true
 	else:
+		if not _exit_brace_animated:
+			_exit_brace_animated = true
+			_play_walker_action("interact", 1.55)
 		if _seat_avatar != null:
 			_seat_avatar.visible = false
 		_show_walker_visual(true)
@@ -364,7 +376,6 @@ func _tick_exit(t: float, damage: VehicleDamage) -> void:
 ## Roll over the shoulder, then a stumble: the eyes pitch through a full turn
 ## and dip while the ground scrubs the inherited speed away.
 func _tick_bail(delta: float) -> void:
-	phase_time += delta
 	var flat := Vector3(_walker.velocity.x, 0.0, _walker.velocity.z) * exp(-3.2 * delta)
 	var fall := _walker.velocity.y - 9.8 * delta
 	if _walker.is_on_floor() and fall < 0.0:
@@ -625,6 +636,13 @@ func _sync_visual() -> void:
 		return
 	_walker_visual.global_transform = _walker.global_transform
 	_walker_visual.global_position -= Vector3.UP * 0.85
+
+
+func _play_walker_action(action: String, rate: float) -> void:
+	if _walker_visual is BaselineHuman:
+		var body := _walker_visual as BaselineHuman
+		if body.rigged != null:
+			body.rigged.play_action(action, rate)
 
 
 func _set_phase(next: String) -> void:

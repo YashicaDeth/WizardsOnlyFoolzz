@@ -32,6 +32,7 @@ func _ready() -> void:
 	await get_tree().create_timer(0.38).timeout
 	proof_camera.current = true
 	await _shot("03_body_sitting")
+	await _seat_proof()
 	await get_tree().create_timer(0.5).timeout
 	await _shot("04a_cab_view_after_ease")
 	proof_camera.current = true
@@ -112,8 +113,10 @@ func _build_stage() -> void:
 	proof_camera.fov = 55.0
 	proof_camera.cull_mask &= ~(1 << (VehicleInterior.CAB_LAYER - 1))
 	add_child(proof_camera)
-	proof_camera.global_position = Vector3(-5.5, 2.4, 3.4)
-	proof_camera.look_at(Vector3(-0.4, 0.7, 0.0))
+	# Driver-side and slightly forward: the door opening frames the seat instead
+	# of the B-pillar hiding the seated body from the proof camera.
+	proof_camera.global_position = Vector3(-5.2, 1.75, -1.25)
+	proof_camera.look_at(Vector3(-0.35, 0.9, -0.05))
 
 
 ## Play keeps the walking body hidden (first person); the proof shows where
@@ -124,6 +127,22 @@ func _show_outside_body(show: bool) -> void:
 		body_visual.global_transform = body.global_transform
 		body_visual.global_position -= Vector3.UP * 0.85
 		body_visual.look_at(body_visual.global_position + (body_visual.global_position - Vector3(0, body_visual.global_position.y, 0)).normalized() * -1.0, Vector3.UP)
+
+
+## The opaque exterior rightly hides most of a seated body. One proof frame
+## keeps the live cab and own-body layers but drops the exterior shell, making
+## the BaselineHuman seated pose and its placement at the wheel inspectable.
+func _seat_proof() -> void:
+	var outside_pose := proof_camera.global_transform
+	var outside_mask := proof_camera.cull_mask
+	proof_camera.cull_mask = (1 << (VehicleInterior.CAB_LAYER - 1)) | (1 << (VehicleDriver.OWN_BODY_LAYER - 1))
+	proof_camera.global_position = car.to_global(Vector3(-1.65, 0.72, 0.32))
+	proof_camera.look_at(car.to_global(Vector3(-0.38, 0.3, 0.12)), Vector3.UP)
+	proof_camera.current = true
+	await _shot("03a_seated_body_at_wheel")
+	proof_camera.global_transform = outside_pose
+	proof_camera.cull_mask = outside_mask
+	proof_camera.current = true
 
 
 func _shot(label: String) -> void:

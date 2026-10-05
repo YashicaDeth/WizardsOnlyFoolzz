@@ -77,12 +77,17 @@ var engine := 1.0
 ## name -> {node, material, hp, mass, wheel (index or -1)}
 var parts: Dictionary = {}
 var detached: Array[String] = []
+## A bent latch kicked clear stays openable for the life of this wreck. This
+## is deliberately separate from hp: forcing the latch does not repair metal.
+var freed_door_latches: Array[String] = []
 var max_crush := 0.0
 var hits := 0
 ## Slowest crumple pass so far (one impact), for the frame budget.
 var dent_usec_max := 0
 var driver: BaselineHuman
 var _meshes: Array[Dictionary] = []
+var _door_openings: Array[AABB] = []
+var door_aperture_faces := 0
 var _steam: CPUParticles3D
 var _spin := 0.0
 var _driver_seed := -1
@@ -200,6 +205,11 @@ func _door(part_name: String, side_sign: int, centre: Vector3) -> void:
 	panel.position = Vector3(0, 0, 0.72)
 	panel.scale = Vector3(1.0, 1.0, 1.45)
 	hinge.add_child(panel)
+	# The Kenney shell bakes its painted doors into the main body mesh. Cut a
+	# matching aperture behind this detachable panel; otherwise opening the
+	# bolt-on door only reveals another solid door and the body phases through
+	# it. The closed hinged part hides this deliberately inset opening.
+	_door_openings.append(AABB(centre + Vector3(-0.28, -0.03, -0.65), Vector3(0.56, 1.38, 1.30)))
 	_regrade(panel)
 	for mi in panel.find_children("*", "MeshInstance3D", true, false):
 		_track_mesh(mi as MeshInstance3D)
@@ -217,7 +227,14 @@ func door_missing(side_sign: int) -> bool:
 
 func door_jammed(side_sign: int) -> bool:
 	var part := door_part(side_sign)
-	return not part.is_empty() and float(part.hp) <= float(part.max_hp) * 0.68
+	var part_name := "DoorLeft" if side_sign < 0 else "DoorRight"
+	return not part.is_empty() and not freed_door_latches.has(part_name) and float(part.hp) <= float(part.max_hp) * 0.68
+
+
+func free_door_latch(side_sign: int) -> void:
+	var part_name := "DoorLeft" if side_sign < 0 else "DoorRight"
+	if not freed_door_latches.has(part_name):
+		freed_door_latches.append(part_name)
 
 
 func set_door_open(side_sign: int, amount: float) -> void:
@@ -297,12 +314,48 @@ func _track_mesh(mi: MeshInstance3D, finer := false) -> void:
 		var arrays := source.surface_get_arrays(index)
 		if finer:
 			arrays = _split_in_four(arrays)
+			arrays = _cut_door_apertures(arrays, mi.get_parent().transform * mi.transform)
 		copy.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 		copy.surface_set_material(index, source.surface_get_material(index))
 		entry.arrays.append(arrays)
 		entry.rest.append((arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).duplicate())
 	mi.mesh = copy
 	_meshes.append(entry)
+
+
+## Removes the shell triangles hidden by the two authored hinge panels. The
+## damage mesh already becomes unindexed in `_split_in_four`, so the cut can
+## retain exactly the vertex, normal and UV channels that crumpling uses.
+func _cut_door_apertures(arrays: Array, mesh_to_car: Transform3D) -> Array:
+	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV] if arrays[Mesh.ARRAY_TEX_UV] != null else PackedVector2Array()
+	var out_v := PackedVector3Array()
+	var out_n := PackedVector3Array()
+	var out_uv := PackedVector2Array()
+	for triangle in range(0, verts.size() - 2, 3):
+		var centre := mesh_to_car * ((verts[triangle] + verts[triangle + 1] + verts[triangle + 2]) / 3.0)
+		var cut := false
+		for opening in _door_openings:
+			if opening.has_point(centre):
+				cut = true
+				break
+		if cut:
+			door_aperture_faces += 1
+			continue
+		for corner in 3:
+			var source_index := triangle + corner
+			out_v.append(verts[source_index])
+			out_n.append(normals[source_index])
+			if not uvs.is_empty():
+				out_uv.append(uvs[source_index])
+	var result := []
+	result.resize(Mesh.ARRAY_MAX)
+	result[Mesh.ARRAY_VERTEX] = out_v
+	result[Mesh.ARRAY_NORMAL] = out_n
+	if not out_uv.is_empty():
+		result[Mesh.ARRAY_TEX_UV] = out_uv
+	return result
 
 
 ## One midpoint subdivision, unindexed. Positions, normals and UVs only; a

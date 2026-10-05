@@ -27,6 +27,7 @@ func _ready() -> void:
 	add_child(car)
 	car.teleport(Transform3D(Basis.IDENTITY, Vector3(0, 0.95, 0)))
 	damage = car.get_node("Damage") as VehicleDamage
+	check(damage.door_aperture_faces > 0, "the detachable panels cover real openings in the baked shell")
 	body = CharacterBody3D.new()
 	body.name = "Player"
 	add_child(body)
@@ -62,6 +63,7 @@ func _door_entry() -> void:
 	var seated_body := car.get_node_or_null("PlayerSeatBody") as BaselineHuman
 	var seated_head := seated_body.parts.get("head") as Node3D if seated_body != null else null
 	check(seated_head != null and absf(seated_body.position.y + seated_head.position.y - VehicleInterior.EYE.y) < 0.08, "the seated body stays inside the cab at eye height")
+	check(seated_body != null and seated_body.visible and seated_head is VisualInstance3D and (seated_head as VisualInstance3D).layers == 1 << (VehicleDriver.OWN_BODY_LAYER - 1), "the seated body is visible to exterior cameras on the own-body layer")
 	Input.action_press("pad_combat_r2")
 	await _seconds(1.5)
 	Input.action_release("pad_combat_r2")
@@ -101,14 +103,18 @@ func _moving_bail() -> void:
 	print("  bail speed=%.2f" % float(car.signed_speed))
 	check(driver.get_out() and driver.exit_kind == "jump", "getting out above GET_OUT_SPEED is a jump, not a refusal")
 	var saw_bail := false
+	var bail_elapsed := 0.0
 	var out_calls := [0]
 	driver.got_out.connect(func(_at: Vector3, _yaw: float) -> void: out_calls[0] += 1)
 	waited = 0.0
 	while (driver.occupied() or out_calls[0] == 0) and waited < 4.0:
 		saw_bail = saw_bail or driver.phase == "bail"
+		if driver.phase == "bail":
+			bail_elapsed += get_physics_process_delta_time()
 		await get_tree().physics_frame
 		waited += get_physics_process_delta_time()
 	check(saw_bail, "a moving exit rolls and stumbles before control returns")
+	check(bail_elapsed >= VehicleDriver.BAIL_SECONDS - 0.08 and bail_elapsed <= VehicleDriver.BAIL_SECONDS + 0.08, "the moving bail keeps its authored %.2f s duration (%.2f s)" % [VehicleDriver.BAIL_SECONDS, bail_elapsed])
 	check(not driver.occupied() and out_calls[0] == 1, "the bail hands the body back once")
 	var local := car.to_local(body.global_position)
 	check(absf(local.x) > float(car.hull_size.x) * 0.5 or absf(local.z) > float(car.hull_size.z) * 0.5, "the bail leaves the body outside the hull")
@@ -142,6 +148,7 @@ func _jammed_passenger_entry() -> void:
 	await _seconds(0.3)
 	check(driver.begin_entry(car, VehicleDriver.DOOR_RIGHT), "the third pull kicks a jammed door free")
 	await _seconds(1.35)
+	check(not damage.door_jammed(VehicleDriver.DOOR_RIGHT), "the kick frees the damaged latch instead of leaving a jammed prompt")
 	check(driver.seated and not driver.driving and driver.seat_side == VehicleDriver.DOOR_RIGHT, "the passenger side uses the same seated entry without taking the wheel")
 	driver.get_out(true)
 
