@@ -349,6 +349,14 @@ func rebuild() -> void:
 		_shape.shape = hull
 
 
+## Drops the shared material and the break voices, for a test or scene swap
+## that tears down before quitting (engine shutdown freeing static resources
+## late can crash).
+static func release() -> void:
+	_look = null
+	MaterialToughness.release()
+
+
 static func look() -> StandardMaterial3D:
 	if _look == null:
 		_look = StandardMaterial3D.new()

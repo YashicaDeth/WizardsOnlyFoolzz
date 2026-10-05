@@ -37,6 +37,19 @@ func _ready() -> void:
 	await _bodies()
 	await _breach()
 	print("DESTRUCTION_TOUGHNESS_TEST_RESULT failures=%d" % failures.size())
+	# Tear down before quitting, as gore_range_reset_test does: engine shutdown
+	# freeing the rig, the debris and the static gore in its own order crashed
+	# (139) about 1 run in 10 under Jolt.
+	GoreChunks.clear()
+	BaselineHuman.clear_gore()
+	WorldDebris.clear_pool(VoxelStructure.CUBE_POOL)
+	WorldDebris.clear_pool(VoxelStructure.CHUNK_POOL)
+	for child in get_children():
+		child.queue_free()
+	await get_tree().process_frame
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	VoxelStructure.release()
 	get_tree().quit(0 if failures.is_empty() else 1)
 
 
@@ -131,6 +144,14 @@ func _bodies() -> void:
 	check(not VoxelStructure.hurt_by(cube, hitbox).is_empty(), "a flying concrete cube wounds the body it meets")
 	cube.linear_velocity = Vector3.ZERO
 	check(VoxelStructure.hurt_by(cube, hitbox).is_empty(), "and a resting one does not")
+	# Done with them: a ragdolled dummy left lying while the lab runs made the
+	# exit crash (139) about 1 run in 10.
+	for node in get_children():
+		if node is RagdollBody or node.name in ["BlastDummy", "DebrisDummy"] or node == cube:
+			node.queue_free()
+	BaselineHuman.clear_gore()
+	await get_tree().physics_frame
+	await get_tree().physics_frame
 
 
 func _breach() -> void:

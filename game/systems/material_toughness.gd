@@ -104,6 +104,10 @@ static func source_for(kind: String) -> String:
 static var _sounds: Dictionary = {}
 
 
+static func release() -> void:
+	_sounds.clear()
+
+
 ## One break voice per material, synthesised once (`GoreChunks.impact_sample`)
 ## and cached, so brick, steel and dirt each sound like themselves.
 static func play_break(host: Node3D, at: Vector3, material: String) -> void:
