@@ -147,6 +147,9 @@ const FUEL_BURN_PER_SECOND := 0.012
 
 var throttle := 0.0
 var steering := 0.0
+## Rear-wheel handbrake. VehicleDriver owns the button; the chassis owns what
+## that means physically (rear grip lets go while the wheels are braked).
+var handbrake := false
 var fuel := 1.0
 ## V1.1. Hull integrity — the same shape `condition` already takes on the
 ## handheld (`handheld_device.gd`, C1.8) and a weapon's own wear
@@ -343,6 +346,8 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		# something: a beaten-up wrecker accelerates and brakes worse without
 		# losing its ability to catch a slide.
 		var grip_limit := load * TIRE_GRIP
+		if handbrake and REAR_WHEELS.has(index):
+			grip_limit *= 0.22
 		var drive_limit := grip_limit * _condition_scale()
 		var steered := forward if not FRONT_WHEELS.has(index) else forward.rotated(up, steer).normalized()
 		var lateral_axis := steered.cross(up).normalized()
@@ -364,6 +369,8 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 				longitudinal = -rolling * BRAKE_FORCE * mass * 0.25 * 0.2
 		elif not enabled:
 			longitudinal = -rolling * BRAKE_FORCE * mass * 0.25
+		if handbrake and REAR_WHEELS.has(index):
+			longitudinal += -rolling * BRAKE_FORCE * mass * 0.5
 		longitudinal -= rolling * ROLLING_DRAG * mass * 0.25 * 0.1
 		longitudinal = clampf(longitudinal, -drive_limit, drive_limit)
 		state.apply_force(steered * longitudinal, offset)

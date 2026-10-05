@@ -15,6 +15,7 @@ const GAMEPLAY_ACTIONS := [
 	"attack", "guard", "parry", "heavy", "reload", "lock_on", "perspective",
 	"wizard_eyes", "depth_scan", "heal", "inspect", "xray", "grapple",
 	"device", "inventory", "pause",
+	"vehicle_handbrake", "vehicle_horn",
 	"pad_combat_r1", "pad_combat_r2", "pad_combat_l1", "pad_combat_l2",
 ]
 
@@ -26,6 +27,7 @@ const REBINDABLE_ACTIONS := [
 	"attack", "guard", "parry", "heavy", "reload", "lock_on", "perspective",
 	"wizard_eyes", "depth_scan", "heal", "inspect", "xray", "grapple",
 	"device", "inventory", "pause",
+	"vehicle_handbrake", "vehicle_horn",
 ]
 
 const ACTION_LABELS := {
@@ -43,6 +45,7 @@ const ACTION_LABELS := {
 	"heal": "DRESS WOUND", "inspect": "INSPECT", "xray": "X-RAY / VATS",
 	"grapple": "GRAPPLE", "device": "BLACK MIRROR",
 	"inventory": "INVENTORY", "pause": "PAUSE",
+	"vehicle_handbrake": "HANDBRAKE", "vehicle_horn": "HORN",
 }
 
 ## Each entry is [kind, key/button/axis, optional direction]. Keyboard and
@@ -77,6 +80,8 @@ const SPECS := {
 	"device": [["key", KEY_G], ["button", JOY_BUTTON_BACK]],
 	"inventory": [["key", KEY_TAB], ["button", JOY_BUTTON_TOUCHPAD]],
 	"pause": [["key", KEY_ESCAPE], ["button", JOY_BUTTON_START]],
+	"vehicle_handbrake": [["key", KEY_SPACE], ["button", JOY_BUTTON_RIGHT_SHOULDER]],
+	"vehicle_horn": [["key", KEY_H], ["button", JOY_BUTTON_A]],
 	"pad_combat_r1": [["button", JOY_BUTTON_RIGHT_SHOULDER]],
 	"pad_combat_r2": [["axis", JOY_AXIS_TRIGGER_RIGHT, 1.0]],
 	"pad_combat_l1": [["button", JOY_BUTTON_LEFT_SHOULDER]],

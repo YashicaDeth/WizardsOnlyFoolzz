@@ -525,6 +525,13 @@ func prompt_for(player_position: Vector3, holding_ram: bool) -> String:
 ## Placeholder geometry in the house palette; Greg's model sheets (Higgsfield
 ## roadmap phase 9) replace it.
 func _kit_out() -> void:
+	dress_security(guard, guard_number)
+
+
+## The security kit over a guard's torso: vest, trauma plates, belt and
+## holster, and his number stencilled front and back. Shared with the v0.1
+## arcade squad (`V01Guard`).
+static func dress_security(guard: Node3D, number: String) -> void:
 	var parts: Dictionary = guard.get("parts")
 	var torso := parts.get("torso") as Node3D
 	if torso == null:
@@ -541,11 +548,11 @@ func _kit_out() -> void:
 	# Belt and holster.
 	_kit_box(kit, Vector3(0.48 * scale, 0.07, 0.32 * scale), Vector3(0, -0.27, 0), Color("1c1612"), "paint")
 	_kit_box(kit, Vector3(0.08, 0.2, 0.12), Vector3(0.27 * scale, -0.36, -0.02), Color("241a14"), "paint")
-	if guard_number.is_empty():
+	if number.is_empty():
 		return
 	for side in [-1.0, 1.0]:
 		var stencil := Label3D.new()
-		stencil.text = guard_number
+		stencil.text = number
 		stencil.font_size = 96
 		stencil.pixel_size = 0.0022
 		stencil.modulate = Color("d8cfb4")
@@ -556,7 +563,7 @@ func _kit_out() -> void:
 		kit.add_child(stencil)
 
 
-func _kit_box(parent: Node3D, size: Vector3, at: Vector3, colour: Color, surface: String) -> void:
+static func _kit_box(parent: Node3D, size: Vector3, at: Vector3, colour: Color, surface: String) -> void:
 	var piece := MeshInstance3D.new()
 	var box := BoxMesh.new()
 	box.size = size

@@ -310,3 +310,42 @@ Defaults set behind dials, all in `OrganSystem` unless named. None of these is G
   2. Make the syringe and scalpel visible in his hand during the telegraph (job6 remaster pass).
   3. Measure fps in the examiner office on the RTX 2060 SUPER (none measured yet).
 - **Failures:** no new ones (job2, job2b and lane-exit-routes are old ones, already handled).
+
+## Job 9 (v0.1 enemies), 2026-10-06: dials and defaults
+
+None of these are Greg's decisions; all are defaults behind constants, tuned so the headless duel bots (careful play) win with each weapon and mashing loses.
+- **Guards** (`systems/v01_guard.gd`): health staff 230 / pistol 170; staff pattern light, light_2, heavy, light, shock; blood share per hit 7% light, 11% heavy, 14% shock, 9% shot; block 3 stamina, regenerates every 3 s; he parries after 2 lights in a row; pistol aim 1.05 s, locks at 72%, 5-round magazine, 1.7 s reload.
+- **Freed subject** (`systems/v01_freed_subject.gd`): health 130; pounce windup 0.62 s (red); claw flurry of 3 (copper, 4% each); dazed 1.8 s after breaking out.
+- **Sentinel** (`systems/v01_sentinel.gd`): health 320; ram windup 1.0 s (red), 17%, then 2 s vent; slam 0.85 s (copper, blockable), 11%; light blows chip plates x0.35, heavies x1.2; core x2.0 melee, x2.5 shot; staff shock stuns 2.6 s; an eye shot blinds 3 s.
+- **Measured** (render_one, RTX 2060 SUPER, 1280x720, vsync off, across three runs): growing floor with the subject loose 110-125 fps; service arcade with three guards awake 116-142; lower works with the sentinel awake 111-200. One 72 ms spike on the growing floor in one run.
+
+## Manager notes, 2026-10-06 05:10
+- **Merged:** job9 enemies (a607fd89, merge 2efeed7b, gate green). The guards, the freed subject and the sentinel are on the one map. 9 of 10 v0.1 jobs have landed; only job7 is left. Every account is parked (Claude until 09:04, alt2 until 06:04, Codex 05:38-10-11).
+- **Looked at** the job9 proof PNGs from the merged run (`P:/GameDev/Temp/job9_shots/v01_guard_2_staff_shock_telegraph.png`, `v01_sentinel_1_ram_telegraph.png`, `v01_subject_1_pounce_telegraph.png`). I didn't do a fresh render because these came from the merged commit.
+  - Weak: in the shock wind-up the guard has his back to the player. The red glint is on the staff tip, low on the floor, and his body tells you nothing.
+  - Weak: from range, the sentinel's ram telegraph is a small orange square and one red dot. The machine is a dark box on wheels that blends into the floor.
+  - Weak: "CELLOUTZ 47 IS DOWN" (from the arcade) is still on screen in the Lower Works. The subtitle never clears.
+  - Weak: in the red-lit growing floor the freed subject is a small crouched figure, red on red. Its pounce telegraph is red too, so it gets lost. The room's red is not a danger cue.
+  - Weak: the guards are still mannequins with a red blob head (imp-60 body look is pending).
+  - Unknown: `v01_weapons_test` has 6 failures ("back round to the cleaver"). The job9 builder thinks lab-53 caused them. Nobody has checked on trunk.
+- **Top 3:**
+  1. Fix the enemy reads (guard faces the player while winding up, a sentinel telegraph you can see from range, the subtitle clears, the subject stands out in the vat room) and find out what is failing in v01_weapons_test. Queued as `fix-73-enemy-reads` (priority 70, claude).
+  2. job7 death, saves and HUD is the last v0.1 job (remaster-job7-p1 pending, keep it next).
+  3. imp-60 body look: the mannequin guards undercut every enemy telegraph.
+- **Failures:** no new ones.
+
+## car-71: GTA-style car door entry (2026-10-05)
+
+- **Wired:** the mechanics-lab cars now prompt only at a driver or passenger handle. USE walks the real lab body to the handle, swings the damage part on its hinge, turns and seats the body, closes the same door, and eases the live first-person camera into the existing cab. Exit reverses that route and resolves beside the door. A detached door skips the swing but not entry; a damaged/jammed door takes three pulls, ending in a kick. Taking damage interrupts entry.
+- **Driving:** R2/L2 throttle/brake, left stick steer, R1 handbrake, Triangle cab/chase toggle, Cross horn (keyboard W/S/A/D, Space, F, H). Exiting over `VehicleDriver.GET_OUT_SPEED` (5 m/s) is a moving bail with inherited velocity, outward shove and roll request rather than a refusal.
+- **Dials (defaults chosen here; Greg has not set them):** `VehicleDriver.ENTRY_SECONDS = 1.18`, `EXIT_SECONDS = 1.05`, `GET_OUT_SPEED = 5.0`, `REACH_TO_GET_IN = 1.05`; `VehicleDamage.door_jammed()` begins below 68% door HP and clears on pull 3. `VehicleStation.ALLOW_SEAT_DRAG = false`: enemy/sparring-partner dragging remains a stretch dial because its combat ownership and reactions are not yet authored. Passenger entry/exit is available through `VehicleDriver.DOOR_RIGHT`.
+- **Animation source:** procedural body/camera interpolation plus the project's existing Quaternius CC0 `Interact` clip for the handle and exit-brace beats, credited in `CREDITS.md`; no uncredited Mixamo download was added.
+- **Follow-up (2026-10-06):** a moving exit is now a `bail` phase: the body keeps the car's speed, the eyes roll through a full turn and then stumble, and control returns where the body lands (`VehicleDriver.BAIL_ROLL_SECONDS = 0.45`, `BAIL_SECONDS = 0.85`, defaults chosen here). Its clock advances once per physics frame, so that dial is the real duration. The lab offers whichever handle is nearest, driver or passenger; a third pull kicks a bent latch permanently free without repairing the door's hp. The hinged panels now cover real apertures cut from the kit's baked shell instead of opening onto a second painted door. The player's own body (walking and seated) is drawn on visual layer `VehicleDriver.OWN_BODY_LAYER = 5`, which the first-person eyes and the cab camera skip; before this the cab view rendered the inside of the seated body's head. Proof PNGs: `P:/GameDev/Temp/car-71-gta-door-entry/01..08`, with `03a_seated_body_at_wheel.png` isolating the live cab/body layers so the seated anatomy can be inspected.
+
+## 2026-10-06, imp-64 first-person arms (Claude, Opus)
+Greg, 5 Oct ~19:00: *"The first person needs a lot of work": animated first-person arms for swings, swing and hit sounds, and the Hunt must stop giving the old sword.*
+Rendered with `render_one.cmd fp_arms_capture --shots=P:/GameDev/Temp/imp64/run5` (128 PNGs; sheets `P:/GameDev/Temp/imp64/R_*.png`). Before: `P:/GameDev/Temp/imp64/before/sheet_cleaver.png` (blade floating in view, no hands). fps 175.9 holding the cleaver (RTX 2060 SUPER, vsync off).
+- Built: `systems/first_person_arms.gd` (procedural: gloved hands seated on the arsenal's grip anchors, forearm stretched to an off-screen elbow; idle breath, walk bob, look lag; wind-up/strike/follow-through/recovery read from `MeleeDriver`'s `SwordMoveset` phase; heavy charge tremble, block, parry flick, hit flinch, contact bounce, pistol recoil, reload with magazine drop, ADS, inspect; bare hands jab/hook/shove). `systems/fp_combat_audio.gd`: whoosh per weapon and weight, hit sound per surface (flesh, bone, metal, concrete, glass), 9 CC0 Freesound clips credited in `CREDITS.md`.
+- Wired: mechanics lab, Service Arcade cleaver, Growing Floor cleaver (doctor route), support unit. The Hunt issues the HOTLINE CLEAVER (`HunterArsenal.SLOT_ORDER`, `BloodTrees.starting_weapon`); `sword` stays defined for rooms and tests that name it.
+- Dials (defaults mine): `FirstPersonArms.REST/ARCS/GUARD/PARRY/INSPECT/RELOAD` key poses, `BACKHAND` 0.6, `INSPECT_SECONDS` 2.4; `FpCombatAudio.WHOOSH` pitch per weapon, `NAME_HINTS` for surfaces; `WeaponBody` cleaver mass 1.40 reach 0.80. Assistant proposal: the non-firearm styles start the Hunt on the cleaver.
+- Still weak: the Hunt's own first-person hands (`bone_yard_hunt.gd`) are not yet `FirstPersonArms`, so the Hunt cleaver has the older hold, not these arcs; the arms are procedural on code-built gloves and sleeves (the sleeves read as a purple checker), not the rigged body's arms or a Mixamo set; the heavy capture ends at the top of the wind-up; the magazine drop is hard to see; bone vs flesh is guessed from heavy blunt blows, not the anatomy's fracture report.
