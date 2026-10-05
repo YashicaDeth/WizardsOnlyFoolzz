@@ -1,7 +1,7 @@
 extends Node
 ## Greg's checklist: a first run with no dead ends. The guided path, end to
 ## end, through the real gates: filed and out of the tank, dressed, his door
-## down, him beaten, his card, the pit door; the jammed gate and the
+## down, him beaten, his card, the staff door; the jammed gate and the
 ## crawlway; the fuse, the sentinel, the heat elevator; up into the Hunt.
 ## Each step asserts the way on is open, so a dead end fails here first.
 
@@ -50,8 +50,17 @@ func _ready() -> void:
 	check(route.door.broken, "dressed, his door comes down (%d blows)" % blows)
 	check(vat._first_run_objective().contains("BEAT HIM"), "the objective points at him")
 	route.fight._win()
-	check(VatRebirth.carries(vat.STAFF_KEYCARD), "beaten, his keycard is yours")
-	check(vat._pit_door_open() and vat._first_run_objective().contains("PIT DOOR"), "and it opens the pit door: the way on")
+	# Job 6: beaten, his card falls to his floor; you pick it up.
+	check(route.fight.keycard_on_floor(), "beaten, his keycard lies on his floor")
+	var card_at: Vector3 = route.fight.keycard_pickup.global_position if route.fight.keycard_on_floor() else vat.player.global_position
+	vat.player.global_position = Vector3(card_at.x, vat.BODY_HALF_HEIGHT + 0.02, card_at.z + 0.6)
+	check(route.fight.take_keycard() and VatRebirth.carries(vat.STAFF_KEYCARD), "taken, his keycard is yours")
+	if vat.FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+		# One map: the staff door is the way on.
+		vat.player.global_position = Vector3(vat.STAFF_DOOR_AT.x - 1.2, vat.BODY_HALF_HEIGHT + 0.02, vat.STAFF_DOOR_AT.z)
+		check(vat._first_run_objective().contains("STAFF DOOR") and vat._try_staff_door() and vat.staff_door_open, "and it opens the staff door: the way on")
+	else:
+		check(vat._pit_door_open() and vat._first_run_objective().contains("PIT DOOR"), "and it opens the pit door: the way on")
 	vat.queue_free()
 	await get_tree().process_frame
 

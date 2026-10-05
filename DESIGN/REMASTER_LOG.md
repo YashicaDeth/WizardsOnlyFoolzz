@@ -253,6 +253,26 @@ Defaults set behind dials, all in `OrganSystem` unless named. None of these is G
 - **Measured (lab-53 capture, RTX 2060 SUPER, vsync off, ~7 other Godot processes running):** 282 fps mean and 236 minimum, per-second averages, over the wall hit and the SUV ram with both cars moving. One crumple pass costs 2.9-3.5 ms on the impact frame (the kit body is split once into 4x faces so creases show). That fits inside a 144 fps frame, but it is a one-frame spike the per-second counter hides. PNGs: `P:/GameDev/Temp/lab53/1_before.png`, `2_after_wall.png`, `3_after_ram.png`, `4_pad_wide.png`, `fps.txt`.
 - **Limits:** the crumple reads as a flattened, shortened nose with a wrinkle, not BeamNG's folded metal. The pad gives a 13 m run-up, too short to reach steel's ram tier, so the capture starts each car at 15 m/s. In play, take a lap of the yard first. **lab53b:** the pad is now a ~24 m lane on the yard's east side (start line by the south wall, crash wall under the roof); full throttle from parked reaches the wall at 15.5 m/s (steel needs 13.8 for the sedan) and the front bumper comes off (`mechanics_lab_test`). The menu teleport now takes you out of the car at any speed, and melee on a car counts as melee (dents, breaks glass, never takes steel off). Doors only come off from side hits or gunfire.
 
+## job6: the examiner, a real boss; his keycard always drops and opens the staff door (2026-10-05)
+
+- **Fight** (`systems/examiner_fight.gd`): about 30 s for a human with the cleaver. A LimboAI behaviour tree picks his moves when the plugin is on disk (built in code by name, as `rival_tactics.gd`), and the same five-branch selector runs in GDScript when it is not (`ExaminerFight.decide`). The scalpel wind-up glints bone-white and can be parried (PARRY: X / L2) into a 1.6 s opening with one double-damage riposte. The syringe glints sick green, lunges from 2.6 m, slows you 6 s and cannot be parried, only stepped out of. Poise is 3 calm / 4 desperate; a reel only interrupts a calm scalpel wind-up. Every third blow that catches him at rest is turned aside (20% damage) and answered with a quick parryable cut, so spamming him is punished. Under half health he is DESPERATE: quicker wind-ups, a follow-up cut, shorter rests, and the bar says so. A cold overhead pool lights his room during the fight. His rig takes every wound but never drops before the fight is won.
+- **Head breaking after two hits:** the screenshot (`greg_playtest_c_screenshot_2026-10-04`) shows the old Higgsfield ModelSkin coming apart zone by zone. fix-55 removed that skin; `examiner_keycard_test` asserts his head stays on through every seeded fight (three by default since land-job6; `--runs=10` for the full sweep).
+- **Click-spam kill:** blows at him skipped the weapon cooldown, so a fast clicker killed him in about a second. They now keep the weapon's own rhythm (axe 0.7 s), and they go through the InputMap actions, so R1 / L2 / R2 work on the pad.
+- **Keycard:** falls to his floor beside him as a lit pickup (use it, or walk over it once you have stepped clear), and is restored there on reload until taken. `ExaminerFight.has_keycard()` is the one check, and the staff door uses it. The door's prompt names the card and where it is (his office, or his office floor).
+- **Staff door (one map):** the shut leaf was a 1.4 m plate with no collision in a 3 m opening, so you could walk round it, and the old 1.55 m frame box stood in the middle of the opened doorway. The leaf now fills the opening with collision and a red reader that goes pale when it opens. The frame is two jambs and a head. His cupboard (2 field dressings, 8 rounds) stands on the artery wall instead of across the doorway. With the card in hand, the objective now says the staff door, not the sealed pit door.
+- **"Examiner office overlay blur" (carried in the manager notes):** that fix-55 shot was taken with the player still in the tank, so the blurred squares and bubbles are the in-tank medium seen through a separate capture camera. From the player's own view in his office there is no blur (`P:/GameDev/Temp/job6/shots/`).
+- **Dials (defaults I chose; Greg has not set these):** `HEALTH` 260; `PARRY_WINDOW` 0.3 s; `PARRIED_STAGGER` 1.6 s; `RIPOSTE` x2; `POISE` [3, 4]; `GUARD_EVERY` 3 at `GUARDED_SHARE` 0.2; `PHASE_TWO_AT` 0.5; wind-ups scalpel [0.6, 0.45] s, syringe [0.95, 0.75] s, follow-up 0.38 s; `COOLDOWN` [1.1, 0.7] s; `ARENA_LIGHT_ENERGY` 2.4 (0 turns it off). His lines and his final model stay OPEN (Greg's).
+- **Proof:** `render_one.cmd examiner_boss_capture --out=P:/GameDev/Temp/job6/shots`: 1 scalpel telegraph, 2 syringe telegraph, 3 desperate, 4 keycard on floor, 5 staff door shut, 6 staff door open onto the artery, 7 cupboard.
+
+## land-job6: the examiner merged onto claude/launch-latest (2026-10-06)
+
+- **Conflicts:** only this log (job6's section and the 21:08 / 23:10 manager notes; both kept). `vat_chamber.gd` auto-merged: job7's field inventory, rebirth site and facility checkpoints sit beside job6's staff door, keycard and cupboard.
+- **Fixed, caused by job6 (also red on hub/job6-the-examiner alone, green on the base):** `first_run_walk_test` still expected the card to go straight into the inventory and the pit door to be the way on. It now takes the card off his floor and opens the staff door (pit door kept for the two-map cut).
+- **Gate time:** `examiner_keycard_test` ran ten ~40 s fights (about 7 min), over `run_tests.sh`'s 200 s ceiling, so the gate timed it out. It now runs three by default; `--runs=10` (after `--`) gives the full sweep, which passed in 6 min 54 s on the merged tree.
+- **Tests (merged tree, headless, own APPDATA, `tools/run_tests.sh`):** all green: baseline_human, body_cut, opening_handoff, first_run_walk, first_thirty_route, examiner_fight, examiner_keycard (3 runs), examiner_feed, death_save_screen.
+- **Proof:** `render_one.cmd examiner_boss_capture --out=P:/GameDev/Temp/land-job6/shots` (7 PNGs, same framing as job6's `P:/GameDev/Temp/job6/shots`). Opened them all: rigged low-poly BaselineHuman body with the doctor's coat (no Higgsfield skin), wind-ups readable, DESPERATE on the bar under half health, the card lit on his floor, staff door shut then open onto the Service Artery, cupboard on the artery wall. His office from the player's view is sharp, no overlay blur. Lighting is dark with green-white pools.
+- **Limits:** his head still reads as stacked boxes (placeholder; his model and lines are Greg's). A warm red lamp washes the floor and left wall at the staff door (shots 5 and 6), which is not a danger cue; I left it alone. Shot 4 shows "CALL THE LIFT" because the capture camera stands on the lift landing; the card prompt wins in reach (`examiner_keycard_test`). No fps number. The glints are small at the capture distance, so the telegraph is judged from the test, not the PNG.
+
 ## Manager notes, 2026-10-05 21:08
 
 - **Merged since 19:08:** lab53b-land-vehicles (9a2df731: 24 m run-up lane, car exits on menu teleport, melee counts as melee) and job7-death-saves-screen (8c6c3e45: persisted subtitles/censor/graphics settings, device-aware inventory hints, blood-sigil capture; blood-fragment spending made a dial in e1031994). Both gates green.
@@ -264,3 +284,29 @@ Defaults set behind dials, all in `OrganSystem` unless named. None of these is G
   1. Queued `remaster-job7-p1` (70, claude) to make the sigil a dark pooled blood decal, swap the floating label for an in-reach prompt (or a dial that defaults to off), and re-render it in facility light.
   2. job6 must fix the examiner-office overlay blur and use the low-poly base for the examiner, not the Higgsfield skin (carried; it's running now).
   3. Render the fix-56 ADS capture, and get a real-GPU fps number for lab-46/47/48 (carried).
+
+## Manager notes, 2026-10-05 23:10
+
+- **Merged since 21:08:** nothing (76f8f0c1 is only a brief tweak).
+- **job6 built but did not land:** hub/job6-the-examiner has the finished boss (d212548a, 448141ec), but its merge into claude/launch-latest conflicted, and the hub put the full job back in pending to be rebuilt. I moved that rebuild to `queue/held/job6-the-examiner.md` and queued `land-job6-examiner` (priority 101, claude): merge the base into the kept branch, resolve the conflicts, rerun the gate, and render once. The builder's own notes say his head still reads as stacked boxes (a placeholder until Greg draws him), there's no fps number yet, and `blood_pool.gd` prints "cast a freed object" when a second test world loads.
+- **Priority order was broken:** imp-64/67/60/68 (98-95) were outranking job6 (94) and job9 (93), and those four are now running on claude-default and claude-alt. Pending headers are now job9 99; imp-61 90, 62 89, 63 88, 66 87, 65 86; art-69 85, art-49 84; v02-51 dropped to 40 (backlog).
+- **Rendering:** skipped. Nothing new merged, and every Claude slot is building.
+- **Failures:** job6, a merge conflict (see above). job2, job2b and lane-exit-routes are old.
+- **Top three:**
+  1. Land job6 (queued, 101).
+  2. job9 enemies next (99).
+  3. Render the fix-56 ADS capture, and get a real-GPU fps number for lab-46/47/48 and for job6 (carried).
+
+## Manager notes, 2026-10-06 02:10
+- **Merged:** land-job6 (793c8dcc, merge 39782473, gate green). The examiner boss, the keycard drop and the staff door are now on claude/launch-latest. 8 of 10 v0.1 jobs have landed; job9 enemies is building on claude-alt2 (since 01:42). Every other account is parked until 04:04 or later.
+- **Looked at** `P:/GameDev/Temp/examiner_boss_2_syringe_telegraph.png` and `_6_staff_door_open.png`.
+  - The telegraph reads: his hand flares white before the syringe. But the syringe itself can't be seen.
+  - Weak: the "open" staff door shot is a flat dark slab with a warm smear on it. It doesn't read as an opening onto the Service Artery.
+  - Weak: red lamps wash the walls and the floor near the door. Greg's rule is "red only on danger".
+  - Weak: the objective says "HIS CARD OPENS THE PIT DOOR" (`game/vat_chamber.gd:1651`), but the caption says "STAFF DOOR". The player is told two different door names for one door.
+  - Still Greg's: the examiner's box head and his lines.
+- **Top 3:**
+  1. Make the staff door read as a real opening, take the non-danger red out at the door, and use one door name in the objective. Queued as `fix-72-staff-door-read`.
+  2. Make the syringe and scalpel visible in his hand during the telegraph (job6 remaster pass).
+  3. Measure fps in the examiner office on the RTX 2060 SUPER (none measured yet).
+- **Failures:** no new ones (job2, job2b and lane-exit-routes are old ones, already handled).
