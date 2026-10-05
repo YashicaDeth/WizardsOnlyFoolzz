@@ -115,6 +115,13 @@ func _ready() -> void:
 		await get_tree().process_frame
 		reach = maxf(reach, arms.held.position.distance_to(fist_rest))
 	check(reach > 0.1, "the fist goes out (%.2f m)" % reach)
+	check(arms._audio != null and arms._audio.whooshes == 1, "and whooshes without a driver behind it")
+
+	# The Hunt issues the HOTLINE CLEAVER, not the old sword.
+	var issued := HunterArsenal.new()
+	check(issued.current_id == "cleaver" and HunterArsenal.SLOT_ORDER[0] == "cleaver" and not HunterArsenal.SLOT_ORDER.has("sword"), "the Hunt's issued blade is the cleaver")
+	check(BloodTrees.starting_weapon("blade") == "cleaver", "a blade style walks into the Hunt holding it")
+	issued.free()
 
 	print("FP_ARMS_TEST_RESULT failures=%d" % failures.size())
 	Engine.time_scale = 1.0

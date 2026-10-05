@@ -99,6 +99,7 @@ func _ready() -> void:
 
 
 func _combo(weapon: String) -> void:
+	lab.melee.stamina = MeleeDriver.MAX_STAMINA
 	Engine.time_scale = SLOW
 	lab.melee.press_light()
 	for frame in 18:
@@ -112,10 +113,12 @@ func _combo(weapon: String) -> void:
 
 
 func _heavy(weapon: String) -> void:
+	# A spent combo leaves too little stamina to swing a heavy at once.
+	lab.melee.stamina = MeleeDriver.MAX_STAMINA
 	Engine.time_scale = SLOW
 	lab.melee.press_heavy()
 	lab.melee.release_heavy()
-	await _sequence("%s_heavy" % weapon, 12, 0.36)
+	await _sequence("%s_heavy" % weapon, 16, 0.27)
 	Engine.time_scale = 1.0
 	await _seconds(0.8)
 
