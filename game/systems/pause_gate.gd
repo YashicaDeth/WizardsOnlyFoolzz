@@ -19,6 +19,7 @@ const Grunge := preload("res://systems/celloutz_grunge.gd")
 const Motion := preload("res://systems/celloutz_motion.gd")
 const BOOT_SPLASH := preload("res://boot_splash.gd")
 const LOOK := preload("res://systems/look_settings.gd")
+const QUALITY_ORDER := ["PERFORMANCE", "HIGH", "ULTRA"]
 
 const VOID := Color("060b09")
 const SMOKE := Color(0.03, 0.045, 0.038, 0.86)
@@ -120,12 +121,17 @@ func _ready() -> void:
 		"hud_opacity": 0.9,
 		"hud_style": "rails",
 		"reduced_glitch": false,
+		"subtitles": true,
+		"anatomy_presentation": AnatomyPresentation.DEFAULT_MODE,
+		"graphics_preset": WorldLook.quality_name(),
 	})
 	_ensure_buses()
 	_restore_screen()
 	_capture_default_binds()
 	_restore_keybinds()
+	WorldLook.set_quality_name(str(WorldHistory.subject(SETTINGS_ID).get("graphics_preset", WorldLook.quality_name())))
 	_apply_mix()
+	get_tree().node_added.connect(_apply_new_node_settings)
 	set_process(true)
 
 
@@ -179,6 +185,36 @@ func _cycle_gore() -> void:
 	var next: String = ORDER[(maxi(0, ORDER.find(_gore_mode())) + 1) % ORDER.size()]
 	WorldHistory.update_subject(SETTINGS_ID, {"gore": next}, "gore_setting_chosen")
 	BaselineHuman.apply_gore_setting()
+
+
+func _subtitles_enabled() -> bool:
+	return bool(WorldHistory.subject(SETTINGS_ID).get("subtitles", true))
+
+
+## Existing dialogue systems all name their presentation node Subtitle. Apply
+## the setting to the live scene without asking each speaker to grow a second
+## preference store; the node-added hook applies it as newly loaded scenes
+## build their subtitle controls.
+func _apply_subtitle_visibility(node: Node) -> void:
+	if node is CanvasItem and str(node.name).to_lower().contains("subtitle"):
+		(node as CanvasItem).visible = _subtitles_enabled()
+	for child in node.get_children():
+		_apply_subtitle_visibility(child)
+
+
+func _apply_new_node_settings(node: Node) -> void:
+	if node is CanvasItem and str(node.name).to_lower().contains("subtitle"):
+		(node as CanvasItem).visible = _subtitles_enabled()
+
+
+## Censor is a presentation dial over the same anatomy. Refresh live rigs so
+## changing it in pause is immediate; future rigs already read the persisted
+## AnatomyPresentation mode while they build.
+func _refresh_body_censors(node: Node) -> void:
+	if node is BaselineHuman:
+		BodyForms.refresh(node as BaselineHuman)
+	for child in node.get_children():
+		_refresh_body_censors(child)
 
 
 ## AG1.4. Whether the window is filling the screen. Read from the window rather
@@ -335,6 +371,9 @@ func _build_rows() -> void:
 	for bus_name in BUSES:
 		_rows.append({"id": "vol_%s" % bus_name, "label": bus_name.to_upper(), "value": "%03d" % roundi(_volume(bus_name) * 100.0), "slider": true})
 	_rows.append({"id": "gore", "label": "VIOLENCE", "value": _gore_mode()})
+	_rows.append({"id": "subtitles", "label": "SUBTITLES", "value": "ON" if _subtitles_enabled() else "OFF"})
+	_rows.append({"id": "censor", "label": "CENSOR", "value": "OFF" if AnatomyPresentation.is_explicit() else "ON"})
+	_rows.append({"id": "graphics", "label": "GRAPHICS", "value": WorldLook.quality_name()})
 	# AG1.4, from the first playtest: "idk if there's a full screen option." There
 	# was not. It belongs beside the other settings rather than in a key nobody
 	# is told about, and it persists like everything else here.
@@ -454,6 +493,17 @@ func _nudge(direction: int) -> void:
 		_set_volume(bus_name, _volume(bus_name) + 0.1 * float(direction))
 	elif id == "gore":
 		_cycle_gore()
+	elif id == "subtitles":
+		WorldHistory.update_subject(SETTINGS_ID, {"subtitles": not _subtitles_enabled()}, "subtitle_setting_changed")
+		_apply_subtitle_visibility(get_tree().root)
+	elif id == "censor":
+		AnatomyPresentation.set_mode("MOSAIC" if AnatomyPresentation.is_explicit() else "EXPLICIT")
+		_refresh_body_censors(get_tree().root)
+	elif id == "graphics":
+		var current := QUALITY_ORDER.find(WorldLook.quality_name())
+		var next: String = QUALITY_ORDER[posmod(current + direction, QUALITY_ORDER.size())]
+		WorldLook.set_quality_name(next)
+		WorldHistory.update_subject(SETTINGS_ID, {"graphics_preset": next}, "graphics_setting_changed")
 	elif id == "screen":
 		_set_fullscreen(not _fullscreen())
 	elif id == "hud_opacity":
@@ -492,7 +542,7 @@ func _activate() -> void:
 		"back":
 			page = "root"
 			highlighted = 0
-		"gore", "screen", "hud_opacity", "hud_style", "reduced_glitch":
+		"gore", "subtitles", "censor", "graphics", "screen", "hud_opacity", "hud_style", "reduced_glitch":
 			_nudge(1)
 		"controls":
 			page = "controls"
