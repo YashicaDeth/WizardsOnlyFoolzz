@@ -126,7 +126,7 @@ func _win_world() -> void:
 
 	# Now hit him. Keep your blood up so this is about your blows.
 	var clicks := 0
-	while fight.state != "won" and clicks < 40:
+	while fight.state != "won" and clicks < 90:
 		vat.anatomy.blood_remaining = vat.anatomy.blood_capacity
 		place(vat, fight.global_position + Vector3(1.1, 0, 0), fight.global_position + Vector3(0, 1.2, 0))
 		route.cooldown = 0.0
@@ -135,6 +135,15 @@ func _win_world() -> void:
 		for i in 3:
 			await get_tree().physics_frame
 	check(fight.state == "won", "he goes down (%d blows)" % clicks)
+	# Job 6: his card falls to the floor; step clear, then walk over it.
+	check(fight.keycard_on_floor() and not VatRebirth.carries(fight.KEYCARD), "his keycard falls to the floor")
+	var card: Vector3 = fight.keycard_pickup.global_position
+	place(vat, card + Vector3(1.5, 0, 0), card)
+	for i in 3:
+		await get_tree().physics_frame
+	place(vat, card, card + Vector3(0, 0, -1))
+	for i in 3:
+		await get_tree().physics_frame
 	check(VatRebirth.carries(fight.KEYCARD), "his keycard is yours")
 	check(Clothing.worn("player") == "examiner_coat", "and you are wearing his coat")
 	check(str(WorldHistory.subject("examiner_fight").get("status", "")) == "won", "the world remembers you beat him")
@@ -148,6 +157,8 @@ func _win_world() -> void:
 	vat._interact()
 	check(vat.staff_door_open, "the keycard opens the staff door")
 	var meds_before := FieldMeds.count()
+	# The cupboard is behind the door: in the one map, on the artery wall.
+	place(vat, vat._staff_cupboard_at() + Vector3(0, 0, -1.0), vat._staff_cupboard_at())
 	vat._interact()
 	check(FieldMeds.count() == meds_before + 2, "his cupboard: two field dressings")
 	vat._interact()
