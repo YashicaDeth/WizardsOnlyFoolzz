@@ -318,3 +318,18 @@ None of these are Greg's decisions; all are defaults behind constants, tuned so 
 - **Freed subject** (`systems/v01_freed_subject.gd`): health 130; pounce windup 0.62 s (red); claw flurry of 3 (copper, 4% each); dazed 1.8 s after breaking out.
 - **Sentinel** (`systems/v01_sentinel.gd`): health 320; ram windup 1.0 s (red), 17%, then 2 s vent; slam 0.85 s (copper, blockable), 11%; light blows chip plates x0.35, heavies x1.2; core x2.0 melee, x2.5 shot; staff shock stuns 2.6 s; an eye shot blinds 3 s.
 - **Measured** (render_one, RTX 2060 SUPER, 1280x720, vsync off, across three runs): growing floor with the subject loose 110-125 fps; service arcade with three guards awake 116-142; lower works with the sentinel awake 111-200. One 72 ms spike on the growing floor in one run.
+
+## Manager notes, 2026-10-06 05:10
+- **Merged:** job9 enemies (a607fd89, merge 2efeed7b, gate green). The guards, the freed subject and the sentinel are on the one map. 9 of 10 v0.1 jobs have landed; only job7 is left. Every account is parked (Claude until 09:04, alt2 until 06:04, Codex 05:38-10-11).
+- **Looked at** the job9 proof PNGs from the merged run (`P:/GameDev/Temp/job9_shots/v01_guard_2_staff_shock_telegraph.png`, `v01_sentinel_1_ram_telegraph.png`, `v01_subject_1_pounce_telegraph.png`). I didn't do a fresh render because these came from the merged commit.
+  - Weak: in the shock wind-up the guard has his back to the player. The red glint is on the staff tip, low on the floor, and his body tells you nothing.
+  - Weak: from range, the sentinel's ram telegraph is a small orange square and one red dot. The machine is a dark box on wheels that blends into the floor.
+  - Weak: "CELLOUTZ 47 IS DOWN" (from the arcade) is still on screen in the Lower Works. The subtitle never clears.
+  - Weak: in the red-lit growing floor the freed subject is a small crouched figure, red on red. Its pounce telegraph is red too, so it gets lost. The room's red is not a danger cue.
+  - Weak: the guards are still mannequins with a red blob head (imp-60 body look is pending).
+  - Unknown: `v01_weapons_test` has 6 failures ("back round to the cleaver"). The job9 builder thinks lab-53 caused them. Nobody has checked on trunk.
+- **Top 3:**
+  1. Fix the enemy reads (guard faces the player while winding up, a sentinel telegraph you can see from range, the subtitle clears, the subject stands out in the vat room) and find out what is failing in v01_weapons_test. Queued as `fix-73-enemy-reads` (priority 70, claude).
+  2. job7 death, saves and HUD is the last v0.1 job (remaster-job7-p1 pending, keep it next).
+  3. imp-60 body look: the mannequin guards undercut every enemy telegraph.
+- **Failures:** no new ones.
