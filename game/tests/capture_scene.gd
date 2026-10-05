@@ -91,6 +91,9 @@ func _ready() -> void:
 		scene._open_resolution(actor)
 		if trigger == "execution":
 			scene.resolution_ui._choose(0)
+			# Fix-58: the blow lands at the end of the beat's draw.
+			while scene.execution.active and not scene.kill_cam.active:
+				await get_tree().process_frame
 		for hold in 20:
 			await get_tree().process_frame
 	elif trigger in ["map", "map_walked"]:

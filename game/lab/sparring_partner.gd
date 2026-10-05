@@ -23,6 +23,10 @@ const RECOVERY := 0.7
 const REST := 1.3
 const DAMAGE := 18.0
 const RESPAWN_SECONDS := 12.0
+## Fix-58. A body on the floor waits for you this long before the lab stands a
+## fresh one up. Downed used to count as dead, so the body you were walking up
+## to finish (or had a hand inside) was deleted under you at twelve seconds.
+const DOWNED_SECONDS := 40.0
 ## Seconds it stands stunned after your parry.
 const PARRIED_STUN := 1.4
 
@@ -36,6 +40,7 @@ var clock := 0.0
 var swings := 0
 var outcomes: Array[String] = []
 var dead_for := 0.0
+var _death_seen := false
 
 
 func build(owner_lab: Node3D) -> void:
@@ -63,6 +68,7 @@ func _spawn() -> void:
 	state = "idle"
 	clock = 0.0
 	dead_for = 0.0
+	_death_seen = false
 
 
 func is_dead() -> bool:
@@ -74,8 +80,17 @@ func _physics_process(delta: float) -> void:
 		return
 	if is_dead():
 		flare.light_energy = 0.0
+		# Never under a finisher or a hand in the chest.
+		var in_use: bool = (lab.execution != null and lab.execution.active and lab.execution.victim == rig) 			or (not lab.rip.is_empty() and lab.rip.get("rig") == rig)
+		var dead_now := rig == null or not is_instance_valid(rig) or rig.anatomy.dead
+		if dead_now and not _death_seen:
+			# The clock to clear a corpse starts at the death, not the fall.
+			_death_seen = true
+			dead_for = 0.0
+		if in_use:
+			return
 		dead_for += delta
-		if dead_for >= RESPAWN_SECONDS:
+		if dead_for >= (RESPAWN_SECONDS if dead_now else DOWNED_SECONDS):
 			_spawn()
 		return
 	var player: CharacterBody3D = lab.player

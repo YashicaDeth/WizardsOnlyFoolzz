@@ -102,6 +102,10 @@ var hand: Node3D
 var hand_item: Dictionary = {}
 var _hand_age := 0.0
 var _hand_beat := false
+## Fix-58: finishing a downed body with what is in your hand (`ExecutionBeat`).
+## R1 / LMB on a body on the floor within reach, any weapon.
+var execution: ExecutionBeat
+const EXECUTE_REACH := 2.6
 
 
 func _ready() -> void:
@@ -130,6 +134,12 @@ func _ready() -> void:
 	arsenal.equipped.connect(func(_id: String) -> void: _hold_current())
 	lock_ring = LockRing.new()
 	add_child(lock_ring)
+	execution = ExecutionBeat.new()
+	execution.name = "Execution"
+	add_child(execution)
+	execution.landed.connect(_on_execution_landed)
+	execution.finished.connect(func(report: Dictionary) -> void:
+		_note("%s // %s" % [str(report.get("verb", "EXECUTED")), "DEAD" if bool(report.get("dead", false)) else "ALIVE"]))
 	sparring = SPARRING.new()
 	sparring.name = "SparringPartner"
 	sparring.position = SPARRING_AT
@@ -365,6 +375,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		# Directional swings follow the mouse's last move.
 		melee.set_swing_hint(Vector2(event.relative.x, -event.relative.y).limit_length(12.0) / 12.0)
+	if execution.active:
+		# The beat owns the body until it ends (always, by DEADLINE): no swing,
+		# shot, roll or press can start under it.
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("attack") and execute_downed():
+		get_viewport().set_input_as_handled()
+		return
 	if _movement_input(event):
 		return
 	if melee.handle_input(event):
@@ -573,11 +591,13 @@ func _physics_process(delta: float) -> void:
 		InputProfile.apply_stick_look(self, delta)
 	_update_lock(delta)
 	var input := Vector2.ZERO
-	if not menu_open:
+	if not menu_open and not execution.active:
 		input = _move_input()
 	if player_body != null:
 		mover.winded = bool(OrganSystem.failure(player_body.anatomy).no_sprint)
-	if not JUMP_CLIMB.busy(player):
+	if execution.active:
+		_face_execution(delta)
+	elif not JUMP_CLIMB.busy(player):
 		mover.tick(player, input, yaw, delta, melee)
 		JUMP_CLIMB.fall(player, delta)
 		player.move_and_slide()
@@ -589,6 +609,7 @@ func _physics_process(delta: float) -> void:
 		melee.set_swing_hint(input * Vector2(1, -1))
 	melee.tick(delta)
 	_pose_held(delta)
+	_pose_execution()
 	if tool == "drill" and not menu_open and Input.is_action_pressed("attack"):
 		destruction.drill(camera.global_position, -camera.global_basis.z, delta, player)
 	var feet := player.global_position - Vector3(0, 0.85, 0)
@@ -650,6 +671,68 @@ func attack(heavy: bool) -> Dictionary:
 	_land(met.collider, met.position, forward, shot, "melee", plane)
 	BODY_CAM.hit(camera, 0.04)
 	return shot
+
+
+## The nearest body on the floor in front of you and within reach, or null.
+func downed_in_reach() -> BaselineHuman:
+	var best: BaselineHuman = null
+	var best_distance := EXECUTE_REACH
+	var forward := -camera.global_basis.z
+	forward.y = 0.0
+	for rig: BaselineHuman in organ_rigs():
+		if rig == null or not is_instance_valid(rig) or not rig.is_downed():
+			continue
+		var to := rig.global_position - player.global_position
+		to.y = 0.0
+		var distance := to.length()
+		if distance > best_distance:
+			continue
+		if distance > 0.5 and forward.length_squared() > 0.01 and forward.normalized().dot(to.normalized()) < 0.2:
+			continue
+		best_distance = distance
+		best = rig
+	return best
+
+
+## R1 / LMB on a downed body in reach: the finisher for whatever is in hand.
+func execute_downed() -> bool:
+	if execution.active or not tool.is_empty() or not rip.is_empty():
+		return false
+	var rig := downed_in_reach()
+	if rig == null:
+		return false
+	if lock_target == rig:
+		lock_target = null
+	return execution.begin(player, rig, str(arsenal.current_id))
+
+
+func _on_execution_landed(report: Dictionary) -> void:
+	BODY_CAM.hit(camera, float((ExecutionBeat.STYLES.get(str(report.style), {}) as Dictionary).get("kick", 0.06)))
+	last_hit = {"what": "body", "zone": str(report.zone), "executed": true}
+	var taken: Dictionary = report.get("taken", {})
+	if not taken.is_empty():
+		var node := execution.victim.organ_parts.get("heart") as MeshInstance3D if execution.victim != null else null
+		var item := OrganSystem.carry_item(carry, taken)
+		_put_in_hand(node.mesh if node != null else null, node.material_override if node != null else null, item, true)
+	liquid.touch(report.get("at", player.global_position), 0.6)
+
+
+## The view turns onto the body and looks down at it while the beat runs.
+func _face_execution(delta: float) -> void:
+	player.velocity = Vector3.ZERO
+	var rate := clampf(delta * 14.0, 0.0, 1.0)
+	yaw = lerp_angle(yaw, execution.view_yaw, rate)
+	pitch = lerpf(pitch, -0.62, rate)
+
+
+## The held weapon is drawn back over the body and brought down on it.
+func _pose_execution() -> void:
+	if not execution.active or held_mount == null or not is_instance_valid(held_mount):
+		return
+	var draw := execution.wind()
+	var rest: Array = HELD_REST.get(str(arsenal.current_id), HELD_REST.sidearm)
+	held_mount.position = (rest[0] as Vector3) + Vector3(0, 0.14, 0.12) * draw
+	held_mount.rotation = (rest[1] as Vector3) + Vector3(0.9, 0, 0) * draw
 
 
 ## A blow from `MeleeDriver` met something. Cuts slice along the swing: a
@@ -769,6 +852,12 @@ func _update_hud() -> void:
 	var organ_prompt := _organ_prompt()
 	if not organ_prompt.is_empty():
 		_prompt.text = organ_prompt
+	if execution.active:
+		_prompt.text = ""
+	elif tool.is_empty() and rip.is_empty():
+		var downed := downed_in_reach()
+		if downed != null:
+			_prompt.text = "[%s] %s" % [InputProfile.glyph("attack"), "TAKE THE HEART" if ExecutionBeat.style_for(downed, str(arsenal.current_id)) == "rip" else "EXECUTE"]
 	_menu.visible = menu_open
 	if menu_open:
 		var rows := ["STATIONS   [%s] GO" % InputProfile.glyph("ui_accept")]

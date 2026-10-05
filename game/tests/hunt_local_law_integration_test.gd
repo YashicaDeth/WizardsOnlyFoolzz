@@ -52,6 +52,7 @@ func _ready() -> void:
 	target.anatomy.go_down()
 	hunt.resolution_target = str(target.subject_id)
 	hunt._resolve_downed("execute")
+	hunt.execution.complete_now()
 	var resolutions := WorldHistory.events.filter(func(event: Dictionary):
 		return str(event.get("type", "")) == "npc_resolution" and str((event.get("details", {}) as Dictionary).get("subject_id", "")) == str(target.subject_id))
 	check(resolutions.size() == 1, "the production resolution writes one canonical npc_resolution event")
@@ -147,6 +148,7 @@ func _ready() -> void:
 		repeated.anatomy.go_down()
 		hunt.resolution_target = str(repeated.subject_id)
 		hunt._resolve_downed("execute")
+		hunt.execution.complete_now()
 		var next_reports: Array = hunt.witness_ledger.tick(WitnessLedger.REPORT_DELAY * 2.0)
 		hunt._answer_local_reports(next_reports)
 		hunt.kill_cam.cancel()
