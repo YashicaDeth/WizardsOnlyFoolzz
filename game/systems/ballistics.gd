@@ -424,6 +424,11 @@ func _mark(at: Vector3, normal: Vector3, energy: float, collider: Object = null,
 	var core := _wound_disc(radius * 0.61, 0.008, Color("080605"), "ImpactCore")
 	core.position.y = 0.003
 	wound.add_child(core)
+	# Lab-47: a scar on a voxel wall goes with the wall, which drops it when
+	# the cell under it is blown away.
+	if collider is VoxelStructure:
+		wound.set_meta(VoxelStructure.SCAR, true)
+		wound.reparent(collider)
 	marks.append(wound)
 
 

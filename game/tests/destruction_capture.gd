@@ -14,9 +14,13 @@ var headless := DisplayServer.get_name() == "headless"
 
 
 func _ready() -> void:
-	for argument in OS.get_cmdline_user_args():
-		if argument.begins_with("--shots="):
-			shots = argument.trim_prefix("--shots=")
+	var arguments := OS.get_cmdline_user_args()
+	for index in arguments.size():
+		if arguments[index].begins_with("--shots="):
+			shots = arguments[index].trim_prefix("--shots=")
+		# render_one.cmd hands it over split at the "=".
+		elif arguments[index] == "--shots" and index + 1 < arguments.size():
+			shots = arguments[index + 1]
 	DirAccess.make_dir_recursive_absolute(shots)
 	var built := Time.get_ticks_usec()
 	lab = load("res://lab/mechanics_lab.tscn").instantiate()
@@ -72,7 +76,8 @@ func _ready() -> void:
 	_perf("shovel_scoop_ms_avg", (Time.get_ticks_usec() - started) / 1000.0 / 12.0)
 	_perf("scoops", scoops)
 	await _seconds(1.0)
-	await _shot("4_dug_and_crater", middle + Vector3(0.5, 3.4, 4.2), middle + Vector3(0, -1.0, 0))
+	# From the yard side (the patch's +z edge is 1.5 m from the perimeter wall).
+	await _shot("4_dug_and_crater", middle + Vector3(3.6, 3.2, 0.6), middle + Vector3(-0.2, -1.0, 0.4))
 
 	# The bunker: twelve seconds of thermal drill on the front.
 	var front: VoxelStructure = station.bunker_front
@@ -91,6 +96,10 @@ func _ready() -> void:
 	# Debris settled: the frame at the station.
 	await _seconds(4.0)
 	lab.go_to(3)
+	# Uncapped, so the number is the frame's cost and not the monitor's refresh.
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+	Engine.max_fps = 0
+	await _seconds(0.5)
 	var frames := 0
 	var physics_ms := 0.0
 	var process_ms := 0.0

@@ -36,6 +36,8 @@ const BROKEN_SHARE := 0.1
 ## A blast's shock reaches this far past its radius, at `shock` x its damage:
 ## weak walls (brick, drywall) blow out wide, hard ones only where it hit.
 const SHOCK_REACH := 1.6
+## Meta on a `Ballistics` scar that sits on a voxel wall (names get uniquified).
+const SCAR := &"voxel_scar"
 
 const FACES := [
 	[Vector3i(1, 0, 0), [Vector3(1, 0, 0), Vector3(1, 1, 0), Vector3(1, 1, 1), Vector3(1, 0, 1)]],
@@ -320,6 +322,7 @@ func rebuild() -> void:
 						colours.append(tint)
 					# Godot's front faces wind clockwise seen from outside.
 					indices.append_array([start, start + 2, start + 1, start, start + 3, start + 2])
+	_drop_scars()
 	if verts.is_empty():
 		_mesh.mesh = null
 		_shape.shape = null
@@ -347,6 +350,24 @@ func rebuild() -> void:
 		var hull := ConvexPolygonShape3D.new()
 		hull.points = verts
 		_shape.shape = hull
+
+
+## Bullet scars (`Ballistics`) with nothing left round them (a blast took
+## the wall there) go too. A scar over its own round's hole keeps its rim.
+func _drop_scars() -> void:
+	for child in get_children():
+		if not child.has_meta(SCAR):
+			continue
+		var scar := child as Node3D
+		var c := cell_of(scar.global_position - scar.global_basis.y * 0.03)
+		var held := false
+		for z in range(-1, 2):
+			for y in range(-1, 2):
+				for x in range(-1, 2):
+					if not cell_at(c + Vector3i(x, y, z)).is_empty():
+						held = true
+		if not held:
+			scar.queue_free()
 
 
 ## Drops the shared material and the break voices, for a test or scene swap

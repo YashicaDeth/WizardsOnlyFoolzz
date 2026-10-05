@@ -196,8 +196,15 @@ func _breach() -> void:
 	check(front.solid_count() < front_before, "and the bunker front has a hole")
 	# Last, so its flying brick does not land on the dig spot above.
 	var brick: VoxelStructure = station.brick_wall
+	# A pistol round's scar where the doorway will be.
+	lab.ballistics.fire(brick.to_global(Vector3(2.4, 1.0, 0.3)) + Vector3(0, 0, 1.5), Vector3.FORWARD, "pistol", 0.0, 1, "lab_player", {"damage": 24.0, "impulse": 2.0, "damage_type": "ballistic", "weapon": "sidearm"})
+	for frame in 10:
+		await get_tree().physics_frame
+	var scars := func() -> int: return brick.get_children().filter(func(node: Node) -> bool: return node.has_meta(VoxelStructure.SCAR) and not node.is_queued_for_deletion()).size()
+	check(scars.call() == 1, "a pistol round leaves its scar on the brick wall (%d)" % scars.call())
 	var brick_charge: Node3D = station.place_charge(brick.to_global(Vector3(2.0, 0.9, 0.3)), Vector3.BACK)
 	station.detonate(brick_charge)
+	check(scars.call() == 0, "and the charge takes the scar with the wall round it (%d left)" % scars.call())
 	check(station.broken_count() >= 1 and brick.broken(), "after the charge the brick wall counts as broken (%s)" % station.status())
 	var door := brick.cell_of(brick.to_global(Vector3(2.0, 0.0, 0.0))).x
 	var left_standing := 0
