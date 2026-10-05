@@ -34,11 +34,14 @@ func _ready() -> void:
 	lab.player.global_position = Vector3(0, 1.0, 17.0)
 	lab.yaw = PI
 	await _frames(4)
+	# Sample the rest only once the arms have posed a frame.
+	await get_tree().process_frame
+	await get_tree().process_frame
 	var rest := arms.held.position
 	var phases := {}
 	var furthest := 0.0
 	var off_grip := 0.0
-	var whooshes := lab.melee.audio.whooshes
+	var whooshes: int = lab.melee.audio.whooshes
 	lab.melee.press_light()
 	for _frame in 50:
 		await get_tree().process_frame
@@ -49,7 +52,7 @@ func _ready() -> void:
 	check(furthest > 0.12, "the hand really travels (%.2f m)" % furthest)
 	check(off_grip < 0.02, "the hand stays seated on the grip (%.3f m)" % off_grip)
 	await _seconds(0.5)
-	check(arms.held.position.distance_to(rest) < 0.06, "and comes home after")
+	check(arms.held.position.distance_to(rest) < 0.06, "and comes home after (%.3f m, %s)" % [arms.held.position.distance_to(rest), arms.last_phase])
 	check(lab.melee.audio.whooshes == whooshes + 1, "one whoosh for the swing")
 
 	lab.melee.set_guard(true)
