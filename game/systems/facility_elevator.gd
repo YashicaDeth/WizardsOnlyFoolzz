@@ -208,9 +208,9 @@ func _build_shaft() -> void:
 	# Light strips passing the car's slots: an amber bar every few metres on
 	# both side walls, and a real light every other one.
 	var strip := StandardMaterial3D.new()
-	strip.albedo_color = Color("ff9a3a")
+	strip.albedo_color = Color("d2ecc0")
 	strip.emission_enabled = true
-	strip.emission = Color("ff7a1a")
+	strip.emission = Color("b8e0a0")
 	strip.emission_energy_multiplier = 3.0
 	var y := bottom + 1.5
 	var count := 0
@@ -225,7 +225,7 @@ func _build_shaft() -> void:
 			add_child(bar)
 		if count % 2 == 0:
 			var lamp := OmniLight3D.new()
-			lamp.light_color = Color("ff8a3a")
+			lamp.light_color = Color("d2ecc0")
 			lamp.light_energy = 0.7
 			lamp.omni_range = 2.6
 			lamp.position = Vector3(SHAFT_HALF.x - 0.3, y, 0)
@@ -266,7 +266,7 @@ func _build_cab() -> void:
 			leaves.append(_leaf(cab, Vector3(side * DOOR_HALF * 0.5, DOOR_HEIGHT * 0.5, face * (CAR_HALF.y - 0.02)), Color("5a5048")))
 		_cab_doors[face] = leaves
 	var lamp := OmniLight3D.new()
-	lamp.light_color = Color("ffd6a0")
+	lamp.light_color = Color("d2ecc0")
 	lamp.light_energy = 1.2
 	lamp.omni_range = 3.2
 	lamp.position = Vector3(0, CAR_HEIGHT - 0.3, 0)

@@ -38,6 +38,10 @@ const GATE_Z := -137.0
 const CONCRETE := Color("1d1915")
 const RUST := Color("231a14")
 const CEILING := Color("100d0b")
+## DESIGN.md 28 Sep / Greg 5 Oct: harsh sick green-white pools, black between,
+## red only on danger. Shells wear the tunnel kit's grime, not flat colour.
+const LAMP_COLOR := Color("d2ecc0")
+const SURFACES := {CONCRETE: "floor", RUST: "wall", CEILING: "ceiling"}
 
 var player: CharacterBody3D
 var camera: Camera3D
@@ -325,12 +329,7 @@ func _room(title: String, y: float, xs: Vector2, zs: Vector2, height: float, gap
 	var steps := Vector2i(maxi(1, int((xs.y - xs.x) / 10.0)), maxi(1, int((zs.y - zs.x) / 10.0)))
 	for i in steps.x:
 		for j in steps.y:
-			var lamp := OmniLight3D.new()
-			lamp.light_color = Color("ffb27a")
-			lamp.light_energy = 1.6
-			lamp.omni_range = 9.0
-			lamp.position = Vector3(xs.x + (xs.y - xs.x) * (i + 0.5) / steps.x, y + height - 0.6, zs.x + (zs.y - zs.x) * (j + 0.5) / steps.y)
-			add_child(lamp)
+			_lamp(Vector3(xs.x + (xs.y - xs.x) * (i + 0.5) / steps.x, y + height - 0.1, zs.x + (zs.y - zs.x) * (j + 0.5) / steps.y))
 
 
 ## A corridor along X at z, 4 m grid: floor, ceiling, two side walls.
@@ -340,7 +339,7 @@ func _corridor_x(y: float, x0: float, x1: float, z: float, width: float, height:
 	_plate(y + height + 0.2, rect, Rect2(), CEILING)
 	for side: int in [-1, 1]:
 		_box(Vector3(x1 - x0, height, 0.3), Vector3((x0 + x1) * 0.5, y + height * 0.5, z + side * (width * 0.5 + 0.15)), RUST)
-	_lamp(Vector3((x0 + x1) * 0.5, y + height - 0.4, z))
+	_lamp(Vector3((x0 + x1) * 0.5, y + height - 0.05, z))
 
 
 func _corridor_z(y: float, x0: float, x1: float, z0: float, z1: float, height: float) -> void:
@@ -349,7 +348,7 @@ func _corridor_z(y: float, x0: float, x1: float, z0: float, z1: float, height: f
 	_plate(y + height + 0.2, rect, Rect2(), CEILING)
 	for x: float in [x0 - 0.15, x1 + 0.15]:
 		_box(Vector3(0.3, height, z1 - z0), Vector3(x, y + height * 0.5, (z0 + z1) * 0.5), RUST)
-	_lamp(Vector3((x0 + x1) * 0.5, y + height - 0.4, (z0 + z1) * 0.5))
+	_lamp(Vector3((x0 + x1) * 0.5, y + height - 0.05, (z0 + z1) * 0.5))
 
 
 ## A horizontal slab over `rect` (x, z), with an optional rectangular hole.
@@ -401,10 +400,13 @@ func _box(size: Vector3, at: Vector3, color: Color, solid := true) -> void:
 	var box := BoxMesh.new()
 	box.size = size
 	mesh.mesh = box
-	var material := StandardMaterial3D.new()
-	material.albedo_color = color
-	material.roughness = 0.9
-	mesh.material_override = material
+	if SURFACES.has(color):
+		mesh.material_override = TUNNEL_KIT.material(SURFACES[color])
+	else:
+		var material := StandardMaterial3D.new()
+		material.albedo_color = color
+		material.roughness = 0.9
+		mesh.material_override = material
 	if not solid:
 		mesh.position = at
 		add_child(mesh)
@@ -420,12 +422,29 @@ func _box(size: Vector3, at: Vector3, color: Color, solid := true) -> void:
 	body.add_child(collider)
 
 
+## A caged ceiling tube and the hard pool straight under it.
 func _lamp(at: Vector3) -> void:
-	var lamp := OmniLight3D.new()
-	lamp.light_color = Color("ffb27a")
-	lamp.light_energy = 1.2
-	lamp.omni_range = 7.0
-	lamp.position = at
+	var tube := MeshInstance3D.new()
+	var bar := BoxMesh.new()
+	bar.size = Vector3(1.1, 0.06, 0.14)
+	tube.mesh = bar
+	var glow := StandardMaterial3D.new()
+	glow.albedo_color = LAMP_COLOR
+	glow.emission_enabled = true
+	glow.emission = LAMP_COLOR
+	glow.emission_energy_multiplier = 2.5
+	tube.material_override = glow
+	tube.position = at
+	add_child(tube)
+	var lamp := SpotLight3D.new()
+	lamp.light_color = LAMP_COLOR
+	lamp.light_energy = 6.0
+	lamp.spot_range = 7.0
+	lamp.spot_angle = 52.0
+	lamp.spot_attenuation = 1.4
+	lamp.shadow_enabled = true
+	lamp.position = at + Vector3(0, -0.08, 0)
+	lamp.rotation.x = -PI * 0.5
 	add_child(lamp)
 
 

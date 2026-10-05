@@ -189,7 +189,7 @@ static func _lamp(piece: Node3D, energy: float) -> void:
 	_model(piece, "tunnel_lamp", Vector3(0, HEIGHT, 0), Basis.IDENTITY)
 	var lamp := OmniLight3D.new()
 	lamp.name = "Lamp"
-	lamp.light_color = Color("ffb27a")
+	lamp.light_color = Color("d2ecc0")
 	lamp.light_energy = energy
 	# Short reach and a steep falloff: pools of light with dark between them
 	# (the Shade's light/dark visibility reads these).
