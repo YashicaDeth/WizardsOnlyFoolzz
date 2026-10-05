@@ -71,6 +71,21 @@ func close_inventory() -> void:
 func handle_input(event: InputEvent) -> bool:
 	if not visible:
 		return false
+	if event.is_action_pressed("inventory") or event.is_action_pressed("ui_cancel"):
+		close_requested.emit()
+		return true
+	if event.is_action_pressed("ui_up"):
+		_step(-1)
+		return true
+	if event.is_action_pressed("ui_down"):
+		_step(1)
+		return true
+	if event.is_action_pressed("ui_accept"):
+		if inspect_rig != null:
+			_take_corpse_row()
+		elif carry != null and not carry.items.is_empty():
+			activate_requested.emit(selected)
+		return true
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_ESCAPE, KEY_O:
@@ -238,7 +253,8 @@ func _draw() -> void:
 	# down the side. Layout and hit areas are unchanged underneath.
 	GothicFrame.draw_cabinet(self, plate, float(Time.get_ticks_msec()) / 1000.0)
 	_t(plate.position + Vector2(28, 38), "FIELD INVENTORY // ONE BODY, ONE BAG", 21, INK, plate.size.x - 56)
-	_t(plate.position + Vector2(28, 62), "O / ESC CLOSE   ↑↓ SELECT   ENTER USE OR WIELD   P POCKET   M MEND CLOTH   B BRAIN", 12, INK * Color(1, 1, 1, 0.6), plate.size.x - 56)
+	var controls := "TOUCHPAD / CIRCLE CLOSE   D-PAD SELECT   CROSS USE OR WIELD" if _using_pad() else "O / ESC CLOSE   ↑↓ SELECT   ENTER USE OR WIELD   P POCKET   M MEND CLOTH   B BRAIN"
+	_t(plate.position + Vector2(28, 62), controls, 12, INK * Color(1, 1, 1, 0.6), plate.size.x - 56)
 
 	var body_rect := Rect2(plate.position + Vector2(28, 88), Vector2(250, plate.size.y - 116))
 	var bag_rect := Rect2(Vector2(body_rect.end.x + 24, body_rect.position.y), Vector2(plate.size.x - body_rect.size.x - 330, body_rect.size.y))
@@ -248,6 +264,11 @@ func _draw() -> void:
 	_draw_body(body_rect)
 	_draw_bag(bag_rect)
 	_draw_gear(gear_rect)
+
+
+func _using_pad() -> bool:
+	var profile := get_node_or_null("/root/InputProfile")
+	return profile != null and bool(profile.using_pad)
 
 
 ## Every line in the house face. `at.y` is a baseline and `px` the size the

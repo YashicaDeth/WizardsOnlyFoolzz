@@ -44,9 +44,10 @@ design decision, it is listed under OPEN; stop and report instead of choosing.
    earlier attempt: read `git log -3` and `git show --stat HEAD` and continue that
    work instead of starting over.
 5. **Look at it.** A change that affects what the player sees is not done
-   until you rendered it (capture harness under `game/tests/*_capture.tscn`, or
-   one windowed run on the right monitor) and opened the PNG. Say which PNGs in
-   the commit message.
+   until you rendered it and opened the PNG: `P:/GameDev/AgentHub/render_one.cmd <capture_scene_name>`
+   with `RENDER_REPO` set to your worktree (capture scenes are `game/tests/*_capture.tscn`).
+   Up to 3 windows may run at once; each closes itself after 4 minutes. Never leave a
+   Godot window open. Say which PNGs in the commit message.
 6. **Performance.** 144 fps or better on Greg's RTX 2060 SUPER in every room
    you touch (`F10` counter or `game/tests/*perf*` / frame-budget tests).
 7. **Report back** in three parts: what is done (with PNG paths and tests

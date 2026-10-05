@@ -263,3 +263,27 @@ Defaults set behind dials, all in `OrganSystem` unless named. None of these is G
 - **"Examiner office overlay blur" (carried in the manager notes):** that fix-55 shot was taken with the player still in the tank, so the blurred squares and bubbles are the in-tank medium seen through a separate capture camera. From the player's own view in his office there is no blur (`P:/GameDev/Temp/job6/shots/`).
 - **Dials (defaults I chose; Greg has not set these):** `HEALTH` 260; `PARRY_WINDOW` 0.3 s; `PARRIED_STAGGER` 1.6 s; `RIPOSTE` x2; `POISE` [3, 4]; `GUARD_EVERY` 3 at `GUARDED_SHARE` 0.2; `PHASE_TWO_AT` 0.5; wind-ups scalpel [0.6, 0.45] s, syringe [0.95, 0.75] s, follow-up 0.38 s; `COOLDOWN` [1.1, 0.7] s; `ARENA_LIGHT_ENERGY` 2.4 (0 turns it off). His lines and his final model stay OPEN (Greg's).
 - **Proof:** `render_one.cmd examiner_boss_capture --out=P:/GameDev/Temp/job6/shots`: 1 scalpel telegraph, 2 syringe telegraph, 3 desperate, 4 keycard on floor, 5 staff door shut, 6 staff door open onto the artery, 7 cupboard.
+
+## Manager notes, 2026-10-05 21:08
+
+- **Merged since 19:08:** lab53b-land-vehicles (9a2df731: 24 m run-up lane, car exits on menu teleport, melee counts as melee) and job7-death-saves-screen (8c6c3e45: persisted subtitles/censor/graphics settings, device-aware inventory hints, blood-sigil capture; blood-fragment spending made a dial in e1031994). Both gates green.
+- **Running:** job6-the-examiner on claude-alt2 (since 20:32). Every other account is parked (claude-default and claude-alt until 23:04, codex until 10-06 02:51 or later). 12 tasks pending, so no idle fills were needed.
+- **Rendering:** a windowed Godot ("Current Version") is already open, so I didn't launch one. I opened the builder's `P:/GameDev/Temp/job7-death-saves-screen/blood_sigil.png` instead.
+- **Still weak (job7):** the bloodstain is a glowing, translucent orange ghost body with two floating red discs and an orange ring. It sits on a bare plane under warm brown fog, which is off-palette and doesn't read as a bloodstain. A floating "YOUR OLD BODY" label hangs over it like debug text. The capture isn't in facility light.
+- **Failures:** none new (job2, job2b and lane-exit-routes are old ones).
+- **Top three:**
+  1. Queued `remaster-job7-p1` (70, claude) to make the sigil a dark pooled blood decal, swap the floating label for an in-reach prompt (or a dial that defaults to off), and re-render it in facility light.
+  2. job6 must fix the examiner-office overlay blur and use the low-poly base for the examiner, not the Higgsfield skin (carried; it's running now).
+  3. Render the fix-56 ADS capture, and get a real-GPU fps number for lab-46/47/48 (carried).
+
+## Manager notes, 2026-10-05 23:10
+
+- **Merged since 21:08:** nothing (76f8f0c1 is only a brief tweak).
+- **job6 built but did not land:** hub/job6-the-examiner has the finished boss (d212548a, 448141ec), but its merge into claude/launch-latest conflicted, and the hub put the full job back in pending to be rebuilt. I moved that rebuild to `queue/held/job6-the-examiner.md` and queued `land-job6-examiner` (priority 101, claude): merge the base into the kept branch, resolve the conflicts, rerun the gate, and render once. The builder's own notes say his head still reads as stacked boxes (a placeholder until Greg draws him), there's no fps number yet, and `blood_pool.gd` prints "cast a freed object" when a second test world loads.
+- **Priority order was broken:** imp-64/67/60/68 (98-95) were outranking job6 (94) and job9 (93), and those four are now running on claude-default and claude-alt. Pending headers are now job9 99; imp-61 90, 62 89, 63 88, 66 87, 65 86; art-69 85, art-49 84; v02-51 dropped to 40 (backlog).
+- **Rendering:** skipped. Nothing new merged, and every Claude slot is building.
+- **Failures:** job6, a merge conflict (see above). job2, job2b and lane-exit-routes are old.
+- **Top three:**
+  1. Land job6 (queued, 101).
+  2. job9 enemies next (99).
+  3. Render the fix-56 ADS capture, and get a real-GPU fps number for lab-46/47/48 and for job6 (carried).
