@@ -139,8 +139,11 @@ func _roll_and_lock() -> void:
 func _sparring() -> void:
 	var partner = lab.sparring
 	check(partner != null and not partner.is_dead(), "a sparring partner stands in the lab")
-	await _button(JOY_BUTTON_DPAD_RIGHT)
-	await _frames(2)
+	# Lab-47 put its four physical destruction tools after the sidearm in the
+	# same NEXT cycle. Keep driving the real pad action until weapons wrap.
+	for _step in lab.DESTRUCTION.TOOLS.size() + 1:
+		await _button(JOY_BUTTON_DPAD_RIGHT)
+		await _frames(2)
 	check(str(lab.arsenal.current_id) == "cleaver", "back round to the cleaver")
 	await _face(partner.rig, 2.0)
 	# Parry: L2 late in its windup.

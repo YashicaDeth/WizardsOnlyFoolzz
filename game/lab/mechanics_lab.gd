@@ -135,7 +135,9 @@ func _ready() -> void:
 	melee.setup(arsenal, camera, [player.get_rid()])
 	melee.struck.connect(_on_melee_struck)
 	melee.kicked.connect(func(amount: float) -> void: BODY_CAM.hit(camera, amount))
-	arsenal.equipped.connect(func(_id: String) -> void: _hold_current())
+	arsenal.equipped.connect(func(_id: String) -> void:
+		_hold_current()
+		_sync_pad_combat_context())
 	lock_ring = LockRing.new()
 	add_child(lock_ring)
 	execution = ExecutionBeat.new()
@@ -156,6 +158,8 @@ func _ready() -> void:
 	_build_hud()
 	_build_organ_kit()
 	PadBridge.set_combat_receiver(self)
+	PadBridge.reset_combat_layer()
+	_sync_pad_combat_context()
 	if OS.get_environment("ATG_TEST_MODE") != "1":
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -428,8 +432,22 @@ func _exit_tree() -> void:
 
 
 func _discipline_changed(id: String) -> void:
+	# Discipline verbs own the shoulders regardless of the object still shown
+	# in hand. OFF returns control to the weapon's ordinary melee/firearm map.
+	PadBridge.set_combat_context("melee" if id != "off" else _weapon_combat_context())
 	PadBridge.set_combat_layer(id, CombatInputLayer.DUELIST if id == "duelist" else (CombatInputLayer.SHADE if id == "shade" else {}))
 	_note("DISCIPLINE // %s" % id.to_upper())
+
+
+func _weapon_combat_context() -> String:
+	return "firearm" if arsenal != null and str(arsenal.current().get("kind", "")) == "firearm" else "melee"
+
+
+func _sync_pad_combat_context() -> void:
+	if disciplines != null and disciplines.active != "off":
+		PadBridge.set_combat_context("melee")
+	else:
+		PadBridge.set_combat_context(_weapon_combat_context())
 
 
 ## Semantic pad receiver: each discipline owns its shoulder meanings while

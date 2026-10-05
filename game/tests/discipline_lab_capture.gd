@@ -28,12 +28,18 @@ func _ready() -> void:
 	eye.current = true
 
 	lab.disciplines.activate("duelist")
+	lab.player.global_position = lab.sparring.holder.global_position + Vector3(0, 1.0, 2.4)
+	lab.player.velocity = Vector3.ZERO
+	lab.yaw = 0.0
+	lab.toggle_lock()
+	lab.sparring._enter("windup")
 	lab.disciplines.open_riposte(lab.sparring.rig)
-	await _shot("duelist", lab.sparring.holder.global_position + Vector3(4.8, 2.2, 4.8), lab.sparring.rig.global_position + Vector3.UP)
+	await get_tree().create_timer(0.22).timeout
+	await _shot("duelist", lab.sparring.holder.global_position + Vector3(2.8, 1.65, 3.0), lab.sparring.rig.global_position + Vector3.UP)
 
 	lab.disciplines.activate("shade")
 	lab.disciplines.toggle_darkness()
-	await _shot("shade_darkness", lab.disciplines.to_global(Vector3(4.8, 2.0, 2.0)), lab.disciplines.target.global_position + Vector3.UP)
+	await _shot("shade_darkness", lab.disciplines.to_global(Vector3(3.7, 1.8, 1.3)), lab.disciplines.target.global_position + Vector3.UP)
 	print("DISCIPLINE_LAB_CAPTURE wrote %s" % shots)
 	get_tree().quit(0)
 

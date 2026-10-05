@@ -18,6 +18,7 @@ func _ready() -> void:
 	add_child(lab)
 	await _frames(5)
 	var station = lab.disciplines
+	check(station.active == "off", "the backlog disciplines default OFF in the lab")
 
 	station.activate("duelist")
 	check(CombatInputLayer.verb(CombatInputLayer.discipline("duelist"), CombatInputLayer.L2, "melee") == "duelist_parry", "Duelist owns a distinct shoulder-button layer")
@@ -38,9 +39,11 @@ func _ready() -> void:
 	var riposte: Dictionary = station.modify_melee({"damage": 20.0, "impulse": 8.0}, lab.sparring.rig)
 	check(bool(riposte.get("riposte", false)) and is_equal_approx(float(riposte.damage), 40.0), "a parry opens one doubled riposte")
 
+	lab.arsenal.select_weapon("sidearm")
 	station.activate("shade")
 	check(CombatInputLayer.verb(CombatInputLayer.discipline("shade"), CombatInputLayer.R2, "melee") == "shade_throw", "Shade owns a distinct shoulder-button layer")
 	check(PadBridge.combat_layer_id == "shade", "the station swaps the shared pad bridge to Shade")
+	check(PadBridge.combat_context == "melee", "the discipline layer owns its verbs even if a firearm was selected")
 	var target: BaselineHuman = station.target
 	var front := target.global_position - target.global_basis.z * 1.2
 	lab.player.global_position = front
