@@ -18,7 +18,6 @@ extends Node3D
 
 const LOOK := preload("res://systems/examiner_look.gd")
 const CARRY := preload("res://systems/carry.gd")
-const MODEL_SKIN := preload("res://systems/model_skin.gd")
 const CLOTHING := preload("res://systems/clothing.gd")
 const VAT_REBIRTH := preload("res://systems/vat_rebirth.gd")
 
@@ -59,12 +58,6 @@ var body: BaselineHuman
 var mask: Node3D
 var scalpel: Node3D
 var syringe: Node3D
-## Greg's generated examiner (his M1 sheet, Higgsfield) as a skin on this rig:
-## null when the media is missing. It shows on pristine zones and hands each
-## zone back to the rig's own gore-capable body the moment anything gory
-## happens to it (ModelSkin), so the fight's wounds and dismemberment are
-## exactly what they were.
-var skin: Node3D
 var state := "idle"
 var health := HEALTH
 var clock := 0.0
@@ -101,7 +94,7 @@ func setup(owner_route: Node3D, bench_at: Vector3, room_x: Vector2, room_z: Vect
 	body = BaselineHuman.new()
 	body.name = "OfficeExaminer"
 	add_child(body)
-	body.build("office_examiner", BaselineHuman.config_from_subject({"race": "decanted"}).merged({"gore": true}, true))
+	body.build("office_examiner", BaselineHuman.config_from_subject({"race": "decanted"}).merged({"gore": true, "rigged": true}, true))
 	var appearance := HunterAppearance.new()
 	body.add_child(appearance)
 	appearance.configure(body, {"axes": {"brow": 0.7, "jaw": 0.6, "cheek": 0.2, "eyes": 0.3, "nose": 0.55, "mouth": 0.4}})
@@ -119,9 +112,6 @@ func setup(owner_route: Node3D, bench_at: Vector3, room_x: Vector2, room_z: Vect
 	position = bench_at + Vector3(0.8, 0.0, 0.0)
 	post = position
 	body.rotation.y = -PI * 0.5
-	skin = MODEL_SKIN.attach(body)
-	if skin != null:
-		skin.hold_tools(scalpel, syringe)
 	_build_bar()
 
 
@@ -250,6 +240,11 @@ func _fight(delta: float, to_player: Vector3, distance: float) -> void:
 			attacks_made += 1
 			winding = "syringe" if attacks_made % 3 == 0 else "scalpel"
 			windup = 0.0
+			if body.rigged != null:
+				# The clip's strike lands as the wind-up ends.
+				var clip := "spell_cast" if winding == "syringe" else "sword_attack"
+				var length := body.rigged.player.get_animation(str(RiggedBody.CLIPS[clip])).length
+				body.rigged.play_action(clip, length / (SYRINGE_WINDUP if winding == "syringe" else SCALPEL_WINDUP))
 
 
 ## The blow lands if you are still in reach when the wind-up ends.
@@ -301,9 +296,6 @@ func _notice() -> void:
 func _win() -> void:
 	state = "won"
 	winding = ""
-	# The coat is the player's now: the rig's own coatless body shows.
-	if skin != null:
-		skin.retire()
 	var carry := CARRY.new()
 	carry.items.append({"label": KEYCARD, "kind": "key", "mass": 0.05, "perishes": false, "age": 0.0, "opens": "staff_door"})
 	carry.save_to_history()
@@ -350,8 +342,9 @@ func _pose(raise: float, walking: float) -> void:
 	if _recoil > 0.0:
 		_recoil = move_toward(_recoil, 0.0, get_physics_process_delta_time() * 3.0)
 		body.rotation.x = -0.3 * ease(_recoil, 0.6)
-	if skin != null:
-		skin.set_windup(raise, winding == "syringe")
+	# Rigged (RiggedBody): the bones own the arms; the wind-up is a clip.
+	if body.rigged != null:
+		return
 	var right := body.parts.get("right_arm") as Node3D
 	var left := body.parts.get("left_arm") as Node3D
 	var swing := sin(walk_phase) * 0.35 * walking
