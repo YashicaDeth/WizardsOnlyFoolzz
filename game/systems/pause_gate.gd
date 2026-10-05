@@ -268,6 +268,19 @@ func _cycle_hud_style() -> void:
 	WorldHistory.update_subject(SETTINGS_ID, {"hud_style": "arcs" if _hud_style() == "rails" else "rails"}, "hud_setting_changed")
 
 
+## imp-68. The field HUD's face (and the pockets that follow it). Empty means
+## the HUD's own default; see `gothic_field_hud.gd` FACE_STYLES.
+func _hud_face() -> String:
+	var chosen := str(WorldHistory.subject(SETTINGS_ID).get("hud_face", ""))
+	return chosen if chosen in FaceMonitor.STYLES else FaceMonitor.DEFAULT_STYLE
+
+
+func _cycle_hud_face(direction := 1) -> void:
+	var at := FaceMonitor.STYLES.find(_hud_face())
+	var next: String = FaceMonitor.STYLES[posmod(at + direction, FaceMonitor.STYLES.size())]
+	WorldHistory.update_subject(SETTINGS_ID, {"hud_face": next}, "hud_setting_changed")
+
+
 func _toggle_reduced_glitch() -> void:
 	WorldHistory.update_subject(SETTINGS_ID, {"reduced_glitch": not _reduced_glitch()}, "hud_setting_changed")
 
@@ -350,6 +363,7 @@ func _build_rows() -> void:
 		_rows.append({"id": "hud_opacity", "label": "HUD OPACITY", "value": "%03d" % roundi(_hud_opacity() * 100.0), "slider": true})
 		_rows.append({"id": "hud_style", "label": "HUD STYLE", "value": _hud_style().to_upper()})
 		_rows.append({"id": "reduced_glitch", "label": "REDUCED GLITCH", "value": "ON" if _reduced_glitch() else "OFF"})
+		_rows.append({"id": "hud_face", "label": "HUD FACE", "value": _hud_face().to_upper()})
 		_rows.append({"id": "settings_back", "label": "BACK", "value": ""})
 		return
 	if page == "controls":
@@ -512,6 +526,8 @@ func _nudge(direction: int) -> void:
 		_cycle_hud_style()
 	elif id == "reduced_glitch":
 		_toggle_reduced_glitch()
+	elif id == "hud_face":
+		_cycle_hud_face(direction)
 	elif id == "look_sensitivity":
 		LOOK.set_value("look_sensitivity", clampf(snappedf(LOOK.sensitivity() + 0.1 * float(direction), 0.05), LOOK.SENSITIVITY_RANGE.x, LOOK.SENSITIVITY_RANGE.y))
 	elif id == "invert_y":
@@ -542,7 +558,7 @@ func _activate() -> void:
 		"back":
 			page = "root"
 			highlighted = 0
-		"gore", "subtitles", "censor", "graphics", "screen", "hud_opacity", "hud_style", "reduced_glitch":
+		"gore", "subtitles", "censor", "graphics", "screen", "hud_opacity", "hud_style", "reduced_glitch", "hud_face":
 			_nudge(1)
 		"controls":
 			page = "controls"
