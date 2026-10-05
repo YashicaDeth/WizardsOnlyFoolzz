@@ -40,11 +40,11 @@ const SUBJECT_BREAKS_OUT := true
 const SUBJECT_TRIGGER := 3.0
 const GUARD_DROPS_WEAPON := true
 ## Player blows on foes, per weapon (light). Heavy x1.6, charged x2.2,
-## riposte (after your parry) x2.
+## riposte (after your parry) x1.75.
 const PLAYER_DAMAGE := {"cleaver": 30.0, "staff": 22.0, "restraint": 16.0, "fists": 9.0, "gun": 45.0}
 const HEAVY := 1.6
 const CHARGED := 2.2
-const RIPOSTE := 2.0
+const RIPOSTE := 1.75
 const HEADSHOT := 1.6
 ## Your parry window and how long a parried foe stays open.
 const PARRY_WINDOW := 0.3
@@ -267,6 +267,7 @@ func _physics_process(delta: float) -> void:
 		heavy_held += delta
 		if heavy_held >= MOVESET.CHARGED_HEAVY_SECONDS + 0.4:
 			_release_heavy()
+	_poll_input()
 	_move_player(delta)
 	_advance_swing(delta)
 	var at: Vector3 = _player_at()
@@ -309,46 +310,39 @@ func _move_player(delta: float) -> void:
 
 # --- Input: the player's side. --------------------------------------------------------
 
-func _unhandled_input(event: InputEvent) -> void:
-	if chamber == null or dead or not bool(chamber.get("can_move")):
+## The fight's verbs are read from the InputMap each physics frame (pad,
+## keys and mouse alike), not from events: the chamber spends Square, Space
+## and the mouse on its own verbs first. Use (Square / E) reaches pickups
+## through the chamber's own `_interact` (`use`), as the examiner's card does.
+func _poll_input() -> void:
+	if chamber.get("intake") != null:
 		return
-	if handle_input(event):
-		get_viewport().set_input_as_handled()
-
-
-## True when the event was spent on a fight (or a fight's pickup).
-func handle_input(event: InputEvent) -> bool:
-	if event.is_action_pressed("interact") and _take_pickup():
-		return true
-	if event.is_action_pressed("xray"):
+	var inventory = chamber.get("field_inventory")
+	if inventory != null and bool(inventory.get("visible")):
+		return
+	if Input.is_action_just_pressed("xray"):
 		xray_on = not xray_on
 		if not xray_on and xray != null:
 			xray.show_scan(null, chamber.camera)
-		return _nearest_foe(ENGAGE_RANGE) != null or xray_on
-	if event.is_action_pressed("reload") and _carries(STAFF_LABEL) and _carries_cleaver():
+	if Input.is_action_just_pressed("reload") and _carries(STAFF_LABEL) and _carries_cleaver():
 		_swap_weapon()
-		return true
+	if heavy_down and not Input.is_action_pressed("heavy"):
+		_release_heavy()
 	if not _in_a_fight():
-		return false
-	if event.is_action_pressed("attack"):
+		return
+	if Input.is_action_just_pressed("attack"):
 		press_light()
-		return true
-	if event.is_action("heavy"):
-		if event.is_action_pressed("heavy") and not heavy_down:
-			press_heavy()
-		elif event.is_action_released("heavy") and heavy_down:
-			_release_heavy()
-		return true
-	if event.is_action("parry"):
-		if event.is_action_pressed("parry"):
-			press_parry()
-		return true
-	if event.is_action_pressed("dodge"):
+	if Input.is_action_just_pressed("heavy") and not heavy_down:
+		press_heavy()
+	if Input.is_action_just_pressed("parry"):
+		press_parry()
+	if Input.is_action_just_pressed("dodge"):
 		press_dodge()
-		return true
-	if event.is_action("guard"):
-		return true
-	return false
+
+
+## Square / E from the chamber's `_interact`. True when a pickup was taken.
+func use() -> bool:
+	return _take_pickup()
 
 
 func _in_a_fight() -> bool:

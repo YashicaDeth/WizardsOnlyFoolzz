@@ -2932,6 +2932,8 @@ func _interact() -> void:
 			return
 	if facility_map != null and facility_map.call("interact"):
 		return
+	if encounters != null and encounters.use():
+		return
 	# Square on the pad lands here, not in DoctorRoute.handle_input: the axe
 	# and the examiner's dropped keycard are taken through the same use.
 	if doctor_route != null and doctor_route._use():

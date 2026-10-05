@@ -34,9 +34,11 @@ const RAM_RANGE := Vector2(3.6, 12.0)
 const RAM_WINDUP := 1.0
 const RAM_LOCK := 0.8
 const RAM_SPEED := 9.0
+## It charges through where you stood and this far past, then vents.
+const RAM_OVERSHOOT := 2.6
 const RAM_DISTANCE := 9.0
 const RAM_HIT := 1.15
-const VENT_SECONDS := 1.7
+const VENT_SECONDS := 2.0
 const SLAM_RANGE := 2.3
 const SLAM_WINDUP := 0.85
 const REST := 1.2
@@ -353,8 +355,10 @@ func _busy(delta: float, to_player: Vector3, distance: float) -> void:
 			cancel_windup()
 			move = spec
 			ram_hit_done = false
-			ram_left = RAM_DISTANCE
-			ramming = RAM_DISTANCE / RAM_SPEED + 0.05
+			var gap: Vector3 = host.player_body().global_position - global_position
+			gap.y = 0.0
+			ram_left = clampf(gap.length() + RAM_OVERSHOOT, 4.0, RAM_DISTANCE)
+			ramming = ram_left / RAM_SPEED + 0.05
 			body.rotation.x = -0.08
 		return
 	# The slam: the arm draws up, then comes down.

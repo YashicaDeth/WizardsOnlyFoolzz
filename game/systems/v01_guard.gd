@@ -27,7 +27,7 @@ const BODY_KIT := preload("res://systems/facility_guard_post.gd")
 const MOVESET := preload("res://systems/sword_moveset.gd")
 
 ## DIAL: guard health per weapon kind.
-const HEALTH := {"staff": 150.0, "pistol": 120.0}
+const HEALTH := {"staff": 230.0, "pistol": 170.0}
 const SPEED := {"staff": 2.6, "pistol": 2.2}
 ## Share of the player's blood each blow takes (V01Encounters.hurt_player).
 const SHARE := {"light": 0.07, "light_2": 0.07, "heavy": 0.11, "shock": 0.14, "riposte": 0.07, "shot": 0.09, "whip": 0.05}
@@ -41,6 +41,8 @@ const NEAR_NOTICE := 4.0
 const CALL_SECONDS := 0.9
 const BLOCK_HOLD := 0.55
 const BLOCK_STAMINA := 3
+## A spent block comes back one blow at a time.
+const BLOCK_REGEN := 3.0
 ## Lights in a row at him before he parries the next.
 const PARRY_AFTER := 2
 ## The pistol: where he likes to stand, how long the sight line holds,
@@ -61,6 +63,7 @@ var blocking := 0.0
 var block_stamina := BLOCK_STAMINA
 var lights_in_a_row := 0
 var _light_clock := 0.0
+var _regen_clock := 0.0
 var attacks_made := 0
 var rounds := MAGAZINE
 var reloading := 0.0
@@ -210,6 +213,10 @@ func branches() -> Array:
 
 func act(action: String, delta: float, to_player: Vector3, distance: float) -> void:
 	_light_clock = maxf(0.0, _light_clock - delta)
+	_regen_clock += delta
+	if _regen_clock >= BLOCK_REGEN:
+		_regen_clock = 0.0
+		block_stamina = mini(BLOCK_STAMINA, block_stamina + 1)
 	if _light_clock <= 0.0:
 		lights_in_a_row = 0
 	if radio_lamp != null:
