@@ -18,9 +18,12 @@ func _ready() -> void:
 	vat.hands_on_breakout = false
 	add_child(vat)
 	await get_tree().process_frame
-	if vat.load_in != null:
-		vat.load_in.skip()
-	for _frame in 30:
+	# As intake_gui_capture: the load-in plays out and the form comes up.
+	for _frame in 130:
+		await get_tree().process_frame
+	vat.intake.handler_says = "Can you read the form from in there? Blink."
+	vat.intake.handler_life = 30.0
+	for _frame in 20:
 		await get_tree().process_frame
 	await _capture("examiner_1_intake_feed")
 
@@ -29,7 +32,8 @@ func _ready() -> void:
 	var eye := Camera3D.new()
 	vat.add_child(eye)
 	var face: Vector3 = vat.examiner_node.global_position + Vector3(0, 1.75, 0)
-	var front: Vector3 = vat.examiner_node.global_transform.basis.z
+	# The rig's face is built on -Z.
+	var front: Vector3 = -vat.examiner_node.get_node("ExaminerBody").global_transform.basis.z
 	eye.global_position = face + front * 1.6 + Vector3(0.3, -0.15, 0)
 	eye.look_at(face - Vector3(0, 0.35, 0))
 	eye.fov = 55.0
