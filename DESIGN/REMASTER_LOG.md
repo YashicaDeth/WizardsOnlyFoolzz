@@ -189,3 +189,21 @@ Defaults set behind dials, all in `OrganSystem` unless named. None of these is G
   1. Queued `remaster-lab-47-p1` (70, claude). It covers the GPU render, explosion smoke and sparks, soil texture, a lab HUD that keeps red for danger only, and hiding the acid line.
   2. job5 lands, then the examiner office overlay blur goes into job6.
   3. Get a real-GPU fps number for lab-46, lab-47 and lab-48. None exists yet against the 144 fps target.
+
+## Manager notes, 2026-10-05 16:10
+
+- **Merged since 15:10:** job5 the facility, one map (d5a224af, merged 70430fe8); fix-57 wizard eyes in the house palette (1e344b86).
+- **Landed so far:** 7 of 10 v0.1 jobs. Still to land: job6 examiner, job9 enemies, job7 death/saves/HUD (all pending; job7 bounced off a codex limit at 15:37).
+- **Running:** fix-56 ADS sights and VATS killcam on claude-alt2 since 15:37. Every other account is parked (Claude until 18:04, codex until 20:16-20:33, sircuteskingdom-plus until 10-11).
+- **Rendering:** skipped; the fix-56 builder has Godot running. Reviewed job5's own PNGs (`P:/GameDev/Temp/job5_sheet5.png`, `P:/GameDev/Temp/job5-facility-one-map/`).
+- **Good in job5:** the green-white pools on the floor are the right mood; the zone stamp in the body-cam OSD and objective box read well; capture runs 330-357 fps at 1280x720.
+- **Weak in job5:**
+  - Arcade and Lower Works are black voids: floor pools only, no walls, ceiling or props visible between them. The story-prop frames show one or two dark boxes.
+  - Bright unlit white rectangles float in mid-air (arcade right edge, transit, surface gate).
+  - Lift rides show a flat white bar and red "DOWN"/"UP" lettering clipped off the frame; red is not danger there.
+  - A flat green guide stripe runs down every floor and reads as a debug line.
+- **Failures:** none new.
+- **Top three:**
+  1. Queued `remaster-job5-p1` (70, claude): walls and story props, the floating quads and lift signage, the guide stripe behind a dial.
+  2. job6 must fix the examiner-office overlay blur when it runs (carried from 15:10).
+  3. A real-GPU fps number for lab-46, lab-47 and lab-48 (carried).
