@@ -158,6 +158,10 @@ func _land_blow(distance: float) -> void:
 			outcome = str(answer.result)
 			lab.player_health = maxf(0.0, float(lab.player_health) - float(answer.damage))
 			if outcome == "hit" or outcome == "guard_broken":
+				# A body caught reaching for a handle is knocked back out of the
+				# entry sequence; damage never grants invulnerable transport.
+				if lab.vehicles != null:
+					lab.vehicles.interrupt_entry("TOOK DAMAGE")
 				BODY_CAM.hit(lab.camera, 0.08)
 				# Its staff is a PRODSTAFF: your own hardware shorts too.
 				if lab.has_method("on_player_shocked"):

@@ -2,14 +2,18 @@ extends Node3D
 
 ## Station 5: the vehicle pad (lab-53). Two cars that crumple, shed parts and
 ## lose their engines (`VehicleDamage` on the derby's chassis), a ramp, and a
-## concrete voxel wall that answers a ram by the toughness table. USE on the
-## plinth or beside a car gets in; USE again gets out. Driving: R2 throttle,
-## L2 brake and reverse, left stick steers (W/S/A/D on the keyboard).
+## concrete voxel wall that answers a ram by the toughness table. The plinth
+## points at the pad; entry itself exists only at the driver's handle. Driving:
+## R2 throttle, L2 brake/reverse, left stick steer, R1 handbrake, Cross horn.
 
 const TITLE := "VEHICLE PAD"
-const VERB := "GET IN / OUT"
+const VERB := "TRY THE CARS"
 const PLINTH := Vector3(-5.2, 0, 4.6)
-const HINT := "DRIVING  R2/W THROTTLE  L2/S BRAKE  USE TO GET OUT"
+const HINT := "DRIVING  R2/W THROTTLE  L2/S BRAKE  R1/SPACE HANDBRAKE  TRIANGLE/F VIEW  CROSS/H HORN"
+## Stretch dial: seat dragging needs combat ownership/reaction work. Kept off
+## until that follow-through exists; ordinary passenger-door entry is live in
+## VehicleDriver.begin_entry(car, VehicleDriver.DOOR_RIGHT).
+const ALLOW_SEAT_DRAG := false
 ## The run-up lane: the sedan parks at its south end, nose to the crash wall
 ## under the roof, about 24 m of straight between them (the yard's east side,
 ## clear of the pillars and the bodies station), so full throttle from parked
@@ -38,8 +42,8 @@ func build(owner_lab: Node3D) -> void:
 	_ramp()
 	wall = VoxelStructure.make(self, "concrete", Vector3(5.0, 2.1, 0.45), WALL_AT + Vector3(0, 1.05, 0))
 	wall.name = "CrashWall"
-	cars.append(_park(VehicleDamage.make("sedan", 3), CAR_AT, 0.0))
-	cars.append(_park(VehicleDamage.make("suv", 7), SECOND_AT, PI * 0.5))
+	cars.append(_park(VehicleDamage.make("sedan", 3, false), CAR_AT, 0.0))
+	cars.append(_park(VehicleDamage.make("suv", 7, false), SECOND_AT, PI * 0.5))
 	driver = VehicleDriver.new()
 	driver.name = "Driver"
 	add_child(driver)
@@ -90,32 +94,71 @@ func driving() -> bool:
 	return driver != null and driver.driving
 
 
+func occupied() -> bool:
+	return driver != null and driver.occupied()
+
+
 ## The plinth: get out if in, else into the nearest car.
 func press() -> String:
-	if driving():
-		return "OUT" if driver.get_out() else "TOO FAST TO GET OUT"
-	var nearest := _nearest_car(INF)
-	if nearest == null:
-		return "NO CAR"
-	driver.attach(nearest)
-	return HINT
+	if driver.seated:
+		return "OUT" if driver.get_out() else driver.last_message
+	return "WALK TO A DRIVER DOOR"
 
 
 ## Out of the car whatever its speed, for the lab menu's teleport.
 func leave() -> void:
-	if driving():
+	if driver != null and driver.phase in ["enter", "jam_pull"]:
+		driver.interrupt_entry("STATION TELEPORT")
+	elif occupied():
 		driver.get_out(true)
 
 
 ## USE beside a car gets straight in; false when no car is in reach.
 func try_enter() -> bool:
-	if driving():
+	if occupied():
 		return false
-	var nearest := _nearest_car(VehicleDriver.REACH_TO_GET_IN)
+	_ensure_walker()
+	var nearest := _nearest_driver_door(VehicleDriver.REACH_TO_GET_IN)
 	if nearest == null:
 		return false
-	driver.attach(nearest)
-	return true
+	return driver.begin_entry(nearest, VehicleDriver.DOOR_LEFT)
+
+
+func prompt() -> String:
+	if driver == null or occupied():
+		return ""
+	_ensure_walker()
+	var nearest := _nearest_driver_door(VehicleDriver.REACH_TO_GET_IN)
+	if nearest == null:
+		return ""
+	var damage := nearest.get_node("Damage") as VehicleDamage
+	if damage.door_missing(VehicleDriver.DOOR_LEFT):
+		return "CLIMB INTO DRIVER SEAT"
+	if damage.door_jammed(VehicleDriver.DOOR_LEFT):
+		return "PULL JAMMED DRIVER DOOR"
+	return "OPEN DRIVER DOOR"
+
+
+func interrupt_entry(reason := "HIT") -> bool:
+	return driver.interrupt_entry(reason) if driver != null else false
+
+
+func _ensure_walker() -> void:
+	if driver == null or lab == null or lab.player == null:
+		return
+	driver.bind_walker(lab.player, lab.camera, lab.player_body)
+
+
+func _nearest_driver_door(reach: float) -> RigidBody3D:
+	var best: RigidBody3D = null
+	var best_distance := reach
+	for candidate in cars:
+		var handle := driver.door_handle(candidate, VehicleDriver.DOOR_LEFT)
+		var distance := handle.distance_to(lab.player.global_position)
+		if distance < best_distance:
+			best_distance = distance
+			best = candidate
+	return best
 
 
 func _nearest_car(reach: float) -> RigidBody3D:
@@ -137,7 +180,9 @@ func _on_got_out(standing: Vector3, facing_yaw: float) -> void:
 
 
 func status() -> String:
-	if not driving():
+	if driver != null and driver.phase != "idle":
+		return "%s  %s" % [driver.phase.to_upper(), driver.last_message]
+	if not driver.seated:
 		return "%d CARS" % cars.size()
 	var report: Dictionary = (driver.car.get_node("Damage") as VehicleDamage).report()
 	return "%d KMH  ENGINE %d%%  OFF %d" % [roundi(absf(driver.speed()) * 3.6), roundi(float(report.engine) * 100.0), (report.detached as Array).size()]

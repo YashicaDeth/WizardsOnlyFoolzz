@@ -43,24 +43,33 @@ func _ready() -> void:
 	get_tree().quit(0 if failures.is_empty() else 1)
 
 
-## Lab-53: USE on the pad's plinth puts you in a car, R2 drives it, a round
-## dents it, USE gets you out.
+## Car-71: the plinth points at the cars; only USE at the driver's handle starts
+## the continuous door entry. R2 drives it, a round dents it, USE gets out.
 func _vehicles() -> void:
 	lab.go_to(4)
 	await _frames(2)
 	await _press("interact")
-	check(lab.vehicles.driving(), "USE on the vehicle plinth gets you into a car")
-	var car: RigidBody3D = lab.vehicles.driver.car
+	check(not lab.vehicles.driving() and lab.last_note == "WALK TO A DRIVER DOOR", "the vehicle plinth sends you to a real door")
+	var car: RigidBody3D = lab.vehicles.cars[0]
+	lab.player.global_position = lab.vehicles.driver.standing_point(car, VehicleDriver.DOOR_LEFT)
+	await _frames(2)
+	await _press("interact")
+	await _seconds(1.35)
+	check(lab.vehicles.driving(), "USE at the driver handle opens the door and seats you")
 	Input.action_press("pad_combat_r2")
-	await _seconds(1.0)
+	var first_peak := 0.0
+	for _frame in 120:
+		await get_tree().physics_frame
+		first_peak = maxf(first_peak, float(car.signed_speed))
 	Input.action_release("pad_combat_r2")
-	check(float(car.signed_speed) > 2.0, "R2 drives it (%.1f m/s)" % float(car.signed_speed))
+	check(first_peak > 2.0, "R2 drives it (%.1f m/s)" % first_peak)
 	var other: RigidBody3D = lab.vehicles.cars[1]
 	lab._land(other, other.to_global(Vector3(0, 0.2, -other.hull_size.z * 0.5)), other.global_basis.z, {"damage": 30.0}, "firearm", null)
 	check((other.get_node("Damage") as VehicleDamage).max_crush > 0.0, "a round dents the other car")
 	car.linear_velocity = Vector3.ZERO
 	await _seconds(0.6)
 	await _press("interact")
+	await _seconds(1.2)
 	check(not lab.vehicles.driving() and lab.camera.current, "USE gets you out and back to your own eyes")
 	await _vehicle_melee(other)
 	await _vehicle_teleport(car)
@@ -70,7 +79,11 @@ func _vehicles() -> void:
 ## A blade dents a car but cannot take a steel door off; a round can.
 func _vehicle_melee(other: RigidBody3D) -> void:
 	var damage := other.get_node("Damage") as VehicleDamage
-	var door: Node3D = damage.parts.DoorLeft.node
+	var door_part := damage.door_part(VehicleDriver.DOOR_LEFT)
+	check(not door_part.is_empty(), "the parked SUV keeps its driver door before the melee test (%s)" % [damage.detached])
+	if door_part.is_empty():
+		return
+	var door: Node3D = door_part.impact_node
 	var into := (other.global_position - door.global_position).normalized()
 	for i in 6:
 		lab._land(other, door.global_position, into, {"damage": 44.0, "weapon": "cleaver"}, "melee", null)
@@ -82,7 +95,8 @@ func _vehicle_melee(other: RigidBody3D) -> void:
 
 ## The lab menu's teleport gets you out of the car first, even at speed.
 func _vehicle_teleport(car: RigidBody3D) -> void:
-	lab.vehicles.driver.attach(car)
+	lab.vehicles.driver.car = car
+	lab.vehicles.driver._enter_immediately(VehicleDriver.DOOR_LEFT)
 	car.linear_velocity = -car.global_basis.z * 10.0
 	await _frames(2)
 	lab.go_to(0)
@@ -100,7 +114,10 @@ func _vehicle_run(car: RigidBody3D) -> void:
 	var damage := car.get_node("Damage") as VehicleDamage
 	var hits_before := damage.hits
 	var detached_before := damage.detached.size()
-	pad.driver.attach(car)
+	pad.driver.car = car
+	pad.driver._enter_immediately(VehicleDriver.DOOR_LEFT)
+	await _frames(2)
+	hits_before = damage.hits
 	Input.action_press("pad_combat_r2")
 	var top := 0.0
 	var waited := 0.0

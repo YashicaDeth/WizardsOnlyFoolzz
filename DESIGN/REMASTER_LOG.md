@@ -333,3 +333,10 @@ None of these are Greg's decisions; all are defaults behind constants, tuned so 
   2. job7 death, saves and HUD is the last v0.1 job (remaster-job7-p1 pending, keep it next).
   3. imp-60 body look: the mannequin guards undercut every enemy telegraph.
 - **Failures:** no new ones.
+
+## car-71: GTA-style car door entry (2026-10-05)
+
+- **Wired:** the mechanics-lab cars now prompt only at the driver's handle. USE walks the real lab body to the handle, swings the damage part on its hinge, turns and seats the body, closes the same door, and eases the live first-person camera into the existing cab. Exit reverses that route and resolves beside the door. A detached door skips the swing but not entry; a damaged/jammed door takes three pulls, ending in a kick. Taking damage interrupts entry.
+- **Driving:** R2/L2 throttle/brake, left stick steer, R1 handbrake, Triangle cab/chase toggle, Cross horn (keyboard W/S/A/D, Space, F, H). Exiting over `VehicleDriver.GET_OUT_SPEED` (5 m/s) is a moving bail with inherited velocity, outward shove and roll request rather than a refusal.
+- **Dials (defaults chosen here; Greg has not set them):** `VehicleDriver.ENTRY_SECONDS = 1.18`, `EXIT_SECONDS = 1.05`, `GET_OUT_SPEED = 5.0`, `REACH_TO_GET_IN = 1.05`; `VehicleDamage.door_jammed()` begins below 68% door HP and clears on pull 3. `VehicleStation.ALLOW_SEAT_DRAG = false`: enemy/sparring-partner dragging remains a stretch dial because its combat ownership and reactions are not yet authored. Passenger entry/exit is available through `VehicleDriver.DOOR_RIGHT`.
+- **Animation source:** procedural body/camera interpolation over the project's existing Quaternius CC0 rig, credited in `CREDITS.md`; no uncredited Mixamo download was added.

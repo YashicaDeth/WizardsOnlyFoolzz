@@ -351,10 +351,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			menu_open = false
 		get_viewport().set_input_as_handled()
 		return
-	if vehicles.driving():
-		# In a car USE gets out; the hands are on the wheel for everything else.
+	if vehicles.occupied():
+		# Entry/exit owns the body until it finishes. Once seated, the driver's
+		# controls replace the walking/combat verbs.
 		if event.is_action_pressed("interact"):
 			_note(vehicles.press())
+		elif vehicles.driver.seated and event.is_action_pressed("perspective"):
+			_note("%s VIEW" % vehicles.driver.toggle_view().to_upper())
+		elif vehicles.driver.seated and event.is_action_pressed("vehicle_horn"):
+			vehicles.driver.horn()
 		get_viewport().set_input_as_handled()
 		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
@@ -576,8 +581,8 @@ func _nearest_plinth() -> Dictionary:
 
 
 func _physics_process(delta: float) -> void:
-	if vehicles.driving():
-		# The walking body waits where it got in; the car's driver owns the view.
+	if vehicles.occupied():
+		# The entry sequence or seated driver owns the body and view.
 		_note_age += delta
 		_update_hud()
 		return
@@ -843,6 +848,9 @@ func _update_hud() -> void:
 	_hud.text = "\n".join(lines)
 	var near := _nearest_plinth()
 	_prompt.text = "" if near.is_empty() else "[%s] %s" % [InputProfile.glyph("interact"), str(near.title)]
+	var car_prompt: String = vehicles.prompt()
+	if not car_prompt.is_empty():
+		_prompt.text = "[%s] %s" % [InputProfile.glyph("interact"), car_prompt]
 	var organ_prompt := _organ_prompt()
 	if not organ_prompt.is_empty():
 		_prompt.text = organ_prompt
@@ -868,7 +876,7 @@ func _build_organ_kit() -> void:
 	player_body.name = "PlayerBody"
 	add_child(player_body)
 	player_body.position = Vector3(0, -40, 0)
-	player_body.build("lab_player", {"gore": false, "blood": 4800.0})
+	player_body.build("lab_player", {"gore": false, "blood": 4800.0, "rigged": true})
 	player_body.visible = false
 	player_body.anatomy.undying = true
 	# The decanting loadout: the regulator keeps a burst heart beating until

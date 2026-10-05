@@ -156,8 +156,8 @@ func _bolt_on(shell: Node3D, box: AABB) -> void:
 	var hood_y := _hood_height(shell, box)
 	_part("BumperFront", BUMPER, Vector3(0, ground + 0.3, front - 0.12), Vector3(0, 0, 0), Vector3(1.55, 1.2, 1.0), "steel_sheet", 20.0, 18.0)
 	_part("BumperRear", BUMPER, Vector3(0, ground + 0.3, back + 0.12), Vector3(0, PI, 0), Vector3(1.55, 1.2, 1.0), "steel_sheet", 20.0, 18.0)
-	_part("DoorLeft", DOOR, Vector3(-side - 0.06, ground + 0.32, 0.05), Vector3.ZERO, Vector3(1.0, 1.0, 1.45), "steel_sheet", 22.0, 24.0)
-	_part("DoorRight", DOOR, Vector3(side + 0.06, ground + 0.32, 0.05), Vector3.ZERO, Vector3(1.0, 1.0, 1.45), "steel_sheet", 22.0, 24.0)
+	_door("DoorLeft", -1, Vector3(-side - 0.06, ground + 0.32, 0.05))
+	_door("DoorRight", 1, Vector3(side + 0.06, ground + 0.32, 0.05))
 	_part("Hood", PLATE, Vector3(0, hood_y + 0.01, front + box.size.z * 0.17), Vector3(0, 0.08, 0), Vector3(1.9, 1.0, 1.15), "steel_sheet", 18.0, 16.0)
 	_windscreen(shell, box, hood_y)
 	for wheel_name in WHEELS:
@@ -166,7 +166,7 @@ func _bolt_on(shell: Node3D, box: AABB) -> void:
 			continue
 		# Physics wheel radius, not the kit's.
 		wheel.scale = Vector3.ONE * (VEHICLE.WHEEL_RADIUS / 0.3) / SHELL_SCALE
-		parts["Wheel%d" % WHEELS[wheel_name]] = {"node": wheel, "material": "steel_sheet", "hp": 45.0, "mass": 22.0, "wheel": WHEELS[wheel_name]}
+		parts["Wheel%d" % WHEELS[wheel_name]] = {"node": wheel, "impact_node": wheel, "material": "steel_sheet", "hp": 45.0, "max_hp": 45.0, "mass": 22.0, "wheel": WHEELS[wheel_name]}
 	for node in shell.find_children("*", "MeshInstance3D", true, false):
 		if not str(node.name).begins_with("wheel"):
 			_track_mesh(node as MeshInstance3D, true)
@@ -182,7 +182,59 @@ func _part(part_name: String, scene: PackedScene, at: Vector3, turn: Vector3, si
 	_regrade(node)
 	for mi in node.find_children("*", "MeshInstance3D", true, false):
 		_track_mesh(mi as MeshInstance3D)
-	parts[part_name] = {"node": node, "material": material, "hp": hp, "mass": kilos, "wheel": -1}
+	parts[part_name] = {"node": node, "impact_node": node, "material": material, "hp": hp, "max_hp": hp, "mass": kilos, "wheel": -1}
+
+
+## A door is damage bodywork and an interaction prop at the same time. The
+## hinge is the detachable part; the authored panel is offset back from it so
+## rotating the pivot opens the actual door rather than a duplicate animation.
+func _door(part_name: String, side_sign: int, centre: Vector3) -> void:
+	var hinge := Node3D.new()
+	hinge.name = "%sHinge" % part_name
+	hinge.position = centre + Vector3(0, 0, -0.72)
+	hinge.set_meta("door_side", side_sign)
+	hinge.set_meta("door_open_angle", float(side_sign) * deg_to_rad(72.0))
+	car.add_child(hinge)
+	var panel := DOOR.instantiate() as Node3D
+	panel.name = part_name
+	panel.position = Vector3(0, 0, 0.72)
+	panel.scale = Vector3(1.0, 1.0, 1.45)
+	hinge.add_child(panel)
+	_regrade(panel)
+	for mi in panel.find_children("*", "MeshInstance3D", true, false):
+		_track_mesh(mi as MeshInstance3D)
+	parts[part_name] = {"node": hinge, "impact_node": panel, "material": "steel_sheet", "hp": 22.0, "max_hp": 22.0, "mass": 24.0, "wheel": -1}
+
+
+func door_part(side_sign: int) -> Dictionary:
+	var part_name := "DoorLeft" if side_sign < 0 else "DoorRight"
+	return parts.get(part_name, {}) as Dictionary
+
+
+func door_missing(side_sign: int) -> bool:
+	return detached.has("DoorLeft" if side_sign < 0 else "DoorRight")
+
+
+func door_jammed(side_sign: int) -> bool:
+	var part := door_part(side_sign)
+	return not part.is_empty() and float(part.hp) <= float(part.max_hp) * 0.68
+
+
+func set_door_open(side_sign: int, amount: float) -> void:
+	var part := door_part(side_sign)
+	if part.is_empty():
+		return
+	var hinge := part.node as Node3D
+	hinge.rotation.y = lerpf(0.0, float(hinge.get_meta("door_open_angle", 0.0)), clampf(amount, 0.0, 1.0))
+
+
+func door_open_amount(side_sign: int) -> float:
+	var part := door_part(side_sign)
+	if part.is_empty():
+		return 1.0
+	var hinge := part.node as Node3D
+	var open_angle := float(hinge.get_meta("door_open_angle", 0.0))
+	return 0.0 if is_zero_approx(open_angle) else clampf(hinge.rotation.y / open_angle, 0.0, 1.0)
 
 
 ## Highest point of the body over its front fifth: where the hood is.
@@ -230,7 +282,7 @@ func _windscreen(shell: Node3D, box: AABB, hood_y: float) -> void:
 	var normal := Vector3.RIGHT.cross(up).normalized()
 	pane.transform = Transform3D(Basis(Vector3.RIGHT, up, normal), middle)
 	car.add_child(pane)
-	parts["Windscreen"] = {"node": pane, "material": "glass", "hp": 4.0, "mass": 6.0, "wheel": -1}
+	parts["Windscreen"] = {"node": pane, "impact_node": pane, "material": "glass", "hp": 4.0, "max_hp": 4.0, "mass": 6.0, "wheel": -1}
 
 
 ## A private, editable copy of a mesh: its rest positions kept so a dent is
@@ -380,7 +432,7 @@ func hit(at: Vector3, push: Vector3, speed: float, source := "vehicle", params :
 	result.dent = _dent(local, inward, minf(over * DENT_PER_MS * crumple, MAX_CRUSH), radius)
 	for part_name in parts.keys():
 		var part: Dictionary = parts[part_name]
-		var node := part.node as Node3D
+		var node := part.get("impact_node", part.node) as Node3D
 		var distance := car.to_local(node.global_position).distance_to(local)
 		if distance > radius + PART_REACH:
 			continue
