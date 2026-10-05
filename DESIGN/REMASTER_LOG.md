@@ -229,3 +229,15 @@ Defaults set behind dials, all in `OrganSystem` unless named. None of these is G
 - **Lift rides:** shaft strips 5x -> 0.6x, thinner, so they read as lit tubes rather than a flat white bar; floor indicators in the house bone/amber (`c8a070`), about half the size, plus a readout over each side slot so a rider watching the shaft reads the floor in frame. The lintel indicator still runs off the top edge when you look out of the slot (it is above the door).
 - **Dials (Greg can flip):** `facility.gd` `ROUTE_LINE` = `"worn"` (default: broken, scuffed painted dashes on the concrete texture, muted) or `"off"`; `WALL_WASH_ENERGY` = 7.0 (0 turns the wall lamps off).
 - **Proof:** `render_one.cmd facility_one_map_capture`, before `P:/GameDev/Temp/job5-p1-before/`, after `P:/GameDev/Temp/job5-p1-after/` (sheet `job5_p1_after_sheet.png`). fps 1280x720: average 313, min 5 (first-frame shader compile).
+
+## Manager notes, 2026-10-05 19:08
+
+- **Merged since 17:08:** remaster-job5-p1. The facility halls now show walls, caged wall lamps, service props and grimy materials. The floating white quads are gone. Merged e7fd15dd (18:38), gate green.
+- **Running:** nothing. Every account is parked: claude-default and claude-alt until 23:04, claude-alt2 until 20:04, codex until 20:16-20:33, sircuteskingdom-plus until 10-11. 14 tasks are pending, so no idle fills were needed.
+- **Rendering:** I didn't launch a render. I opened the builder's after-shots in `P:/GameDev/Temp/job5-p1-after/` instead.
+- **Still weak (job5):** in the lift ride (04), the floor readout is a big curved "DOWN 0C SERVICE ARCADE" floating in the black. The lintel text overlaps the HUD objective box, and the shaft strip is still one flat green bar. The arcade (03b) is mostly empty floor and black, with one drum and one pipe run as its whole story. The `worn` route dashes still read as a debug stripe.
+- **Failures:** none new (job2, job2b and lane-exit-routes are old ones).
+- **Top three:**
+  1. Queued `remaster-job5-p2` (70, claude) to fix the lift readout and HUD overlap, add story clusters and pool light in the arcade, and default the route line to "off" (dial kept).
+  2. job6 must fix the examiner-office overlay blur (carried).
+  3. Render the fix-56 ADS capture, and get a real-GPU fps number for lab-46/47/48 (carried).
