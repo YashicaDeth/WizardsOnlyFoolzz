@@ -1001,7 +1001,7 @@ func _build_examination_station() -> void:
 	body.name = "ExaminerBody"
 	body.rotation.y = PI
 	examiner.add_child(body)
-	body.build("intake_examiner", BASELINE_HUMAN.config_from_subject({"race": "decanted"}).merged({"gore": false}, true))
+	body.build("intake_examiner", BASELINE_HUMAN.config_from_subject({"race": "decanted"}).merged({"gore": false, "rigged": true}, true))
 	var look := HUNTER_APPEARANCE.new()
 	body.add_child(look)
 	look.configure(body, {"axes": {"brow": 0.7, "jaw": 0.6, "cheek": 0.2, "eyes": 0.3, "nose": 0.55, "mouth": 0.4}})

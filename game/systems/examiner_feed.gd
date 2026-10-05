@@ -79,6 +79,8 @@ func _light(at: Vector3, color: Color, energy: float) -> void:
 func _build_examiner() -> void:
 	var config: Dictionary = BASELINE_HUMAN.config_from_subject({"race": "decanted"})
 	config["gore"] = false
+	# The stylised rigged base everyone else wears (RiggedBody), not a generated skin.
+	config["rigged"] = true
 	rig = BASELINE_HUMAN.new()
 	rig.name = "Examiner"
 	stage.add_child(rig)

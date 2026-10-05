@@ -22,7 +22,9 @@ const LENS := Color("5f7d74")
 ## Stains and dresses `body` as the examiner and adds the mask and loupes.
 ## Returns the mask node so a scene can raise or lower it (`set_mask`).
 static func dress(body: BaselineHuman, mask_up := false) -> Node3D:
-	body.scale = Vector3(GAUNT, TALL, GAUNT)
+	# A rigged body's capsule hitboxes turn with its bones, and Jolt cannot take
+	# a non-uniform scale on them: tall only (the mannequin is already slight).
+	body.scale = Vector3.ONE * TALL if body.rigged != null else Vector3(GAUNT, TALL, GAUNT)
 	var wardrobe := ClothingShell.fresh_wardrobe()
 	wardrobe.erase("head")
 	wardrobe["style"] = "clinical"
