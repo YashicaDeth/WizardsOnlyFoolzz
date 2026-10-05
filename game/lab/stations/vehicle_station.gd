@@ -3,7 +3,7 @@ extends Node3D
 ## Station 5: the vehicle pad (lab-53). Two cars that crumple, shed parts and
 ## lose their engines (`VehicleDamage` on the derby's chassis), a ramp, and a
 ## concrete voxel wall that answers a ram by the toughness table. The plinth
-## points at the pad; entry itself exists only at the driver's handle. Driving:
+## points at the pad; entry exists only at a door handle (driver or passenger). Driving:
 ## R2 throttle, L2 brake/reverse, left stick steer, R1 handbrake, Cross horn.
 
 const TITLE := "VEHICLE PAD"
@@ -113,30 +113,33 @@ func leave() -> void:
 		driver.get_out(true)
 
 
-## USE beside a car gets straight in; false when no car is in reach.
+## USE at a door handle: the driver's or the passenger's. False when no
+## handle is in reach.
 func try_enter() -> bool:
 	if occupied():
 		return false
 	_ensure_walker()
-	var nearest := _nearest_driver_door(VehicleDriver.REACH_TO_GET_IN)
-	if nearest == null:
+	var door := _nearest_door(VehicleDriver.REACH_TO_GET_IN)
+	if door.is_empty():
 		return false
-	return driver.begin_entry(nearest, VehicleDriver.DOOR_LEFT)
+	return driver.begin_entry(door.car, int(door.side))
 
 
 func prompt() -> String:
 	if driver == null or occupied():
 		return ""
 	_ensure_walker()
-	var nearest := _nearest_driver_door(VehicleDriver.REACH_TO_GET_IN)
-	if nearest == null:
+	var door := _nearest_door(VehicleDriver.REACH_TO_GET_IN)
+	if door.is_empty():
 		return ""
-	var damage := nearest.get_node("Damage") as VehicleDamage
-	if damage.door_missing(VehicleDriver.DOOR_LEFT):
-		return "CLIMB INTO DRIVER SEAT"
-	if damage.door_jammed(VehicleDriver.DOOR_LEFT):
-		return "PULL JAMMED DRIVER DOOR"
-	return "OPEN DRIVER DOOR"
+	var side := int(door.side)
+	var seat := "DRIVER" if side == VehicleDriver.DOOR_LEFT else "PASSENGER"
+	var damage := (door.car as Node).get_node("Damage") as VehicleDamage
+	if damage.door_missing(side):
+		return "CLIMB INTO %s SEAT" % seat
+	if damage.door_jammed(side):
+		return "PULL JAMMED %s DOOR" % seat
+	return "OPEN %s DOOR" % seat
 
 
 func interrupt_entry(reason := "HIT") -> bool:
@@ -149,15 +152,16 @@ func _ensure_walker() -> void:
 	driver.bind_walker(lab.player, lab.camera, lab.player_body)
 
 
-func _nearest_driver_door(reach: float) -> RigidBody3D:
-	var best: RigidBody3D = null
+## The closest handle in reach, either side of any car: {car, side} or {}.
+func _nearest_door(reach: float) -> Dictionary:
+	var best := {}
 	var best_distance := reach
 	for candidate in cars:
-		var handle := driver.door_handle(candidate, VehicleDriver.DOOR_LEFT)
-		var distance := handle.distance_to(lab.player.global_position)
-		if distance < best_distance:
-			best_distance = distance
-			best = candidate
+		for side in [VehicleDriver.DOOR_LEFT, VehicleDriver.DOOR_RIGHT]:
+			var distance := driver.door_handle(candidate, side).distance_to(lab.player.global_position)
+			if distance < best_distance:
+				best_distance = distance
+				best = {"car": candidate, "side": side}
 	return best
 
 

@@ -18,6 +18,9 @@ const FOV_REST := 72.0
 const FOV_FLAT := 90.0
 const ENTRY_SECONDS := 1.18
 const EXIT_SECONDS := 1.05
+## A moving bail: the forward roll, then the stumble that eats the car's speed.
+const BAIL_ROLL_SECONDS := 0.45
+const BAIL_SECONDS := 0.85
 const DOOR_LEFT := -1
 const DOOR_RIGHT := 1
 
@@ -281,6 +284,9 @@ func _tick_transition(delta: float) -> void:
 				damage.set_door_open(seat_side, 0.0)
 			_set_phase("idle")
 		return
+	if phase == "bail":
+		_tick_bail(delta)
+		return
 	if phase == "enter":
 		_tick_enter(clampf(phase_time / ENTRY_SECONDS, 0.0, 1.0), damage)
 		if phase_time >= ENTRY_SECONDS:
@@ -345,6 +351,35 @@ func _tick_exit(t: float, damage: VehicleDamage) -> void:
 		_sync_visual()
 
 
+## Roll over the shoulder, then a stumble: the eyes pitch through a full turn
+## and dip while the ground scrubs the inherited speed away.
+func _tick_bail(delta: float) -> void:
+	phase_time += delta
+	var flat := Vector3(_walker.velocity.x, 0.0, _walker.velocity.z) * exp(-3.2 * delta)
+	var fall := _walker.velocity.y - 9.8 * delta
+	if _walker.is_on_floor() and fall < 0.0:
+		fall = 0.0
+	_walker.velocity = Vector3(flat.x, fall, flat.z)
+	_walker.move_and_slide()
+	var view_pose := _walker_camera_local
+	if phase_time < BAIL_ROLL_SECONDS:
+		var roll := _smooth(phase_time / BAIL_ROLL_SECONDS)
+		view_pose.basis = view_pose.basis * Basis(Vector3.RIGHT, -TAU * roll)
+		view_pose.origin.y -= sin(roll * PI) * 0.55
+	else:
+		var stumble := clampf((phase_time - BAIL_ROLL_SECONDS) / (BAIL_SECONDS - BAIL_ROLL_SECONDS), 0.0, 1.0)
+		var sway := sin(stumble * PI) * (1.0 - stumble)
+		view_pose.basis = view_pose.basis * Basis(Vector3.FORWARD, sway * 0.32 * float(seat_side)) * Basis(Vector3.RIGHT, -sway * 0.25)
+		view_pose.origin.y -= sway * 0.3
+	_walker_camera.transform = view_pose
+	if phase_time >= BAIL_SECONDS:
+		_walker_camera.transform = _walker_camera_local
+		_standing = _walker.global_position
+		_set_phase("idle")
+		last_message = "OUT"
+		got_out.emit(_standing, _facing_yaw)
+
+
 func _finish_entry() -> void:
 	seated = true
 	driving = seat_side < 0
@@ -378,8 +413,17 @@ func _finish_exit() -> void:
 		_walker.velocity = car.linear_velocity + outward * 2.2 + Vector3.UP * 2.4
 		if _walker_visual is BaselineHuman and (_walker_visual as BaselineHuman).rigged != null:
 			(_walker_visual as BaselineHuman).rigged.play_action("Roll", 1.35)
-	else:
-		_walker.velocity = Vector3.ZERO
+		# The body is out but still tumbling: the driver keeps it until the
+		# roll and stumble have spent the car's speed.
+		_walker_camera.transform = _walker_camera_local
+		_walker_camera.current = true
+		if _seat_avatar != null:
+			_seat_avatar.visible = false
+		phase_time = 0.0
+		last_message = "ROLLING CLEAR"
+		_set_phase("bail")
+		return
+	_walker.velocity = Vector3.ZERO
 	_walker_camera.transform = _walker_camera_local
 	_walker_camera.current = true
 	_show_walker_visual(false)
