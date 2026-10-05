@@ -239,3 +239,9 @@ Screenshot: data/greg_playtest_b_screenshot_2026-10-04.webp (prompt "E CUT THE P
 # Greg, 5 Oct midday
 - "The map is the main thing in the demo that needs to be fixed." Facility map (job5) is the top priority.
 - The examiner/doctor "looks wayyy too human-like, that cursed Higgsfield model sucks". Remove the generated Higgsfield examiner skin (model_skin / M1) everywhere. He uses the same stylised low-poly rigged base as everyone else, dressed as the examiner (stained coat, surgical mask, loupes), until Greg draws him.
+- Teardown destruction and BeamNG-style vehicles are still not in the game (lab-47 building, lab-53 bumped to 98).
+- VATS: wants a SLOWED-DOWN CUTSCENE of the bullet entering and rupturing (Sniper Elite kill cam: follow the round, X-ray through skin, organ/bone rupture). BUG: when aiming down the sights the gun's iron sights block the whole screen because the weapon models are scuffed (wrong scale/position/FOV).
+- The Black Mirror phone "still does not cohesively work". Make it one working device: raise/lower, its pages (MAP, camera with night vision, inventory link) navigable on the pad, consistent look, no broken pages.
+- The DEPTH MAP camera mode "practically does nothing" and is not the interesting TouchDesigner node-based look he wants (blob tracking / LiDAR grey-to-white point look, block-tracked boxes on bodies and objects, depth contours, scan lines that sweep; designed like a TD operator graph, built as a Godot shader).
+- Wizard eyes: cool for now but "way too visually disgusting, some neon horrible green". Restyle: keep the spirit/faces idea, lose the neon green; use the house palette (bone, copper, deep red, a sickly desaturated green at most), subtle and readable.
+- Executing a downed enemy is "still super bugged". Fix the execution/finisher on downed bodies (positioning, animation, damage, camera, the organ-rip finisher path).
