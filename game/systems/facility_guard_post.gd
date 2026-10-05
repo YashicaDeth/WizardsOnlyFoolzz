@@ -531,6 +531,12 @@ func _kit_out() -> void:
 ## The security kit over a guard's torso: vest, trauma plates, belt and
 ## holster, and his number stencilled front and back. Shared with the v0.1
 ## arcade squad (`V01Guard`).
+## On a rigged human skin (torso part space, which the skin's fit scales):
+## where the holster hangs at the right hip and the number sits on the plates.
+const FITTED_HOLSTER := Vector3(0.2, -0.33, -0.02)
+const FITTED_STENCIL := Vector3(0.0, 0.1, 0.15)
+
+
 static func dress_security(guard: Node3D, number: String) -> void:
 	var parts: Dictionary = guard.get("parts")
 	var torso := parts.get("torso") as Node3D
@@ -541,23 +547,32 @@ static func dress_security(guard: Node3D, number: String) -> void:
 	torso.add_child(kit)
 	var scale := float(guard.get("build_factor")) if "build_factor" in guard else 1.0
 	var vest_colour := Color("3a3d2c")
-	_kit_box(kit, Vector3(0.42, 0.48, 0.25) * Vector3(scale, 1.0, scale), Vector3(0, 0.02, 0), vest_colour, "paint")
-	# Front and back trauma plates, proud of the vest.
-	_kit_box(kit, Vector3(0.3, 0.3, 0.04) * Vector3(scale, 1.0, 1.0), Vector3(0, 0.06, -0.135 * scale), vest_colour.darkened(0.3), "paint")
-	_kit_box(kit, Vector3(0.3, 0.3, 0.04) * Vector3(scale, 1.0, 1.0), Vector3(0, 0.06, 0.135 * scale), vest_colour.darkened(0.3), "paint")
-	# Belt and holster.
-	_kit_box(kit, Vector3(0.48 * scale, 0.07, 0.32 * scale), Vector3(0, -0.27, 0), Color("1c1612"), "paint")
-	_kit_box(kit, Vector3(0.08, 0.2, 0.12), Vector3(0.27 * scale, -0.36, -0.02), Color("241a14"), "paint")
+	# imp-60: on a rigged human skin the vest, plates and belt are painted onto
+	# the fitted uniform (RiggedBody.wear_kit), so they follow the body; boxes
+	# stood off it as a slab. The holster and the number stay as they were.
+	var rigged: Variant = guard.get("rigged")
+	var fitted: bool = rigged is RiggedBody and (rigged as RiggedBody).wear_kit({
+		"vest_colour": vest_colour, "plate_colour": vest_colour.darkened(0.3), "belt_colour": Color("1c1612"),
+	})
+	if not fitted:
+		_kit_box(kit, Vector3(0.42, 0.48, 0.25) * Vector3(scale, 1.0, scale), Vector3(0, 0.02, 0), vest_colour, "paint")
+		# Front and back trauma plates, proud of the vest.
+		_kit_box(kit, Vector3(0.3, 0.3, 0.04) * Vector3(scale, 1.0, 1.0), Vector3(0, 0.06, -0.135 * scale), vest_colour.darkened(0.3), "paint")
+		_kit_box(kit, Vector3(0.3, 0.3, 0.04) * Vector3(scale, 1.0, 1.0), Vector3(0, 0.06, 0.135 * scale), vest_colour.darkened(0.3), "paint")
+		# Belt.
+		_kit_box(kit, Vector3(0.48 * scale, 0.07, 0.32 * scale), Vector3(0, -0.27, 0), Color("1c1612"), "paint")
+	# Holster.
+	_kit_box(kit, Vector3(0.08, 0.2, 0.12), Vector3(0.27 * scale, -0.36, -0.02) if not fitted else FITTED_HOLSTER, Color("241a14"), "paint")
 	if number.is_empty():
 		return
 	for side in [-1.0, 1.0]:
 		var stencil := Label3D.new()
 		stencil.text = number
 		stencil.font_size = 96
-		stencil.pixel_size = 0.0022
+		stencil.pixel_size = 0.0022 if not fitted else 0.0016
 		stencil.modulate = Color("d8cfb4")
 		stencil.outline_size = 0
-		stencil.position = Vector3(0, 0.08, side * (0.16 * scale))
+		stencil.position = Vector3(0, 0.08, side * (0.16 * scale)) if not fitted else Vector3(0, FITTED_STENCIL.y, side * FITTED_STENCIL.z)
 		# The rig faces -z: the front plate is at -z, read from in front.
 		stencil.rotation.y = 0.0 if side > 0.0 else PI
 		kit.add_child(stencil)

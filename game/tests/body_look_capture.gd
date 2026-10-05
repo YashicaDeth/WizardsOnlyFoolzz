@@ -46,6 +46,9 @@ func _ready() -> void:
 	_shoot_at(Vector3(0, 1.0, 7.0), Vector3(0, 0.9, 0), 45.0)
 	await _capture("lineup_front")
 	for key: String in people:
+		# Alone, so the side shot is not taken from inside a neighbour.
+		for other: String in people:
+			(people[other] as Node3D).visible = other == key
 		var at := (people[key] as Node3D).global_position
 		_shoot_at(at + Vector3(0, 1.0, 3.2), at + Vector3(0, 0.9, 0), 40.0)
 		await _capture("%s_front" % key)
