@@ -45,6 +45,8 @@ const HELD_REST := {
 	"staff": [Vector3(0.26, -0.34, -0.42), Vector3(0.06, 0.10, -0.20)],
 	"sidearm": [Vector3(0.20, -0.22, -0.46), Vector3(0.0, 0.0, 0.0)],
 }
+## Where the destruction station stands; its dig patch cuts the yard floor.
+const DESTRUCTION_AT := Vector3(-12, 0, 11)
 
 var player: CharacterBody3D
 var camera: Camera3D
@@ -69,6 +71,8 @@ var liquid: Node3D
 var weather: Node3D
 var destruction: Node3D
 var bodies: Node3D
+## A destruction tool in hand (`DESTRUCTION.TOOLS`) instead of a weapon, or "".
+var tool := ""
 var menu_open := false
 var menu_index := 0
 var last_note := ""
@@ -105,7 +109,7 @@ func _ready() -> void:
 	liquid = _station(LIQUID, Vector3(-12, 0, -8), Vector3(0, 0, 0))
 	bodies = _station(BODIES, Vector3(10, 0, -8), Vector3(0, 0, 0))
 	weather = _station(WEATHER, Vector3(0, 0, 2), Vector3(0, 0, 0))
-	destruction = _station(DESTRUCTION, Vector3(-12, 0, 11), Vector3(0, 0, 0))
+	destruction = _station(DESTRUCTION, DESTRUCTION_AT, DESTRUCTION.PLINTH)
 	_vehicle_pad(Vector3(12, 0, 12))
 	_build_player()
 	ballistics = Ballistics.new()
@@ -175,8 +179,19 @@ func _build_world() -> void:
 	# Open half: packed dirt, the ground rounds dig into (`GroundHole`). Its
 	# material is the one the weather wets.
 	var dirt := _surface(Color("5a4a3a"), 0.95)
-	var ground := _solid(Vector3(HALF * 2.0, 0.4, HALF), Vector3(0, -0.2, HALF * 0.5), dirt)
-	ground.add_to_group(GroundHole.GROUP)
+	# The destruction station's dig patch (`DigTerrain`) stands in for the
+	# yard floor over its own rectangle, so the floor is laid round it.
+	var hole := Rect2(DESTRUCTION.DIG_RECT.position + Vector2(DESTRUCTION_AT.x, DESTRUCTION_AT.z), DESTRUCTION.DIG_RECT.size)
+	for strip: Rect2 in [
+		Rect2(-HALF, 0.0, HALF * 2.0, hole.position.y),
+		Rect2(-HALF, hole.end.y, HALF * 2.0, HALF - hole.end.y),
+		Rect2(-HALF, hole.position.y, hole.position.x + HALF, hole.size.y),
+		Rect2(hole.end.x, hole.position.y, HALF - hole.end.x, hole.size.y),
+	]:
+		if strip.size.x <= 0.0 or strip.size.y <= 0.0:
+			continue
+		var ground := _solid(Vector3(strip.size.x, 0.4, strip.size.y), Vector3(strip.get_center().x, -0.2, strip.get_center().y), dirt)
+		ground.add_to_group(GroundHole.GROUP)
 	var roof_material := _surface(Color("2b2825"), 0.8)
 	_solid(Vector3(HALF * 2.0, 0.3, HALF), Vector3(0, ROOF_Y + 0.15, -HALF * 0.5), roof_material)
 	var pillar := _surface(Color("37332e"), 0.8)
@@ -374,9 +389,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("reload"):
 		arsenal.reload()
 	elif event.is_action_pressed("inspect"):
-		var next: String = WEAPONS[(WEAPONS.find(arsenal.current_id) + 1) % WEAPONS.size()]
-		arsenal.select_weapon(next)
-		_note(str(arsenal.current().label))
+		next_weapon()
 	elif event.is_action_pressed("xray"):
 		_note(bodies.press())
 	elif JUMP_CLIMB.is_jump_key(event):
@@ -507,6 +520,21 @@ func _pose_held(delta: float) -> void:
 	camera.fov = lerpf(88.0, ads.fov(str(arsenal.current_id)), aim_blend)
 
 
+## NEXT steps through the weapons, then the destruction tools, then round.
+func next_weapon() -> void:
+	var tools: Array = DESTRUCTION.TOOLS
+	if not tool.is_empty():
+		var after := tools.find(tool) + 1
+		tool = tools[after] if after < tools.size() else ""
+		if tool.is_empty():
+			arsenal.select_weapon(WEAPONS[0])
+	elif arsenal.current_id == WEAPONS[-1]:
+		tool = tools[0]
+	else:
+		arsenal.select_weapon(WEAPONS[(WEAPONS.find(arsenal.current_id) + 1) % WEAPONS.size()])
+	_note(tool.to_upper() if not tool.is_empty() else str(arsenal.current().label))
+
+
 ## Stand in front of plinth `index`, facing what it shows.
 func go_to(index: int) -> void:
 	var entry: Dictionary = stations[clampi(index, 0, stations.size() - 1)]
@@ -561,6 +589,8 @@ func _physics_process(delta: float) -> void:
 		melee.set_swing_hint(input * Vector2(1, -1))
 	melee.tick(delta)
 	_pose_held(delta)
+	if tool == "drill" and not menu_open and Input.is_action_pressed("attack"):
+		destruction.drill(camera.global_position, -camera.global_basis.z, delta, player)
 	var feet := player.global_position - Vector3(0, 0.85, 0)
 	liquid.wade(player, feet, player.velocity, delta)
 	_organ_frame(delta)
@@ -573,6 +603,9 @@ func _physics_process(delta: float) -> void:
 ## One attack with the held weapon: a round per pellet for a gun, a blow
 ## along the view for a blade. Returns the arsenal's answer.
 func attack(heavy: bool) -> Dictionary:
+	if not tool.is_empty():
+		_note(destruction.use_tool(tool, camera.global_position, -camera.global_basis.z, player))
+		return {"accepted": true, "kind": "tool", "tool": tool}
 	if str(arsenal.current().kind) == "melee":
 		# Pressed outside the event path (a test, a script): the same verbs.
 		if heavy:
@@ -715,11 +748,13 @@ func _note(text: String) -> void:
 
 func _update_hud() -> void:
 	var weapon: Dictionary = arsenal.current()
-	var lines := ["MECHANICS LAB", "%s   [%s] NEXT   [%s] FIRE/SWING   [%s] HEAVY" % [str(weapon.label), InputProfile.glyph("inspect"), InputProfile.glyph("attack"), InputProfile.glyph("heavy")]]
+	var lines := ["MECHANICS LAB", "%s   [%s] NEXT   [%s] FIRE/SWING   [%s] HEAVY" % [tool.to_upper() if not tool.is_empty() else str(weapon.label), InputProfile.glyph("inspect"), InputProfile.glyph("attack"), InputProfile.glyph("heavy")]]
 	for entry in stations:
 		if entry.node != null:
 			lines.append("%s  %s" % [str(entry.title), entry.node.status()])
-	lines.append("ACID ON YOU %.1f  (x%.2f)" % [weather.player_acid_taken, weather.acid_player_scale])
+	# Acid rain is a lab demo, off by default (Greg): its line only while it falls.
+	if weather.state == "acid":
+		lines.append("ACID ON YOU %.1f  (x%.2f)" % [weather.player_acid_taken, weather.acid_player_scale])
 	var extra := ""
 	if arsenal.current_id == "cleaver":
 		extra = "   HEAT %d%%%s" % [roundi(melee.heat * 100.0), "  VENTING" if melee.vent_left > 0.0 else ""]

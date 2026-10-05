@@ -33,14 +33,21 @@ func _ready() -> void:
 	await _seconds(3.0)
 	await _shot("liquid", lab.liquid.to_global(Vector3(2.6, 1.9, 1.6)), lab.liquid.to_global(Vector3(0, 0.4, -2.0)))
 
-	# Destruction: a round through each kind, two cleaver blows on the wall,
+	# Destruction: a round through each kind of prop, rounds and two blows on
+	# the voxel walls (lab-47: brick and concrete, not the old Wall_ panels),
 	# and holes in the open ground in front.
 	var station = lab.destruction
 	for prop: BreakableProp in station.props.duplicate():
-		if prop.name.begins_with("Wall_1") or prop.name.begins_with("Crate_1") or prop.name.begins_with("Pane_0") or prop.name.begins_with("Pipe_1"):
+		if prop.name.begins_with("Crate_1") or prop.name.begins_with("Pane_0") or prop.name.begins_with("Pipe_1"):
 			WORLD_BREAK.hit(prop, 200.0, "round", prop.global_position, Vector3(0, 0, -1), "sniper", "firearm")
-		elif prop.name.begins_with("Wall_2_0") or prop.name.begins_with("Crate_0"):
+		elif prop.name.begins_with("Crate_0"):
 			WORLD_BREAK.hit(prop, 44.0, "melee", prop.global_position, Vector3(0, 0, -1), "sword", "melee")
+	for wall: VoxelStructure in [station.brick_wall, station.concrete_wall]:
+		var front_z: float = wall.size.z * wall.voxel
+		for index in 3:
+			var at: Vector3 = wall.to_global(Vector3(0.4 + float(index) * 0.5, 0.6 + float(index) * 0.4, front_z))
+			WORLD_BREAK.hit(wall, 200.0, "round", at, Vector3(0, 0, -1), "sniper", "firearm")
+		WORLD_BREAK.hit(wall, 44.0, "melee", wall.to_global(Vector3(wall.size.x * wall.voxel - 0.5, 1.2, front_z)), Vector3(0, 0, -1), "sword", "melee")
 	for index in 5:
 		var at: Vector3 = station.to_global(Vector3(-1.5 + float(index) * 0.8, 3.0, 2.6))
 		lab.ballistics.fire(at, Vector3(0.05, -1, 0.02), "rifle" if index % 2 == 0 else "pistol")

@@ -154,3 +154,12 @@ Defaults set behind dials, all in `OrganSystem` unless named. None of these is G
 - Anatomy fix: the organ layout and skeleton had the spine in front of the heart. The rig faces -Z, as `BodyForms` says. They have been turned round.
 - New organs: stomach and two kidneys.
 - Open question: `AgentHub/queue/questions/lab48_reflex_booster.md`.
+
+## lab-47 teardown destruction, 2026-10-05
+
+- Built: Greg's five tiers as one table (`systems/material_toughness.gd`), 15 cm voxel walls/crates/bunker that break where hit and drop unsupported pieces as their own breakable bodies (`voxel_structure.gd`), a 6 x 6 x 3 m diggable dirt patch (SDF + naive surface nets, chunked, cuts replayable from a save: `dig_terrain.gd`), one explosion for voxels, soil, props and bodies (`blast.gd`). WorldBreak routes every existing weapon into them. Lab: brick and concrete voxel walls replace the panel wall; breach corner (tier 4 bunker front, tier 5 shell, lit crate inside; buried tier 3 hatch over a pocket); NEXT now steps on to grenade, charge, thermal drill, shovel.
+- Library: in-house GDScript, not Voxel Tools. Its GDExtension (1.7, MIT) would be a native binary loaded by every lane's headless suite and is marked less tested than the module build; the lab patch costs 17 ms for a grenade crater remesh in GDScript, which is fine here and not for kilometres of map. Voxel Tools stays the upgrade path for the real map.
+- Dials (defaults, for Greg): per-material hp per voxel (brick 18, concrete 30, bunker 60, sealed 120); loose cubes 96 and falling pieces 16, oldest recycled; grenade r 1.1 m / 260, charge r 0.85 m / 520 (fuses 2.2 s / 3 s); drill 55 hp/s r 0.3 m (about 12 s through 60 cm of bunker); ramming 35 kJ per tier (a 1.2 t car at 50 km/h beats tier 3); chaos magick tiers per metre of altitude 0 (off until the spell exists).
+- Measured headless (CPU only): 17 pistol rounds 1.7 ms total; charge on brick 8 ms (203 cells); grenade crater 17 ms; drill 0.16 ms a frame; debris settled with 83 cubes: physics 1.0 ms, process 2.2 ms a frame.
+- Not looked at: no render_one.cmd, so no PNGs (`tests/destruction_capture.tscn -- --shots=DIR` takes all six) and no real-GPU fps.
+- Weak: falling pieces collide as their convex hull; voxel faces are not greedy-merged; the dig patch draws one vertex colour, no texture; explosions are a light flash and the debris, no smoke or sparks yet.

@@ -29,6 +29,19 @@ static func hit(collider: Object, damage: float, cause: String, point: Vector3, 
 	for _depth in 6:
 		if node == null:
 			break
+		if node is VoxelStructure:
+			# Tiered voxels: the round or blade takes the cells it can beat
+			# (MaterialToughness), a small sphere just inside the face it met.
+			var structure := node as VoxelStructure
+			var source := MaterialToughness.source_for(kind)
+			var reach := 0.11 if source == "firearm" else 0.2
+			var cut := structure.damage_sphere(point + direction.normalized() * structure.voxel * 0.5, reach, source, damage, direction)
+			cut["kind"] = str(cut.get("material", "voxel"))
+			cut["broken"] = int(cut.removed) > 0
+			return _filed(cut, "voxel", str(structure.name), cause, weapon)
+		if node is DigTerrain:
+			var dug := (node as DigTerrain).carve_sphere(point, 0.14 if kind == "firearm" else 0.22, MaterialToughness.source_for(kind))
+			return _filed({"kind": "ground", "dug": dug, "broken": dug > 0}, "ground", str(node.name), cause, weapon)
 		if node is BreakableProp:
 			var prop := node as BreakableProp
 			# Filed under its own name, so the record says which crate, not "a crate".

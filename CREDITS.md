@@ -22,3 +22,11 @@ lists: `game/art/textures/lab/CREDITS.md` (ambientCG, CC0).
   shaders, which do not run headless, so the test suite could not exercise
   them, and one tank's spill does not need tens of thousands of particles.
   The CPU SPH-lite pour and depth-grid pool are our own.
+- Destruction (`game/systems/voxel_structure.gd`, `dig_terrain.gd`, lab-47):
+  looked at Zylann's Voxel Tools (https://github.com/Zylann/godot_voxel, MIT;
+  GDExtension 1.7 for Godot 4.5+) as the diggable-terrain engine, and the
+  surface-nets write-up by Mikola Lysenko ("Smooth Voxel Terrain (Part 2)",
+  0fps.net, 2012) for the meshing. No files or code copied: the voxel grid,
+  connectivity split and naive surface nets are our own GDScript, so they run
+  in the headless suite on every lane without a native binary. Voxel Tools
+  stays the named upgrade path for the real map's large terrain.
