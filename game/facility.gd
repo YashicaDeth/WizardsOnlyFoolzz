@@ -45,6 +45,8 @@ const SURFACES := {CONCRETE: "floor", RUST: "wall", CEILING: "ceiling"}
 const ROUTE_COLOR := Color("81906f")
 const SCREEN_COLOR := Color("b8d49f")
 const DANGER_COLOR := Color("a52d20")
+## Fittings in tall halls hang on rods to this height above the floor.
+const LAMP_HANG := 4.6
 
 var player: CharacterBody3D
 var camera: Camera3D
@@ -112,7 +114,9 @@ func _build_level_0c() -> void:
 	_room("SERVICE ARCADE", 0.0, Vector2(20.75, 35.25), Vector2(-58.5, 5.5), 8.2,
 		{"w": [[-2.5, 4.0, 3.4]], "n": [[28.0, 3.0, 3.0]]})
 	_box(Vector3(14.5, 0.4, 0.6), Vector3(28, 6.0, -48.0), RUST, false)
-	_sign("PRESSURE GATE", Vector3(28, 5.4, -47.6))
+	# v0.1 removes the pressure-gate scan; the beam stays, its name does not.
+	if not (embedded and V01_ONE_MAP):
+		_sign("PRESSURE GATE", Vector3(28, 5.4, -47.6))
 	_build_service_arcade_dressing()
 	# Vestibule to Lift A.
 	_corridor_z(0.0, 26.5, 29.5, -60.2, -58.5, 3.0)
@@ -179,6 +183,33 @@ func _build_surface() -> void:
 	day.omni_range = 18.0
 	day.position = Vector3(28, SURFACE_Y + 6.0, -142)
 	add_child(day)
+	# The v0.1 ending is blinding daylight: the open gate reads as a white-out
+	# from the whole head-house, and the light pours in along the floor.
+	var glare := MeshInstance3D.new()
+	glare.name = "DaylightGlare"
+	var sheet := BoxMesh.new()
+	sheet.size = Vector3(14.0, 10.0, 0.05)
+	glare.mesh = sheet
+	var white := StandardMaterial3D.new()
+	white.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	white.albedo_color = Color("fff4e0")
+	white.emission_enabled = true
+	white.emission = Color("fff4e0")
+	white.emission_energy_multiplier = 6.0
+	glare.material_override = white
+	glare.position = Vector3(28, SURFACE_Y + 3.0, -141.0)
+	add_child(glare)
+	var shaft := SpotLight3D.new()
+	shaft.name = "DaylightShaft"
+	shaft.light_color = Color("fff1d8")
+	shaft.light_energy = 14.0
+	shaft.spot_range = 16.0
+	shaft.spot_angle = 24.0
+	shaft.shadow_enabled = true
+	shaft.position = Vector3(28, SURFACE_Y + 2.2, -139.5)
+	shaft.rotation.x = -0.12
+	shaft.rotation.y = PI
+	add_child(shaft)
 
 
 # --- Player -----------------------------------------------------------------
@@ -284,15 +315,31 @@ func _update_hud() -> void:
 func objective_for(at: Vector3) -> String:
 	if at.y > SURFACE_Y - 2.0:
 		return "OPEN THE SURFACE GATE"
-	if at.y < -6.0:
-		if at.z > -118.0:
-			return "CROSS LOWER WORKS TO THE HEAT ELEVATOR"
+	# In the heat shaft at any height, the ride is the next thing.
+	if at.z < -118.0 and at.x > 25.0 and at.x < 31.0:
 		return "RIDE THE HEAT ELEVATOR TO DAYLIGHT"
+	if at.y < -6.0:
+		return "CROSS LOWER WORKS TO THE HEAT ELEVATOR"
 	if at.x < 8.0:
 		return "GO THROUGH THE EAST STAFF DOOR"
 	if at.z > -57.0:
 		return "CROSS THE SERVICE ARCADE TO THE TRANSIT LIFT"
 	return "RIDE THE TRANSIT LIFT DOWN"
+
+
+## The body-cam location stamp for a point on the v0.1 route.
+func location_for(at: Vector3) -> String:
+	if at.y > SURFACE_Y - 2.0:
+		return "SURFACE  //  HEAD-HOUSE"
+	if at.y < -6.0:
+		return "SUBLEVEL 0D  //  LOWER WORKS"
+	if at.y < -1.0 or at.z < -58.5:
+		return "SUBLEVEL 0C  //  LIFT SHAFT"
+	if at.x < 8.0:
+		return "SUBLEVEL 0C  //  GROWING FLOOR"
+	if at.x < 20.75:
+		return "SUBLEVEL 0C  //  SERVICE ARTERY"
+	return "SUBLEVEL 0C  //  SERVICE ARCADE"
 
 
 ## The Surface Gate: the first zone exit. Same ledger as the Lower Works' own
@@ -332,12 +379,20 @@ func _room(title: String, y: float, xs: Vector2, zs: Vector2, height: float, gap
 		_wall_z(xs.y, zs, y, height, gaps.get("e", []))
 	var centre := Vector3((xs.x + xs.y) * 0.5, y, (zs.x + zs.y) * 0.5)
 	_sign(title, centre + Vector3(0, minf(height - 0.5, 3.2), 0))
-	# Sparse pools on a ~16 m grid. The unlit spans matter as much as the pools,
-	# and the Lower Works stays within the forward-light budget.
-	var steps := Vector2i(maxi(1, int((xs.y - xs.x) / 16.0)), maxi(1, int((zs.y - zs.x) / 16.0)))
+	# Pools on a ~10 m grid, hung on drop rods at working height: from an 8 m
+	# or 12 m ceiling the old fittings never reached the floor and the arcade
+	# and Lower Works rendered black. Black still sits between the pools.
+	var steps := Vector2i(maxi(1, int((xs.y - xs.x) / 10.0)), maxi(1, int((zs.y - zs.x) / 10.0)))
+	var hang := minf(height - 0.1, LAMP_HANG)
+	var count := 0
 	for i in steps.x:
 		for j in steps.y:
-			_lamp(Vector3(xs.x + (xs.y - xs.x) * (i + 0.5) / steps.x, y + height - 0.1, zs.x + (zs.y - zs.x) * (j + 0.5) / steps.y))
+			var at := Vector3(xs.x + (xs.y - xs.x) * (i + 0.5) / steps.x, y + hang, zs.x + (zs.y - zs.x) * (j + 0.5) / steps.y)
+			if height - hang > 0.3:
+				_drop_rod(at, y + height)
+			# Large halls cast shadows from every other fitting only.
+			_lamp(at, steps.x * steps.y <= 6 or count % 2 == 0)
+			count += 1
 
 
 ## A corridor along X at z, 4 m grid: floor, ceiling, two side walls.
@@ -431,7 +486,7 @@ func _box(size: Vector3, at: Vector3, color: Color, solid := true) -> void:
 
 
 ## A caged ceiling tube and the hard pool straight under it.
-func _lamp(at: Vector3) -> void:
+func _lamp(at: Vector3, shadows := true) -> void:
 	var tube := MeshInstance3D.new()
 	var bar := BoxMesh.new()
 	bar.size = Vector3(1.1, 0.06, 0.14)
@@ -440,23 +495,43 @@ func _lamp(at: Vector3) -> void:
 	glow.albedo_color = LAMP_COLOR
 	glow.emission_enabled = true
 	glow.emission = LAMP_COLOR
-	glow.emission_energy_multiplier = 2.5
+	glow.emission_energy_multiplier = 4.0
 	tube.material_override = glow
 	tube.position = at
 	add_child(tube)
+	var hood := MeshInstance3D.new()
+	var shade := BoxMesh.new()
+	shade.size = Vector3(1.3, 0.12, 0.42)
+	hood.mesh = shade
+	hood.material_override = _prop_material("duct")
+	hood.position = at + Vector3(0, 0.09, 0)
+	add_child(hood)
 	var lamp := SpotLight3D.new()
 	lamp.light_color = LAMP_COLOR
-	lamp.light_energy = 6.0
-	lamp.spot_range = 7.0
-	lamp.spot_angle = 52.0
-	lamp.spot_attenuation = 1.4
-	lamp.shadow_enabled = true
+	# Low distance falloff so the pool lands hard on the floor 4.6 m down;
+	# the cone edge, not the distance, is what leaves black between pools.
+	lamp.light_energy = 14.0
+	lamp.spot_range = 9.5
+	lamp.spot_angle = 50.0
+	lamp.spot_attenuation = 0.45
+	lamp.spot_angle_attenuation = 0.6
+	lamp.shadow_enabled = shadows
 	lamp.distance_fade_enabled = true
-	lamp.distance_fade_begin = 18.0
-	lamp.distance_fade_length = 8.0
+	lamp.distance_fade_begin = 26.0
+	lamp.distance_fade_length = 10.0
 	lamp.position = at + Vector3(0, -0.08, 0)
 	lamp.rotation.x = -PI * 0.5
 	add_child(lamp)
+
+
+func _drop_rod(at: Vector3, ceiling_y: float) -> void:
+	var rod := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(0.05, ceiling_y - at.y, 0.05)
+	rod.mesh = mesh
+	rod.material_override = _prop_material("cable")
+	rod.position = Vector3(at.x, (at.y + ceiling_y) * 0.5, at.z)
+	add_child(rod)
 
 
 # --- Authored route dressing -----------------------------------------------
@@ -477,6 +552,9 @@ func _build_service_arcade_dressing() -> void:
 	_story_box("CableTray", Vector3(0.16, 0.12, 55.0), Vector3(33.15, 6.78, -25.5), "cable", "service_arcade", "cable")
 	_story_monitor(Vector3(28.0, 1.35, -46.8), 0.0, "service_arcade", true)
 	_danger_light(Vector3(28.0, 5.7, -47.0), 7.0)
+	# Cameras over each threshold: someone watches the route you take.
+	_story_cctv(Vector3(21.2, 4.6, -0.6), Vector3(26.0, 0.0, -4.0), "service_arcade")
+	_story_cctv(Vector3(30.6, 2.8, -58.2), Vector3(28.0, 0.0, -52.0), "service_arcade")
 
 
 ## Lower Works reads across its full height: a clear painted run to the heat
@@ -494,6 +572,8 @@ func _build_lower_works_dressing() -> void:
 	_story_monitor(Vector3(24.2, -10.65, -72.0), -PI * 0.5, "lower_works", false)
 	_story_monitor(Vector3(31.8, -10.65, -116.8), PI * 0.5, "lower_works", true)
 	_danger_light(Vector3(28.0, -3.0, -119.0), 9.0)
+	_story_cctv(Vector3(30.4, -9.2, -66.6), Vector3(28.0, -12.0, -74.0), "lower_works")
+	_story_cctv(Vector3(31.4, -8.4, -119.6), Vector3(28.0, -12.0, -112.0), "lower_works")
 
 
 func _route_strip(at: Vector3, size: Vector3) -> void:
@@ -514,6 +594,32 @@ func _story_tank(at: Vector3, radius: float, height: float, zone: String) -> voi
 	_register_story_prop(tank, zone, "tank")
 	_story_box("TankBand", Vector3(radius * 2.12, 0.16, radius * 2.12), at + Vector3(0, height * 0.22, 0), "frame", zone, "tank")
 	_story_box("TankBand", Vector3(radius * 2.12, 0.16, radius * 2.12), at - Vector3(0, height * 0.22, 0), "frame", zone, "tank")
+	# A service lamp on each tank: props stand in their own pool.
+	var work := SpotLight3D.new()
+	work.name = "TankLamp"
+	work.light_color = LAMP_COLOR
+	work.light_energy = 11.0
+	work.spot_range = height + 3.0
+	work.spot_angle = 34.0
+	work.spot_attenuation = 0.5
+	work.distance_fade_enabled = true
+	work.distance_fade_begin = 22.0
+	work.distance_fade_length = 8.0
+	add_child(work)
+	work.look_at_from_position(at + Vector3(radius + 0.9, height * 0.5 + 1.6, 0), at + Vector3(0, height * 0.1, 0))
+
+
+## The generated CCTV (the one SecurityCamera wears), as a still prop: no
+## cone, no alarm. v0.1 has no "creep past it".
+func _story_cctv(at: Vector3, watching: Vector3, zone: String) -> void:
+	var model := TUNNEL_KIT.GENERATED_MODEL.make("cctv")
+	if model == null:
+		return
+	model.name = "WatchingCamera"
+	_register_story_prop(model, zone, "cctv")
+	model.look_at_from_position(at, watching)
+	# The model looks along +Z; look_at aims -Z.
+	model.rotate_object_local(Vector3.UP, PI)
 
 
 func _story_monitor(at: Vector3, heading: float, zone: String, danger: bool) -> void:
@@ -528,6 +634,15 @@ func _story_monitor(at: Vector3, heading: float, zone: String, danger: bool) -> 
 	_story_box_local(console, "Console", Vector3(0.9, 1.4, 0.48), Vector3(0, 0, 0), "console")
 	_story_box_local(console, "Screen", Vector3(0.62, 0.45, 0.035), Vector3(0, 0.25, -0.26), "danger_screen" if danger else "screen")
 	_story_box_local(console, "Foot", Vector3(0.48, 0.12, 0.56), Vector3(0, -0.76, 0.02), "frame")
+	# The screen lights its own console and the floor in front of it.
+	var spill := OmniLight3D.new()
+	spill.name = "ScreenSpill"
+	spill.light_color = DANGER_COLOR if danger else SCREEN_COLOR
+	spill.light_energy = 1.4
+	spill.omni_range = 3.0
+	spill.omni_attenuation = 1.2
+	spill.position = Vector3(0, 0.3, -0.7)
+	console.add_child(spill)
 
 
 func _story_box(name: String, size: Vector3, at: Vector3, material_key: String, zone: String, kind: String) -> void:

@@ -2900,8 +2900,12 @@ func _update_hud() -> void:
 		return
 	if facility_map != null and (player.global_position.x > 8.0 or player.global_position.y < -1.0):
 		$HUD/Objective.text = "OBJECTIVE\n" + str(facility_map.call("objective_for", player.global_position))
+		if osd != null:
+			osd.location = str(facility_map.call("location_for", player.global_position))
 	else:
 		$HUD/Objective.text = "OBJECTIVE\n" + (_first_run_objective() if _first_run() else objective_text)
+		if osd != null:
+			osd.location = "SUBLEVEL 0C  //  GROWING FLOOR"
 	# AX3.1/AX3.6. INSPECT is a held state, not a menu, so it wins the prompt
 	# line for as long as it is held rather than opening anything separate.
 	if inspect_held and not FACILITY_MAP_SCRIPT.V01_ONE_MAP:

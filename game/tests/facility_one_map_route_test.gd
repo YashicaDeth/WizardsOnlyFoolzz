@@ -38,6 +38,14 @@ func _ready() -> void:
 	check(str(facility.objective_for(Vector3(14, 0, -2.5))).contains("SERVICE ARCADE"), "0C names the next walkable threshold")
 	check(str(facility.objective_for(Vector3(28, -12, -90))).contains("HEAT ELEVATOR"), "0D names the heat elevator")
 	check(str(facility.objective_for(Vector3(28, 20, -130))).contains("SURFACE GATE"), "the surface objective names its door")
+	check(str(facility.objective_for(Vector3(28, 2, -122))).contains("HEAT ELEVATOR"), "mid-ride in the heat shaft still names the heat elevator")
+	check(str(facility.location_for(Vector3(28, -12, -90))).contains("LOWER WORKS"), "the body-cam stamp follows the player into 0D")
+	check(str(facility.location_for(Vector3(28, 20, -130))).contains("SURFACE"), "the body-cam stamp reaches the surface")
+	var lamps := 0
+	for child in facility.get_children():
+		if child is SpotLight3D and child.position.y > -12.0 and child.position.y < -6.0:
+			lamps += 1
+	check(lamps >= 10, "Lower Works lamps hang low enough to reach the floor (%d)" % lamps)
 	vat._open_staff_door(false)
 	check(vat.staff_door_open and vat.staff_door_panel.position.z > vat.STAFF_DOOR_AT.z + 1.0, "the east staff door physically clears the artery opening")
 	var objective: Label = vat.get_node("HUD/Objective")

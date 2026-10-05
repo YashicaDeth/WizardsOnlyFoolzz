@@ -21,7 +21,7 @@ const ORIGIN := Vector3(10.75, 0.0, -2.5)
 const LAYOUT := {
 	Vector2i(0, 0): ["straight", "ew", 1.8, {"w": 0.75}],
 	Vector2i(1, 0): ["cross", "nesw", 2.2, {}],
-	Vector2i(2, 0): ["door", "ew", 0.0, {}],
+	Vector2i(2, 0): ["door", "ew", 1.4, {}],
 	Vector2i(1, 1): ["vent", "n", 1.2, {}],
 	Vector2i(1, -1): ["pipe_run", "ns", 0.0, {}],
 	Vector2i(1, -2): ["t", "esw", 2.0, {}],

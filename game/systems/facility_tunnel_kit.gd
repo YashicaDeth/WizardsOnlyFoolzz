@@ -61,6 +61,9 @@ const TEXTURES := {
 	},
 }
 const FALLBACK := {"wall": Color("231a14"), "floor": Color("1d1915"), "ceiling": Color("100d0b"), "door": Color("2a1510")}
+const LAMP_GAIN := 2.2
+## Dial: false restores the generated tunnel_lift_cab cage inside each car.
+const V01_PLAIN_CAB := true
 const TINT := {"wall": Color("806d60"), "floor": Color("706a63"), "ceiling": Color("605c56"), "door": Color("806b5a")}
 
 static var _materials := {}
@@ -196,11 +199,21 @@ static func dress_lift(lift: Node3D) -> void:
 			for part in child.get_children():
 				if part is MeshInstance3D:
 					(part as MeshInstance3D).material_override = material("door", true)
+	# The generated cab cage read as torn foil and blocked the side slots the
+	# shaft is meant to pass by in; the car wears the kit's steel instead.
 	var cab := lift.get("cab") as Node3D
 	if cab != null:
-		var cage := GENERATED_MODEL.make("tunnel_lift_cab")
-		if cage != null:
-			cab.add_child(cage)
+		for part in cab.get_children():
+			if part is MeshInstance3D:
+				(part as MeshInstance3D).material_override = material("wall", true)
+			elif part is AnimatableBody3D:
+				for leaf in part.get_children():
+					if leaf is MeshInstance3D:
+						(leaf as MeshInstance3D).material_override = material("door", true)
+		if not V01_PLAIN_CAB:
+			var cage := GENERATED_MODEL.make("tunnel_lift_cab")
+			if cage != null:
+				cab.add_child(cage)
 
 
 ## A world-facing basis: local +Z looks along `forward`, +Y stays up.
@@ -222,11 +235,13 @@ static func _lamp(piece: Node3D, energy: float) -> void:
 	var lamp := OmniLight3D.new()
 	lamp.name = "Lamp"
 	lamp.light_color = Color("d2ecc0")
-	lamp.light_energy = energy
+	# Layout energies were set for a steep falloff that left the artery black
+	# in render; the low-falloff pool needs about twice the energy.
+	lamp.light_energy = energy * LAMP_GAIN
 	# Short reach and a steep falloff: pools of light with dark between them
 	# (the Shade's light/dark visibility reads these).
 	lamp.omni_range = 5.0
-	lamp.omni_attenuation = 1.6
+	lamp.omni_attenuation = 0.9
 	lamp.shadow_enabled = true
 	lamp.position = Vector3(0, HEIGHT - 0.7, 0)
 	piece.add_child(lamp)

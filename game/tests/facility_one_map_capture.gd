@@ -33,8 +33,13 @@ func _ready() -> void:
 	vat.can_move = true
 	vat.fade.color.a = 0.0
 	vat.submerge_tint.color.a = 0.0
+	# Real play reaches the aisle with the intake filed and the beat line
+	# cleared; the OSD (and the objective it adopts) only shows after that.
 	if vat.intake != null:
-		vat.intake.visible = false
+		vat.intake.queue_free()
+		vat.intake = null
+	vat.subtitle.text = ""
+	vat.line_index = vat.active_beats.size()
 	if vat.load_in != null:
 		vat.load_in.visible = false
 	vat._open_staff_door(false)
@@ -43,10 +48,16 @@ func _ready() -> void:
 	vat.player.velocity = Vector3.ZERO
 
 	await _pose_and_capture("01_staff_door_to_artery.png", Vector3(4.4, 0.86, -2.5), -PI * 0.5)
+	vat.thought_life = 0.0
 	await _walk(Vector3(9.5, 0.0, -2.5))
 	await _walk(Vector3(18.0, 0.0, -2.5))
 	await _capture("02_artery_to_arcade.png")
 	await _walk(Vector3(28.0, 0.0, -2.5))
+	await _walk(Vector3(28.0, 0.0, -24.0))
+	await _capture("03a_arcade_mid.png")
+	await _walk(Vector3(28.0, 0.0, -36.0))
+	await _look_at(Vector3(23.0, 1.4, -41.5))
+	await _capture("03b_arcade_story_props.png")
 	await _walk(Vector3(28.0, 0.0, -55.0))
 	await _capture("03_arcade_to_transit.png")
 
@@ -54,10 +65,15 @@ func _ready() -> void:
 	await _walk(Vector3(28.0, 0.0, -62.0))
 	vat._interact()
 	await _until(func() -> bool: return transit.state == "moving" and transit.cab.position.y < -3.0)
+	await _look_out_of_cab()
 	await _capture("04_transit_lift_riding_down.png")
 	await _until(func() -> bool: return transit.state == "open")
 	await _walk(Vector3(28.0, 0.0, -70.0))
 	await _capture("05_transit_to_lower_works.png")
+	await _walk(Vector3(28.0, 0.0, -94.0))
+	await _capture("05b_lower_works_mid.png")
+	await _look_at(Vector3(38.0, -10.5, -98.0))
+	await _capture("05c_lower_works_story_props.png")
 	await _walk(Vector3(28.0, 0.0, -116.8))
 	await _capture("06_lower_works_to_heat_lift.png")
 
@@ -65,6 +81,7 @@ func _ready() -> void:
 	await _walk(Vector3(28.0, 0.0, -122.0))
 	vat._interact()
 	await _until(func() -> bool: return heat.state == "moving" and heat.cab.position.y > -5.0)
+	await _look_out_of_cab()
 	await _capture("07_heat_lift_riding_up.png")
 	await _until(func() -> bool: return heat.state == "open")
 	await _walk(Vector3(28.0, 0.0, -130.0))
@@ -76,8 +93,26 @@ func _ready() -> void:
 	for sample in fps_samples:
 		total += sample
 	var average := total / maxf(1.0, float(fps_samples.size()))
-	print("FACILITY_ONE_MAP_CAPTURE_RESULT walked=vat_to_surface shots=8 fps_min=%.1f fps_average=%.1f" % [minimum, average])
+	print("FACILITY_ONE_MAP_CAPTURE_RESULT walked=vat_to_surface shots=12 fps_min=%.1f fps_average=%.1f" % [minimum, average])
 	get_tree().quit()
+
+
+## Turn the real camera onto a story prop, as a player looking round would.
+func _look_at(target: Vector3) -> void:
+	var to: Vector3 = target - vat.camera.global_position
+	vat.yaw = atan2(-to.x, -to.z)
+	vat.pitch = atan2(to.y, Vector2(to.x, to.z).length())
+	await _frames(8)
+
+
+## You keep control in the car: turn to the side slot and watch the shaft go by.
+func _look_out_of_cab() -> void:
+	vat.yaw += PI * 0.5
+	vat.pitch = 0.05
+	await _frames(6)
+	vat.yaw -= PI * 0.5
+	vat.yaw += PI * 0.38
+	await _frames(4)
 
 
 func _pose_and_capture(file_name: String, at: Vector3, heading: float) -> void:
