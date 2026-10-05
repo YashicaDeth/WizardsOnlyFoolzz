@@ -26,6 +26,7 @@ const LOOK := preload("res://systems/look_settings.gd")
 const FACILITY_ROUTES := preload("res://systems/facility_routes.gd")
 const TUNNEL_NETWORK := preload("res://facility_tunnel_network.tscn")
 const TUNNEL_KIT := preload("res://systems/facility_tunnel_kit.gd")
+const ZONE_IDENTITY_SCRIPT := preload("res://systems/facility_zone_identity.gd")
 
 ## The vat. The player wakes in front of it, facing deeper in (-Z).
 const START := Vector3(0, 1.0, -2.4)
@@ -53,6 +54,9 @@ const ROUTE_LINE := "worn"
 ## Dial: caged wall lamps that wash the hall walls at each pool row, so the
 ## arcade and Lower Works show their bounds. 0 turns them off.
 const WALL_WASH_ENERGY := 7.0
+## Dial (REMASTER_LOG imp-67): each zone its own surfaces, landmark and story
+## props (systems/facility_zone_identity.gd). false = the shared kit look.
+const ZONE_IDENTITY := true
 
 var player: CharacterBody3D
 var camera: Camera3D
@@ -69,6 +73,7 @@ var embedded := false
 ## Set by tests and the playbot: a world point to walk to, sprinting.
 var bot_goal = null
 var _prop_materials := {}
+var identity = null
 
 
 func _ready() -> void:
@@ -82,6 +87,10 @@ func _ready() -> void:
 		var world := WorldEnvironment.new()
 		world.environment = environment
 		add_child(world)
+	if ZONE_IDENTITY:
+		identity = ZONE_IDENTITY_SCRIPT.new()
+		identity.name = "ZoneIdentity"
+		add_child(identity)
 	_build_level_0c()
 	_build_level_0d()
 	if not embedded:
@@ -89,6 +98,8 @@ func _ready() -> void:
 	_build_surface()
 	for lift: FacilityElevator in lifts.values():
 		TUNNEL_KIT.dress_lift(lift)
+	if identity != null:
+		identity.apply(self)
 	if not embedded:
 		_build_player()
 		_build_hud()
@@ -565,7 +576,10 @@ func _build_service_arcade_dressing() -> void:
 		_story_box("ArcadeFrame", Vector3(0.34, 5.4, 0.34), Vector3(34.0, 2.7, z), "frame", "service_arcade", "frame")
 		_story_box("ArcadeFrame", Vector3(12.35, 0.34, 0.34), Vector3(28.0, 5.4, z), "frame", "service_arcade", "frame")
 	for z: float in [-8.5, -25.0, -41.5]:
-		_story_tank(Vector3(23.0, 1.45, z), 0.75, 2.9, "service_arcade")
+		# Zone identity: vessels are the Lower Works' own; here the stalls
+		# are the landmark, and the first tank stood in front of them.
+		if identity == null:
+			_story_tank(Vector3(23.0, 1.45, z), 0.75, 2.9, "service_arcade")
 		_story_monitor(Vector3(33.9, 1.25, z - 2.2), PI * 0.5, "service_arcade", false)
 	_story_box("CableTray", Vector3(0.22, 0.16, 55.0), Vector3(33.5, 6.85, -25.5), "cable", "service_arcade", "cable")
 	_story_box("CableTray", Vector3(0.16, 0.12, 55.0), Vector3(33.15, 6.78, -25.5), "cable", "service_arcade", "cable")
@@ -636,7 +650,9 @@ func _dress_walls(zone: String, y: float, xs: Vector2, rows: Array, height: floa
 			if WALL_WASH_ENERGY > 0.0:
 				_wall_lamp(Vector3(wall_x + inward * 0.12, y + minf(height - 1.0, 3.4), z), inward)
 			if (index + (0 if side < 0 else 1)) % 2 == 0:
-				_wall_prop(kinds[(index * 2 + (side + 1) / 2) % kinds.size()], Vector3(wall_x, y, z - 2.0), inward, zone)
+				var at := Vector3(wall_x, y, z - 2.0)
+				if identity == null or not identity.wall_slot(zone, at, inward):
+					_wall_prop(kinds[(index * 2 + (side + 1) / 2) % kinds.size()], at, inward, zone)
 
 
 func _wall_lamp(at: Vector3, inward: float) -> void:
