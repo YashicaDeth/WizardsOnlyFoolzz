@@ -27,6 +27,10 @@ const DESTRUCTION := preload("res://lab/stations/destruction_station.gd")
 const BODIES := preload("res://lab/stations/bodies_station.gd")
 const SPARRING := preload("res://lab/sparring_partner.gd")
 const VEHICLES := preload("res://lab/stations/vehicle_station.gd")
+const MATERIA := preload("res://lab/stations/materia_station.gd")
+## drug-70: the materia station stands in the open half, so the weather's
+## wind reaches its smoke.
+const MATERIA_AT := Vector3(0, 0, 10)
 ## Where the sparring partner (job 3) stands: the covered half, clear of the
 ## stations, so a fight has room to move.
 const SPARRING_AT := Vector3(0, 0, -12)
@@ -68,6 +72,7 @@ var weather: Node3D
 var destruction: Node3D
 var bodies: Node3D
 var vehicles: Node3D
+var materia: Node3D
 ## A destruction tool in hand (`DESTRUCTION.TOOLS`) instead of a weapon, or "".
 var tool := ""
 var menu_open := false
@@ -113,6 +118,7 @@ func _ready() -> void:
 	destruction = _station(DESTRUCTION, DESTRUCTION_AT, DESTRUCTION.PLINTH)
 	vehicles = _station(VEHICLES, Vector3(12, 0, 12), VEHICLES.PLINTH)
 	_build_player()
+	materia = _station(MATERIA, MATERIA_AT, Vector3(0, 0, 0.9))
 	ballistics = Ballistics.new()
 	add_child(ballistics)
 	ballistics.round_hit.connect(_on_round_hit)
@@ -368,6 +374,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("attack") and execute_downed():
 		get_viewport().set_input_as_handled()
 		return
+	if materia.handle_input(event):
+		get_viewport().set_input_as_handled()
+		return
 	if _movement_input(event):
 		return
 	if melee.handle_input(event):
@@ -587,6 +596,7 @@ func _physics_process(delta: float) -> void:
 	player.rotation.y = yaw
 	camera.position.y = EYE_HEIGHT - mover.eye_drop
 	BODY_CAM.apply(camera, player, delta, pitch)
+	materia.apply_body(delta)
 	arsenal.tick(delta)
 	if input.length_squared() > 0.25:
 		melee.set_swing_hint(input * Vector2(1, -1))

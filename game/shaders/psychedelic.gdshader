@@ -48,12 +48,66 @@ uniform float cut_intensity : hint_range(0.0, 1.0) = 0.0;
 uniform float cut_seed = 0.0;
 uniform float cut_rate = 8.0;
 
+// drug-70: the dials the materia classes needed that the first six did not
+// have. Every one is neutral at 0, so a scene that never names them pays a
+// branch each and sees nothing.
+
+// 1b. Palette cycling: the LUT key scrolls, cycles per second. Only does
+// anything while `lut_strength` is up.
+uniform float palette_cycle = 0.0;
+// 2b. A left/right mirror fold, 0 or 1 (blended between). Cheaper and plainer
+// than the kaleidoscope, and what a body-stone reads as.
+uniform float mirror_fold : hint_range(0.0, 1.0) = 0.0;
+// 5b. Melt: the frame drips down along noise columns.
+uniform float melt_strength : hint_range(0.0, 0.2) = 0.0;
+// 7. Beat-locked pulse. `beat_level` is fed by `AudioReactive` (the audio bus
+// spectrum, 0-1 and already smoothed); `pulse_strength` is how far the frame
+// breathes in on it. A pulse is a push, not a cut: it is the other half of
+// what "beat-locked" meant in FINAL_V's table.
+uniform float pulse_strength : hint_range(0.0, 1.0) = 0.0;
+uniform float beat_level : hint_range(0.0, 1.0) = 0.0;
+// 8. Saturation, -1 grey to +1 oversaturated.
+uniform float saturation_shift : hint_range(-1.0, 1.0) = 0.0;
+// 9. Darkness from the edge in. The deliriant dial: the light goes first.
+uniform float darkness : hint_range(0.0, 1.0) = 0.0;
+// 10. Detachment: the world shrinks away into the middle of the screen with
+// nothing around it. The dissociative dial.
+uniform float tunnel : hint_range(0.0, 1.0) = 0.0;
+// 11. Figures at the edge of vision. Never in the middle of the frame, never
+// lit, never there when you would look straight at them.
+uniform float edge_figures : hint_range(0.0, 1.0) = 0.0;
+
 float hash11(float x) {
 	return fract(sin(x) * 43758.5453123);
 }
 
+// A standing shape: head and a tapered body, in a box `size` tall, feet at
+// `foot`. Returns coverage 0-1 with a soft edge. Coordinates are aspect-
+// corrected so a figure is not stretched by the screen.
+float figure(vec2 p, vec2 foot, float size, float lean) {
+	vec2 q = (p - foot) / size;
+	q.x -= q.y * lean;
+	float head = length(q - vec2(0.0, 0.86)) - 0.085;
+	float width = mix(0.16, 0.07, clamp(q.y / 0.78, 0.0, 1.0));
+	float body = max(abs(q.x) - width, max(-q.y, q.y - 0.78));
+	float d = min(head, body);
+	return 1.0 - smoothstep(0.0, 0.035, d);
+}
+
 void fragment() {
 	vec2 uv = UV;
+	// 7. The pulse breathes the whole frame in toward its middle.
+	if (pulse_strength > 0.0) {
+		uv = (uv - 0.5) * (1.0 - pulse_strength * beat_level * 0.06) + 0.5;
+	}
+	// 10. Detachment shrinks the frame before anything else touches it.
+	if (tunnel > 0.0) {
+		uv = (uv - 0.5) * (1.0 + tunnel * 0.9) + 0.5;
+	}
+	// 2b. Mirror fold.
+	if (mirror_fold > 0.0) {
+		uv.x = mix(uv.x, 0.5 - abs(uv.x - 0.5), mirror_fold);
+	}
 	vec2 centered = uv * 2.0 - 1.0;
 
 	// 2. Fold the frame into wedges before anything samples it.
@@ -71,6 +125,11 @@ void fragment() {
 		vec2 flow = texture(noise_texture, uv * 0.6 + vec2(0.0, TIME * displacement_scroll)).rg - 0.5;
 		uv += flow * displacement_strength;
 	}
+	// 5b. Melt: columns of the frame slide down at their own rate.
+	if (melt_strength > 0.0) {
+		float column = texture(noise_texture, vec2(uv.x * 3.0, 0.37)).r;
+		uv.y -= melt_strength * column * (0.5 + 0.5 * sin(TIME * 0.4 + column * 6.0)) * uv.y;
+	}
 
 	// 4. Chromatic separation, sampled off the (possibly folded/warped) uv.
 	vec3 color;
@@ -86,7 +145,7 @@ void fragment() {
 	// 1. Palette LUT, keyed on luminance.
 	if (lut_strength > 0.0) {
 		float luma = dot(color, vec3(0.299, 0.587, 0.114));
-		vec3 graded = texture(lut_texture, vec2(luma, 0.5)).rgb;
+		vec3 graded = texture(lut_texture, vec2(fract(luma + TIME * palette_cycle), 0.5)).rgb;
 		color = mix(color, graded, lut_strength);
 	}
 
@@ -119,6 +178,52 @@ void fragment() {
 		float beat = floor(TIME * cut_rate + cut_seed);
 		float held = step(0.5, hash11(beat * 91.7));
 		color = mix(color, vec3(hash11(beat * 12.9898)), held * cut_intensity);
+	}
+
+	// 8. Saturation around the frame's own luminance.
+	if (saturation_shift != 0.0) {
+		float grey = dot(color, vec3(0.299, 0.587, 0.114));
+		color = max(mix(vec3(grey), color, 1.0 + saturation_shift), vec3(0.0));
+	}
+
+	// 7. The beat lifts the frame a little as well as pushing it.
+	if (pulse_strength > 0.0) {
+		color *= 1.0 + pulse_strength * beat_level * 0.25;
+	}
+
+	vec2 screen = UV * 2.0 - 1.0;
+	// 10. Outside the shrunken frame there is nothing.
+	if (tunnel > 0.0) {
+		float edge = max(abs(screen.x), abs(screen.y));
+		color *= 1.0 - smoothstep(1.0 / (1.0 + tunnel * 0.9) - 0.12, 1.0 / (1.0 + tunnel * 0.9), edge) * tunnel;
+	}
+
+	// 9. Darkness: a vignette that eats inward and crushes what it leaves.
+	if (darkness > 0.0) {
+		float r = length(screen * vec2(1.0, 0.8));
+		float eaten = smoothstep(1.25 - darkness * 1.05, 1.35 - darkness * 0.6, r);
+		color *= (1.0 - eaten) * (1.0 - darkness * 0.55);
+	}
+
+	// 11. Figures at the edge. Each holds its place for a few seconds, then is
+	// somewhere else; they sit only in the outer fifth of the frame, and a
+	// figure fades as the frame's middle gets closer to it.
+	if (edge_figures > 0.0) {
+		float aspect = SCREEN_PIXEL_SIZE.y / max(SCREEN_PIXEL_SIZE.x, 0.000001);
+		vec2 p = vec2(UV.x * aspect, 1.0 - UV.y);
+		float cover = 0.0;
+		for (int i = 0; i < 3; i++) {
+			float fi = float(i);
+			float slot = floor(TIME / (2.6 + fi * 0.9) + fi * 17.0);
+			float t = fract(TIME / (2.6 + fi * 0.9) + fi * 17.0);
+			float side = step(0.5, hash11(slot * 3.1 + fi));
+			float x = mix(0.03 + hash11(slot * 5.7 + fi) * 0.12, 0.85 + hash11(slot * 7.3 + fi) * 0.12, side) * aspect;
+			float size = 0.42 + hash11(slot * 9.1 + fi) * 0.3;
+			float there = step(0.35, hash11(slot * 1.3 + fi * 4.0)) * smoothstep(0.0, 0.3, t) * (1.0 - smoothstep(0.8, 1.0, t));
+			cover = max(cover, figure(p, vec2(x, 0.02), size, (hash11(slot + fi) - 0.5) * 0.25) * there);
+		}
+		float periphery = smoothstep(0.35, 0.75, abs(screen.x));
+		color *= 1.0 - cover * periphery * edge_figures * 0.92;
 	}
 
 	COLOR = vec4(color, 1.0);
