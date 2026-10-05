@@ -30,6 +30,9 @@ const DIG_CORNER := Vector3(-7.5, -3.0, 2.5)
 ## Station-space ground the dig patch replaces (x, z, width, depth); the lab
 ## leaves this out of its yard floor.
 const DIG_RECT := Rect2(-7.5, 2.5, 6.0, 6.0)
+## The REBUILD plinth, station space: in front of the walls, clear of the dig
+## patch, so its sign stands behind the view of the walls, not in it.
+const PLINTH := Vector3(1.0, 0, 5.0)
 const GRENADE_FUSE := 2.2
 const GRENADE := {"radius": 1.1, "damage": 260.0, "source": "explosive"}
 const CHARGE_FUSE := 3.0
@@ -66,12 +69,19 @@ func press() -> String:
 	return "REBUILT"
 
 
+## Props that broke, and voxel walls, crates and bunker parts that lost a real
+## share of themselves (`VoxelStructure.broken`) or are gone.
 func broken_count() -> int:
-	return props.filter(func(prop: BreakableProp) -> bool: return is_instance_valid(prop) and prop.broken).size()
+	var count := props.filter(func(prop: BreakableProp) -> bool: return is_instance_valid(prop) and prop.broken).size()
+	return count + voxels.filter(func(structure: VoxelStructure) -> bool: return not is_instance_valid(structure) or structure.broken()).size()
+
+
+func breakables() -> int:
+	return props.size() + voxels.size()
 
 
 func status() -> String:
-	return "BROKEN %d/%d  DUG %d" % [broken_count(), props.size(), terrain.cuts.size() if is_instance_valid(terrain) else 0]
+	return "BROKEN %d/%d  DUG %d" % [broken_count(), breakables(), terrain.cuts.size() if is_instance_valid(terrain) else 0]
 
 
 func _process(_delta: float) -> void:

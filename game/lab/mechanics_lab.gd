@@ -109,7 +109,7 @@ func _ready() -> void:
 	liquid = _station(LIQUID, Vector3(-12, 0, -8), Vector3(0, 0, 0))
 	bodies = _station(BODIES, Vector3(10, 0, -8), Vector3(0, 0, 0))
 	weather = _station(WEATHER, Vector3(0, 0, 2), Vector3(0, 0, 0))
-	destruction = _station(DESTRUCTION, DESTRUCTION_AT, Vector3(0, 0, 0))
+	destruction = _station(DESTRUCTION, DESTRUCTION_AT, DESTRUCTION.PLINTH)
 	_vehicle_pad(Vector3(12, 0, 12))
 	_build_player()
 	ballistics = Ballistics.new()
@@ -752,7 +752,9 @@ func _update_hud() -> void:
 	for entry in stations:
 		if entry.node != null:
 			lines.append("%s  %s" % [str(entry.title), entry.node.status()])
-	lines.append("ACID ON YOU %.1f  (x%.2f)" % [weather.player_acid_taken, weather.acid_player_scale])
+	# Acid rain is a lab demo, off by default (Greg): its line only while it falls.
+	if weather.state == "acid":
+		lines.append("ACID ON YOU %.1f  (x%.2f)" % [weather.player_acid_taken, weather.acid_player_scale])
 	var extra := ""
 	if arsenal.current_id == "cleaver":
 		extra = "   HEAT %d%%%s" % [roundi(melee.heat * 100.0), "  VENTING" if melee.vent_left > 0.0 else ""]

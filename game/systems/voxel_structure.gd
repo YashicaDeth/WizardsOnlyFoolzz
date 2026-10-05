@@ -30,6 +30,12 @@ const LOOSE_CELLS := 2
 const DEBRIS_LAYER := 1 << 3
 const HURT_SPEED := 3.5
 const HURT_PER_MOMENTUM := 2.2
+## A structure that has lost this share of its cells counts as broken (the
+## lab's BROKEN tally, and later the map's "breached").
+const BROKEN_SHARE := 0.1
+## A blast's shock reaches this far past its radius, at `shock` x its damage:
+## weak walls (brick, drywall) blow out wide, hard ones only where it hit.
+const SHOCK_REACH := 1.6
 
 const FACES := [
 	[Vector3i(1, 0, 0), [Vector3(1, 0, 0), Vector3(1, 1, 0), Vector3(1, 1, 1), Vector3(1, 0, 1)]],
@@ -51,6 +57,8 @@ var size := Vector3i.ONE
 var cells := PackedByteArray()
 var hp := PackedFloat32Array()
 var palette: Array[String] = []
+## Cells when built whole; 0 for a piece that broke off.
+var start_cells := 0
 var _mesh: MeshInstance3D
 var _shape: CollisionShape3D
 
@@ -80,6 +88,7 @@ func fill(dims: Vector3i, material: String) -> void:
 	cells.fill(1)
 	hp.resize(cells.size())
 	hp.fill(MaterialToughness.hp_of(material))
+	start_cells = cells.size()
 
 
 func _ready() -> void:
@@ -116,6 +125,11 @@ func solid_count() -> int:
 	return cells.size() - cells.count(0)
 
 
+## Lost a real share of itself (or is gone). Pieces that broke off never count.
+func broken() -> bool:
+	return start_cells > 0 and solid_count() <= int(start_cells * (1.0 - BROKEN_SHARE))
+
+
 func cell_of(world_point: Vector3) -> Vector3i:
 	var local := to_local(world_point) / voxel
 	return Vector3i(floori(local.x), floori(local.y), floori(local.z))
@@ -128,10 +142,13 @@ func cell_centre(c: Vector3i) -> Vector3:
 ## Takes `damage` (full at the centre, half at the edge) off every cell within
 ## `radius` of `world_point` that `source` can beat. Returns what happened:
 ## removed cells, cells it could not beat ("blocked"), pieces that broke off.
-func damage_sphere(world_point: Vector3, radius: float, source: String, damage: float, push := Vector3.ZERO, params := {}) -> Dictionary:
+## `shock` > 0 (blasts): out to SHOCK_REACH x radius, cells also take
+## `shock` x damage, falling to nothing at the edge.
+func damage_sphere(world_point: Vector3, radius: float, source: String, damage: float, push := Vector3.ZERO, params := {}, shock := 0.0) -> Dictionary:
 	var result := {"removed": 0, "blocked": 0, "fell": 0, "material": ""}
 	var centre := to_local(world_point) / voxel
-	var reach := radius / voxel
+	var core := radius / voxel
+	var reach := core * (SHOCK_REACH if shock > 0.0 else 1.0)
 	var low := Vector3i(floori(centre.x - reach), floori(centre.y - reach), floori(centre.z - reach)).max(Vector3i.ZERO)
 	var high := Vector3i(floori(centre.x + reach), floori(centre.y + reach), floori(centre.z + reach)).min(size - Vector3i.ONE)
 	var gone: Array[Vector3i] = []
@@ -148,7 +165,10 @@ func damage_sphere(world_point: Vector3, radius: float, source: String, damage: 
 				if not MaterialToughness.can_break(source, material, params):
 					result.blocked += 1
 					continue
-				hp[i] -= damage * (1.0 - 0.5 * distance / maxf(reach, 0.001))
+				if distance <= core:
+					hp[i] -= damage * (1.0 - 0.5 * distance / maxf(core, 0.001))
+				else:
+					hp[i] -= damage * shock * (1.0 - (distance - core) / maxf(reach - core, 0.001))
 				if hp[i] <= 0.0:
 					result.material = material
 					gone.append(Vector3i(x, y, z))
@@ -333,6 +353,8 @@ static func look() -> StandardMaterial3D:
 	if _look == null:
 		_look = StandardMaterial3D.new()
 		_look.vertex_color_use_as_albedo = true
+		# The table's colours are sRGB; without this brick reads salmon.
+		_look.vertex_color_is_srgb = true
 		_look.roughness = 0.88
 	return _look
 

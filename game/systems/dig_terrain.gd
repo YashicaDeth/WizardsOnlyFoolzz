@@ -22,12 +22,14 @@ const CHUNK := 8
 ## bottom; the top cells are air for the crater lips and spoil.
 @export var cells := Vector3i(24, 14, 24)
 @export var depth := 3.0
+const GRIME := preload("res://shaders/grimy_dirt.gdshader")
+
 @export var material := "dirt"
 var density := PackedFloat32Array()
 var cuts: Array = []
 var _chunks: Dictionary = {}
 var _dirty: Dictionary = {}
-var _look: StandardMaterial3D
+var _look: ShaderMaterial
 
 
 func _ready() -> void:
@@ -38,9 +40,8 @@ func _ready() -> void:
 		for y in samples.y:
 			for x in samples.x:
 				density[_s(x, y, z)] = depth - float(y) * cell
-	_look = StandardMaterial3D.new()
-	_look.vertex_color_use_as_albedo = true
-	_look.roughness = 0.97
+	_look = ShaderMaterial.new()
+	_look.shader = GRIME
 	for cz in ceili(float(cells.z) / CHUNK):
 		for cy in ceili(float(cells.y) / CHUNK):
 			for cx in ceili(float(cells.x) / CHUNK):

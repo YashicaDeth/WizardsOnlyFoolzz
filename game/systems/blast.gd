@@ -2,6 +2,11 @@ class_name Blast
 extends RefCounted
 
 const WORLD_BREAK := preload("res://systems/world_break.gd")
+## The share of a blast's damage its shock carries past the radius (see
+## `VoxelStructure.damage_sphere`). 0.1 of a charge (52) blows brick (18 hp)
+## and wood out wide, chips concrete (30) near the edge of the core, and does
+## nothing more to a bunker (60). A dial.
+const SHOCK := 0.1
 
 ## One explosion for every breakable that speaks tiers (`VoxelStructure`,
 ## `DigTerrain`), the older breakables (`WorldBreak`), bodies (wounded, and
@@ -18,7 +23,7 @@ static func explode(host: Node3D, at: Vector3, radius: float, damage: float, sou
 		var structure := node as VoxelStructure
 		if not is_instance_valid(structure) or structure.is_queued_for_deletion():
 			continue
-		var result := structure.damage_sphere(at, radius, source, damage, Vector3.UP)
+		var result := structure.damage_sphere(at, radius, source, damage, Vector3.UP, {}, SHOCK)
 		tally.removed += int(result.removed)
 		tally.blocked += int(result.blocked)
 	for node in tree.get_nodes_in_group(DigTerrain.GROUP):

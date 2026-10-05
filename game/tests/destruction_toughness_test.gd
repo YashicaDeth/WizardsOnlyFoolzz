@@ -138,6 +138,8 @@ func _breach() -> void:
 	add_child(lab)
 	await _frames(3)
 	var station = lab.destruction
+	# The HUD counts voxel walls too; a charge on brick is checked last.
+	check(station.broken_count() == 0 and str(station.status()).begins_with("BROKEN 0/%d" % station.breakables()), "the station starts whole and counts its voxel walls (%s)" % station.status())
 	var hatch: VoxelStructure = station.hatch
 	var terrain: DigTerrain = station.terrain
 	var above := hatch.cell_centre(Vector3i(hatch.size.x / 2, 0, hatch.size.z / 2)) + Vector3(0, 1.4, 0)
@@ -171,15 +173,31 @@ func _breach() -> void:
 	var through := _ray_through(aim + Vector3(0, 0, 0.5), Vector3.FORWARD, front)
 	check(drilled > 8 and through, "twelve seconds of thermal drill bore through the bunker front (%d cells)" % drilled)
 	check(front.solid_count() < front_before, "and the bunker front has a hole")
+	# Last, so its flying brick does not land on the dig spot above.
+	var brick: VoxelStructure = station.brick_wall
+	var brick_charge: Node3D = station.place_charge(brick.to_global(Vector3(2.0, 0.9, 0.3)), Vector3.BACK)
+	station.detonate(brick_charge)
+	check(station.broken_count() >= 1 and brick.broken(), "after the charge the brick wall counts as broken (%s)" % station.status())
+	var door := brick.cell_of(brick.to_global(Vector3(2.0, 0.0, 0.0))).x
+	var left_standing := 0
+	for z in brick.size.z:
+		for y in 12:
+			for x in range(door - 2, door + 2):
+				left_standing += 1 if not brick.cell_at(Vector3i(x, y, z)).is_empty() else 0
+	check(left_standing == 0, "and leaves a hole you walk through: 0.6 x 1.8 m clear from the floor (%d cells left in it)" % left_standing)
+	# Let the lab and its debris free before quitting (quitting the same frame crashed now and then).
 	lab.queue_free()
+	await _frames(3)
 
 
 func _round_at(structure: VoxelStructure, at: Vector3) -> Dictionary:
 	return load("res://systems/world_break.gd").hit(structure, 24.0, "round", at, (structure.global_position + Vector3(structure.size) * structure.voxel * 0.5 - at).normalized(), "sidearm", "firearm")
 
 
+## What the tools see (layer 1): loose cubes the shovel throws up sit on
+## their own layer and may land in the shaft.
 func _down(from: Vector3) -> Dictionary:
-	return get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(from, from + Vector3.DOWN * 4.0))
+	return get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(from, from + Vector3.DOWN * 4.0, 1))
 
 
 ## True when a ray along `along` from `from` passes the structure without meeting it.

@@ -113,6 +113,9 @@ func _destruction() -> void:
 	await _press("attack")
 	await _seconds(0.6)
 	check(wall.solid_count() < cells_before, "the cleaver knocks brick out of the voxel wall (%d -> %d)" % [cells_before, wall.solid_count()])
+	# The plinth stands back from the walls (lab-47: its sign was in the shot).
+	lab.go_to(3)
+	await _frames(2)
 	await _press("interact")
 	check(station.broken_count() == 0, "USE on the destruction plinth rebuilds it all")
 
