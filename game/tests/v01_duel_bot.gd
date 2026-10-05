@@ -136,9 +136,11 @@ func axis(index: JoyAxis, value: float) -> void:
 	Input.parse_input_event(event)
 
 
+## A quick press: three physics frames, about as short as a thumb makes.
 func tap(index: JoyButton) -> void:
 	button(index, true)
-	await get_tree().physics_frame
+	for _frame in 3:
+		await get_tree().physics_frame
 	button(index, false)
 
 
@@ -201,7 +203,7 @@ func careful(foe: V01Foe, reach: float, keep: float, weapon := "melee", aim_part
 	# The telegraph: colour and time left.
 	if foe.winding != "" and not foe.move.is_empty():
 		var left := foe.windup_needed - foe.windup
-		var key := foe.telegraphs
+		var key := "%d:%d" % [foe.get_instance_id(), foe.telegraphs]
 		var colour: Color = foe.move.get("colour", V01Foe.COPPER)
 		if colour == V01Foe.COPPER and bool(foe.move.get("parryable", false)) and left <= 0.16 and not _parried_for.has(key):
 			_parried_for[key] = true
@@ -215,7 +217,7 @@ func careful(foe: V01Foe, reach: float, keep: float, weapon := "melee", aim_part
 			return
 		if colour == V01Foe.RED and left <= 0.12 and not _dodged_for.has(key):
 			_dodged_for[key] = true
-			stick(Vector2(1.0 if key % 2 == 0 else -1.0, 0.0))
+			stick(Vector2(1.0 if foe.telegraphs % 2 == 0 else -1.0, 0.0))
 			await get_tree().physics_frame
 			await tap(JOY_BUTTON_B)
 			await get_tree().physics_frame
@@ -230,7 +232,7 @@ func careful(foe: V01Foe, reach: float, keep: float, weapon := "melee", aim_part
 		if (open or foe.winding == "" or aim_part == "eye") and enc.gun_cooldown <= 0.0 and enc._gun_rounds() > 0:
 			await trigger(JOY_AXIS_TRIGGER_RIGHT, 0.05)
 		return
-	if open or (foe.winding == "" and foe.attack_clock < 0.3 and foe is V01FreedSubject):
+	if open:
 		if distance > reach:
 			stick(Vector2(0, -1))
 			return

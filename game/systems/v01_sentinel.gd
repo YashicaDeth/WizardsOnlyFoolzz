@@ -17,14 +17,14 @@ extends V01Foe
 ##   a long overload stun (eye dark, core venting).
 ## - **Pistol** rounds ricochet off plates. A round in the EYE blinds it for a
 ##   few seconds (it loses you and only swings at what touches it); a round in
-##   the CORE takes three times the damage.
+##   the CORE takes two and a half times the damage.
 ##
 ## Its blows: the RAM (red: its eye flares, it rears back, then charges along
 ## the line it locked; it overshoots and vents, core open) and the piston
 ## SLAM up close (copper: blockable, never parryable; it is a machine).
 
 ## DIALS (REMASTER_LOG job9).
-const HEALTH := 260.0
+const HEALTH := 320.0
 const SPEED := 1.7
 const TURN_RATE := 1.5
 const SIGHT_RANGE := 13.0
@@ -45,12 +45,17 @@ const REST := 1.2
 const SHARE := {"ram": 0.17, "slam": 0.11}
 ## Through an intact plate, a blow does this share of its damage.
 const PLATE_PASS := 0.15
+## Behind a plate that has come off, the works take this share.
+const EXPOSED_SHARE := 0.5
+## How much of a blow a plate soaks as wear: light blows chip, heavies break.
+const CHIP_LIGHT := 0.35
+const CHIP_HEAVY := 1.2
 const PLATE_HEALTH := {"front": 130.0, "left": 90.0, "right": 90.0, "cowl": 60.0}
 const PLATE_ARMOUR := 0.85
 const CORE_MULTIPLIER := 2.0
-const CORE_SHOT_MULTIPLIER := 3.0
+const CORE_SHOT_MULTIPLIER := 2.5
 const SHOCK_STUN := 2.6
-const BLIND_SECONDS := 4.0
+const BLIND_SECONDS := 3.0
 ## Its patrol line along the Lower Works' painted route.
 var patrol: Array[Vector3] = []
 var _patrol_index := 0
@@ -428,14 +433,14 @@ func take_blow(packet: Dictionary) -> Dictionary:
 		return _count(packet, damage * (CORE_MULTIPLIER if weapon != "gun" else 1.0), "weak")
 	var plate: Dictionary = plates.get(side, {})
 	if plate.is_empty() or float(plate.health) <= 0.0:
-		# The plate is gone: straight into the works.
-		return _count(packet, damage, "hit")
+		# The plate is gone: into the works, still braced by the frame.
+		return _count(packet, damage * EXPOSED_SHARE, "hit")
 	if weapon == "gun":
 		# A ricochet: nothing gets through, the plate barely marks.
 		plate.health = maxf(0.0, float(plate.health) - damage * 0.1)
 		flash(Color("ffcf6a"), 3.0)
 		return {"result": "armour", "damage": 0.0}
-	var chip := damage * (1.6 if str(packet.get("move", "")) in ["heavy", "charged_heavy"] else 0.7)
+	var chip := damage * (CHIP_HEAVY if str(packet.get("move", "")) in ["heavy", "charged_heavy"] else CHIP_LIGHT)
 	plate.health = maxf(0.0, float(plate.health) - chip)
 	flash(Color("ffcf6a"), 3.5)
 	if float(plate.health) <= 0.0:

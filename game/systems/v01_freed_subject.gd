@@ -15,14 +15,15 @@ extends V01Foe
 ## - **Flurry** (COPPER, in reach): three quick claws, each parryable. A
 ##   parried claw throws it on its back, open for a long beat.
 ##
-## Low health: three clean cleaver blows, or a careful parry and two.
+## Light on health for a foe: four or five clean cleaver blows, fewer
+## through the opening a parry makes.
 ## No lines, no name: "bingyanger" is a placeholder (Greg 5 Oct), so its id
 ## is neutral and nothing it does prints a word.
 
 const MOVESET := preload("res://systems/sword_moveset.gd")
 
 ## DIALS (REMASTER_LOG job9).
-const HEALTH := 80.0
+const HEALTH := 130.0
 const DART_SPEED := 5.4
 const DAZED_SECONDS := 1.8
 const POUNCE_RANGE := Vector2(2.5, 6.5)
@@ -50,7 +51,7 @@ func configure(seed_value: int) -> void:
 	_seed = seed_value
 	kind = "freed_subject"
 	max_health = HEALTH
-	max_poise = 2
+	max_poise = 3
 
 
 func _subject_record() -> Dictionary:
@@ -149,7 +150,7 @@ func act(action: String, delta: float, to_player: Vector3, distance: float) -> v
 				leap_dir = to_player.normalized()
 				leap_left = clampf(distance + 0.4, 2.0, POUNCE_RANGE.y + 0.5)
 				begin("pounce", {"windup": POUNCE_WINDUP, "colour": RED, "parryable": false, "blockable": false, "share": SHARE.pounce, "zone": "torso", "type": "cut", "clip": "roll", "recovery": SPRAWL})
-				body.scale = Vector3(1.0, 0.86, 1.0)
+				_crouch(true)
 		_:
 			_dart(delta, to_player, distance)
 
@@ -170,7 +171,7 @@ func _busy(delta: float, to_player: Vector3, distance: float) -> void:
 			var spec := move
 			cancel_windup()
 			move = spec
-			body.scale = Vector3.ONE
+			_crouch(false)
 			leaping = leap_left / LEAP_SPEED + 0.05
 		return
 	face(to_player, delta * 10.0)
@@ -223,7 +224,9 @@ func on_parried(open_for: float) -> void:
 	host.release_token(self)
 
 
-## Erratic: bursts sideways and in, then a twitching stop.
+## Erratic: bursts sideways and in, then a twitching stop. Ready to strike
+## it comes in (to claw, or to pounce range); not ready it hangs off at a
+## pounce's distance.
 func _dart(delta: float, to_player: Vector3, distance: float) -> void:
 	face(to_player, delta * 8.0)
 	_dart_clock -= delta
@@ -231,10 +234,21 @@ func _dart(delta: float, to_player: Vector3, distance: float) -> void:
 		var beat := (pounces * 7 + hits_taken * 3 + int(Time.get_ticks_msec() / 337)) % 5
 		_dart_clock = [0.35, 0.5, 0.28, 0.6, 0.42][beat]
 		var side := to_player.normalized().cross(Vector3.UP) * (1.0 if beat % 2 == 0 else -1.0)
-		var inward := to_player.normalized() * (0.9 if distance > POUNCE_RANGE.x else -0.3)
-		_dart_dir = (side + inward).normalized() if beat != 3 else Vector3.ZERO
+		var ready := attack_clock >= REST
+		var wanted := (1.0 if distance < POUNCE_RANGE.x else POUNCE_RANGE.x + 0.5) if ready else 3.4
+		var inward := to_player.normalized() * clampf(distance - wanted, -1.0, 1.0) * 1.2
+		_dart_dir = (side * 0.8 + inward).normalized() if beat != 3 else Vector3.ZERO
 	walk(_dart_dir * DART_SPEED * delta)
 	body.rotation.z = sin(Time.get_ticks_msec() * 0.04) * 0.05 if _dart_dir == Vector3.ZERO else 0.0
+
+
+## Low and coiled before a pounce: dropped and leaning in. A body with
+## physics hitboxes is never scaled unevenly (Jolt refuses it).
+func _crouch(down: bool) -> void:
+	if body == null:
+		return
+	body.position.y = -0.2 if down else 0.0
+	body.rotation.x = 0.35 if down else 0.0
 
 
 func take_blow(packet: Dictionary) -> Dictionary:
@@ -252,6 +266,6 @@ func stagger(seconds: float) -> void:
 	super.stagger(seconds)
 	swipes_left = 0
 	leaping = 0.0
-	body.scale = Vector3.ONE
+	_crouch(false)
 	if host != null:
 		host.release_token(self)

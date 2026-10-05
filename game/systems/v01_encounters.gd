@@ -447,14 +447,15 @@ func _advance_swing(delta: float) -> void:
 
 ## What the guards read: your swing, while it is still winding at `foe`.
 func player_swing_at(foe: V01Foe) -> Dictionary:
-	if swing.is_empty() or bool(swing.landed) or swing.target != foe:
+	if swing.is_empty() or bool(swing.landed) or not is_instance_valid(swing.target) or swing.target != foe:
 		return {}
 	return swing
 
 
 func _contact() -> void:
-	var foe: V01Foe = swing.target
-	if foe == null or not is_instance_valid(foe) or not foe.is_alive() or not _in_cone(foe, float(swing.reach) + 0.4, 0.4):
+	var aimed = swing.target
+	var foe: V01Foe = aimed as V01Foe if is_instance_valid(aimed) else null
+	if foe == null or not foe.is_alive() or not _in_cone(foe, float(swing.reach) + 0.4, 0.4):
 		foe = _target(float(swing.reach))
 	if foe == null:
 		feel.whiff()
@@ -722,7 +723,7 @@ func hurt_player(foe: V01Foe, move_id: String, spec: Dictionary) -> String:
 		shove_left = 0.12 * float(spec.shove) / 3.0
 	if outcome == "hit":
 		_teach_colour(spec)
-	WorldHistory.record_event("v01_player_hurt", {"foe": foe.foe_id, "move": move_id, "outcome": outcome, "share": snappedf(share, 0.001)})
+	WorldHistory.record_event("v01_player_hurt", {"foe": foe.foe_id, "move": move_id, "outcome": outcome, "share": snappedf(share, 0.001), "since_dodge": snappedf(DODGE_COOLDOWN - dodge_cooldown, 0.01) if dodge_cooldown > 0.0 else -1.0})
 	return outcome
 
 
