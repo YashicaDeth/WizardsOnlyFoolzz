@@ -66,6 +66,21 @@ var pulmonary_diagnostic: Control
 ## Brain, column, hanging CRTs and pocket rack. Replaces the mask-and-ampoules
 ## corner; null falls back to `_draw_player_state`.
 var nerve_rig: NerveRig
+## imp-68. Greg, 5 Oct ~19:00: the round frowning face "looks dumb" and the
+## three vials at the bottom need rework. The dial picks the face; the pockets
+## follow it. "xray" (default): a bolted CRT with your own skull, and pockets
+## hung off the sacrum as tags. "bodycam": a live feed of your own rigged head
+## (the skull plate where there is no body), pockets as tags. "mask": the old
+## jester mask and bottle rack. Pause > DISPLAY / HUD > HUD FACE flips it.
+const FACE_STYLES := FaceMonitor.STYLES
+const FACE_STYLE_DEFAULT := FaceMonitor.DEFAULT_STYLE
+var face_style := FACE_STYLE_DEFAULT:
+	set(value):
+		face_style = value if value in FACE_STYLES else FACE_STYLE_DEFAULT
+		_sync_face_style()
+var face_monitor: FaceMonitor
+var _face_setting_seen := ""
+var _face_setting_clock := 0.0
 
 
 func _ready() -> void:
@@ -76,6 +91,36 @@ func _ready() -> void:
 	nerve_rig = NerveRig.new()
 	nerve_rig.name = "NerveRig"
 	add_child(nerve_rig)
+	face_monitor = FaceMonitor.new()
+	face_monitor.name = "FaceMonitor"
+	add_child(face_monitor)
+	_poll_face_setting()
+	_sync_face_style()
+
+
+func _sync_face_style() -> void:
+	if face_monitor != null:
+		face_monitor.set_style(face_style)
+		face_monitor.visible = face_style != "mask" and not menu_open
+	if nerve_rig != null:
+		nerve_rig.pocket_style = "rack" if face_style == "mask" else "spine"
+
+
+## The pause menu's HUD FACE row, read when it changes, so a scene or capture
+## that sets `face_style` itself is not overridden every frame.
+func _poll_face_setting() -> void:
+	var chosen := str(WorldHistory.subject("settings").get("hud_face", ""))
+	if chosen == _face_setting_seen:
+		return
+	_face_setting_seen = chosen
+	if chosen in FACE_STYLES:
+		face_style = chosen
+
+
+## The player's own body, for the body-cam face to look at.
+func attach_head(body: Node) -> void:
+	if face_monitor != null:
+		face_monitor.attach_head(body)
 
 
 ## The space between a key and the verb it performs. `draw_condensed` returns
@@ -170,6 +215,9 @@ func set_state(values: Dictionary) -> void:
 		var rig_values := values.duplicate()
 		rig_values["mood"] = mood_name()
 		nerve_rig.set_state(rig_values)
+	if face_monitor != null:
+		face_monitor.set_state(values)
+		face_monitor.visible = face_style != "mask" and not menu_open
 
 
 func rotate_pulmonary(relative: Vector2) -> void:
@@ -188,6 +236,13 @@ func pulmonary_state() -> Dictionary:
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	_face_setting_clock += delta
+	if _face_setting_clock >= 0.5:
+		_face_setting_clock = 0.0
+		_poll_face_setting()
+	# The face hangs with the rig's monitors, so it recedes and returns with them.
+	if face_monitor != null and nerve_rig != null:
+		face_monitor.modulate.a = nerve_rig.presence
 	# The organ view has inertia of its own: inhalation fills quickly, exhalation
 	# clears slowly, a cough snaps on and decays, and saved tissue state changes
 	# without one-frame colour pops.
@@ -228,7 +283,9 @@ func _draw() -> void:
 	_draw_hunt_thread()
 	# Greg: the face should be visible. With the nerve rig up it is the face
 	# only, hung below the monitors; the rig owns the fluids and the mood word.
-	_draw_player_state(nerve_rig != null)
+	# The face is the FaceMonitor's unless the dial asks for the old mask.
+	if nerve_rig == null or face_style == "mask":
+		_draw_player_state(nerve_rig != null)
 	_draw_minimap()
 	_draw_lung_xray()
 	_draw_breath()

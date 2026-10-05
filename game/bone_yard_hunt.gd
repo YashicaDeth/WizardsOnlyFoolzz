@@ -1422,6 +1422,9 @@ func _build_player_rig() -> void:
 	# B4.1. The sheet's marks travel with the appearance it already drives.
 	hunter_appearance.configure(player_rig, appearance)
 	_dress_player_humiliation_outfit()
+	# imp-68. The HUD's body-cam face looks at this head.
+	if field_interface != null:
+		field_interface.attach_head(player_rig)
 
 
 ## The elites did not decant the hunter naked; they issued a joke of a uniform.
