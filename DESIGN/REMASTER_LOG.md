@@ -163,3 +163,29 @@ Defaults set behind dials, all in `OrganSystem` unless named. None of these is G
 - Measured headless (CPU only): 17 pistol rounds 1.7 ms total; charge on brick 8 ms (203 cells); grenade crater 17 ms; drill 0.16 ms a frame; debris settled with 83 cubes: physics 1.0 ms, process 2.2 ms a frame.
 - Not looked at: no render_one.cmd, so no PNGs (`tests/destruction_capture.tscn -- --shots=DIR` takes all six) and no real-GPU fps.
 - Weak: falling pieces collide as their convex hull; voxel faces are not greedy-merged; the dig patch draws one vertex colour, no texture; explosions are a light flash and the debris, no smoke or sparks yet.
+
+## Manager notes, 2026-10-05 15:10
+
+- **Merged since 10:33:**
+  - lab-48 organs, cybernetics and X-ray (248ea0c9)
+  - lab-47 Teardown destruction (c73a2e0e)
+  - fix-58 execution on a downed body (61c323f3)
+  - fix-55 examiner on the rigged base (c75be73a)
+- **Landed so far:** 6 of 10 v0.1 jobs.
+- **Running:** job5 (the facility map) on claude-alt2 since 15:07. Every other account is parked: Claude default and alt until 18:04; codex until 15:11, 20:30 and 20:33, and sircuteskingdom-plus until 10-11.
+- **Rendering:** not done. Two Godot processes are running under the job5 builder, so the one-window rule applies. I reviewed the existing PNGs instead.
+- **Weak in the lab-48 PNGs** (`P:/GameDev/Temp/lab48/contact_sheet.png`):
+  - The whole lab is one flat brown-red wash.
+  - Every lab HUD line is printed red, which breaks Greg's "red only on danger" rule.
+  - The `ACID ON YOU` line still shows, although acid is off.
+  - Debug text overlaps the X-ray scan panel.
+  - Blood pools are flat red squares.
+  - What reads well: the heart in hand, the X-ray scan panel, and the shorted-implant sparks.
+- **Weak in the fix-55 PNGs** (`P:/GameDev/Temp/examiner_*.png`): the green mood is right. But a blurred grid of squares covers the whole office frame, the head reads as stacked boxes, and one arm is bare white.
+- **Priorities:** lab-53 (98) and v02-51 (90) sit above the v0.1 jobs. Greg bumped them at midday, so I left them.
+- **Failures:** none new. job2 and job2b are superseded. lane-exit-routes is an old task.
+- **Game plan v2:** the draft is started at `DESIGN/GAME_PLAN_V2_DRAFT.md`, because 6 of 10 jobs have landed. Nothing was queued from it.
+- **Top three:**
+  1. Queued `remaster-lab-47-p1` (70, claude). It covers the GPU render, explosion smoke and sparks, soil texture, a lab HUD that keeps red for danger only, and hiding the acid line.
+  2. job5 lands, then the examiner office overlay blur goes into job6.
+  3. Get a real-GPU fps number for lab-46, lab-47 and lab-48. None exists yet against the 144 fps target.
