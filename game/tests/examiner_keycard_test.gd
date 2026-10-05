@@ -1,8 +1,9 @@
 extends Node
 
 ## Job 6 (v0.1 "Escape"). Greg, 4 Oct: "I literally killed him, where is his
-## key." Ten worlds, each on a fresh random seed (printed; pass --seed=N to
-## replay one): out of the vat, his door down, a fight with a random mix of
+## key." Three worlds by default (each ~40 s of fight, so the gate's 200 s
+## ceiling holds; pass --runs=10 for the full sweep), each on a fresh random
+## seed (printed; pass --seed=N to replay one): out of the vat, his door down, a fight with a random mix of
 ## mouse clicks and pad buttons, weapons, angles, parries and step-outs. Every
 ## time: his head stays on until the fight is over, his card lies on his floor,
 ## the staff door is physically shut and says what it needs and where, the
@@ -11,7 +12,7 @@ extends Node
 ## tree making his choices when the plugin is present.
 
 const VAT := preload("res://vat_chamber.tscn")
-const RUNS := 10
+const RUNS := 3
 
 var failures: Array[String] = []
 var rng := RandomNumberGenerator.new()
@@ -28,13 +29,16 @@ func _ready() -> void:
 		get_tree().quit(2)
 		return
 	var fixed := -1
+	var runs := RUNS
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--seed="):
 			fixed = int(arg.trim_prefix("--seed="))
+		elif arg.begins_with("--runs="):
+			runs = maxi(1, int(arg.trim_prefix("--runs=")))
 	_selector_rules()
 	var seeder := RandomNumberGenerator.new()
 	seeder.randomize()
-	for run in (1 if fixed >= 0 else RUNS):
+	for run in (1 if fixed >= 0 else runs):
 		var seed_value: int = fixed if fixed >= 0 else seeder.randi() % 1000000
 		await _run(run, seed_value)
 	print("EXAMINER_KEYCARD_TEST_RESULT failures=%d" % failures.size())
