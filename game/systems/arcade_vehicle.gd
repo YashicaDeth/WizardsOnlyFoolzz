@@ -217,6 +217,20 @@ var airborne := false
 ## contact is precisely where that guarantee matters most.  Retaining the last
 ## good body state gives a bad contact a safe recovery path instead of letting
 ## NaN values poison every wheel ray and appear to hard-freeze the game.
+## Lab-53. Per-car geometry and damage, read by `VehicleDamage`. The defaults
+## are the derby's own chassis, so a car nobody customises is unchanged.
+var wheel_anchors: Array = WHEEL_ANCHORS
+var hull_size := Vector3(2.65, 1.3, 4.8)
+## A wheel knocked off: no ray, no spring, no grip at that corner.
+var wheel_lost := [false, false, false, false]
+var wheel_compression := [0.0, 0.0, 0.0, 0.0]
+var steer_angle := 0.0
+## 1.0 healthy. Scales top speed and drive force (a holed radiator, a
+## cracked block): `VehicleDamage` lowers it, nothing raises it.
+var engine_power := 1.0
+## World point of the contact behind the latest `impact`, so a listener
+## knows where the car was hit rather than only how hard.
+var last_contact := Vector3.ZERO
 var _last_safe_transform := Transform3D.IDENTITY
 var _has_safe_transform := false
 
@@ -241,7 +255,7 @@ func _ready() -> void:
 	physics_material_override = material
 	var collider := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = Vector3(2.65, 1.3, 4.8)
+	box.size = hull_size
 	collider.shape = box
 	add_child(collider)
 	# Neighbouring cars slew opposite ways off a stalemate instead of shuffling
@@ -276,9 +290,14 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	# just looks worse. Same floor `limit` below uses, so a wrecked car goes
 	# soft rather than inert.
 	steer *= _condition_scale()
+	steer_angle = steer
 
-	for index in WHEEL_ANCHORS.size():
-		var anchor: Vector3 = WHEEL_ANCHORS[index]
+	for index in wheel_anchors.size():
+		var anchor: Vector3 = wheel_anchors[index]
+		if wheel_lost[index]:
+			wheel_contacts[index] = false
+			wheel_loads[index] = 0.0
+			continue
 		var world_anchor := transform * anchor
 		var reach := SUSPENSION_REST + WHEEL_RADIUS
 		var query := PhysicsRayQueryParameters3D.create(world_anchor, world_anchor - up * reach)
@@ -287,6 +306,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		if hit.is_empty():
 			wheel_contacts[index] = false
 			wheel_loads[index] = 0.0
+			wheel_compression[index] = 0.0
 			continue
 		wheel_contacts[index] = true
 		grounded += 1
@@ -299,6 +319,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		# --- suspension ---------------------------------------------------
 		var distance := world_anchor.distance_to(contact)
 		var compression := clampf(reach - distance, 0.0, SUSPENSION_REST)
+		wheel_compression[index] = compression
 		var travel_speed := point_velocity.dot(up)
 		var spring := compression * SPRING_RATE * mass * 0.25
 		var damper := travel_speed * SPRING_DAMP * mass * 0.25
@@ -334,9 +355,9 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		var rolling := point_velocity.dot(steered)
 		var longitudinal := 0.0
 		if enabled and stun <= 0.0 and fuel > 0.0 and REAR_WHEELS.has(index):
-			var target := throttle * (DRIVE_SPEED if throttle >= 0.0 else REVERSE_SPEED)
+			var target := throttle * (DRIVE_SPEED if throttle >= 0.0 else REVERSE_SPEED) * engine_power
 			if absf(throttle) > 0.05:
-				longitudinal = signf(target - rolling) * DRIVE_FORCE * mass * 0.25 * absf(throttle)
+				longitudinal = signf(target - rolling) * DRIVE_FORCE * mass * 0.25 * absf(throttle) * lerpf(0.4, 1.0, engine_power)
 				if absf(rolling) > absf(target):
 					longitudinal = 0.0
 			else:
@@ -430,6 +451,7 @@ func _resolve_contacts(state: PhysicsDirectBodyState3D) -> void:
 		# `impact` signal's payload also decide condition — one real number
 		# instead of a second damage model computed separately downstream.
 		condition = clampf(condition - maxf(0.0, closing - impact_threshold) * CONDITION_DAMAGE_PER_SPEED * self_share, 0.0, 1.0)
+		last_contact = _contact_centre(state, other)
 		impact.emit.call_deferred(other, closing, self_share)
 	if pressed.length_squared() > 0.0:
 		contact_seconds += state.step
@@ -444,6 +466,18 @@ func _resolve_contacts(state: PhysicsDirectBodyState3D) -> void:
 		for id in contact_cooldowns.keys():
 			if now > int(contact_cooldowns[id]):
 				contact_cooldowns.erase(id)
+
+## Middle of every contact this step with `other`: a car square into a wall
+## touches along its whole nose, and one reported corner is not where it hit.
+func _contact_centre(state: PhysicsDirectBodyState3D, other: Object) -> Vector3:
+	var sum := Vector3.ZERO
+	var count := 0
+	for index in state.get_contact_count():
+		if state.get_contact_collider_object(index) == other:
+			sum += state.get_contact_collider_position(index)
+			count += 1
+	return sum / maxf(1.0, float(count))
+
 
 func _kick_apart(state: PhysicsDirectBodyState3D, index: int, normal: Vector3, closing: float) -> void:
 	var separation := clampf(closing * SEPARATION_GAIN, 0.0, MAX_SEPARATION)

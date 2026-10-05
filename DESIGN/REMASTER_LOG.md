@@ -221,3 +221,12 @@ Defaults set behind dials, all in `OrganSystem` unless named. None of these is G
   1. remaster-job5-p1 at 18:04 (walls, story props, floating quads, lift signage).
   2. job6 must fix the examiner-office overlay blur (carried).
   3. Render the fix-56 ADS capture and check that the sights no longer fill the screen.
+
+## lab-53: BeamNG-style vehicles on the lab's vehicle pad (2026-10-05)
+
+- **Built:** two drivable cars on the mechanics lab's vehicle pad (Kenney CC0 sedan and SUV, regraded to rust/bone/old blood), a 1.2 m ramp, and a concrete voxel crash wall. `game/systems/vehicle_damage.gd` + `game/lab/stations/vehicle_station.gd`.
+- **Why not a real soft body:** BeamNG-style node-beam (mass-spring lattice at ~2 kHz) needs native code; two cars of it in GDScript cannot hold 144 fps and there is no maintained Godot 4 port. Jolt's SoftBody3D is cloth-like and cannot carry a suspension. So the existing raycast chassis (`arcade_vehicle.gd`: per-wheel springs, load-based grip, real weight transfer) drives, and damage is applied where each impact lands: the body mesh's vertices are pushed in (one ~1k-vertex pass per impact, never per frame), parts come off as rigid bodies, and the engine loses power.
+- **Toughness tiers:** parts carry `MaterialToughness` materials (bodywork `steel_sheet` tier 3, new `glass` tier 1). A part comes off only when the blow's source beats its tier. For a ram the tier comes from kinetic energy (`ram_joules_per_tier`), so a 1.1 t car bends on a slow knock and sheds steel from about 14 m/s (50 km/h). Melee dents a car and breaks its glass but cannot take a steel door off; guns can. A car ramming a voxel wall hits the wall with the `vehicle` source.
+- **Bodies inside:** a seated `BaselineHuman` takes each crash in the zone nearest the contact, with the derby's rule: once the bumper and hood are gone, a fast front hit lands on the chest as shear.
+- **Dials (defaults I chose; Greg has not set these):** `VehicleDamage.crumple` 1.0 (global crumple strength); `DENT_PER_MS` 0.045 m per m/s, `MAX_CRUSH` 0.6 m; `ENGINE_PER_MS` 0.04 with a floor of 0.25 (a wrecked engine limps at ~6 m/s rather than stopping); `PART_DAMAGE` 2.5. Crush is shared about equally in a car-to-car hit (0.7 + 0.3 x own share of the closing speed). The derby is unchanged: its cars do not use `VehicleDamage`.
+- **Controls:** R2 throttle, L2 brake then reverse, left stick steers; W/S/A/D on keyboard. USE on the plinth or beside a car gets in; USE gets out (refused above 5 m/s).

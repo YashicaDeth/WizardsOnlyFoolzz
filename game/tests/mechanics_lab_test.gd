@@ -37,9 +37,31 @@ func _ready() -> void:
 	await _weather()
 	await _destruction()
 	await _bodies()
+	await _vehicles()
 
 	print("MECHANICS_LAB_TEST_RESULT failures=%d" % failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
+
+
+## Lab-53: USE on the pad's plinth puts you in a car, R2 drives it, a round
+## dents it, USE gets you out.
+func _vehicles() -> void:
+	lab.go_to(4)
+	await _frames(2)
+	await _press("interact")
+	check(lab.vehicles.driving(), "USE on the vehicle plinth gets you into a car")
+	var car: RigidBody3D = lab.vehicles.driver.car
+	Input.action_press("pad_combat_r2")
+	await _seconds(1.0)
+	Input.action_release("pad_combat_r2")
+	check(float(car.signed_speed) > 2.0, "R2 drives it (%.1f m/s)" % float(car.signed_speed))
+	var other: RigidBody3D = lab.vehicles.cars[1]
+	lab._land(other, other.to_global(Vector3(0, 0.2, -other.hull_size.z * 0.5)), other.global_basis.z, {"damage": 30.0}, "firearm", null)
+	check((other.get_node("Damage") as VehicleDamage).max_crush > 0.0, "a round dents the other car")
+	car.linear_velocity = Vector3.ZERO
+	await _seconds(0.6)
+	await _press("interact")
+	check(not lab.vehicles.driving() and lab.camera.current, "USE gets you out and back to your own eyes")
 
 
 func _liquid() -> void:

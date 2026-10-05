@@ -138,7 +138,9 @@ func _physics_process(delta: float) -> void:
 	if car == null or not is_instance_valid(car):
 		return
 	if driving:
-		car.throttle = Input.get_axis("move_back", "move_forward")
+		# Pad first: R2 throttle, L2 brake then reverse (the chassis brakes
+		# when asked for the opposite direction). The stick and W/S still work.
+		car.throttle = clampf(Input.get_axis("move_back", "move_forward") + Input.get_action_strength("pad_combat_r2") - Input.get_action_strength("pad_combat_l2"), -1.0, 1.0)
 		car.steering = Input.get_axis("move_left", "move_right")
 		_follow(delta)
 

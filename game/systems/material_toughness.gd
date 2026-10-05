@@ -31,6 +31,9 @@ const MATERIALS := {
 		"sound": {"freq": 180.0, "noise": 0.5, "decay": 12.0, "gain": 0.6, "character": "crack"}},
 	"flesh": {"tier": SOFT, "hp": 8.0, "colour": Color("70201c"), "mass": 1.0,
 		"sound": {"freq": 90.0, "noise": 0.55, "decay": 6.0, "gain": 0.55, "character": "slap"}},
+	## Lab-53: car windows. Soft, so any blow, round or ram above a tap breaks it.
+	"glass": {"tier": SOFT, "hp": 4.0, "colour": Color("4a5a58"), "mass": 2.5,
+		"sound": {"freq": 1900.0, "noise": 0.4, "decay": 18.0, "gain": 0.6, "character": "crack"}},
 	"drywall": {"tier": MEDIUM, "hp": 8.0, "colour": Color("b8b0a0"), "mass": 0.7,
 		"sound": {"freq": 240.0, "noise": 0.8, "decay": 16.0, "gain": 0.5, "character": "slap"}},
 	"brick": {"tier": MEDIUM, "hp": 18.0, "colour": Color("7a3a2a"), "mass": 2.0,
