@@ -1136,6 +1136,11 @@ World rules; realm identity and transition rules; what persists across realms; d
   - **Cost:** free, but the view degrades the longer you stay in.
   - **Wizard eyes look** like the wizard eyes in Adventure Time's Ice King
     episodes (Greg's reference; the art is original, not copied).
+  - **Palette correction (Greg, 5 October):** wizard eyes are cool for now but
+    the neon green is visually disgusting. Keep the spirits, faces and signal
+    rings; restyle them in bone (`e6d4ac`), copper (`b0552a`) and deep red
+    (`a8281a`), with at most a desaturated sickly green accent. Saturation and
+    bloom stay low enough to be subtle and readable in the opening and lab.
   - **Detection:** only hacked cameras notice you using the modes.
   - **Hunt keys move:** inventory to Tab; re-decant to holding K.
     *Built:* Tab = inventory (O still works; Tab still cycles the phone's
