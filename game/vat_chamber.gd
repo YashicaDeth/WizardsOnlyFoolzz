@@ -54,6 +54,8 @@ const VAT_REBIRTH := preload("res://systems/vat_rebirth.gd")
 const WOUND_CATALOG := preload("res://systems/wound_catalog.gd")
 const DOCTOR_ROUTE := preload("res://systems/doctor_route.gd")
 const IMPLANT_BOOT_HUD := preload("res://systems/implant_boot_hud.gd")
+const FIELD_INVENTORY := preload("res://systems/field_inventory.gd")
+const FACILITY_CHECKPOINTS := preload("res://systems/facility_checkpoints.gd")
 
 const EYE_HEIGHT := 1.62
 const BODY_HALF_HEIGHT := 0.85
@@ -259,6 +261,10 @@ var revenge_at := -1.0
 var jolt := 0.0
 ## His door behind the vat, his room and the lift down (DoctorRoute).
 var doctor_route: Node3D
+var field_inventory: FieldInventory
+var route_carry: Carry
+var checkpoints: FacilityCheckpoints
+var rebirth_site: RebirthSite
 
 # 0 submerged, 1 voiding, 2 breach, 3 floor, 4 aisle
 const BEATS := [
@@ -330,6 +336,9 @@ func _ready() -> void:
 		facility_map.set("embedded", true)
 		add_child(facility_map)
 		facility_map.call("attach_player", player, camera)
+		rebirth_site = RebirthSite.new()
+		add_child(rebirth_site)
+		rebirth_site.setup("growing_floor", player)
 	doctor_route = DOCTOR_ROUTE.new()
 	add_child(doctor_route)
 	doctor_route.build(self)
@@ -341,6 +350,12 @@ func _ready() -> void:
 	osd.adopt(vitals, $HUD/Objective, prompt, "SUBLEVEL 0C  //  GROWING FLOOR")
 	osd.camera = camera
 	osd.visible = intake == null
+	field_inventory = FIELD_INVENTORY.new()
+	field_inventory.name = "FieldInventory"
+	$HUD.add_child(field_inventory)
+	route_carry = CARRY.new()
+	field_inventory.close_requested.connect(_close_field_inventory)
+	field_inventory.activate_requested.connect(_activate_field_item)
 	opening_audio = OPENING_AUDIO.new()
 	add_child(opening_audio)
 	sight = SIGNAL_SIGHT.new()
@@ -371,6 +386,10 @@ func _ready() -> void:
 	_wire_guidance()
 	key_hints = KeyHints.new()
 	add_child(key_hints)
+	if FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+		checkpoints = FACILITY_CHECKPOINTS.new()
+		add_child(checkpoints)
+		checkpoints.setup(self, player, facility_map)
 	tank_view = TankView.new()
 	add_child(tank_view)
 	if VatHorror.wanted():
@@ -1566,6 +1585,14 @@ func _slab(dimensions: Vector3, at: Vector3, _kind: String, _color: Color) -> vo
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if field_inventory != null and field_inventory.visible:
+		if field_inventory.handle_input(event):
+			get_viewport().set_input_as_handled()
+		return
+	if can_move and event.is_action_pressed("inventory"):
+		_open_field_inventory()
+		get_viewport().set_input_as_handled()
+		return
 	# No fighting while a dressing goes on (hold 4).
 	if meds.busy() and event is InputEventMouseButton and event.pressed:
 		return
@@ -1681,6 +1708,42 @@ func _pad_input(event: InputEvent) -> bool:
 	return false
 
 
+func _open_field_inventory() -> void:
+	if field_inventory == null:
+		return
+	route_carry = CARRY.new()
+	field_inventory.open_inventory(route_carry, null, null)
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+
+func _close_field_inventory() -> void:
+	if field_inventory != null:
+		field_inventory.close_inventory()
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func _activate_field_item(_index: int) -> void:
+	# The v0.1 route shows the honest carried object list. Item-specific use
+	# remains in the physical hands/interact verbs; inventory never invents a
+	# second activation path.
+	_close_field_inventory()
+
+
+func _resume_from_checkpoint() -> void:
+	breakout_complete = true
+	first_acquisition_complete = true
+	phase = "aisle"
+	can_move = true
+	if intake != null and is_instance_valid(intake):
+		intake.queue_free()
+		intake = null
+	if load_in != null and is_instance_valid(load_in):
+		load_in.queue_free()
+		load_in = null
+	if osd != null:
+		osd.visible = true
+
+
 ## A stick is coarser than a mouse: the wire nearest the middle of the view
 ## within this wider cone is the one Square takes.
 const PAD_WIRE_CONE := 0.8
@@ -1728,6 +1791,10 @@ func in_fluid() -> bool:
 
 
 func _physics_process(delta: float) -> void:
+	if field_inventory != null and field_inventory.visible:
+		return
+	if key_hints != null and not KeyHints.seen("inventory") and not WorldHistory.subject("inventory").get("items", []).is_empty():
+		key_hints.offer("inventory", KEY_TAB, "TAB", "open inventory")
 	if phase != thought_phase:
 		thought_phase = phase
 		if THOUGHTS.has(phase):
@@ -2744,6 +2811,11 @@ func _update_movement(delta: float) -> void:
 func _interact() -> void:
 	if not can_move:
 		return
+	if rebirth_site != null:
+		var recovered := rebirth_site.try_recover()
+		if not recovered.is_empty():
+			subtitle.text = recovered
+			return
 	if facility_map != null and facility_map.call("interact"):
 		return
 	if not FACILITY_MAP_SCRIPT.V01_ONE_MAP:

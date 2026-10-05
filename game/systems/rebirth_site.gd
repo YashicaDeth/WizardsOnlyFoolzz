@@ -16,6 +16,8 @@ var player: Node3D
 var died := false
 var rebirth_request: Dictionary = {}
 var _bodies: Dictionary = {}
+var _sigils: Dictionary = {}
+var _pulse := 0.0
 
 
 func setup(location_id: String, player_node: Node3D) -> void:
@@ -39,6 +41,54 @@ func setup(location_id: String, player_node: Node3D) -> void:
 		tag.position = body.position + Vector3(0, 0.9, 0)
 		add_child(tag)
 		_bodies[str(remains.id)] = [body, tag]
+		if int(remains.get("blood_fragments", 0)) > 0 and not bool(remains.get("sigil_lost", false)):
+			_build_sigil(str(remains.id), body.position + Vector3(0, 0.35, 0))
+
+
+func _build_sigil(remains_id: String, at: Vector3) -> void:
+	var root := Node3D.new()
+	root.name = "BloodSigil_%s" % remains_id
+	root.position = at
+	add_child(root)
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color("5f110c")
+	material.emission_enabled = true
+	material.emission = Color("b53a22")
+	material.emission_energy_multiplier = 2.2
+	material.roughness = 0.38
+	# Three wet lobes read as an organ at a glance; the copper ring makes it a
+	# recovery mark rather than another loose gore chunk.
+	for offset in [Vector3(-0.18, 0, 0), Vector3(0.18, 0, 0), Vector3(0, 0.12, 0.08)]:
+		var lobe := MeshInstance3D.new()
+		var sphere := SphereMesh.new()
+		sphere.radius = 0.24
+		sphere.height = 0.42
+		sphere.material = material
+		lobe.mesh = sphere
+		lobe.position = offset
+		lobe.scale = Vector3(1.0, 0.78, 0.72)
+		root.add_child(lobe)
+	var light := OmniLight3D.new()
+	light.light_color = Color("c34828")
+	light.light_energy = 1.8
+	light.omni_range = 2.8
+	root.add_child(light)
+	_sigils[remains_id] = root
+
+
+func _process(delta: float) -> void:
+	_pulse += delta
+	for remains_id: String in _sigils.keys():
+		var sigil: Node3D = _sigils[remains_id]
+		if not is_instance_valid(sigil):
+			_sigils.erase(remains_id)
+			continue
+		var distance := player.global_position.distance_to(sigil.global_position) if player != null else 99.0
+		var near := clampf(1.0 - distance / 12.0, 0.0, 1.0)
+		var beat := pow(maxf(0.0, sin(_pulse * lerpf(2.5, 5.2, near))), 8.0)
+		sigil.scale = Vector3.ONE * (1.0 + beat * 0.16)
+		var light := sigil.get_child(sigil.get_child_count() - 1) as OmniLight3D
+		light.light_energy = 1.2 + near * 1.8 + beat * 2.4
 
 
 ## The old body within reach, if any.
@@ -64,7 +114,10 @@ func try_recover() -> String:
 	if not bool(result.get("ok", false)):
 		return ""
 	(_bodies[remains_id][1] as Label3D).text = "STRIPPED"
-	return "TAKEN BACK OFF YOUR OLD BODY // %d THINGS" % int(result.get("items", 0))
+	if _sigils.has(remains_id):
+		(_sigils[remains_id] as Node3D).queue_free()
+		_sigils.erase(remains_id)
+	return "RECOVERED // %d THINGS // %d BLOOD FRAGMENTS" % [int(result.get("items", 0)), int(result.get("blood_fragments", 0))]
 
 
 ## You died here. Everything carried and worn stays on this body.

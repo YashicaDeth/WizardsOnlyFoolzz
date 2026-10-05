@@ -71,6 +71,21 @@ func close_inventory() -> void:
 func handle_input(event: InputEvent) -> bool:
 	if not visible:
 		return false
+	if event.is_action_pressed("inventory") or event.is_action_pressed("ui_cancel"):
+		close_requested.emit()
+		return true
+	if event.is_action_pressed("ui_up"):
+		_step(-1)
+		return true
+	if event.is_action_pressed("ui_down"):
+		_step(1)
+		return true
+	if event.is_action_pressed("ui_accept"):
+		if inspect_rig != null:
+			_take_corpse_row()
+		elif carry != null and not carry.items.is_empty():
+			activate_requested.emit(selected)
+		return true
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_ESCAPE, KEY_O:

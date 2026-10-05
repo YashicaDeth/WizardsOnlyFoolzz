@@ -380,6 +380,29 @@ func close() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("pause"):
+		toggle()
+		get_viewport().set_input_as_handled()
+		return
+	if open and (event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down") or event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right") or event.is_action_pressed("ui_accept") or event.is_action_pressed("ui_cancel")):
+		_build_rows()
+		if event.is_action_pressed("ui_cancel"):
+			if page == "root": close()
+			else:
+				page = "root"
+				highlighted = 0
+		elif event.is_action_pressed("ui_up"):
+			highlighted = (highlighted + _rows.size() - 1) % _rows.size()
+		elif event.is_action_pressed("ui_down"):
+			highlighted = (highlighted + 1) % _rows.size()
+		elif event.is_action_pressed("ui_left"):
+			_nudge(-1)
+		elif event.is_action_pressed("ui_right"):
+			_nudge(1)
+		else:
+			_activate()
+		get_viewport().set_input_as_handled()
+		return
 	if not (event is InputEventKey and event.pressed and not event.echo):
 		return
 	if rebinding_action != "":
