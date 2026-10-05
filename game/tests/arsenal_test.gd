@@ -21,10 +21,11 @@ func _ready() -> void:
 	var arsenal: Node = ARSENAL.new()
 	add_child(arsenal)
 	arsenal.configure(rig)
-	check(arsenal.current_id == "sword" and arsenal.models.size() == 3, "hunter receives three modeled weapon slots")
-	check(arsenal.models.sword.visible and not arsenal.models.shotgun.visible, "only equipped weapon is visible in the real hand")
+	# imp-64: the Hunt issues the HOTLINE CLEAVER, not the old sword.
+	check(arsenal.current_id == "cleaver" and arsenal.models.size() == 3, "hunter receives three modeled weapon slots")
+	check(arsenal.models.cleaver.visible and not arsenal.models.shotgun.visible, "only equipped weapon is visible in the real hand")
 	var sword: Dictionary = arsenal.begin_attack(true)
-	check(sword.accepted and sword.kind == "melee" and float(sword.damage) > 60.0, "heavy sword attack has distinct force and cost")
+	check(sword.accepted and sword.kind == "melee" and float(sword.damage) > float(arsenal.current().damage) * 1.4, "heavy cleaver attack has distinct force and cost")
 	arsenal.tick(2.0)
 	check(arsenal.select_slot(1), "slot 2 equips shotgun")
 	var shell_before := int(arsenal.ammo.shotgun.loaded)
@@ -62,7 +63,7 @@ func _ready() -> void:
 	check(arsenal.carried().has("sniper"), "now it is something you are carrying")
 
 	# The actual bug: switch away, and try to come back.
-	check(arsenal.select_slot(0) and arsenal.current_id == "sword", "switching to the issued first slot still works")
+	check(arsenal.select_slot(0) and arsenal.current_id == "cleaver", "switching to the issued first slot still works")
 	check(arsenal.select_weapon("sniper") and arsenal.current_id == "sniper", "and the rifle can be reached again by name")
 	check(arsenal.select_slot(3) and arsenal.current_id == "sniper", "or by its position in what you carry")
 
@@ -73,7 +74,7 @@ func _ready() -> void:
 
 	# Wrapping, so there is never a dead end to get stuck on.
 	check(arsenal.select_slot(0) and arsenal.cycle(-1) and arsenal.current_id == "sniper", "cycling back from the first wraps onto the last")
-	check(arsenal.cycle(1) and arsenal.current_id == "sword", "and forward from the last wraps round again")
+	check(arsenal.cycle(1) and arsenal.current_id == "cleaver", "and forward from the last wraps round again")
 	check(arsenal.select_slot(9) == false, "a slot nobody is carrying is still refused")
 
 	print("ARSENAL_TEST_RESULT failures=", failures.size())

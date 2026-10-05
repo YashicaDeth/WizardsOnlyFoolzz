@@ -90,7 +90,10 @@ const WEAPONS := {
 ## `facility_sidearm` is not: it is a weapon you come into possession of, and
 ## a rifle that reaches across the whole bone yard is not something the game
 ## should hand you at spawn.
-const SLOT_ORDER := ["sword", "shotgun", "sidearm"]
+## imp-64, Greg 5 Oct ~19:00: the Hunt must stop giving the old sword; the
+## HOTLINE CLEAVER is the issued blade. `sword` stays in `WEAPONS` for the
+## rooms and tests that still name it.
+const SLOT_ORDER := ["cleaver", "shotgun", "sidearm"]
 ## AF10.10. These are attachment points on the object, not perks on its
 ## holder. The future crafting screen may decide where a part comes from, but
 ## it must install through this vocabulary so the Hunt, range and cab all read
@@ -108,7 +111,7 @@ const CUSTOMIZATION_SCALES := {
 	"reload_scale": Vector2(0.5, 2.0),
 }
 
-var current_id := "sword"
+var current_id := "cleaver"
 var cooldown := 0.0
 var reload_remaining := 0.0
 var shot_serial := 0
@@ -710,7 +713,7 @@ func apply_grip(grip_name: String) -> bool:
 ## parented to that arm inherits the pitch a second time unless it is cancelled;
 ## read from the constant rather than copied, so retuning the pose does not
 ## quietly lay the blade down across the view again.
-func _build_weapon_model(weapon_id: String) -> Node3D:
+static func _build_weapon_model(weapon_id: String) -> Node3D:
 	var root := Node3D.new()
 	root.name = "%s_mount" % weapon_id
 	root.position = Vector3(0.098, -0.232, -0.706)

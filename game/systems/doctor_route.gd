@@ -510,14 +510,19 @@ func _take_axe() -> void:
 	carry.items.append({"label": AXE_LABEL, "kind": "tool", "mass": 2.6, "perishes": false, "age": 0.0, "from": "growing_floor"})
 	carry.save_to_history()
 	WorldHistory.record_event("doctor_route_axe_taken", {"location": "growing_floor"})
-	held_axe = _axe_mesh()
-	LabSurface.hold_in_view(chamber.camera, held_axe)
-	held_axe.rotation_degrees = AXE_REST
-	held_axe.position += Vector3(0.04, -0.04, 0.04)
+	# imp-64: carried by the hunter's animated arms, not hung in view.
+	var arms := FirstPersonArms.new()
+	arms.body = chamber.get("player") as CharacterBody3D
+	chamber.camera.add_child(arms)
+	arms.take("cleaver")
+	held_axe = arms
 	chamber.subtitle.text = "HOTLINE CLEAVER  //  TAKEN OFF THE WALL"
 
 
 func _swing_held() -> void:
+	if held_axe is FirstPersonArms:
+		(held_axe as FirstPersonArms).strike()
+		return
 	var held := held_axe if held_axe != null else held_restraint
 	if held == null:
 		return

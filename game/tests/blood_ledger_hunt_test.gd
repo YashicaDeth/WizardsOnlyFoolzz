@@ -38,19 +38,19 @@ func _ready() -> void:
 	# front of you has seen you, or the blow would also count as unseen.
 	hunt.player_unseen = false
 	hunt._equip_weapon(0)
-	check(str(hunt.arsenal.current_id) == "sword", "the cleaver is in hand")
-	var before := ledger.weapon_blood("sword")
+	check(str(hunt.arsenal.current_id) == "cleaver", "the cleaver is in hand")
+	var before := ledger.weapon_blood("cleaver")
 	# Enemies block by tier now (Greg, 24 September); caught mid-wind-up they
 	# cannot, so this blow is struck into their swing and always lands.
 	actor["attack_time"] = hunt._actor_attack_cycle(actor) * 0.95
 	var swing: Dictionary = hunt.arsenal.begin_attack()
 	swing["range"] = 9.0
 	check(hunt._attack_nearest_encounter_actor(swing), "the swing lands on the marked body")
-	var after_hit := ledger.weapon_blood("sword")
+	var after_hit := ledger.weapon_blood("cleaver")
 	check(after_hit > before, "a real Hunt hit pays the cleaver (%d -> %d)" % [before, after_hit])
-	check(ledger.readout.active_count() >= 1 and ledger.readout.text_of(ledger.readout.active_count() - 1).ends_with("// ASHLINE CLEAVER"), "the popup names the weapon: %s" % ledger.readout.text_of(ledger.readout.active_count() - 1))
+	check(ledger.readout.active_count() >= 1 and ledger.readout.text_of(ledger.readout.active_count() - 1).ends_with("// HOTLINE CLEAVER"), "the popup names the weapon: %s" % ledger.readout.text_of(ledger.readout.active_count() - 1))
 	hunt._kill_encounter_actor(hunt.encounter_actors.find(actor), "test")
-	check(ledger.weapon_blood("sword") == after_hit + int(BloodTrees.RATES.kill), "the real death pays the cleaver the kill (%d)" % ledger.weapon_blood("sword"))
+	check(ledger.weapon_blood("cleaver") == after_hit + int(BloodTrees.RATES.kill), "the real death pays the cleaver the kill (%d)" % ledger.weapon_blood("cleaver"))
 
 	var seven := InputEventKey.new()
 	seven.keycode = KEY_7
@@ -61,8 +61,8 @@ func _ready() -> void:
 	check(not ledger.tree_view.visible, "7 closes it again")
 
 	# Enough blood for FIRST CUT, then the Hunt's own swing report carries it.
-	ledger.credit("sword", 40, "hit")
-	var base := float(HunterArsenal.WEAPONS.sword.damage)
+	ledger.credit("cleaver", 40, "hit")
+	var base := float(HunterArsenal.WEAPONS.cleaver.damage)
 	check(ledger.is_unlocked("first_cut"), "FIRST CUT opens by itself in the Hunt")
 	hunt.arsenal.cooldown = 0.0
 	var learned: Dictionary = hunt.arsenal.begin_attack()

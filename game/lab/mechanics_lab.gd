@@ -40,12 +40,6 @@ const START := Vector3(0, 1.0, 17.0)
 const WEAPONS := ["cleaver", "staff", "sidearm"]
 const EYE_HEIGHT := 0.77
 const LOCK_RANGE := 14.0
-## Where a held weapon rests in view, before the swing or the sights move it.
-const HELD_REST := {
-	"cleaver": [Vector3(0.30, -0.30, -0.50), Vector3(0.10, 0.20, -0.35)],
-	"staff": [Vector3(0.26, -0.34, -0.42), Vector3(0.06, 0.10, -0.20)],
-	"sidearm": [Vector3(0.20, -0.22, -0.46), Vector3(0.0, 0.0, 0.0)],
-}
 ## Where the destruction station stands; its dig patch cuts the yard floor.
 const DESTRUCTION_AT := Vector3(-12, 0, 11)
 
@@ -57,7 +51,8 @@ var arsenal: HunterArsenal
 var melee: MeleeDriver
 var mover := SoulsMover.new()
 var ads := AimDownSights.new()
-var held_mount: Node3D
+## imp-64: the hunter's arms, carrying whatever is held (`FirstPersonArms`).
+var held_mount: FirstPersonArms
 var aiming := false
 var aim_blend := 0.0
 var player_health := 100.0
@@ -496,23 +491,15 @@ func _update_lock(delta: float) -> void:
 
 ## Rebuild the held model for the current weapon, parented to the eye.
 func _hold_current() -> void:
-	if held_mount != null and is_instance_valid(held_mount):
-		held_mount.queue_free()
-	var id := str(arsenal.current_id)
-	held_mount = Node3D.new()
-	held_mount.name = "HeldMount"
-	camera.add_child(held_mount)
-	var gear := HeldGear.build_weapon(id)
-	held_mount.add_child(gear)
-	var grip := gear.get_node_or_null("anchor_grip") as Node3D
-	if grip != null:
-		gear.position = -(gear.transform.basis * grip.position)
-	var rest: Array = HELD_REST.get(id, HELD_REST.sidearm)
-	held_mount.position = rest[0]
-	held_mount.rotation = rest[1]
+	if held_mount == null:
+		held_mount = FirstPersonArms.new()
+		held_mount.body = player
+		held_mount.ads = ads
+		camera.add_child(held_mount)
+		held_mount.drive(melee)
+	held_mount.take(str(arsenal.current_id))
 	ads.reset()
 	aim_blend = 0.0
-	melee.set_model(held_mount if str(arsenal.current().kind) == "melee" else null)
 
 
 func _pose_held(delta: float) -> void:
@@ -522,12 +509,9 @@ func _pose_held(delta: float) -> void:
 	aiming = firearm and (Input.is_action_pressed("parry") or Input.is_action_pressed("guard"))
 	ads.advance(delta, aiming)
 	aim_blend = move_toward(aim_blend, 1.0 if aiming else 0.0, delta * 7.0)
+	held_mount.aim_blend = aim_blend
 	if not firearm:
 		return
-	var rest: Array = HELD_REST.get(str(arsenal.current_id), HELD_REST.sidearm)
-	held_mount.position = rest[0]
-	held_mount.rotation = rest[1]
-	ads.pose(held_mount, camera.global_transform, str(arsenal.current_id), aim_blend)
 	camera.fov = lerpf(88.0, ads.fov(str(arsenal.current_id)), aim_blend)
 
 
@@ -726,12 +710,15 @@ func _face_execution(delta: float) -> void:
 
 ## The held weapon is drawn back over the body and brought down on it.
 func _pose_execution() -> void:
-	if not execution.active or held_mount == null or not is_instance_valid(held_mount):
+	if held_mount == null:
 		return
+	if not execution.active:
+		held_mount.transform = Transform3D.IDENTITY
+		return
+	# An offset on the arms as a whole; the arms keep their own hand pose.
 	var draw := execution.wind()
-	var rest: Array = HELD_REST.get(str(arsenal.current_id), HELD_REST.sidearm)
-	held_mount.position = (rest[0] as Vector3) + Vector3(0, 0.14, 0.12) * draw
-	held_mount.rotation = (rest[1] as Vector3) + Vector3(0.9, 0, 0) * draw
+	held_mount.position = Vector3(0, 0.14, 0.12) * draw
+	held_mount.rotation = Vector3(0.9, 0, 0) * draw
 
 
 ## A blow from `MeleeDriver` met something. Cuts slice along the swing: a

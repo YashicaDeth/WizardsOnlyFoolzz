@@ -437,9 +437,15 @@ func _arm_cleaver() -> void:
 	melee.setup(arsenal, camera, [player.get_rid()])
 	melee.struck.connect(_on_cleaver_struck)
 	melee.kicked.connect(func(amount: float) -> void: BODY_CAM.hit(camera, amount))
-	cleaver_held = DoctorRoute.cleaver_model()
-	LabSurface.hold_in_view(camera, cleaver_held)
-	melee.set_model(cleaver_held)
+	# imp-64: the cleaver is carried by the hunter's animated arms.
+	var arms := FirstPersonArms.new()
+	arms.body = player
+	camera.add_child(arms)
+	arms.drive(melee)
+	arms.take("cleaver")
+	cleaver_held = arms
+	if weapon_taken:
+		arms.left_hand.visible = false
 
 
 ## The ram in view; beside the cleaver it moves to the off hand.
@@ -448,6 +454,8 @@ func _hold_ram() -> void:
 	LabSurface.hold_in_view(camera, weapon_visual)
 	if melee != null:
 		weapon_visual.position.x = -weapon_visual.position.x
+		# The ram takes the arms' free left hand.
+		(cleaver_held as FirstPersonArms).left_hand.visible = false
 
 
 ## A cleaver blow met something: the guard takes it through his post (same

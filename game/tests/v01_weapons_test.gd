@@ -139,9 +139,13 @@ func _roll_and_lock() -> void:
 func _sparring() -> void:
 	var partner = lab.sparring
 	check(partner != null and not partner.is_dead(), "a sparring partner stands in the lab")
-	await _button(JOY_BUTTON_DPAD_RIGHT)
-	await _frames(2)
-	check(str(lab.arsenal.current_id) == "cleaver", "back round to the cleaver")
+	# NEXT runs on through the lab's destruction tools before it comes round.
+	for _step in 1 + (lab.DESTRUCTION.TOOLS as Array).size():
+		await _button(JOY_BUTTON_DPAD_RIGHT)
+		await _frames(2)
+		if lab.tool.is_empty() and str(lab.arsenal.current_id) == "cleaver":
+			break
+	check(lab.tool.is_empty() and str(lab.arsenal.current_id) == "cleaver", "back round to the cleaver")
 	await _face(partner.rig, 2.0)
 	# Parry: L2 late in its windup.
 	await _until(func() -> bool: return partner.state == "windup" and partner.clock >= WINDUP_PARRY_AT, 4.0)
