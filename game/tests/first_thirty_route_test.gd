@@ -5,8 +5,8 @@ extends Node
 ## Hunt at each route's own arrival point.
 ##
 ##   vat: examination filed -> the examiner leaves -> the tank drains ->
-##        END ALL SUFFERING, four wires torn out -> GET REVENGE -> breakout ->
-##        the jammed tank pried, the dead subject's smock taken
+##        END ALL SUFFERING, four wires torn out -> GET REVENGE -> breakout;
+##        the rejected dead-subject undressing beat stays switched off
 ##   Service Arcade: the ram and the card -> Hollis coerced, his hand on the
 ##        reader, his gun taken -> the pressure gate
 ##   Lower Works: then either the fuse and the heat elevator up, or the drain
@@ -107,10 +107,12 @@ func _through_the_facility(route_name: String) -> Node:
 	check(vat.phase == "wired", "%s: the drained tank leaves you in the wires" % route_name)
 	_complete_live_breakout(vat, route_name)
 	check(vat.breakout_complete and vat.can_move, "%s: GET REVENGE, the glass goes, and you stand" % route_name)
+	check(vat.facility_map != null and vat.facility_map.player == vat.player, "%s: the connected facility keeps the opening player" % route_name)
 	vat.player.global_position = vat.stuck_tank_marker.global_position + Vector3(0, 0.9, 1.2)
 	vat._interact()
 	vat._interact()
-	check(Clothing.worn("player") != "bare", "%s: the restraint pries the jammed tank and the smock comes off the dead" % route_name)
+	check(Clothing.worn("player") == "bare" and WorldHistory.event_count("opening_first_object_used") == 0,
+		"%s: the rejected tank-pry and undressing beat is switched off" % route_name)
 	vat._record_service_arcade_entry()
 	vat.queue_free()
 	await get_tree().process_frame

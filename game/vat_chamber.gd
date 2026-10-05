@@ -1,5 +1,7 @@
 extends Node3D
 const LOOK := preload("res://systems/look_settings.gd")
+const FACILITY_MAP_SCENE := preload("res://facility.tscn")
+const FACILITY_MAP_SCRIPT := preload("res://facility.gd")
 
 ## THE GROWING FLOOR — the opening.
 ##
@@ -239,6 +241,7 @@ var stuck_tank_culture: MeshInstance3D
 var failed_subject_visual: Node3D
 var stuck_tank_opened := false
 var inspect_held := false
+var facility_map: Node3D
 ## Death is rebirth in a vat (Greg, 24 September). A regrown body wakes here
 ## with no examination: the record, the preset and the memories are kept.
 var rebirth := false
@@ -322,6 +325,11 @@ func _ready() -> void:
 	watchers.call("build", VAT_POSITION + Vector3(0, 1.55, 0))
 	_build_first_objects()
 	_build_player()
+	if FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+		facility_map = FACILITY_MAP_SCENE.instantiate()
+		facility_map.set("embedded", true)
+		add_child(facility_map)
+		facility_map.call("attach_player", player, camera)
 	doctor_route = DOCTOR_ROUTE.new()
 	add_child(doctor_route)
 	doctor_route.build(self)
@@ -356,9 +364,10 @@ func _ready() -> void:
 	# Greg, 28 September: pools of light in the black, red only on danger.
 	room_lights = RoomLights.new().setup("vat", strip_lights)
 	add_child(room_lights)
-	# A stash in the left wall between the second and third bays.
-	caches.append(HIDDEN_CACHE.place_stash(self, sight, "growing_floor_stash", Vector3(-7.35, 1.0, -5.75), Vector3.RIGHT))
-	_build_den()
+	# The optional stash/den route stays available outside the cut-down build.
+	if not FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+		caches.append(HIDDEN_CACHE.place_stash(self, sight, "growing_floor_stash", Vector3(-7.35, 1.0, -5.75), Vector3.RIGHT))
+		_build_den()
 	_wire_guidance()
 	key_hints = KeyHints.new()
 	add_child(key_hints)
@@ -781,7 +790,15 @@ func _build_chamber() -> void:
 	_slab(Vector3(16.0, 0.4, AISLE_LENGTH + 8.0), Vector3(0, -0.2, -AISLE_LENGTH * 0.4), "dirt", Color("15120f"))
 	_slab(Vector3(16.0, 0.35, AISLE_LENGTH + 8.0), Vector3(0, 4.3, -AISLE_LENGTH * 0.4), "rust", Color("100d0b"))
 	_build_left_wall()
-	_slab(Vector3(0.5, 4.4, AISLE_LENGTH + 8.0), Vector3(7.6, 2.2, -AISLE_LENGTH * 0.4), "rust", Color("1c1712"))
+	if FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+		# The authored staff door is the west port of the 4 m service artery.
+		# Split the old solid wall around it so opening the panel reveals a real
+		# corridor, not another scene transition.
+		_slab(Vector3(0.5, 4.4, 4.9), Vector3(7.6, 2.2, 0.95), "rust", Color("1c1712"))
+		_slab(Vector3(0.5, 4.4, 22.1), Vector3(7.6, 2.2, -15.55), "rust", Color("1c1712"))
+		_slab(Vector3(0.5, 1.4, 3.0), Vector3(7.6, 3.7, STAFF_DOOR_AT.z), "rust", Color("1c1712"))
+	else:
+		_slab(Vector3(0.5, 4.4, AISLE_LENGTH + 8.0), Vector3(7.6, 2.2, -AISLE_LENGTH * 0.4), "rust", Color("1c1712"))
 	# The near wall is DoctorRoute's: the same wall in pieces, around his door
 	# and the observation glass.
 	# Greg, playing the build: "you walk to the end of this room and then
@@ -2727,19 +2744,22 @@ func _update_movement(delta: float) -> void:
 func _interact() -> void:
 	if not can_move:
 		return
-	if _try_pry_stuck_tank():
+	if facility_map != null and facility_map.call("interact"):
 		return
-	if _try_take_garment():
-		return
+	if not FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+		if _try_pry_stuck_tank():
+			return
+		if _try_take_garment():
+			return
 	if _try_staff_door():
 		return
 	if break_weak_wall() or _try_den():
 		return
-	if HIDDEN_CACHE.open_near(caches, player.global_position, sight) == "stash":
+	if not FACILITY_MAP_SCRIPT.V01_ONE_MAP and HIDDEN_CACHE.open_near(caches, player.global_position, sight) == "stash":
 		key_hints.offer("field_dressing", KEY_4, "HOLD 4", "dress a wound")
 		subtitle.text = "A FIELD DRESSING AND FOUR ROUNDS  //  SOMEBODY HID THESE"
 		return
-	if sight != null and sight.call("cut_wire_near", player.global_position) != "":
+	if not FACILITY_MAP_SCRIPT.V01_ONE_MAP and sight != null and sight.call("cut_wire_near", player.global_position) != "":
 		subtitle.text = "THE LINE SPITS AND DIES  //  THAT BAY GOES DARK"
 		if bool(sight.get("last_cut_shocked")):
 			anatomy.call("apply_hit", "right_arm", sight.SHOCK_BLOOD, 0.0, "blunt")
@@ -2752,6 +2772,9 @@ func _interact() -> void:
 		return
 	if not _pit_door_open():
 		subtitle.text = "THE PIT DOOR  //  A CARD READER, RED  //  HE CARRIES THE CARD"
+		return
+	if FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+		subtitle.text = "THE OLD PIT ROUTE IS SEALED  //  USE THE EAST STAFF DOOR"
 		return
 	# Filing the stage can legitimately refuse -- it is write-once and a resumed
 	# world may already have it -- but that is not a reason to refuse the door.
@@ -2875,10 +2898,17 @@ func _update_hud() -> void:
 		prompt.text = ""
 		$HUD/Objective.text = ""
 		return
-	$HUD/Objective.text = "OBJECTIVE\n" + (_first_run_objective() if _first_run() else objective_text)
+	if facility_map != null and (player.global_position.x > 8.0 or player.global_position.y < -1.0):
+		$HUD/Objective.text = "OBJECTIVE\n" + str(facility_map.call("objective_for", player.global_position))
+		if osd != null:
+			osd.location = str(facility_map.call("location_for", player.global_position))
+	else:
+		$HUD/Objective.text = "OBJECTIVE\n" + (_first_run_objective() if _first_run() else objective_text)
+		if osd != null:
+			osd.location = "SUBLEVEL 0C  //  GROWING FLOOR"
 	# AX3.1/AX3.6. INSPECT is a held state, not a menu, so it wins the prompt
 	# line for as long as it is held rather than opening anything separate.
-	if inspect_held:
+	if inspect_held and not FACILITY_MAP_SCRIPT.V01_ONE_MAP:
 		prompt.text = _inspect_text()
 		return
 	if not stuck_tank_opened and (_carries_restraint() or not grant_restraint) and _near_first_objects():

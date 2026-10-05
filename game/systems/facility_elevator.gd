@@ -23,7 +23,7 @@ const DOOR_HEIGHT := 2.3
 const DOOR_TIME := 1.1
 ## Believable lift speed, metres per second, with a short ease at each end.
 const SPEED := 2.4
-const STRIP_EVERY := 3.0
+const STRIP_EVERY := 1.6
 const HUM_RATE := 22050.0
 
 var stops: Array = []
@@ -208,10 +208,10 @@ func _build_shaft() -> void:
 	# Light strips passing the car's slots: an amber bar every few metres on
 	# both side walls, and a real light every other one.
 	var strip := StandardMaterial3D.new()
-	strip.albedo_color = Color("ff9a3a")
+	strip.albedo_color = Color("d2ecc0")
 	strip.emission_enabled = true
-	strip.emission = Color("ff7a1a")
-	strip.emission_energy_multiplier = 3.0
+	strip.emission = Color("b8e0a0")
+	strip.emission_energy_multiplier = 5.0
 	var y := bottom + 1.5
 	var count := 0
 	while y < top - 0.5:
@@ -225,9 +225,9 @@ func _build_shaft() -> void:
 			add_child(bar)
 		if count % 2 == 0:
 			var lamp := OmniLight3D.new()
-			lamp.light_color = Color("ff8a3a")
-			lamp.light_energy = 0.7
-			lamp.omni_range = 2.6
+			lamp.light_color = Color("d2ecc0")
+			lamp.light_energy = 1.6
+			lamp.omni_range = 2.8
 			lamp.position = Vector3(SHAFT_HALF.x - 0.3, y, 0)
 			add_child(lamp)
 		y += STRIP_EVERY
@@ -265,11 +265,17 @@ func _build_cab() -> void:
 		for side: int in [-1, 1]:
 			leaves.append(_leaf(cab, Vector3(side * DOOR_HALF * 0.5, DOOR_HEIGHT * 0.5, face * (CAR_HALF.y - 0.02)), Color("5a5048")))
 		_cab_doors[face] = leaves
-	var lamp := OmniLight3D.new()
-	lamp.light_color = Color("ffd6a0")
-	lamp.light_energy = 1.2
-	lamp.omni_range = 3.2
-	lamp.position = Vector3(0, CAR_HEIGHT - 0.3, 0)
+	# A downlight, not an omni: an omni a metre from the closed doors burned a
+	# flat hot disc on them and left the rest of the car black.
+	var lamp := SpotLight3D.new()
+	lamp.name = "CabLight"
+	lamp.light_color = Color("d2ecc0")
+	lamp.light_energy = 2.2
+	lamp.spot_range = 3.4
+	lamp.spot_angle = 70.0
+	lamp.spot_attenuation = 0.8
+	lamp.position = Vector3(0, CAR_HEIGHT - 0.15, 0)
+	lamp.rotation.x = -PI * 0.5
 	cab.add_child(lamp)
 	indicator = _label(cab, Vector3(0, DOOR_HEIGHT + 0.2, -CAR_HALF.y + 0.1), 0.0)
 	var back := _label(cab, Vector3(0, DOOR_HEIGHT + 0.2, CAR_HALF.y - 0.1), PI)
