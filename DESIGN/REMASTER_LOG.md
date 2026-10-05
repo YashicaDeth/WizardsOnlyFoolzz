@@ -207,3 +207,17 @@ Defaults set behind dials, all in `OrganSystem` unless named. None of these is G
   1. Queued `remaster-job5-p1` (70, claude): walls and story props, the floating quads and lift signage, the guide stripe behind a dial.
   2. job6 must fix the examiner-office overlay blur when it runs (carried from 15:10).
   3. A real-GPU fps number for lab-46, lab-47 and lab-48 (carried).
+
+## Manager notes, 2026-10-05 17:08
+
+- **Merged since 16:10:** fix-56 ADS sights small and centred, hands seated on the pistol and 12G (8532801d); RoundCam: the killing round replayed slowed into the X-ray (15c3a1f0); merged 267b2107, gate green.
+- **Running:** lab-53 BeamNG-style vehicles on claude-alt2 since 16:47 (priority 98, Greg's bump). Claude accounts parked until 18:04, codex until 20:16-20:33, sircuteskingdom-plus until 10-11.
+- **Rendering:** skipped; lab-53 has Godot running. The ADS check is `res://tests/aim_down_sights_capture.tscn`; render it next run.
+- **Queue order fix:** Greg said at midday that the facility map is the top priority, but `remaster-job5-p1` was at 70, behind job6/job9/job7/v02-51/art-49. Raised it to 96, so the first Claude account to unpark at 18:04 gets it. lab-53 stays at 98 (Greg's number).
+- **Covered from Greg's midday notes:** examiner reskin (fix-55 done), ADS/VATS (fix-56 done), eyes (fix-57 done), execution (fix-58 done), Black Mirror and depth map (in v02-51 pending).
+- **Open question for Greg:** `queue/questions/execution-58-01.md`. Should executed bodies in the Hunt and the arcade ragdoll? Default for now: no change, so they stay in the stiff downed pose.
+- **Failures:** none new.
+- **Top three:**
+  1. remaster-job5-p1 at 18:04 (walls, story props, floating quads, lift signage).
+  2. job6 must fix the examiner-office overlay blur (carried).
+  3. Render the fix-56 ADS capture and check that the sights no longer fill the screen.
