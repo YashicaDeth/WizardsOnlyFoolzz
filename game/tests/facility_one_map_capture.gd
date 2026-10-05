@@ -53,6 +53,11 @@ func _ready() -> void:
 	await _walk(Vector3(18.0, 0.0, -2.5))
 	await _capture("02_artery_to_arcade.png")
 	await _walk(Vector3(28.0, 0.0, -2.5))
+	# The arcade's landmark from its entry: the shuttered stalls (imp-67).
+	var held_pitch: float = vat.pitch
+	await _look_at(Vector3(21.0, 1.4, -17.5))
+	await _capture("02b_arcade_entry_stalls.png")
+	vat.pitch = held_pitch
 	await _walk(Vector3(28.0, 0.0, -24.0))
 	await _capture("03a_arcade_mid.png")
 	await _walk(Vector3(28.0, 0.0, -36.0))
@@ -93,7 +98,14 @@ func _ready() -> void:
 	for sample in fps_samples:
 		total += sample
 	var average := total / maxf(1.0, float(fps_samples.size()))
-	print("FACILITY_ONE_MAP_CAPTURE_RESULT walked=vat_to_surface shots=12 fps_min=%.1f fps_average=%.1f" % [minimum, average])
+	var result := "FACILITY_ONE_MAP_CAPTURE_RESULT walked=vat_to_surface shots=13 fps_min=%.1f fps_average=%.1f" % [minimum, average]
+	print(result)
+	# render_one.cmd runs the window detached: keep the numbers with the PNGs.
+	var report := FileAccess.open(shots.path_join("result.txt"), FileAccess.WRITE)
+	if report != null:
+		report.store_line(result)
+		report.store_line("fps per shot: %s" % [fps_samples])
+		report.close()
 	get_tree().quit()
 
 

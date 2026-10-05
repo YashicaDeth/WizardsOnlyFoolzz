@@ -18,6 +18,8 @@ signal struck(collider: Object, at: Vector3, direction: Vector3, packet: Diction
 signal kicked(amount: float)
 signal staggered(rig: Node3D, report: Dictionary)
 signal swing_started(attack_id: String)
+## An incoming blow was answered: `result` is parried, blocked, guard_broken or hit.
+signal blow_received(result: String)
 
 ## Seconds a press is kept while the weapon is busy (brief: about 150 ms).
 const INPUT_BUFFER := 0.15
@@ -74,12 +76,15 @@ var heavy_held := -1.0
 var swing_hint := Vector2.ZERO
 var contacts := 0
 var last_packet: Dictionary = {}
+## imp-64: the swing's whoosh and the hit's voice (`FpCombatAudio`).
+var audio: FpCombatAudio
 
 var _pending := ""
 var _pending_age := 0.0
 var _swing_mirror := false
 var _swept_to := 0.0
 var _swing_serial := 0
+var _whooshed := 0
 var _hit_ids: Dictionary = {}
 var _hitstop_until_us := 0
 var _stamina_wait := 0.0
@@ -92,6 +97,10 @@ func setup(owner_arsenal: HunterArsenal, owner_eye: Node3D, skip: Array[RID] = [
 	arsenal = owner_arsenal
 	eye = owner_eye
 	exclude = skip
+	if audio == null:
+		audio = FpCombatAudio.new()
+		audio.name = "CombatAudio"
+		add_child(audio)
 	_sync_weapon()
 
 
@@ -102,6 +111,11 @@ func set_model(held: Node3D) -> void:
 	if model != null:
 		_model_rest = model.transform
 	_update_glow()
+
+
+## The current swing runs the mirrored way (a hint from the left).
+func swing_mirrored() -> bool:
+	return _swing_mirror
 
 
 func melee_held() -> bool:
@@ -165,6 +179,12 @@ func handle_input(event: InputEvent) -> bool:
 ## window costs nothing and staggers the attacker's swing; a raised guard
 ## soaks it for stamina; otherwise it lands.
 func receive_blow(damage: float) -> Dictionary:
+	var answer := _answer_blow(damage)
+	blow_received.emit(str(answer.result))
+	return answer
+
+
+func _answer_blow(damage: float) -> Dictionary:
 	if parry_left > 0.0:
 		parry_left = 0.0
 		return {"result": "parried", "damage": 0.0}
@@ -199,8 +219,17 @@ func tick(delta: float) -> void:
 	if bool(report.get("started_buffered", false)) and moveset.is_attacking():
 		spend(float(report.get("stamina_cost", 0.0)))
 		_begin_swing()
+	if moveset.is_attacking() and moveset.phase() == "active" and _whooshed != _swing_serial:
+		_whooshed = _swing_serial
+		if audio != null:
+			audio.whoosh(arsenal.current_id, swing_heavy())
 	_sweep()
 	_update_pose()
+
+
+## The swing in flight is a heavy, charged or running blow.
+func swing_heavy() -> bool:
+	return moveset.is_attacking() and moveset.current_attack() in ["heavy", "charged_heavy", "running_attack"]
 
 
 func _queue(kind: String) -> void:
@@ -315,6 +344,8 @@ func _contact(collider: Object, at: Vector3, along: Vector3, definition: Diction
 	# the arc passes through.
 	if _hit_ids.size() == 1:
 		_after_contact(heavy, packet)
+		if audio != null:
+			audio.impact(FpCombatAudio.surface_of(collider, packet), heavy)
 
 
 func _after_contact(heavy: bool, packet: Dictionary) -> void:
@@ -476,6 +507,9 @@ static func rig_of(collider: Object) -> BaselineHuman:
 ## active, eased home in recovery. Charging a heavy draws it further back.
 func _update_pose() -> void:
 	if model == null or not is_instance_valid(model):
+		return
+	# imp-64: real arms pose themselves from this driver's state.
+	if model is FirstPersonArms:
 		return
 	var turn := Vector3.ZERO
 	var push := Vector3.ZERO
