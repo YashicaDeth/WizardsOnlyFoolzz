@@ -769,4 +769,60 @@ func _build_weapon_model(weapon_id: String) -> Node3D:
 		left.set_meta("grip_rest_rotation", left.rotation)
 		left.set_meta("forearm_entry", Vector3(-0.47, -0.53, -0.31))
 		root.add_child(left)
+	if visual_id in ["sidearm", "shotgun"]:
+		_seat_gun_hands(visual_id, gear, right, root.get_node_or_null("LeftGripHand") as Node3D)
 	return root
+
+
+## Fix-56. The generic mount stood both hands upright behind each gun, knuckles
+## at receiver height, so the trigger finger, the support fingers and the
+## cuffs rose past the rear sight and filled the aimed view. A firing hand
+## holds with its palm on the grip's right side, the knuckle line down the
+## grip (index on top) and the fingers running forward into the guard; a
+## pistol's support hand mirrors it on the left, and a shotgun's cradles the
+## pump from below with the fingers closing up its far side. The wrists and
+## cuffs then sit under the sight picture. Built in the gun's own authored
+## frame (muzzle +Z, up +Y) from its anchors, so the MERCY NINE and the BREACH
+## NINE share the pistol seat.
+const GRIP_HAND_TILT := 0.15
+const GRIP_KNUCKLES := {
+	"sidearm": {1: Vector3(-0.031, 0.002, 0.032), -1: Vector3(0.033, -0.008, 0.038)},
+	"shotgun": {1: Vector3(-0.035, -0.005, 0.004)},
+}
+## Where the shotgun's support knuckles sit off `anchor_forend`, and how far
+## the wrist drops toward the left elbow.
+const PUMP_KNUCKLES := Vector3(-0.016, -0.036, 0.030)
+const PUMP_HAND_TILT := 0.35
+
+
+static func _seat_gun_hands(visual_id: String, gear: Node3D, right: Node3D, left: Node3D) -> void:
+	var knuckle_table: Dictionary = GRIP_KNUCKLES[visual_id]
+	for hand: Node3D in [right, left]:
+		if hand == null:
+			continue
+		var side := 1 if hand == right else -1
+		var x_axis: Vector3
+		var y_axis: Vector3
+		var knuckles: Vector3
+		# Hand space: fingers along +Z, curling toward +Y (the palm), index at
+		# -X on a right hand and +X on a left.
+		if knuckle_table.has(side):
+			var grip := gear.get_node_or_null("anchor_grip") as Node3D
+			if grip == null:
+				continue
+			x_axis = Vector3(0.0, -cos(GRIP_HAND_TILT), -sin(GRIP_HAND_TILT)) * float(side)
+			y_axis = Vector3(float(side), 0.0, 0.0)
+			knuckles = grip.position + (knuckle_table[side] as Vector3)
+		else:
+			var forend := gear.get_node_or_null("anchor_forend") as Node3D
+			if forend == null:
+				continue
+			x_axis = Vector3(0.0, 0.0, 1.0)
+			y_axis = Vector3(sin(PUMP_HAND_TILT), cos(PUMP_HAND_TILT), 0.0)
+			knuckles = forend.position + PUMP_KNUCKLES
+		var z_axis := x_axis.cross(y_axis)
+		var reach := 0.086 * hand.scale.x
+		var seat := Transform3D(Basis(x_axis, y_axis, z_axis).scaled_local(hand.scale), knuckles - z_axis * reach)
+		hand.transform = gear.transform * seat
+		hand.set_meta("grip_rest_position", hand.position)
+		hand.set_meta("grip_rest_rotation", hand.rotation)

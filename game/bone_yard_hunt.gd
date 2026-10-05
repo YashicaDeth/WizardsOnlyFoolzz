@@ -4511,6 +4511,12 @@ func _pose_first_person_forearm(hand: Node3D) -> void:
 	# hand do not share an elbow. The hand supplies its authored off-screen entry;
 	# old callers retain the former corner as a safe default.
 	var entry: Vector3 = hand.get_meta("forearm_entry", Vector3(0.43 * float(side), -0.49, -0.30))
+	# Fix-56: shouldered, both arms run straight down and back from the grip,
+	# under the gun, instead of sweeping in across the sight picture from the
+	# hip corners.
+	if firearm_aim_blend > 0.0 and arsenal != null and hand.get_parent() == arsenal.models.get(str(arsenal.current_id)):
+		var wrist := camera.to_local(hand.global_position)
+		entry = entry.lerp(wrist + Vector3(0.07 * float(side), -0.46, 0.20), firearm_aim_blend)
 	var start := camera.to_global(entry)
 	var end := hand.to_global(Vector3(0.0, 0.0, -0.035))
 	var along := end - start
