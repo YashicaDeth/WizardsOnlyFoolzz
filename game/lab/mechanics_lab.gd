@@ -26,6 +26,7 @@ const WEATHER := preload("res://lab/stations/weather_station.gd")
 const DESTRUCTION := preload("res://lab/stations/destruction_station.gd")
 const BODIES := preload("res://lab/stations/bodies_station.gd")
 const SPARRING := preload("res://lab/sparring_partner.gd")
+const VEHICLES := preload("res://lab/stations/vehicle_station.gd")
 ## Where the sparring partner (job 3) stands: the covered half, clear of the
 ## stations, so a fight has room to move.
 const SPARRING_AT := Vector3(0, 0, -12)
@@ -71,6 +72,7 @@ var liquid: Node3D
 var weather: Node3D
 var destruction: Node3D
 var bodies: Node3D
+var vehicles: Node3D
 ## A destruction tool in hand (`DESTRUCTION.TOOLS`) instead of a weapon, or "".
 var tool := ""
 var menu_open := false
@@ -114,7 +116,7 @@ func _ready() -> void:
 	bodies = _station(BODIES, Vector3(10, 0, -8), Vector3(0, 0, 0))
 	weather = _station(WEATHER, Vector3(0, 0, 2), Vector3(0, 0, 0))
 	destruction = _station(DESTRUCTION, DESTRUCTION_AT, DESTRUCTION.PLINTH)
-	_vehicle_pad(Vector3(12, 0, 12))
+	vehicles = _station(VEHICLES, Vector3(12, 0, 12), VEHICLES.PLINTH)
 	_build_player()
 	ballistics = Ballistics.new()
 	add_child(ballistics)
@@ -303,29 +305,6 @@ func _plinth(at: Vector3, title: String, verb: String) -> void:
 	add_child(label)
 
 
-## Station 5: an empty marked pad for the driving work that comes later.
-func _vehicle_pad(at: Vector3) -> void:
-	var paint := _surface(Color("b0552a"), 0.6)
-	for side in [-1.0, 1.0]:
-		_stripe(at + Vector3(side * 4.0, 0.01, 0), Vector3(0.18, 0.02, 8.18), paint)
-		_stripe(at + Vector3(0, 0.01, side * 4.0), Vector3(8.18, 0.02, 0.18), paint)
-	_stripe(at + Vector3(0, 0.01, 0), Vector3(0.18, 0.02, 3.0), paint)
-	_stripe(at + Vector3(0, 0.01, 0), Vector3(3.0, 0.02, 0.18), paint)
-	var plinth := at + Vector3(-5.2, 0, 4.6)
-	_plinth(plinth, "VEHICLE PAD", "RESERVED FOR DRIVING")
-	stations.append({"node": null, "title": "VEHICLE PAD", "plinth": plinth})
-
-
-func _stripe(at: Vector3, size: Vector3, material: Material) -> void:
-	var stripe := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = size
-	box.material = material
-	stripe.mesh = box
-	stripe.position = at
-	add_child(stripe)
-
-
 # --- the player --------------------------------------------------------------
 
 func _build_player() -> void:
@@ -372,6 +351,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			menu_open = false
 		get_viewport().set_input_as_handled()
 		return
+	if vehicles.driving():
+		# In a car USE gets out; the hands are on the wheel for everything else.
+		if event.is_action_pressed("interact"):
+			_note(vehicles.press())
+		get_viewport().set_input_as_handled()
+		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		# Directional swings follow the mouse's last move.
 		melee.set_swing_hint(Vector2(event.relative.x, -event.relative.y).limit_length(12.0) / 12.0)
@@ -390,7 +375,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("interact"):
 		# Lab-48: a hand into an opened body before the plinth button.
 		if not begin_rip_aimed():
-			use_nearest()
+			if vehicles.try_enter():
+				_note(VEHICLES.HINT)
+			else:
+				use_nearest()
 	elif not hand_item.is_empty() and event.is_action_pressed("reload"):
 		install_hand_item()
 	elif not hand_item.is_empty() and event.is_action_pressed("heal"):
@@ -587,6 +575,11 @@ func _nearest_plinth() -> Dictionary:
 
 
 func _physics_process(delta: float) -> void:
+	if vehicles.driving():
+		# The walking body waits where it got in; the car's driver owns the view.
+		_note_age += delta
+		_update_hud()
+		return
 	if not menu_open and lock_target == null:
 		InputProfile.apply_stick_look(self, delta)
 	_update_lock(delta)

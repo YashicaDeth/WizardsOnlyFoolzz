@@ -7,6 +7,7 @@ lists: `game/art/textures/lab/CREDITS.md` (ambientCG, CC0).
 | File | Source | Author | Licence |
 |---|---|---|---|
 | `game/art/characters/ual_mannequin.glb` (`UAL1_Standard.glb` from "Universal Animation Library [Standard]", Unreal-Godot folder, no root motion; 65-bone skeleton, 43 clips; downloaded 2026-10-04) | https://quaternius.itch.io/universal-animation-library | Quaternius | CC0 1.0 |
+| `game/art/vehicles/kenney_car_kit/sedan.glb`, `suv.glb`, `debris-door.glb`, `debris-bumper.glb`, `debris-plate-a.glb`, `Textures/colormap.png` (Car Kit 3.1; `colormap_biopunk.png` is our regrade of `colormap.png`; lab-53, 2026-10-05) | https://kenney.nl/assets/car-kit | Kenney | CC0 1.0 (`License.txt` beside the files) |
 
 ## Code and shader references (no files copied)
 
@@ -30,3 +31,10 @@ lists: `game/art/textures/lab/CREDITS.md` (ambientCG, CC0).
   connectivity split and naive surface nets are our own GDScript, so they run
   in the headless suite on every lane without a native binary. Voxel Tools
   stays the named upgrade path for the real map's large terrain.
+- Vehicle crumple (`game/systems/vehicle_damage.gd`, lab-53): impact-time
+  vertex deformation after the spherical deformer in cloudofoz's
+  godot-deformablemesh (https://github.com/cloudofoz/godot-deformablemesh,
+  MIT) and the MeshDataTool approach in the Godot docs. Looked at node-beam
+  soft bodies (BeamLab, https://github.com/zenkovich/beamlab, C++ at 2 kHz;
+  BeamNG's own physics page, https://beamng.com/game/about/physics/) and
+  rejected them for GDScript at 144 fps. No code copied.
