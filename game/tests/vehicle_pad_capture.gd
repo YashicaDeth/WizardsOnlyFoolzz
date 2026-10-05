@@ -42,10 +42,8 @@ func _ready() -> void:
 	# Into the concrete wall, full throttle from the pad.
 	car.enabled = true
 	car.throttle = 1.0
-	# The pad is 13 m from the wall: arrive at 15 m/s (54 km/h), as from a
-	# lap of the yard, so the hit is past steel's ram tier.
-	car.linear_velocity = -car.global_basis.z * 15.0
-	await _until(func() -> bool: return damage.hits > 0, 5.0)
+	# From parked: the lane is about 24 m, enough to pass steel's ram tier.
+	await _until(func() -> bool: return damage.hits > 0, 8.0)
 	car.throttle = 0.0
 	await _seconds(1.5)
 	car.enabled = false
@@ -66,7 +64,7 @@ func _ready() -> void:
 	await _seconds(1.5)
 	suv.enabled = false
 	await _shot_car("3_after_ram", car)
-	await _shot("4_pad_wide", pad.to_global(Vector3(9.0, 7.0, 9.0)), pad.to_global(Vector3(0, 0, -5.0)))
+	await _shot("4_pad_wide", pad.to_global(Vector3(-4.0, 8.0, 10.0)), pad.to_global(Vector3(4.0, 0, -10.0)))
 
 	var report := damage.report()
 	var low: float = _fps.min() if not _fps.is_empty() else 0.0

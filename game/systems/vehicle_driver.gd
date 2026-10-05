@@ -107,11 +107,11 @@ func get_in() -> bool:
 
 
 ## Out through the driver's door, onto whatever is beside the car there. Refused
-## at speed.
-func get_out() -> bool:
+## at speed unless `force` (a menu teleport takes you out whatever the car does).
+func get_out(force := false) -> bool:
 	if not driving or car == null or not is_instance_valid(car):
 		return false
-	if absf(float(car.signed_speed)) > GET_OUT_SPEED:
+	if not force and absf(float(car.signed_speed)) > GET_OUT_SPEED:
 		return false
 	driving = false
 	car.throttle = 0.0

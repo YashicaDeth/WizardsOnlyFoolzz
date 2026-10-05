@@ -399,8 +399,10 @@ func hit(at: Vector3, push: Vector3, speed: float, source := "vehicle", params :
 
 
 ## The lab's own hit hook (`mechanics_lab._land`): a round or a blow.
-func strike(at: Vector3, direction: Vector3) -> Dictionary:
-	var result := hit(at, direction, DENT_THRESHOLD + 4.0, "firearm")
+## `kind` is the lab's "firearm" or "melee"; a blade dents and breaks glass
+## but cannot take steel off.
+func strike(at: Vector3, direction: Vector3, kind := "firearm") -> Dictionary:
+	var result := hit(at, direction, DENT_THRESHOLD + 4.0, MaterialToughness.source_for(kind))
 	result["what"] = "vehicle"
 	return result
 

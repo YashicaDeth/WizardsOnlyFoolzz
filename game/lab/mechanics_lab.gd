@@ -545,6 +545,7 @@ func next_weapon() -> void:
 func go_to(index: int) -> void:
 	var entry: Dictionary = stations[clampi(index, 0, stations.size() - 1)]
 	var plinth: Vector3 = entry.plinth
+	vehicles.leave()
 	player.global_position = plinth + Vector3(0, 1.0, 1.9)
 	player.velocity = Vector3.ZERO
 	yaw = 0.0
@@ -780,7 +781,7 @@ func _land(collider: Object, at: Vector3, direction: Vector3, attack_data: Dicti
 			return
 		if node.has_meta("lab_station"):
 			var station = node.get_meta("lab_station")
-			last_hit = station.strike(at, direction)
+			last_hit = station.strike(at, direction, kind) if station is VehicleDamage else station.strike(at, direction)
 			last_hit["what"] = "station"
 			return
 		node = node.get_parent()
