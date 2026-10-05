@@ -9948,7 +9948,14 @@ func _update_camera() -> void:
 		# `HunterMotor.lens_in_head`.
 		var head := player_rig.parts.get("head") as Node3D
 		if head != null and is_instance_valid(head):
-			head.visible = not HUNTER_MOTOR.lens_in_head(fp_position, camera.global_position)
+			var in_head := HUNTER_MOTOR.lens_in_head(fp_position, camera.global_position)
+			# imp-68. The HUD's body-cam films this head, so while it does the
+			# head stays visible and only leaves the eye's own render layers.
+			var face: FaceMonitor = field_interface.get("face_monitor") if field_interface != null else null
+			var filmed := face != null and face.feeding()
+			head.visible = filmed or not in_head
+			if face != null:
+				face.film_head(camera, player_rig, filmed and in_head)
 	# The arms follow the camera actually used, like the head: a room that
 	# forces the eye gets first-person arms, and nothing that sets
 	# third_person without the F key leaves them stretched back to the lens.

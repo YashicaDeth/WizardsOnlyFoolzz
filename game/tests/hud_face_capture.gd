@@ -81,7 +81,13 @@ func _hunt() -> void:
 	var hud: Control = hunt.field_interface
 	for style in _styles(hud):
 		_apply(hud, style, HURT)
-		await _frames(30)
+		# The Hunt's own head handling (hide or film) runs in _update_camera;
+		# with physics held it would also move the lens, so the shot keeps its own.
+		var shot: Transform3D = hunt.camera.global_transform
+		for _tick in 30:
+			hunt._update_camera()
+			hunt.camera.global_transform = shot
+			await get_tree().process_frame
 		await _shoot("hunt_%s.png" % style)
 		if style == "bodycam" and hud.face_monitor._feed != null:
 			var monitor: FaceMonitor = hud.face_monitor

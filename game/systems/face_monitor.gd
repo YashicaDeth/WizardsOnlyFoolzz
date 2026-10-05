@@ -40,6 +40,8 @@ const FEED_PIXELS := 112
 const FEED_RATE := 24.0
 const FEED_REACH := 0.5
 const FEED_FOV := 38.0
+## The render layer the head sits on while the eye is inside it.
+const HEAD_LAYER := 20
 
 var style := "xray"
 var health := 100.0
@@ -60,11 +62,12 @@ var _glass: Control
 var _plate: Control
 var _feed_clock := 0.0
 var _redraw_clock := 0.0
+var _head_on_layer := false
 
 const FEED_SHADER := """
 shader_type canvas_item;
 uniform vec3 ink = vec3(0.435, 0.878, 0.784);
-uniform float gain = 1.6;
+uniform float gain = 1.0;
 uniform float pain = 0.0;
 uniform float blood = 1.0;
 uniform float wake = 1.0;
@@ -125,6 +128,31 @@ func attach_head(body: Node) -> void:
 	_sync_feed()
 
 
+## The eye sits inside the skull, so the Hunt hides the head from it; hiding
+## the node would hide it from this feed too. While `hidden`, every piece of
+## the head (zone part, dressing, rigged skin) goes on HEAD_LAYER, which the
+## eye's camera does not draw and the feed does; otherwise back on layer 1.
+func film_head(eye: Camera3D, body: Node, hidden: bool) -> void:
+	if not hidden and not _head_on_layer:
+		return
+	_head_on_layer = hidden
+	eye.set_cull_mask_value(HEAD_LAYER, not hidden)
+	var pieces: Array = []
+	var part := (body.get("parts") as Dictionary).get("head") as Node3D if body != null and "parts" in body else null
+	if part != null:
+		pieces.append(part)
+		pieces.append_array(part.find_children("*", "VisualInstance3D", true, false))
+	var rigged: Node = body.get("rigged") if body != null and "rigged" in body else null
+	if rigged != null and is_instance_valid(rigged):
+		pieces.append_array((rigged.get("zone_meshes") as Dictionary).get("head", []))
+	# ponytail: rescans the head every frame it is hidden (dressing is rebuilt
+	# underneath it); cache on child count if it ever shows in a profile.
+	var mask := 1 << (HEAD_LAYER - 1) if hidden else 1
+	for piece in pieces:
+		if piece is VisualInstance3D and is_instance_valid(piece):
+			(piece as VisualInstance3D).layers = mask
+
+
 ## Whether the live feed is what is on the screen right now.
 func feeding() -> bool:
 	return style == "bodycam" and head != null and is_instance_valid(head) and head.is_inside_tree()
@@ -153,6 +181,15 @@ func _build_feed() -> void:
 	_feed_camera.far = 4.0
 	_feed.add_child(_feed_camera)
 	_feed_camera.current = true
+	# A ring light on the rig: the face is usually turned from the sun. It
+	# lights only HEAD_LAYER, so it touches nothing the eye can see.
+	var ring := OmniLight3D.new()
+	ring.name = "RingLight"
+	ring.omni_range = 1.2
+	ring.light_energy = 1.4
+	ring.light_color = Color("f2e2c8")
+	ring.light_cull_mask = 1 << (HEAD_LAYER - 1)
+	_feed_camera.add_child(ring)
 	_feed_view = TextureRect.new()
 	_feed_view.name = "FeedView"
 	_feed_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
