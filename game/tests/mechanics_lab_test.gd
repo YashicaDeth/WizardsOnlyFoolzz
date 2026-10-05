@@ -85,9 +85,13 @@ func _vehicle_melee(other: RigidBody3D) -> void:
 		return
 	var door: Node3D = door_part.impact_node
 	var into := (other.global_position - door.global_position).normalized()
+	# Repeated blows on one spot reach the crush cap, so the last blow alone
+	# may dent nothing; the deepest of the six is the one that counts.
+	var deepest := 0.0
 	for i in 6:
 		lab._land(other, door.global_position, into, {"damage": 44.0, "weapon": "cleaver"}, "melee", null)
-	check(not damage.detached.has("DoorLeft") and float(lab.last_hit.get("dent", 0.0)) > 0.0, "a cleaver dents the door but cannot take steel off")
+		deepest = maxf(deepest, float(lab.last_hit.get("dent", 0.0)))
+	check(not damage.detached.has("DoorLeft") and deepest > 0.0, "a cleaver dents the door but cannot take steel off")
 	for i in 3:
 		lab._land(other, door.global_position, into, {"damage": 30.0}, "firearm", null)
 	check(damage.detached.has("DoorLeft"), "rounds take the same door off")

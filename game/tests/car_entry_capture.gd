@@ -22,7 +22,9 @@ func _ready() -> void:
 	await get_tree().create_timer(0.6).timeout
 	body.global_position = driver.standing_point(car, VehicleDriver.DOOR_LEFT)
 	proof_camera.current = true
+	_show_outside_body(true)
 	await _shot("01_at_driver_handle")
+	_show_outside_body(false)
 	driver.begin_entry(car, VehicleDriver.DOOR_LEFT)
 	await get_tree().create_timer(0.42).timeout
 	proof_camera.current = true
@@ -31,6 +33,7 @@ func _ready() -> void:
 	proof_camera.current = true
 	await _shot("03_body_sitting")
 	await get_tree().create_timer(0.5).timeout
+	await _shot("04a_cab_view_after_ease")
 	proof_camera.current = true
 	await _shot("04_door_closed_driver_seated")
 	driver.get_out()
@@ -39,7 +42,9 @@ func _ready() -> void:
 	await _shot("05_exit_through_open_door")
 	await get_tree().create_timer(0.54).timeout
 	proof_camera.current = true
+	_show_outside_body(true)
 	await _shot("06_standing_beside_door")
+	_show_outside_body(false)
 	var part: Dictionary = damage.door_part(VehicleDriver.DOOR_LEFT)
 	damage._detach("DoorLeft", -car.global_basis.x, (part.node as Node3D).global_position)
 	body.global_position = driver.standing_point(car, VehicleDriver.DOOR_LEFT)
@@ -47,6 +52,9 @@ func _ready() -> void:
 	await get_tree().create_timer(0.72).timeout
 	proof_camera.current = true
 	await _shot("07_torn_door_climb_in")
+	await get_tree().create_timer(0.7).timeout
+	proof_camera.current = true
+	await _shot("08_torn_door_seated")
 	get_tree().quit(0)
 
 
@@ -106,6 +114,16 @@ func _build_stage() -> void:
 	add_child(proof_camera)
 	proof_camera.global_position = Vector3(-7.0, 3.0, 5.2)
 	proof_camera.look_at(Vector3(-0.4, 0.7, 0.0))
+
+
+## Play keeps the walking body hidden (first person); the proof shows where
+## it stands before entry and after the exit.
+func _show_outside_body(show: bool) -> void:
+	body_visual.visible = show
+	if show:
+		body_visual.global_transform = body.global_transform
+		body_visual.global_position -= Vector3.UP * 0.85
+		body_visual.look_at(body_visual.global_position + (body_visual.global_position - Vector3(0, body_visual.global_position.y, 0)).normalized() * -1.0, Vector3.UP)
 
 
 func _shot(label: String) -> void:

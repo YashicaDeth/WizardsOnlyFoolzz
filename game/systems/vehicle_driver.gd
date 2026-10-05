@@ -23,6 +23,10 @@ const BAIL_ROLL_SECONDS := 0.45
 const BAIL_SECONDS := 0.85
 const DOOR_LEFT := -1
 const DOOR_RIGHT := 1
+## Visual layer for the player's own body while it is seen from outside (the
+## entry/exit sequence and the seated driver). The first-person eyes and the
+## cab camera skip it, so the camera never renders the inside of its own head.
+const OWN_BODY_LAYER := 5
 
 signal got_out(standing: Vector3, facing_yaw: float)
 signal got_in()
@@ -55,6 +59,7 @@ var _facing_yaw := 0.0
 var _jam_pulls: Dictionary = {}
 var _horn: AudioStreamPlayer3D
 var _seat_avatar: BaselineHuman
+var _visual_layers: Dictionary = {}
 
 static var _carried: RigidBody3D = null
 
@@ -110,6 +115,7 @@ func bind_walker(body: CharacterBody3D, eyes: Camera3D, visual: Node3D = null) -
 	_walker_visual = visual
 	if eyes != null:
 		_walker_camera_local = eyes.transform
+		eyes.cull_mask &= ~(1 << (OWN_BODY_LAYER - 1))
 	if body != null:
 		_walker_collision_layer = body.collision_layer
 		_walker_collision_mask = body.collision_mask
@@ -497,9 +503,25 @@ func _ensure_seat_avatar() -> void:
 	car.add_child(_seat_avatar)
 	_seat_avatar.build("vehicle_player", {"seated": true, "gore": false, "blood": 4800.0})
 	_seat_avatar.visible = false
+	_set_own_body_layer(_seat_avatar, true)
 	var damage := _damage()
 	if damage != null:
 		damage.driver = _seat_avatar
+
+
+## Moves a body onto OWN_BODY_LAYER, or back onto the layers it had before.
+func _set_own_body_layer(node: Node, own: bool) -> void:
+	if node is VisualInstance3D:
+		var visual := node as VisualInstance3D
+		if own:
+			if not _visual_layers.has(visual.get_instance_id()):
+				_visual_layers[visual.get_instance_id()] = visual.layers
+			visual.layers = 1 << (OWN_BODY_LAYER - 1)
+		elif _visual_layers.has(visual.get_instance_id()):
+			visual.layers = int(_visual_layers[visual.get_instance_id()])
+			_visual_layers.erase(visual.get_instance_id())
+	for child in node.get_children():
+		_set_own_body_layer(child, own)
 
 
 func _set_exterior_layer(node: Node, except: Node) -> void:
@@ -580,8 +602,10 @@ func _show_walker_visual(show: bool) -> void:
 		return
 	_walker_visual.visible = show
 	if show:
+		_set_own_body_layer(_walker_visual, true)
 		_sync_visual()
 	else:
+		_set_own_body_layer(_walker_visual, false)
 		_walker_visual.global_position = Vector3(0, -40, 0)
 
 
