@@ -2,7 +2,7 @@
 
 Started by the hourly build manager, 2026-10-05 15:10. This is a draft. It does not change GAME_PLAN.html or BUILD_PLAN.html, and no v0.2 job has been queued from it. Anything not taken from Greg's recorded decisions is marked **proposal, needs Greg**.
 
-## 1. What v0.1 "Escape" actually delivered (as of 15:10, 5 Oct)
+## 1. What v0.1 "Escape" actually delivered (as of 02:10, 6 Oct)
 
 6 of the 10 v0.1 jobs have landed on `claude/launch-latest`. Details are in DESIGN/REMASTER_LOG.md.
 
@@ -15,7 +15,7 @@ Started by the hourly build manager, 2026-10-05 15:10. This is a draft. It does 
 | job3 moving and fighting | yes | HOTLINE CLEAVER and PRODSTAFF work with buffer, hitstop, stagger, block and parry. Movement has sprint, crouch and roll. There is lab ADS and lock-on. The arcade guard can be cut. | The first-person swing is a pose, not an animated arm. There is no swing or hit sound. The Hunt still issues the old sword. `remaster-job3-p1` is pending. |
 | job4 waking in the vat | yes | First-person wake in red liquid, real glass and a flood. | It was not rendered at landing. `remaster-job4-p1` is pending. |
 | job5 one facility map | running | | Greg's top priority ("the map is the main thing"). |
-| job6 examiner | pending | fix-55 moved him onto the rigged base. | The boss fight itself is not built. |
+| job6 examiner | landed (39782473, 6 Oct) | A fair, telegraphed boss on the rigged base body. His keycard always drops and opens the staff door. | His head is still a placeholder (Greg's call). The open doorway reads flat, and there is red light that isn't a danger cue (fix-72 queued). |
 | job9 enemies | pending | | |
 | job7 death, saves, HUD | pending | | |
 
