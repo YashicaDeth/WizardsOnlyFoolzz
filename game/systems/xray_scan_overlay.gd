@@ -27,7 +27,9 @@ const STATE_TONES := {"OK": SCAN, "BRUISED": BRASS, "DAMAGED": Color("d06a2a"), 
 const TAG_HZ := 20.0
 const SCAN_EVERY := 0.2
 
-var rig: BaselineHuman
+## A BaselineHuman, or a machine that answers `xray_report()` and
+## `xray_point(entry)` (job 9: the Lower Works sentinel's plates).
+var rig: Node3D
 var camera: Camera3D
 var report: Dictionary = {}
 var _clock := 0.0
@@ -49,10 +51,10 @@ func _ready() -> void:
 
 
 ## Point the scan at `target` (null clears it).
-func show_scan(target: BaselineHuman, eye: Camera3D) -> void:
+func show_scan(target: Node3D, eye: Camera3D) -> void:
 	rig = target
 	camera = eye
-	report = OrganSystem.scan(target) if target != null else {}
+	report = _scan(target)
 	visible = target != null
 	_column_hash = 0
 	_refresh_column()
@@ -69,7 +71,7 @@ func _process(delta: float) -> void:
 	_scan_clock -= delta
 	if _scan_clock <= 0.0:
 		_scan_clock = SCAN_EVERY
-		report = OrganSystem.scan(rig)
+		report = _scan(rig)
 		_refresh_column()
 	_tag_clock -= delta
 	if _tag_clock <= 0.0:
@@ -132,7 +134,7 @@ func _draw() -> void:
 	for organ: Dictionary in report.get("organs", []):
 		if str(organ.state) in ["OK", "TAKEN"]:
 			continue
-		var node := rig.organ_parts.get(str(organ.id)) as Node3D
+		var node := (rig as BaselineHuman).organ_parts.get(str(organ.id)) as Node3D if rig is BaselineHuman else null
 		if node == null or not node.is_inside_tree() or camera.is_position_behind(node.global_position):
 			continue
 		var at := camera.unproject_position(node.global_position)
@@ -163,8 +165,18 @@ func _draw_column() -> void:
 	CellOutzType.draw_text(_column, at + Vector2(0, y + 6), "LOOT EST %d SCRIP" % int(report.get("value", 0)), 11.0, SPARK, 1.0)
 
 
+static func _scan(target: Node3D) -> Dictionary:
+	if target is BaselineHuman:
+		return OrganSystem.scan(target as BaselineHuman)
+	if target != null and target.has_method("xray_report"):
+		return target.call("xray_report")
+	return {}
+
+
 func _where(entry: Dictionary) -> Vector3:
-	var zone_node := rig.parts.get(str(entry.zone)) as Node3D
+	if rig.has_method("xray_point"):
+		return rig.call("xray_point", entry)
+	var zone_node := (rig as BaselineHuman).parts.get(str(entry.zone)) as Node3D if rig is BaselineHuman else null
 	if zone_node == null or not zone_node.is_inside_tree():
 		return rig.global_position + Vector3.UP
 	var visual := zone_node.get_node_or_null("Implant_%s" % str(entry.site)) as Node3D

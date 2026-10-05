@@ -244,6 +244,10 @@ func _exits() -> Array:
 ## The subject climbs out over the rim: whatever floated in there is gone from
 ## the tank, and a loose bingyanger stands in the spill, facing the aisle.
 func _free(tank: Dictionary) -> void:
+	# Job 9: on the v0.1 one map the first subject out is the hostile one.
+	var encounters = host.get("encounters")
+	if encounters != null and encounters.claim_freed(tank):
+		return
 	var at: Vector3 = tank.at
 	for key in ["curled", "cradled"]:
 		var body = tank.get(key)

@@ -272,6 +272,8 @@ var doctor_route: Node3D
 var field_inventory: FieldInventory
 var route_carry: Carry
 var checkpoints: FacilityCheckpoints
+## Job 9: v0.1's guards, freed subject and sentinel on the one map.
+var encounters: V01Encounters
 var rebirth_site: RebirthSite
 
 # 0 submerged, 1 voiding, 2 breach, 3 floor, 4 aisle
@@ -399,6 +401,9 @@ func _ready() -> void:
 		checkpoints = FACILITY_CHECKPOINTS.new()
 		add_child(checkpoints)
 		checkpoints.setup(self, player, facility_map)
+		encounters = V01Encounters.new()
+		add_child(encounters)
+		encounters.setup(self)
 	tank_view = TankView.new()
 	add_child(tank_view)
 	if VatHorror.wanted():
@@ -2927,6 +2932,8 @@ func _interact() -> void:
 			return
 	if facility_map != null and facility_map.call("interact"):
 		return
+	if encounters != null and encounters.use():
+		return
 	# Square on the pad lands here, not in DoctorRoute.handle_input: the axe
 	# and the examiner's dropped keycard are taken through the same use.
 	if doctor_route != null and doctor_route._use():
@@ -3126,6 +3133,10 @@ func _update_hud() -> void:
 		return
 	if sight != null and sight.call("wire_in_reach", player.global_position):
 		prompt.text = "[E] CUT THE POWER LINE"
+		return
+	var fight_prompt: String = encounters.prompt_text() if encounters != null else ""
+	if fight_prompt != "":
+		prompt.text = fight_prompt
 		return
 	var smash_prompt: String = vat_smash.prompt_for(camera, doctor_route.held_weapon() if doctor_route != null else "") if vat_smash != null and breakout_complete else ""
 	if smash_prompt != "":
