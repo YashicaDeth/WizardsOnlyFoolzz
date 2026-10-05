@@ -1,22 +1,21 @@
 shader_type canvas_item;
 
-// Greg, 26 September: K = wizard eyes (the world traced in bone lines on
-// black, what glows turns acid green; his reference is the wizard eyes in
-// Adventure Time's Ice King episodes), J = the depth scan (cold, thin, walls
-// read as outlines). `strain` is the cost: static from the edges and a blur
-// the longer you stay in.
+// Greg, 5 October: keep the wizard-eyes forms, but remove the neon green.
+// The world is a subtle bone/copper trace with deep red and only a muted
+// sickly accent. J remains the cold, thin depth scan. `strain` is the cost:
+// static from the edges and a blur the longer you stay in.
 
 uniform sampler2D screen_tex : hint_screen_texture, filter_linear_mipmap;
 uniform int mode = 0; // 0 off, 1 wizard eyes, 2 depth
 uniform float strain : hint_range(0.0, 1.0) = 0.0;
 uniform float fade : hint_range(0.0, 1.0) = 1.0;
+uniform vec4 wizard_bone : source_color = vec4(0.90, 0.83, 0.67, 1.0);
+uniform vec4 wizard_copper : source_color = vec4(0.69, 0.33, 0.16, 1.0);
+uniform vec4 wizard_blood : source_color = vec4(0.66, 0.16, 0.10, 1.0);
+uniform vec4 wizard_sickly : source_color = vec4(0.48, 0.51, 0.39, 1.0);
 
 const vec3 BONE = vec3(0.90, 0.83, 0.67);
-const vec3 ACID = vec3(0.71, 0.85, 0.28);
-const vec3 NIGHT = vec3(0.02, 0.035, 0.03);
 const vec3 COLD = vec3(0.35, 0.85, 0.95);
-// The wizard-eyes line colour: greener than ACID (which stays for spirits).
-const vec3 LINE = vec3(0.42, 0.95, 0.38);
 
 float lum(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
 
@@ -59,10 +58,8 @@ void fragment() {
 		float y = lum(c);
 		vec3 outc;
 		if (mode == 1) {
-			// The Ice King reference (Greg, 26 September; the concept "green
-			// line art, glowing spirits"): the world drawn in glowing green
-			// lines on green-black, a white-hot core where lines are strongest,
-			// a soft halo around every line, lit things a faint green wash.
+			// The spirit-realm line art stays, but it is a restrained engraving:
+			// bone edges, a copper falloff and a barely sickly luminous accent.
 			float gx2 = 0.0;
 			float gy2 = 0.0;
 			vec2 wide = px * 2.2;
@@ -73,13 +70,13 @@ void fragment() {
 			gx2 = wr - wl;
 			gy2 = wb - wt;
 			float halo = smoothstep(0.03, 0.2, length(vec2(gx2, gy2)));
-			vec3 ground = vec3(0.008, 0.03, 0.014);
-			outc = ground + LINE * smoothstep(0.35, 0.9, y) * 0.16;
-			outc += LINE * halo * 0.3;
-			outc = mix(outc, LINE * 1.05, edge);
-			outc += vec3(0.8, 1.0, 0.75) * smoothstep(0.6, 1.0, edge) * 0.3;
-			// A slow shimmer running up the lines.
-			outc += LINE * edge * 0.12 * (0.5 + 0.5 * sin(TIME * 3.0 - uv.y * 60.0));
+			vec3 ground = vec3(0.018, 0.012, 0.010);
+			outc = ground + vec3(y) * 0.035;
+			outc += wizard_copper.rgb * halo * 0.11;
+			outc = mix(outc, wizard_bone.rgb * 0.56 + wizard_copper.rgb * 0.06, edge * 0.86);
+			outc += wizard_sickly.rgb * smoothstep(0.64, 1.0, y) * 0.055;
+			// A dim travelling glint, not a bloom pass.
+			outc += wizard_copper.rgb * edge * 0.035 * (0.5 + 0.5 * sin(TIME * 2.2 - uv.y * 54.0));
 		} else {
 			outc = vec3(y * 0.22) + COLD * edge * 0.8;
 			float scan = step(0.5, fract(uv.y / px.y / 3.0));
@@ -91,7 +88,7 @@ void fragment() {
 		float from_centre = length((uv - 0.5) * vec2(1.4, 1.0));
 		float n = hash(floor(uv / px / 2.0) + floor(TIME * 24.0));
 		float edge_static = smoothstep(0.75 - strain * 0.55, 0.9, from_centre) * strain;
-		outc = mix(outc, vec3(n) * mix(BONE, ACID, float(mode == 1)), edge_static * 0.85);
+		outc = mix(outc, vec3(n) * mix(BONE, wizard_sickly.rgb, float(mode == 1)), edge_static * 0.68);
 		COLOR = vec4(outc, fade);
 	}
 }

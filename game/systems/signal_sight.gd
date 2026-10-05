@@ -7,9 +7,10 @@ extends Node
 ##  hack on (the host sets `enabled`). Free, but the view strains the longer
 ##  you stay in: static from the edges, blur, then a nosebleed; leaving clears
 ##  it. Only hacked cameras notice you doing it.
-##  Wizard eyes shows camera signals as pulsing wave rings, and spirits as
-##  glowing green figures where people died. The depth scan shows camera
-##  signals and bodies through walls.
+##  Wizard eyes shows camera signals as pulsing wave rings, and spirits where
+##  people died. Greg's 5 October correction keeps those forms but restrains
+##  them to the house bone/copper/red palette, with sickly green only an accent.
+##  The depth scan shows camera signals and bodies through walls.
 ##
 ## One component per scene: `add_child`, then `setup(camera)`. The host feeds
 ## `spirits` (world positions), `bodies` (a Callable returning positions) and
@@ -28,8 +29,9 @@ signal wire_cut(id: String)
 const SHADER := preload("res://shaders/signal_sight.gdshader")
 const SIGHT_AUDIO := preload("res://systems/sight_audio.gd")
 const BONE := Color("e6d4ac")
-const ACID := Color("b4da48")
+const COPPER := Color("b0552a")
 const BLOOD := Color("a8281a")
+const SICKLY := Color("7b8164")
 const COLD := Color("59d9f2")
 ## Seconds in a mode until the strain is total, and to clear it again.
 const STRAIN_SECONDS := 22.0
@@ -97,6 +99,10 @@ func setup(camera: Camera3D) -> void:
 	screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_material = ShaderMaterial.new()
 	_material.shader = SHADER
+	_material.set_shader_parameter("wizard_bone", BONE)
+	_material.set_shader_parameter("wizard_copper", COPPER)
+	_material.set_shader_parameter("wizard_blood", BLOOD)
+	_material.set_shader_parameter("wizard_sickly", SICKLY)
 	screen.material = _material
 	layer.add_child(screen)
 	screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -211,7 +217,7 @@ func _draw_marks() -> void:
 		_draw_wires()
 		_draw_beacons()
 		_draw_labels()
-		CellOutzType.draw_string_compat(marks, Vector2(marks.size.x * 0.05, marks.size.y * 0.2), "WIZARD EYES  //  K" if mode == "wizard" else "DEPTH  //  J", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, ACID if mode == "wizard" else COLD)
+		CellOutzType.draw_string_compat(marks, Vector2(marks.size.x * 0.05, marks.size.y * 0.2), "WIZARD EYES  //  K" if mode == "wizard" else "DEPTH  //  J", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, BONE if mode == "wizard" else COLD)
 	# The nosebleed: past halfway, blood runs down from the top of the view.
 	if strain > 0.5:
 		var run := clampf((strain - 0.5) / 0.5, 0.0, 1.0)
@@ -222,7 +228,7 @@ func _draw_marks() -> void:
 
 ## Each camera's signal: rings pulsing out of the lens along what it sees.
 func _draw_signals(tone_override: Variant = null) -> void:
-	var tone: Color = tone_override if tone_override != null else (ACID if mode == "wizard" else COLD)
+	var tone: Color = tone_override if tone_override != null else (COPPER if mode == "wizard" else COLD)
 	for lens in SecurityCamera.all_cameras():
 		if lens.broken:
 			continue
@@ -237,14 +243,14 @@ func _draw_signals(tone_override: Variant = null) -> void:
 				continue
 			var edge = _project(centre + view.global_transform.basis.x * tan(SecurityCamera.HALF_ANGLE) * distance)
 			var radius := 6.0 if edge == null else maxf(3.0, (edge as Vector2).distance_to(at))
-			var alpha := (1.0 - along) * (0.9 if lens.tracking else 0.55)
-			marks.draw_arc(at, radius, 0.0, TAU, 32, Color(BLOOD if lens.tracking else tone, alpha), 3.0)
-			marks.draw_arc(at, radius + 3.0, 0.0, TAU, 32, Color(BLOOD if lens.tracking else tone, alpha * 0.35), 6.0)
+			var alpha := (1.0 - along) * (0.72 if lens.tracking else 0.42)
+			marks.draw_arc(at, radius, 0.0, TAU, 32, Color(BLOOD if lens.tracking else tone, alpha), 2.0)
+			marks.draw_arc(at, radius + 2.0, 0.0, TAU, 32, Color(BLOOD if lens.tracking else tone, alpha * 0.14), 4.0)
 		var lens_at = _project(eye)
 		if lens_at != null:
 			var pulse := 5.0 + 3.0 * absf(sin(clock * 4.0))
-			marks.draw_circle(lens_at, pulse + 4.0, Color(tone, 0.25))
-			marks.draw_circle(lens_at, pulse, Color(tone, 0.95))
+			marks.draw_circle(lens_at, pulse + 3.0, Color(tone, 0.10))
+			marks.draw_circle(lens_at, pulse, Color(BONE if mode == "wizard" else tone, 0.72))
 
 
 ## The phone's carriers through its camera: each transmitter pulses rings
@@ -266,7 +272,7 @@ func _draw_carriers() -> void:
 		CellOutzType.draw_string_compat(marks, (at as Vector2) + Vector2(10, -10), "%s  //  %d M" % [str(emitter.get("name", "SIGNAL")), roundi(distance)], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(INFRARED, 0.9))
 
 
-## Where people died: soft green figures standing there.
+## Where people died: soft figures in muted sickly cloth with a bone core.
 func _draw_spirits() -> void:
 	for point in spirits:
 		var feet = _project(point)
@@ -278,7 +284,8 @@ func _draw_spirits() -> void:
 		var top: Vector2 = head + Vector2(sway, 0)
 		for glow in 3:
 			var grow := float(3 - glow) * height * 0.04
-			var colour := Color(ACID, 0.12 + 0.18 * float(glow))
+			var spirit_tone := SICKLY.lerp(BONE, float(glow) * 0.28)
+			var colour := Color(spirit_tone, 0.05 + 0.065 * float(glow))
 			marks.draw_circle(top + Vector2(0, height * 0.1), height * 0.1 + grow, colour)
 			var body := PackedVector2Array([top + Vector2(-height * 0.14 - grow, height * 0.22), top + Vector2(height * 0.14 + grow, height * 0.22), feet + Vector2(height * 0.1 + grow, 0), feet + Vector2(-height * 0.1 - grow, 0)])
 			marks.draw_colored_polygon(body, colour)
@@ -304,7 +311,7 @@ func _draw_beacons() -> void:
 	if not beacons.is_valid():
 		return
 	for beacon: Dictionary in beacons.call():
-		var tone: Color = {"objective": ACID, "distress": BLOOD.lightened(0.25), "task": BONE}.get(str(beacon.get("kind", "task")), BONE)
+		var tone: Color = {"objective": SICKLY, "distress": BLOOD.lightened(0.18), "task": BONE}.get(str(beacon.get("kind", "task")), BONE)
 		var base: Vector3 = beacon.get("at", Vector3.ZERO)
 		var points := PackedVector2Array()
 		for step in 24:
@@ -337,10 +344,10 @@ func _draw_labels() -> void:
 			continue
 		var word := str(label.get("word", "")).to_upper()
 		var box := Rect2((at as Vector2) - Vector2(26, 26), Vector2(52, 52))
-		marks.draw_rect(box, Color(ACID, 0.7), false, 1.2)
+		marks.draw_rect(box, Color(COPPER, 0.62), false, 1.2)
 		for corner in [box.position, box.position + Vector2(box.size.x, 0), box.position + Vector2(0, box.size.y), box.end]:
-			marks.draw_rect(Rect2(corner - Vector2(3, 3), Vector2(6, 6)), Color(ACID, 0.9))
-		CellOutzType.draw_string_compat(marks, box.position + Vector2(0, -6), word, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(ACID, 0.95))
+			marks.draw_rect(Rect2(corner - Vector2(3, 3), Vector2(6, 6)), Color(BONE, 0.78))
+		CellOutzType.draw_string_compat(marks, box.position + Vector2(0, -6), word, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(BONE, 0.88))
 
 
 ## Bodies through walls, as X-ray outlines.
@@ -361,7 +368,7 @@ func _draw_bodies() -> void:
 ## Hidden things: the outline of what is really there, cracks in wizard eyes,
 ## the hollow behind it in the depth scan. Noticed once on screen and near.
 func _draw_hidden() -> void:
-	var tone := ACID if mode == "wizard" else COLD
+	var tone := COPPER if mode == "wizard" else COLD
 	var pulse := 0.55 + 0.45 * absf(sin(clock * 3.0))
 	for thing: Dictionary in hidden:
 		if bool(thing.get("gone", false)):
@@ -429,7 +436,7 @@ func _notice_hidden() -> void:
 ## Power along each wire: pulses running from the supply to what it feeds.
 ## A cut wire hangs dark red with a gap where it was cut.
 func _draw_wires() -> void:
-	var tone := ACID if mode == "wizard" else COLD
+	var tone := COPPER if mode == "wizard" else COLD
 	for wire: Dictionary in wires:
 		var points: Array = wire.get("points", [])
 		if points.size() < 2 or view == null or view.global_position.distance_to(points[0]) > HIDDEN_RANGE * 2.0:
@@ -449,8 +456,8 @@ func _draw_wires() -> void:
 			gap[0] = flat[0].lerp(flat[1], 0.25)
 			marks.draw_polyline(gap, Color(BLOOD, 0.6), 2.0)
 			continue
-		marks.draw_polyline(flat, Color(tone, 0.35), 5.0)
-		marks.draw_polyline(flat, Color(tone, 0.85), 1.6)
+		marks.draw_polyline(flat, Color(tone, 0.16), 4.0)
+		marks.draw_polyline(flat, Color(BONE if mode == "wizard" else tone, 0.68), 1.4)
 		# Three pulses travelling toward the load.
 		var lengths: Array = [0.0]
 		for index in range(1, flat.size()):
@@ -463,9 +470,9 @@ func _draw_wires() -> void:
 			for index in range(1, flat.size()):
 				if along <= float(lengths[index]):
 					var t := (along - float(lengths[index - 1])) / maxf(0.001, float(lengths[index]) - float(lengths[index - 1]))
-					marks.draw_circle(flat[index - 1].lerp(flat[index], t), 4.0, Color(tone, 0.95))
+					marks.draw_circle(flat[index - 1].lerp(flat[index], t), 3.0, Color(SICKLY if mode == "wizard" else tone, 0.76))
 					break
-		marks.draw_circle(flat[0], 7.0, Color(tone, 0.5 + 0.4 * absf(sin(clock * 5.0))))
+		marks.draw_circle(flat[0], 6.0, Color(COPPER if mode == "wizard" else tone, 0.36 + 0.28 * absf(sin(clock * 5.0))))
 
 
 func _notice_wires() -> void:
