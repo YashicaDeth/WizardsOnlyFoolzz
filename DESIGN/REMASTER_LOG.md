@@ -296,3 +296,17 @@ Defaults set behind dials, all in `OrganSystem` unless named. None of these is G
   1. Land job6 (queued, 101).
   2. job9 enemies next (99).
   3. Render the fix-56 ADS capture, and get a real-GPU fps number for lab-46/47/48 and for job6 (carried).
+
+## Manager notes, 2026-10-06 02:10
+- **Merged:** land-job6 (793c8dcc, merge 39782473, gate green). The examiner boss, the keycard drop and the staff door are now on claude/launch-latest. 8 of 10 v0.1 jobs have landed; job9 enemies is building on claude-alt2 (since 01:42). Every other account is parked until 04:04 or later.
+- **Looked at** `P:/GameDev/Temp/examiner_boss_2_syringe_telegraph.png` and `_6_staff_door_open.png`.
+  - The telegraph reads: his hand flares white before the syringe. But the syringe itself can't be seen.
+  - Weak: the "open" staff door shot is a flat dark slab with a warm smear on it. It doesn't read as an opening onto the Service Artery.
+  - Weak: red lamps wash the walls and the floor near the door. Greg's rule is "red only on danger".
+  - Weak: the objective says "HIS CARD OPENS THE PIT DOOR" (`game/vat_chamber.gd:1651`), but the caption says "STAFF DOOR". The player is told two different door names for one door.
+  - Still Greg's: the examiner's box head and his lines.
+- **Top 3:**
+  1. Make the staff door read as a real opening, take the non-danger red out at the door, and use one door name in the objective. Queued as `fix-72-staff-door-read`.
+  2. Make the syringe and scalpel visible in his hand during the telegraph (job6 remaster pass).
+  3. Measure fps in the examiner office on the RTX 2060 SUPER (none measured yet).
+- **Failures:** no new ones (job2, job2b and lane-exit-routes are old ones, already handled).
