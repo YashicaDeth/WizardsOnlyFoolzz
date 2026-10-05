@@ -98,6 +98,32 @@ func _ready() -> void:
 	for row in gate._rows:
 		settings_ids.append(str(row.id))
 	check(settings_ids.has("controls"), "settings offers a way into controls")
+	check(settings_ids.has("subtitles") and settings_ids.has("censor") and settings_ids.has("graphics"),
+		"settings includes subtitles, the body censor and a graphics preset")
+
+	WorldHistory.amend_subject("settings", {"subtitles": true})
+	var subtitle := Label.new()
+	subtitle.name = "Subtitle"
+	add_child(subtitle)
+	gate.highlighted = settings_ids.find("subtitles")
+	gate._nudge(1)
+	check(not bool(WorldHistory.subject("settings").get("subtitles", true)) and not subtitle.visible,
+		"turning subtitles off persists and hides the live subtitle layer")
+	gate._nudge(1)
+
+	var censor_before := AnatomyPresentation.mode()
+	gate.highlighted = settings_ids.find("censor")
+	gate._nudge(1)
+	check(AnatomyPresentation.mode() != censor_before, "the pause censor uses the shared anatomy presentation setting")
+	gate._nudge(1)
+
+	WorldLook.set_quality_name("PERFORMANCE")
+	gate.highlighted = settings_ids.find("graphics")
+	gate._nudge(1)
+	check(WorldLook.quality_name() == "HIGH" and str(WorldHistory.subject("settings").get("graphics_preset", "")) == "HIGH",
+		"the graphics preset applies to the live renderer and persists")
+	WorldLook.set_quality_name("PERFORMANCE")
+	WorldHistory.amend_subject("settings", {"graphics_preset": "PERFORMANCE"})
 
 	gate.page = "controls"
 	gate._build_rows()

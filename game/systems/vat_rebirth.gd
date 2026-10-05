@@ -18,12 +18,19 @@ extends RefCounted
 ## claim, so the two agree about who has you.
 
 const CARRY := preload("res://systems/carry.gd")
+## Job 7 OPEN dial. Fragments recover and persist in v0.1, but buy nothing
+## until Greg defines the brain-board economy.
+const BLOOD_FRAGMENTS_SPEND_ENABLED := false
 const CLOTHING := preload("res://systems/clothing.gd")
 const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 
 ## CellOutz grew you and owns what it grew (DESIGN/COSMOLOGY.md, the opening's
 ## "Debt's in the meat"), so with no other claim on you, the body is theirs.
 const DEFAULT_CLAIMANT := "celloutz"
+## OPEN dial (Job 7): fragments have no v0.1 spend path. One carried fragment
+## proves the drop/recovery loop without assigning an economy value Greg has
+## not chosen yet.
+const DEFAULT_BLOOD_FRAGMENTS := 1
 
 ## Only the Growing Floor exists as a vat scene today. The other claimants'
 ## tanks are named so the record says whose vat it was, and share its scene
@@ -77,14 +84,23 @@ static func die(location: String, cause: String, killed_by := "", position := Ve
 	var outfit_record := WorldHistory.subject(Outfit.SUBJECT)
 	var outfit: Dictionary = (outfit_record.get("parts", {}) as Dictionary).duplicate() if bool(outfit_record.get("initialized", false)) else {}
 	var remains_id := "remains_%d" % count
+	var fragments := int(player.get("blood_fragments", DEFAULT_BLOOD_FRAGMENTS))
 
 	WorldHistory.begin_ledger_batch()
+	# Soulslike rule from Job 7: a second death erases the previous recovery
+	# sigil. It does not erase the physical corpse or the equipment on it.
+	for old_index in range(1, count):
+		var old_id := "remains_%d" % old_index
+		var old := WorldHistory.subject(old_id)
+		if not old.is_empty() and int(old.get("blood_fragments", 0)) > 0 and not bool(old.get("sigil_recovered", false)):
+			WorldHistory.amend_subject(old_id, {"blood_fragments": 0, "sigil_lost": true})
 	WorldHistory.register_subject(remains_id, {
 		"kind": "remains", "name": "YOUR OLD BODY", "status": "dead",
 		"location": location, "position": [position.x, position.y, position.z],
 		"items": items, "worn_layer": worn, "worn_condition": CLOTHING.worn_condition("player"),
 		"outfit": outfit,
 		"died_of": cause, "killed_by": killed_by, "body_number": count, "recovered": false,
+		"blood_fragments": fragments, "sigil_recovered": fragments <= 0, "sigil_lost": false,
 	})
 	carry.items.clear()
 	carry.save_to_history()
@@ -99,6 +115,7 @@ static func die(location: String, cause: String, killed_by := "", position := Ve
 		"reborn_by": claim,
 		"reborn_at": str(vat.place),
 		"body_number": count + 1,
+		"blood_fragments": 0,
 		"memory": "Died at %s (%s). %s grew the body back." % [location.replace("_", " "), cause, str(vat.label)],
 	})
 	WorldHistory.record_event("player_died", {
@@ -150,19 +167,22 @@ static func recover(remains_id: String) -> Dictionary:
 	for item in items:
 		carry.items.append((item as Dictionary).duplicate(true) if item is Dictionary else item)
 	var outfit: Dictionary = remains.get("outfit", {})
+	var fragments := int(remains.get("blood_fragments", 0)) if not bool(remains.get("sigil_lost", false)) else 0
 	for part_id: String in outfit:
 		carry.items.append(Outfit.part_item(part_id, float(outfit[part_id])))
 	WorldHistory.begin_ledger_batch()
 	carry.save_to_history()
+	if fragments > 0:
+		WorldHistory.amend_subject("player", {"blood_fragments": int(WorldHistory.subject("player").get("blood_fragments", 0)) + fragments})
 	var worn := str(remains.get("worn_layer", "bare"))
 	var dressed := false
 	if worn != "bare" and CLOTHING.worn("player") == "bare":
 		WorldHistory.amend_subject("player", {"worn_layer": worn, "worn_condition": float(remains.get("worn_condition", 1.0))})
 		dressed = true
-	WorldHistory.amend_subject(remains_id, {"recovered": true, "items": [], "worn_layer": "bare", "outfit": {}})
-	PLAYER_ACTION_LEDGER.record("player_remains_recovered", {"remains_id": remains_id, "items": items.size(), "dressed": dressed})
+	WorldHistory.amend_subject(remains_id, {"recovered": true, "items": [], "worn_layer": "bare", "outfit": {}, "blood_fragments": 0, "sigil_recovered": true})
+	PLAYER_ACTION_LEDGER.record("player_remains_recovered", {"remains_id": remains_id, "items": items.size(), "dressed": dressed, "blood_fragments": fragments})
 	WorldHistory.commit_ledger_batch()
-	return {"ok": true, "items": items.size() + outfit.size(), "dressed": dressed}
+	return {"ok": true, "items": items.size() + outfit.size(), "dressed": dressed, "blood_fragments": fragments}
 
 
 ## Whether the player is carrying something by label. The facility's tools
