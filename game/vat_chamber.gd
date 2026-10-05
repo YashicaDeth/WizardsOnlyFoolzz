@@ -1063,6 +1063,20 @@ func _build_staff_door() -> void:
 	frame.mesh = frame_mesh
 	frame.position = STAFF_DOOR_AT + Vector3(0.42, 1.28, 0)
 	add_child(frame)
+	if FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+		# The render showed this 1.55 m frame as a solid, walk-through slab
+		# standing in the middle of the 3 m opening once the door slid away:
+		# here it becomes two jambs and a head at the opening's real edges.
+		frame_mesh.size = Vector3(0.36, 0.14, STAFF_OPENING_SIZE.z + 0.2)
+		frame.position = Vector3(STAFF_OPENING_CENTRE.x - 0.1, STAFF_OPENING_SIZE.y + 0.07, STAFF_OPENING_CENTRE.z)
+		for side in [-1.0, 1.0]:
+			var jamb := MeshInstance3D.new()
+			var jamb_mesh := BoxMesh.new()
+			jamb_mesh.size = Vector3(0.36, STAFF_OPENING_SIZE.y, 0.1)
+			jamb_mesh.material = frame_mesh.material
+			jamb.mesh = jamb_mesh
+			jamb.position = Vector3(STAFF_OPENING_CENTRE.x - 0.1, STAFF_OPENING_SIZE.y * 0.5, STAFF_OPENING_CENTRE.z + side * (STAFF_OPENING_SIZE.z * 0.5 + 0.05))
+			add_child(jamb)
 
 	var jamb_light := OmniLight3D.new()
 	jamb_light.position = STAFF_DOOR_AT + Vector3(-0.15, 2.25, 0)
@@ -1084,6 +1098,10 @@ func _build_staff_door() -> void:
 	lintel_mesh.material = lintel_material
 	lintel.mesh = lintel_mesh
 	lintel.position = STAFF_DOOR_AT + Vector3(0.30, 2.46, 0)
+	if FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+		# Under the head of the full-width opening, not floating mid-doorway.
+		lintel_mesh.size = Vector3(0.06, 0.07, STAFF_OPENING_SIZE.z - 0.1)
+		lintel.position = Vector3(STAFF_OPENING_CENTRE.x - 0.3, STAFF_OPENING_SIZE.y - 0.06, STAFF_OPENING_CENTRE.z)
 	add_child(lintel)
 
 	staff_door_panel = Node3D.new()
@@ -1607,6 +1625,9 @@ func _pit_door_open() -> bool:
 func _first_run_objective() -> String:
 	# The step on top; the escape purpose always under it (opening tests).
 	if _has_staff_keycard():
+		# One map: the pit route is sealed; the staff door is the way on.
+		if FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+			return "THROUGH THE STAFF DOOR\nESCAPE THE FACILITY" if staff_door_open else "HIS CARD OPENS THE STAFF DOOR\nESCAPE THE FACILITY"
 		return "HIS CARD OPENS THE PIT DOOR\nESCAPE THE FACILITY"
 	if doctor_route != null and doctor_route.door != null and doctor_route.door.broken:
 		return "GET REVENGE  //  BEAT HIM, TAKE HIS CARD\nTHEN ESCAPE THE FACILITY"

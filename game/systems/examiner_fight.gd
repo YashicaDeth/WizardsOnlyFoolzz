@@ -97,6 +97,7 @@ const GLINT_SYRINGE := Color("9fb38a")
 ## How close the dropped keycard is picked up just by walking over it.
 const KEYCARD_WALK_OVER := 0.6
 const KEYCARD_REACH := 1.8
+const KEYCARD_DROP := 1.0
 
 var route: Node3D
 var chamber: Node3D
@@ -169,7 +170,7 @@ func setup(owner_route: Node3D, bench_at: Vector3, room_x: Vector2, room_z: Vect
 	body.add_child(appearance)
 	appearance.configure(body, {"axes": {"brow": 0.7, "jaw": 0.6, "cheek": 0.2, "eyes": 0.3, "nose": 0.55, "mouth": 0.4}})
 	mask = LOOK.dress(body, false)
-	scalpel = _tool(body.parts.get("right_arm") as Node3D, Vector3(0.012, 0.012, 0.16), Color("c9ccc8"), 0.6)
+	scalpel = _tool(body.parts.get("right_arm") as Node3D, Vector3(0.02, 0.02, 0.24), Color("c9ccc8"), 0.6)
 	syringe = _tool(body.parts.get("left_arm") as Node3D, Vector3(0.022, 0.022, 0.14), Color("dfe8e0"), 0.1)
 	var record := WorldHistory.subject(SUBJECT)
 	if str(record.get("status", "")) == "won":
@@ -179,7 +180,7 @@ func setup(owner_route: Node3D, bench_at: Vector3, room_x: Vector2, room_z: Vect
 		position = Vector3(float(record.get("x", bench_at.x + 0.8)), 0.0, float(record.get("z", bench_at.z)))
 		_lie_down(1.0)
 		if not has_keycard() and WorldHistory.event_count("examiner_keycard_taken") == 0:
-			_drop_keycard(Vector3(float(record.get("card_x", position.x)), 0.0, float(record.get("card_z", position.z + 0.6))))
+			_drop_keycard(Vector3(float(record.get("card_x", position.x)), 0.0, float(record.get("card_z", position.z + KEYCARD_DROP))))
 		return
 	# At his bench, his back to the door, working.
 	position = bench_at + Vector3(0.8, 0.0, 0.0)
@@ -639,10 +640,15 @@ func _win() -> void:
 	parried_left = 0.0
 	stagger_left = 0.0
 	CLOTHING.wear("player", COAT)
-	# His card falls where he does, a step towards you, inside his room.
+	# His card falls to his side, a little towards you, inside his room: he
+	# falls forward, and a card dropped straight ahead lay under his body in
+	# the render.
 	var toward: Vector3 = chamber.player.global_position - global_position
 	toward.y = 0.0
-	var card_at := global_position + (toward.normalized() * 0.6 if toward.length() > 0.01 else Vector3(0, 0, -0.6))
+	toward = toward.normalized() if toward.length() > 0.01 else Vector3(0, 0, -1)
+	var card_at := _card_spot(toward, 1.0)
+	if not _inside_room(card_at):
+		card_at = _card_spot(toward, -1.0)
 	card_at.x = clampf(card_at.x, room_min.x, room_max.x)
 	card_at.z = clampf(card_at.z, room_min.y, room_max.y)
 	card_at.y = 0.0
@@ -674,22 +680,30 @@ func _lose() -> void:
 
 # --- His keycard, on the floor until taken. ---
 
+func _card_spot(toward: Vector3, side: float) -> Vector3:
+	return global_position + toward.cross(Vector3.UP) * side * KEYCARD_DROP + toward * 0.5
+
+
+func _inside_room(at: Vector3) -> bool:
+	return at.x >= room_min.x and at.x <= room_max.x and at.z >= room_min.y and at.z <= room_max.y
+
+
 func _drop_keycard(at: Vector3) -> void:
 	if keycard_on_floor():
 		return
 	keycard_pickup = Node3D.new()
 	keycard_pickup.name = "StaffKeycardPickup"
 	add_child(keycard_pickup)
-	keycard_pickup.global_position = Vector3(at.x, 0.012, at.z)
+	keycard_pickup.global_position = Vector3(at.x, 0.03, at.z)
 	keycard_pickup.rotation.y = 0.6
-	_card_box(Vector3(0.13, 0.008, 0.085), Vector3.ZERO, Color("d9d1bf"), 0.6, "Card")
-	_card_box(Vector3(0.13, 0.01, 0.018), Vector3(0, 0.001, -0.022), Color("b0643a"), 1.4, "Stripe")
+	_card_box(Vector3(0.16, 0.01, 0.1), Vector3.ZERO, Color("d9d1bf"), 0.9, "Card")
+	_card_box(Vector3(0.16, 0.012, 0.022), Vector3(0, 0.001, -0.026), Color("b0643a"), 1.8, "Stripe")
 	# A small low light so the card reads on a dark floor.
 	var light := OmniLight3D.new()
 	light.name = "CardLight"
 	light.light_color = Color("e8d09a")
-	light.light_energy = 0.9
-	light.omni_range = 1.1
+	light.light_energy = 1.2
+	light.omni_range = 1.4
 	light.position = Vector3(0, 0.35, 0)
 	keycard_pickup.add_child(light)
 
@@ -750,7 +764,7 @@ func _watch_keycard() -> void:
 		return
 	var light := keycard_pickup.get_node_or_null("CardLight") as OmniLight3D
 	if light != null:
-		light.light_energy = 0.7 + 0.35 * sin(Time.get_ticks_msec() * 0.004)
+		light.light_energy = 1.0 + 0.4 * sin(Time.get_ticks_msec() * 0.004)
 
 
 func _face(toward: Vector3, weight: float) -> void:
@@ -846,7 +860,7 @@ func _set_glint(colour: Color) -> void:
 	if _glint == null and lit:
 		_glint = OmniLight3D.new()
 		_glint.name = "TelegraphGlint"
-		_glint.omni_range = 1.4
+		_glint.omni_range = 2.0
 		add_child(_glint)
 	if _glint == null:
 		return
@@ -860,9 +874,12 @@ func _set_glint(colour: Color) -> void:
 func _glow(amount: float) -> void:
 	var tool := syringe if winding == "syringe" else scalpel
 	if tool != null and _tool_glow.has(tool):
-		(_tool_glow[tool] as StandardMaterial3D).emission_energy_multiplier = 1.0 + amount * 5.0
+		(_tool_glow[tool] as StandardMaterial3D).emission_energy_multiplier = 2.0 + amount * 8.0
 	if _glint != null and _glint.visible:
-		_glint.light_energy = 0.4 + amount * 2.2
+		# A sharp flash as the wind-up starts (the glint you react to), then
+		# a steady build to the blow.
+		var flash := 4.0 * maxf(0.0, 1.0 - amount / 0.15)
+		_glint.light_energy = 0.8 + amount * 3.5 + flash
 		if tool != null:
 			_glint.global_position = tool.global_position
 
