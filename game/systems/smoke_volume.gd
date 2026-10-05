@@ -35,21 +35,23 @@ const SHADER := preload("res://shaders/smoke_parcel.gdshader")
 ## `radius` at the mouth, `density` 0-1, `heat` is buoyancy, `life` seconds,
 ## `grow` m/s of mixing, `thin` per second, `tint` the colour of it.
 const DEVICES := {
-	"cigarette": {"count": 26, "speed": 1.5, "spread": 0.10, "radius": 0.035, "density": 0.55, "heat": 0.55,
+	"cigarette": {"count": 44, "speed": 1.5, "spread": 0.08, "radius": 0.026, "density": 0.55, "heat": 0.55,
 		"life": 7.0, "grow": 0.09, "thin": 0.30, "tint": Color(0.70, 0.72, 0.74)},
-	"joint": {"count": 34, "speed": 1.3, "spread": 0.13, "radius": 0.045, "density": 0.65, "heat": 0.45,
+	"joint": {"count": 56, "speed": 1.3, "spread": 0.1, "radius": 0.032, "density": 0.65, "heat": 0.45,
 		"life": 9.0, "grow": 0.10, "thin": 0.24, "tint": Color(0.70, 0.74, 0.66)},
-	"spliff": {"count": 30, "speed": 1.35, "spread": 0.12, "radius": 0.04, "density": 0.6, "heat": 0.5,
+	"spliff": {"count": 50, "speed": 1.35, "spread": 0.09, "radius": 0.03, "density": 0.6, "heat": 0.5,
 		"life": 8.0, "grow": 0.095, "thin": 0.27, "tint": Color(0.70, 0.73, 0.68)},
 	# Vapour, not smoke: dense, white, a big soft cloud that sinks a little and
 	# is gone far faster than smoke is.
-	"vape": {"count": 60, "speed": 1.7, "spread": 0.22, "radius": 0.06, "density": 0.85, "heat": -0.08,
+	"vape": {"count": 84, "speed": 1.7, "spread": 0.22, "radius": 0.06, "density": 0.85, "heat": -0.08,
 		"life": 4.5, "grow": 0.22, "thin": 0.55, "tint": Color(0.92, 0.93, 0.95)},
 	# The bong is the one that empties a whole chest: slow, enormous, long.
-	"bong": {"count": 72, "speed": 1.0, "spread": 0.16, "radius": 0.07, "density": 0.8, "heat": 0.35,
+	"bong": {"count": 100, "speed": 1.0, "spread": 0.16, "radius": 0.07, "density": 0.8, "heat": 0.35,
 		"life": 12.0, "grow": 0.12, "thin": 0.16, "tint": Color(0.72, 0.75, 0.68)},
 }
 ## The thin stream that rises off a lit end you are not drawing on.
+## How long one breath takes to leave the mouth.
+const EXHALE_SECONDS := 0.8
 const SIDESTREAM := {"radius": 0.012, "density": 0.35, "heat": 0.9, "life": 5.0, "grow": 0.05, "thin": 0.35}
 
 ## The air, in m/s. The owner writes this from the weather.
@@ -79,6 +81,8 @@ var _grow := PackedFloat32Array()
 var _thin := PackedFloat32Array()
 var _ring := PackedFloat32Array() # 0 for a free parcel, the ring's spin speed for a ring parcel
 var _tint := PackedColorArray()
+## Breaths still leaving the mouth.
+var _streams: Array[Dictionary] = []
 ## Each obstacle: {"a": Vector3, "b": Vector3, "r": float} (a capsule a-b).
 var _obstacles: Array[Dictionary] = []
 var _ray_cursor := 0
@@ -103,6 +107,7 @@ func _ready() -> void:
 	_view.multimesh = _multimesh
 	var material := ShaderMaterial.new()
 	material.shader = SHADER
+	material.set_shader_parameter("noise_texture", _grain())
 	_view.material_override = material
 	_view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_view.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
@@ -110,6 +115,21 @@ func _ready() -> void:
 	_view.top_level = true
 	_view.custom_aabb = AABB(Vector3(-200, -50, -200), Vector3(400, 150, 400))
 	add_child(_view)
+
+
+## The grain that frays each card into wisps. Seamless, so it can scroll.
+static func _grain() -> NoiseTexture2D:
+	var noise := FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	noise.frequency = 0.035
+	noise.fractal_octaves = 4
+	var texture := NoiseTexture2D.new()
+	texture.noise = noise
+	texture.seamless = true
+	texture.width = 128
+	texture.height = 128
+	texture.generate_mipmaps = true
+	return texture
 
 
 func cap() -> int:
@@ -138,22 +158,38 @@ func set_ray_exclusions(rids: Array[RID]) -> void:
 
 ## One exhale. `breath` scales the jet (a clean draw is about 1, a big harsh
 ## one up to 1.6); `volume` scales how much smoke there is (the held draw).
+## A breath is a stream, not a burst: the parcels leave the mouth over
+## `EXHALE_SECONDS`, fast at first and slower as the breath runs out, so the
+## wind bends the stream into a curve instead of pushing one blob sideways.
+## Returns how many parcels the breath will carry.
 func exhale(device_id: String, mouth: Vector3, direction: Vector3, breath := 1.0, volume := 1.0) -> int:
 	var spec: Dictionary = DEVICES.get(device_id, DEVICES["cigarette"])
 	var forward := direction.normalized() if direction.length_squared() > 0.0001 else Vector3.FORWARD
 	var n := roundi(float(spec.count) * clampf(volume, 0.2, 2.0))
-	var made := 0
-	for index in n:
-		# The jet is a stream, not a burst: later parcels leave slower, as the
-		# breath runs out, and from a little further along the first ones' path.
-		var t := float(index) / maxf(float(n - 1), 1.0)
-		var jitter := Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * float(spec.spread)
-		var speed := float(spec.speed) * breath * lerpf(1.0, 0.35, t)
-		var velocity := (forward + jitter).normalized() * speed
-		made += _spawn(mouth + forward * 0.02 * t, velocity, float(spec.radius) * lerpf(1.0, 1.4, t),
-			float(spec.density) * clampf(volume, 0.3, 1.3), float(spec.heat), float(spec.life) * randf_range(0.8, 1.1),
-			float(spec.grow), float(spec.thin), spec.tint, 0.0)
-	return made
+	_streams.append({"spec": spec, "mouth": mouth, "forward": forward, "breath": breath,
+		"volume": volume, "total": n, "emitted": 0, "elapsed": 0.0})
+	return n
+
+
+func _emit_streams(delta: float) -> void:
+	for index in range(_streams.size() - 1, -1, -1):
+		var stream: Dictionary = _streams[index]
+		stream.elapsed = float(stream.elapsed) + delta
+		var spec: Dictionary = stream.spec
+		var total := int(stream.total)
+		var due := mini(total, ceili(float(total) * clampf(float(stream.elapsed) / EXHALE_SECONDS, 0.0, 1.0)))
+		var forward: Vector3 = stream.forward
+		while int(stream.emitted) < due:
+			var t := float(stream.emitted) / maxf(float(total - 1), 1.0)
+			var jitter := Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * float(spec.spread)
+			var speed := float(spec.speed) * float(stream.breath) * lerpf(1.0, 0.3, t)
+			var velocity := (forward + jitter).normalized() * speed
+			_spawn(stream.mouth, velocity, float(spec.radius) * lerpf(0.8, 1.3, t),
+				float(spec.density) * clampf(float(stream.volume), 0.3, 1.3), float(spec.heat), float(spec.life) * randf_range(0.8, 1.1),
+				float(spec.grow), float(spec.thin), spec.tint, 0.0)
+			stream.emitted = int(stream.emitted) + 1
+		if int(stream.emitted) >= total:
+			_streams.remove_at(index)
 
 
 ## A smoke ring: a hollow loop of parcels with a shared forward speed. It keeps
@@ -229,9 +265,20 @@ func air_at(at: Vector3) -> Vector3:
 	return wind + curl * turbulence * 0.5
 
 
+## Smoke is slow: stepping it thirty times a second looks the same as sixty
+## and costs half. The cards are still drawn every frame.
+const STEP_SECONDS := 1.0 / 30.0
+var _step_accumulator := 0.0
+
+
 func _physics_process(delta: float) -> void:
-	step(delta)
-	_draw_parcels()
+	_step_accumulator += delta
+	if _step_accumulator >= STEP_SECONDS:
+		step(_step_accumulator)
+		_step_accumulator = 0.0
+	# Drawn every physics frame, carried along its velocity since the last
+	# step, so a fast jet does not hop.
+	_draw_parcels(_step_accumulator)
 
 
 ## One simulation step. Public so a test can run the smoke without a frame.
@@ -239,6 +286,7 @@ func step(delta: float) -> void:
 	if delta <= 0.0:
 		return
 	_time += delta
+	_emit_streams(delta)
 	var index := _pos.size() - 1
 	while index >= 0:
 		_age[index] += delta
@@ -331,18 +379,45 @@ func _probe_walls(delta: float) -> void:
 		_pos[k] = (hit.position as Vector3) + normal * _radius[k] * 0.4
 
 
-func _draw_parcels() -> void:
+## One buffer upload rather than three server calls a parcel: 12 floats of
+## transform, 4 of colour, 4 of custom data, per instance.
+var _buffer := PackedFloat32Array()
+
+
+func _draw_parcels(ahead := 0.0) -> void:
 	var n := _pos.size()
-	if _multimesh.instance_count < n:
-		_multimesh.instance_count = cap()
-	_multimesh.visible_instance_count = n
+	var total := cap()
+	if _multimesh.instance_count != total:
+		_multimesh.instance_count = total
+	if _buffer.size() != total * 20:
+		_buffer.resize(total * 20)
 	for index in n:
 		var size := _radius[index] * 2.6
-		_multimesh.set_instance_transform(index, Transform3D(Basis.from_scale(Vector3.ONE * size), _pos[index]))
+		var p := _pos[index] + _vel[index] * ahead
 		var tint := _tint[index]
-		tint.a = _density[index]
-		_multimesh.set_instance_color(index, tint)
-		_multimesh.set_instance_custom_data(index, Color(fmod(float(index) * 0.618, 1.0), _age[index] / maxf(_life[index], 0.01), 0.0, 0.0))
+		var k := index * 20
+		_buffer[k] = size
+		_buffer[k + 1] = 0.0
+		_buffer[k + 2] = 0.0
+		_buffer[k + 3] = p.x
+		_buffer[k + 4] = 0.0
+		_buffer[k + 5] = size
+		_buffer[k + 6] = 0.0
+		_buffer[k + 7] = p.y
+		_buffer[k + 8] = 0.0
+		_buffer[k + 9] = 0.0
+		_buffer[k + 10] = size
+		_buffer[k + 11] = p.z
+		_buffer[k + 12] = tint.r
+		_buffer[k + 13] = tint.g
+		_buffer[k + 14] = tint.b
+		_buffer[k + 15] = _density[index]
+		_buffer[k + 16] = fmod(float(index) * 0.618, 1.0)
+		_buffer[k + 17] = _age[index] / maxf(_life[index], 0.01)
+		_buffer[k + 18] = 0.0
+		_buffer[k + 19] = 0.0
+	_multimesh.buffer = _buffer
+	_multimesh.visible_instance_count = n
 
 
 ## --- readouts for tests and the HUD -----------------------------------------
@@ -389,6 +464,7 @@ func positions() -> PackedVector3Array:
 
 
 func clear() -> void:
+	_streams.clear()
 	# Packed arrays are values: each one is cleared by name, not through a list.
 	_pos.clear()
 	_vel.clear()

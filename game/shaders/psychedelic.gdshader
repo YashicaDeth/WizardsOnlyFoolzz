@@ -198,13 +198,6 @@ void fragment() {
 		color *= 1.0 - smoothstep(1.0 / (1.0 + tunnel * 0.9) - 0.12, 1.0 / (1.0 + tunnel * 0.9), edge) * tunnel;
 	}
 
-	// 9. Darkness: a vignette that eats inward and crushes what it leaves.
-	if (darkness > 0.0) {
-		float r = length(screen * vec2(1.0, 0.8));
-		float eaten = smoothstep(1.25 - darkness * 1.05, 1.35 - darkness * 0.6, r);
-		color *= (1.0 - eaten) * (1.0 - darkness * 0.55);
-	}
-
 	// 11. Figures at the edge. Each holds its place for a few seconds, then is
 	// somewhere else; they sit only in the outer fifth of the frame, and a
 	// figure fades as the frame's middle gets closer to it.
@@ -224,6 +217,15 @@ void fragment() {
 		}
 		float periphery = smoothstep(0.35, 0.75, abs(screen.x));
 		color *= 1.0 - cover * periphery * edge_figures * 0.92;
+	}
+
+	// 9. Darkness: a vignette that eats inward and crushes what it leaves.
+	// The edge keeps a dim floor rather than going to black, because what
+	// stands at the edge (dial 11) has to have something to stand against.
+	if (darkness > 0.0) {
+		float r = length(screen * vec2(1.0, 0.8));
+		float eaten = smoothstep(1.25 - darkness * 1.05, 1.35 - darkness * 0.6, r);
+		color *= mix(1.0, 0.2, eaten) * (1.0 - darkness * 0.45);
 	}
 
 	COLOR = vec4(color, 1.0);

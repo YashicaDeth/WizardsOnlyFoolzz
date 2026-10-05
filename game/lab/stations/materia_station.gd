@@ -74,6 +74,9 @@ var lung_fill := 0.0
 var lung_stain := 0.0
 var lung_cough := 0.0
 var _lungs_show := 0.0
+var _lift := 0.0
+var _ladder_clock := 0.0
+var _ladder_altitude := 0.0
 
 # --- lost time ---
 var lost_time_events := 0
@@ -398,7 +401,7 @@ func _pose_model(to_mouth: float) -> void:
 		return
 	var rest := Vector3(0.13, -0.11, -0.3) if device_id != "bong" else Vector3(0.0, -0.42, -0.42)
 	var lips := Vector3(0.02, -0.055, -0.12) if device_id != "bong" else Vector3(0.0, -0.36, -0.2)
-	model.position = rest.lerp(lips, to_mouth)
+	model.position = rest.lerp(lips, smoothstep(0.0, 1.0, to_mouth))
 	model.rotation = Vector3(0.05, 0.35 * (1.0 - to_mouth) + 0.05, 0.0) if device_id != "bong" else Vector3.ZERO
 
 
@@ -408,11 +411,16 @@ func _process(delta: float) -> void:
 	if lab == null or lab.get("camera") == null:
 		return
 	var now := WorldClock.minutes()
-	var live: bool = not str(Materia.state(SUBJECT, now).get("class", "")).is_empty()
+	var live: bool = not str(last_state.get("class", "")).is_empty()
 	if live and clock_rate > 0.0:
 		WorldClock.advance(delta * clock_rate)
 		now = WorldClock.minutes()
-	last_state = Materia.state(SUBJECT, now)
+	# The ladder's own altitude walks the event log; twice a second is plenty.
+	_ladder_clock -= delta
+	if _ladder_clock <= 0.0:
+		_ladder_clock = 0.5
+		_ladder_altitude = PlaneLadder.altitude(SUBJECT)
+	last_state = Materia.state(SUBJECT, now, _ladder_altitude)
 
 	# The wind, from the weather station's own dial unless pinned.
 	var speed := wind_override if wind_override >= 0.0 else (float(lab.weather.wind) * wind_per_weather if lab.get("weather") != null else 0.0)
@@ -423,7 +431,11 @@ func _process(delta: float) -> void:
 	# The hand.
 	if drawing:
 		draw_held += delta
-	_pose_model(clampf(draw_held * 4.0, 0.0, 1.0) if drawing or _exhale_wait > 0.0 else 0.0)
+	# Up to the lips over half a second and back down again, eased: bringing a
+	# cigarette to your mouth should not be the jolt that knocks the ash off.
+	var lift_target := 1.0 if drawing or _exhale_wait > 0.0 else 0.0
+	_lift = move_toward(_lift, lift_target, delta * 2.2)
+	_pose_model(_lift)
 	ember.tick(delta, Smokeables.draw_heat(device_id, draw_held) if drawing else 0.0)
 	if not _pending_exhale.is_empty():
 		_exhale_wait -= delta

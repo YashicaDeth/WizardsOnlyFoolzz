@@ -259,7 +259,10 @@ static func dose(subject_id: String, class_id: String, now: float, source := "sa
 ## Every live dose at once. Returns the shader dials (strongest deviation from
 ## rest wins per dial, so two doses never stack into a broken picture), the
 ## summed feel, the altitude and the dominant class.
-static func state(subject_id: String, now: float) -> Dictionary:
+## `ladder_altitude` is `PlaneLadder.altitude()` if the caller already has it:
+## that read walks the whole event log, so a per-frame caller passes a cached
+## value instead of paying for it every frame.
+static func state(subject_id: String, now: float, ladder_altitude := -1.0) -> Dictionary:
 	var rest: Dictionary = PsychedelicRig.NEUTRAL
 	var dials: Dictionary = rest.duplicate()
 	var feel := {}
@@ -302,7 +305,7 @@ static func state(subject_id: String, now: float) -> Dictionary:
 	return {
 		"dials": dials, "feel": feel, "class": top_class, "level": top_level,
 		"phase": phase, "plane": plane, "xray_reach": xray,
-		"altitude": maxf(altitude, PlaneLadderRef.altitude(subject_id)),
+		"altitude": maxf(altitude, ladder_altitude if ladder_altitude >= 0.0 else PlaneLadderRef.altitude(subject_id)),
 		"palette": str((CLASSES.get(top_class, {}) as Dictionary).get("palette", "")),
 	}
 

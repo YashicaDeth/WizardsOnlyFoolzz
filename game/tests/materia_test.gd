@@ -147,6 +147,10 @@ func _smoke() -> void:
 	windy.wind = Vector3(2.0, 0, 0)
 	calm.exhale("cigarette", Vector3(0, 1.6, 0), Vector3.FORWARD)
 	windy.exhale("cigarette", Vector3(0, 1.6, 0), Vector3.FORWARD)
+	# The breath takes 0.8 s to leave; measure from when it has.
+	for _i in 50:
+		calm.step(1.0 / 60.0)
+		windy.step(1.0 / 60.0)
 	var density_start := calm.total_density()
 	var radius_start := calm.mean_radius()
 	for _i in 120:
@@ -263,10 +267,10 @@ func _station() -> void:
 	station.ember.ash_length = 0.02
 	await _frames(2)
 	drops = station.ember.drops
-	lab.yaw += 2.5
-	await _frames(2)
-	lab.yaw -= 2.5
-	await _frames(2)
+	# A snap of the view and back, over a few frames: the hand whips round.
+	for step_index in 8:
+		lab.yaw += 0.35 if step_index < 4 else -0.35
+		await get_tree().process_frame
 	check(station.ember.drops > drops, "long ash falls when you move hard (%s)" % station.ember.last_drop_reason)
 	await _press("reload")
 	check(station.device_id.is_empty(), "Y puts it away")

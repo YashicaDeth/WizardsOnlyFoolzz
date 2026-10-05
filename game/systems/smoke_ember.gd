@@ -36,6 +36,7 @@ const ASH_HOLD_AT_LIMIT := 9.0
 const HEAT_RISE := 5.0
 const HEAT_FALL := 1.1
 const SIDESTREAM_EVERY := 0.18
+const ACCEL_SMOOTHING := 0.05
 
 ## Dial: scale the ash's grip (higher holds longer).
 static var ash_grip := 1.0
@@ -56,6 +57,9 @@ var _column: MeshInstance3D
 var _column_mesh: CylinderMesh
 var _last_tip := Vector3.ZERO
 var _last_velocity := Vector3.ZERO
+## Acceleration, low-passed over about a twentieth of a second: a single
+## frame's jitter is not a jolt, a real snap of the wrist is.
+var _accel := Vector3.ZERO
 var _has_last := false
 var _side_clock := 0.0
 
@@ -119,13 +123,18 @@ func tick(delta: float, draw: float, light_scale := 1.0) -> void:
 	# The hand's acceleration, from the tip's own track.
 	if _has_last:
 		var velocity := (tip - _last_tip) / delta
-		var accel := (velocity - _last_velocity) / delta
+		var raw := (velocity - _last_velocity) / delta
 		_last_velocity = velocity
 		# A teleport is not a hand movement.
-		if ash_length > 0.002 and velocity.length() < 25.0 and accel.length() > hold_limit():
+		if velocity.length() > 25.0:
+			_accel = Vector3.ZERO
+		else:
+			_accel = _accel.lerp(raw, 1.0 - exp(-delta / ACCEL_SMOOTHING))
+		if ash_length > 0.002 and _accel.length() > hold_limit():
 			_drop(velocity, "moved hard")
 	else:
 		_last_velocity = Vector3.ZERO
+		_accel = Vector3.ZERO
 	_last_tip = tip
 	_has_last = true
 	if ash_length >= limit:

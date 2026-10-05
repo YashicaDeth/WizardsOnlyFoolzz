@@ -66,6 +66,8 @@ func setup(target_rig: PsychedelicRig, layer: CanvasLayer) -> void:
 
 
 func play() -> void:
+	# The sequence's own palette, whatever a dose had set before it.
+	rig.set_texture("lut_texture", Materia.palette_texture(Materia.FUN_PALETTE))
 	playing = true
 	elapsed = 0.0
 	_skip_left = -1.0
