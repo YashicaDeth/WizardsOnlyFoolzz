@@ -42,6 +42,9 @@ const CEILING := Color("100d0b")
 ## red only on danger. Shells wear the tunnel kit's grime, not flat colour.
 const LAMP_COLOR := Color("d2ecc0")
 const SURFACES := {CONCRETE: "floor", RUST: "wall", CEILING: "ceiling"}
+const ROUTE_COLOR := Color("81906f")
+const SCREEN_COLOR := Color("b8d49f")
+const DANGER_COLOR := Color("a52d20")
 
 var player: CharacterBody3D
 var camera: Camera3D
@@ -57,6 +60,7 @@ var exit_reached := false
 var embedded := false
 ## Set by tests and the playbot: a world point to walk to, sprinting.
 var bot_goal = null
+var _prop_materials := {}
 
 
 func _ready() -> void:
@@ -109,6 +113,7 @@ func _build_level_0c() -> void:
 		{"w": [[-2.5, 4.0, 3.4]], "n": [[28.0, 3.0, 3.0]]})
 	_box(Vector3(14.5, 0.4, 0.6), Vector3(28, 6.0, -48.0), RUST, false)
 	_sign("PRESSURE GATE", Vector3(28, 5.4, -47.6))
+	_build_service_arcade_dressing()
 	# Vestibule to Lift A.
 	_corridor_z(0.0, 26.5, 29.5, -60.2, -58.5, 3.0)
 
@@ -127,6 +132,7 @@ func _build_level_0d() -> void:
 	var drain_hole := Rect2() if embedded and V01_DISABLED_ROUTES_AS_SEALED else Rect2(36, -120, 2, 2)
 	_room("LOWER WORKS", -12.0, Vector2(13, 43), Vector2(-136, -66), 11.8,
 		{"s": [[28.0, 3.0, 3.0]]}, [], drain_hole, Rect2(26.2, -123.8, 3.6, 3.6))
+	_build_lower_works_dressing()
 	var heat := FacilityElevator.new()
 	heat.name = "HeatElevator"
 	heat.position = Vector3(28, 0, -122)
@@ -165,6 +171,7 @@ func _build_surface() -> void:
 	_room("SURFACE HEAD-HOUSE", SURFACE_Y, Vector2(24, 32), Vector2(-135, -123.8), 4.0,
 		{"s": [[28.0, 3.6, 4.0]], "n": [[28.0, 3.0, 3.0]]})
 	_sign("SURFACE GATE // THE ASHBLOOM", Vector3(28, SURFACE_Y + 3.4, -134.6))
+	_route_strip(Vector3(28, SURFACE_Y + 0.025, -129.4), Vector3(0.55, 0.025, 10.5))
 	_box(Vector3(30, 0.4, 20), Vector3(28, SURFACE_Y - 0.2, -145), Color("3a3026"))
 	var day := OmniLight3D.new()
 	day.light_color = Color("fff1d8")
@@ -325,8 +332,9 @@ func _room(title: String, y: float, xs: Vector2, zs: Vector2, height: float, gap
 		_wall_z(xs.y, zs, y, height, gaps.get("e", []))
 	var centre := Vector3((xs.x + xs.y) * 0.5, y, (zs.x + zs.y) * 0.5)
 	_sign(title, centre + Vector3(0, minf(height - 0.5, 3.2), 0))
-	# Lighting pools on a ~10 m grid.
-	var steps := Vector2i(maxi(1, int((xs.y - xs.x) / 10.0)), maxi(1, int((zs.y - zs.x) / 10.0)))
+	# Sparse pools on a ~16 m grid. The unlit spans matter as much as the pools,
+	# and the Lower Works stays within the forward-light budget.
+	var steps := Vector2i(maxi(1, int((xs.y - xs.x) / 16.0)), maxi(1, int((zs.y - zs.x) / 16.0)))
 	for i in steps.x:
 		for j in steps.y:
 			_lamp(Vector3(xs.x + (xs.y - xs.x) * (i + 0.5) / steps.x, y + height - 0.1, zs.x + (zs.y - zs.x) * (j + 0.5) / steps.y))
@@ -443,9 +451,165 @@ func _lamp(at: Vector3) -> void:
 	lamp.spot_angle = 52.0
 	lamp.spot_attenuation = 1.4
 	lamp.shadow_enabled = true
+	lamp.distance_fade_enabled = true
+	lamp.distance_fade_begin = 18.0
+	lamp.distance_fade_length = 8.0
 	lamp.position = at + Vector3(0, -0.08, 0)
 	lamp.rotation.x = -PI * 0.5
 	add_child(lamp)
+
+
+# --- Authored route dressing -----------------------------------------------
+
+## The arcade's thirteen structural bays are its navigational rhythm. Tanks,
+## cable trays and service monitors explain the space without adding lore.
+func _build_service_arcade_dressing() -> void:
+	_route_strip(Vector3(28, 0.025, -27.0), Vector3(0.34, 0.025, 61.0))
+	for bay in 13:
+		var z := 2.5 - bay * 4.55
+		_story_box("ArcadeFrame", Vector3(0.34, 5.4, 0.34), Vector3(22.0, 2.7, z), "frame", "service_arcade", "frame")
+		_story_box("ArcadeFrame", Vector3(0.34, 5.4, 0.34), Vector3(34.0, 2.7, z), "frame", "service_arcade", "frame")
+		_story_box("ArcadeFrame", Vector3(12.35, 0.34, 0.34), Vector3(28.0, 5.4, z), "frame", "service_arcade", "frame")
+	for z: float in [-8.5, -25.0, -41.5]:
+		_story_tank(Vector3(23.0, 1.45, z), 0.75, 2.9, "service_arcade")
+		_story_monitor(Vector3(33.9, 1.25, z - 2.2), PI * 0.5, "service_arcade", false)
+	_story_box("CableTray", Vector3(0.22, 0.16, 55.0), Vector3(33.5, 6.85, -25.5), "cable", "service_arcade", "cable")
+	_story_box("CableTray", Vector3(0.16, 0.12, 55.0), Vector3(33.15, 6.78, -25.5), "cable", "service_arcade", "cable")
+	_story_monitor(Vector3(28.0, 1.35, -46.8), 0.0, "service_arcade", true)
+	_danger_light(Vector3(28.0, 5.7, -47.0), 7.0)
+
+
+## Lower Works reads across its full height: a clear painted run to the heat
+## lift, heavy edge machinery, hanging services and one red danger landmark.
+func _build_lower_works_dressing() -> void:
+	_route_strip(Vector3(28, -11.975, -94.5), Vector3(0.48, 0.025, 55.0))
+	for z: float in [-74.0, -90.0, -106.0, -130.0]:
+		for x: float in [15.5, 40.5]:
+			_story_box("WorksColumn", Vector3(0.9, 9.5, 0.9), Vector3(x, -7.25, z), "frame", "lower_works", "frame")
+		_story_box("WorksTruss", Vector3(25.8, 0.55, 0.7), Vector3(28.0, -2.8, z), "frame", "lower_works", "frame")
+	for at: Vector3 in [Vector3(18.0, -10.1, -82.0), Vector3(38.0, -10.1, -98.0), Vector3(18.0, -10.1, -114.0)]:
+		_story_tank(at, 1.35, 3.8, "lower_works")
+	_story_box("OverheadDuct", Vector3(1.25, 1.1, 51.0), Vector3(18.0, -3.9, -95.0), "duct", "lower_works", "cable")
+	_story_box("OverheadCable", Vector3(0.24, 0.18, 49.0), Vector3(38.0, -4.8, -96.0), "cable", "lower_works", "cable")
+	_story_monitor(Vector3(24.2, -10.65, -72.0), -PI * 0.5, "lower_works", false)
+	_story_monitor(Vector3(31.8, -10.65, -116.8), PI * 0.5, "lower_works", true)
+	_danger_light(Vector3(28.0, -3.0, -119.0), 9.0)
+
+
+func _route_strip(at: Vector3, size: Vector3) -> void:
+	_story_box("RouteStripe", size, at, "route", "route", "route")
+
+
+func _story_tank(at: Vector3, radius: float, height: float, zone: String) -> void:
+	var tank := MeshInstance3D.new()
+	tank.name = "ProcessTank"
+	var cylinder := CylinderMesh.new()
+	cylinder.top_radius = radius * 0.88
+	cylinder.bottom_radius = radius
+	cylinder.height = height
+	cylinder.radial_segments = 12
+	tank.mesh = cylinder
+	tank.material_override = _prop_material("tank")
+	tank.position = at
+	_register_story_prop(tank, zone, "tank")
+	_story_box("TankBand", Vector3(radius * 2.12, 0.16, radius * 2.12), at + Vector3(0, height * 0.22, 0), "frame", zone, "tank")
+	_story_box("TankBand", Vector3(radius * 2.12, 0.16, radius * 2.12), at - Vector3(0, height * 0.22, 0), "frame", zone, "tank")
+
+
+func _story_monitor(at: Vector3, heading: float, zone: String, danger: bool) -> void:
+	var console := Node3D.new()
+	console.name = "DangerMonitor" if danger else "ServiceMonitor"
+	console.position = at
+	console.rotation.y = heading
+	add_child(console)
+	console.set_meta("facility_story_prop", "monitor")
+	console.set_meta("facility_zone", zone)
+	console.add_to_group("facility_story_props")
+	_story_box_local(console, "Console", Vector3(0.9, 1.4, 0.48), Vector3(0, 0, 0), "console")
+	_story_box_local(console, "Screen", Vector3(0.62, 0.45, 0.035), Vector3(0, 0.25, -0.26), "danger_screen" if danger else "screen")
+	_story_box_local(console, "Foot", Vector3(0.48, 0.12, 0.56), Vector3(0, -0.76, 0.02), "frame")
+
+
+func _story_box(name: String, size: Vector3, at: Vector3, material_key: String, zone: String, kind: String) -> void:
+	var mesh := MeshInstance3D.new()
+	mesh.name = name
+	var box := BoxMesh.new()
+	box.size = size
+	mesh.mesh = box
+	mesh.material_override = _prop_material(material_key)
+	mesh.position = at
+	_register_story_prop(mesh, zone, kind)
+
+
+func _story_box_local(parent: Node3D, name: String, size: Vector3, at: Vector3, material_key: String) -> void:
+	var mesh := MeshInstance3D.new()
+	mesh.name = name
+	var box := BoxMesh.new()
+	box.size = size
+	mesh.mesh = box
+	mesh.material_override = _prop_material(material_key)
+	mesh.position = at
+	parent.add_child(mesh)
+
+
+func _register_story_prop(prop: Node3D, zone: String, kind: String) -> void:
+	add_child(prop)
+	prop.set_meta("facility_story_prop", kind)
+	prop.set_meta("facility_zone", zone)
+	prop.add_to_group("facility_story_props")
+
+
+func _prop_material(key: String) -> StandardMaterial3D:
+	if _prop_materials.has(key):
+		return _prop_materials[key]
+	var material := StandardMaterial3D.new()
+	material.roughness = 0.82
+	match key:
+		"route":
+			material.albedo_color = ROUTE_COLOR
+			material.roughness = 0.62
+		"screen":
+			material.albedo_color = SCREEN_COLOR
+			material.emission_enabled = true
+			material.emission = SCREEN_COLOR
+			material.emission_energy_multiplier = 1.8
+		"danger_screen":
+			material.albedo_color = DANGER_COLOR
+			material.emission_enabled = true
+			material.emission = DANGER_COLOR
+			material.emission_energy_multiplier = 2.4
+		"cable":
+			material.albedo_color = Color("0b0c0a")
+			material.roughness = 0.72
+		"duct":
+			material.albedo_color = Color("322f2a")
+			material.metallic = 0.65
+		"tank":
+			material.albedo_color = Color("40372f")
+			material.metallic = 0.4
+		"console":
+			material.albedo_color = Color("292722")
+			material.metallic = 0.25
+		_:
+			material = TUNNEL_KIT.material("wall")
+	_prop_materials[key] = material
+	return material
+
+
+func _danger_light(at: Vector3, reach: float) -> void:
+	var light := SpotLight3D.new()
+	light.name = "DangerPool"
+	light.light_color = DANGER_COLOR
+	light.light_energy = 3.4
+	light.spot_range = reach
+	light.spot_angle = 43.0
+	light.shadow_enabled = true
+	light.distance_fade_enabled = true
+	light.distance_fade_begin = 18.0
+	light.distance_fade_length = 6.0
+	light.position = at
+	light.rotation.x = -PI * 0.5
+	add_child(light)
 
 
 func _sign(text: String, at: Vector3) -> void:
