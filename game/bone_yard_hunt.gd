@@ -710,6 +710,11 @@ var pathfinder = preload("res://systems/ashbloom_pathfinder.gd").new()
 var social_markers: Array[Node3D] = []
 var resolution_ui: Control
 var resolution_target := ""
+## Fix-58. EXECUTE is a beat now, not a teleporting death on the menu press:
+## step in, draw back, the blow, a moment over the body (`ExecutionBeat`).
+## `_pending_execution` carries the decision's record until the blow lands.
+var execution: ExecutionBeat
+var _pending_execution: Dictionary = {}
 var living_map: Control
 ## I0.1. The real index. Hunt Grounds was drawing its own text list instead.
 var world_index: Control
@@ -1051,6 +1056,11 @@ func _ready() -> void:
 	resolution_ui.selected.connect(_resolve_downed)
 	resolution_ui.cancelled.connect(_resolution_cancelled)
 	resolution_ui.voice_capture_requested.connect(_voice_capture)
+	execution = ExecutionBeat.new()
+	execution.name = "Execution"
+	add_child(execution)
+	execution.landed.connect(_execution_landed)
+	execution.finished.connect(_execution_finished)
 	living_map = LIVING_MAP.new()
 	living_map.name = "LivingMap"
 	$HUD.add_child(living_map)
@@ -1648,7 +1658,7 @@ func _register_people() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if resolution_ui.visible or kill_cam.active:
+	if resolution_ui.visible or kill_cam.active or (execution != null and execution.active):
 		return
 	if _vats_input(event):
 		get_viewport().set_input_as_handled()
@@ -1854,6 +1864,12 @@ func _unhandled_input(event: InputEvent) -> void:
 				sight.call("toggle_wizard")
 			_k_held_for = -1.0
 		return
+	# Fix-58. Square / X is USE on the pad. The Hunt reads no synthetic keys, so
+	# without this a pad player could not open the downed window at all.
+	if event is InputEventJoypadButton and event.is_action_pressed("interact"):
+		_interact()
+		get_viewport().set_input_as_handled()
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		match _action_key(event):
 			KEY_1: _equip_weapon(0)
@@ -2049,6 +2065,9 @@ func _sync_pad_combat_context() -> void:
 ## discipline layer before this is called. The Hunt consumes verbs, never
 ## button numbers, so a later discipline can remap without editing this scene.
 func _pad_combat_verb(verb: String, pressed: bool) -> void:
+	# The finisher owns the body; releases still pass so no hold is left stuck.
+	if pressed and execution != null and execution.active:
+		return
 	match verb:
 		"light":
 			# A firearm is not a second R1 trigger. The future split-hand loadout
@@ -2299,6 +2318,17 @@ func _update_carrion(delta: float) -> void:
 
 func _update_player(delta: float) -> void:
 	if player_rig.is_downed() or player_rig.anatomy.dead:
+		# Dropped mid-finisher: the beat lets go rather than dragging you.
+		if execution != null and execution.active:
+			execution.cancel()
+		return
+	# Fix-58. The finisher owns the body the way a vault does: the beat places
+	# it, the view turns onto the victim, and nothing else moves it.
+	if execution != null and execution.active:
+		player_body.velocity = Vector3.ZERO
+		player = player_body.position + Vector3.UP * 0.6
+		yaw = lerp_angle(yaw, execution.view_yaw, clampf(delta * 12.0, 0.0, 1.0))
+		pitch = lerpf(pitch, -0.42, clampf(delta * 8.0, 0.0, 1.0))
 		return
 	# AD1.2. Under scripted motion rather than normal control for the
 	# vault's short duration — the eased position itself is the whole
@@ -2826,6 +2856,8 @@ func _advance_third_person_melee(step: float) -> void:
 
 func _attack(heavy := false) -> void:
 	if resolution_ui.visible or kill_cam.active or player_rig.is_downed() or player_rig.anatomy.dead:
+		return
+	if execution != null and execution.active:
 		return
 	# No fighting while a dressing goes on (hold 4).
 	if field_meds.busy():
@@ -5321,13 +5353,17 @@ func _interact() -> void:
 		return
 	# AX3. The one entry point every registered object's offer reaches the
 	# player through, regardless of which system built the object.
+	# Fix-58. Somebody on the floor at your feet comes before the furniture: E
+	# beside a downed body near the bedroll used to sleep seven hours, and near
+	# any registered interactable it never opened the window at all.
+	var downed := _nearest_downed()
 	var interactable := _nearest_interactable()
-	if not interactable.is_empty():
+	var downed_first := not downed.is_empty() and player.distance_to(downed.node.global_position) <= DOWNED_FIRST_REACH
+	if not interactable.is_empty() and not downed_first:
 		(interactable.get("action") as Callable).call()
 		return
-	if _try_sleep_at_site():
+	if not downed_first and _try_sleep_at_site():
 		return
-	var downed := _nearest_downed()
 	if not downed.is_empty():
 		# F6.1. Raising the handheld changes E from an offer into an overwrite.
 		# The consensual resolution remains a different, plainly labelled act.
@@ -7198,6 +7234,10 @@ func _addressable_actor() -> Dictionary:
 	return _nearest_standing()
 
 
+## Within this, a downed body wins E over any interactable or the bedroll.
+const DOWNED_FIRST_REACH := 2.6
+
+
 func _nearest_downed() -> Dictionary:
 	var nearest: Dictionary = {}
 	var distance := 4.0
@@ -7322,18 +7362,19 @@ func _resolve_downed(outcome: String) -> void:
 		"at": {"x": act_at.x, "z": act_at.z},
 	}
 	if outcome == "execute":
-		var finish := _execution_target(actor)
-		actor.rig.hit(str(finish[0]), 100.0, 30.0, "puncture", str(finish[1]))
-		actor.rig.execute()
-		var snapshot: Dictionary = actor.rig.snapshot()
-		resolution_details["zone"] = finish[0]
-		resolution_details["organ"] = finish[1]
-		resolution_details["anatomy_state"] = snapshot
-		# Preserve the original chronology: the decision is the fact; death,
-		# vacancy and dropped loot are its consequences.
-		witness_ledger.record("npc_resolution", resolution_details, witnesses)
-		kill_cam.trigger(str(actor.display_name), str(finish[0]), actor.node.global_position - player, "EXECUTION / %s" % str(finish[1]).to_upper().replace("_", " "), snapshot)
-		_kill_encounter_actor(encounter_actors.find(actor), "execution")
+		# Fix-58. The decision starts the beat; the record, the kill cam and
+		# the death are written when the blow lands (`_execution_landed`), in
+		# the order they always were.
+		_pending_execution = {"actor": actor, "details": resolution_details, "witnesses": witnesses}
+		var weapon_id := str(arsenal.current_id) if arsenal != null else ""
+		if not execution.begin(player_body, actor.rig, weapon_id, _execution_target(actor)):
+			_pending_execution = {}
+			return
+		strike_windup = -1.0
+		heavy_held = -1.0
+		prompt.text = ""
+		attack_cooldown = 0.72
+		return
 	else:
 		actor.rig.spare()
 		actor.state = "recruited" if outcome == "recruit" else "spared"
@@ -7359,6 +7400,44 @@ func _resolve_downed(outcome: String) -> void:
 		_refresh_ascent_job_market()
 	prompt.text = "DISPOSITION RECORDED / " + outcome.to_upper()
 	attack_cooldown = 0.72
+
+
+## The blow of an execution landed: the resolution is recorded, the X-ray kill
+## cam plays the body as it now is, and the death goes down the one route
+## every death takes.
+func _execution_landed(report: Dictionary) -> void:
+	var pending := _pending_execution
+	_pending_execution = {}
+	if pending.is_empty():
+		return
+	var actor: Dictionary = pending.actor
+	if not encounter_actors.has(actor):
+		return
+	var details: Dictionary = pending.details
+	var snapshot: Dictionary = actor.rig.snapshot()
+	details["zone"] = str(report.zone)
+	details["organ"] = str(report.organ)
+	details["finisher"] = str(report.style)
+	details["anatomy_state"] = snapshot
+	# Preserve the original chronology: the decision is the fact; death,
+	# vacancy and dropped loot are its consequences.
+	witness_ledger.record("npc_resolution", details, pending.witnesses)
+	kill_cam.trigger(str(actor.display_name), str(report.zone), actor.node.global_position - player, "EXECUTION / %s" % str(report.organ).to_upper().replace("_", " "), snapshot)
+	_kill_encounter_actor(encounter_actors.find(actor), "execution")
+	prompt.text = "DISPOSITION RECORDED / EXECUTE"
+
+
+## The beat ended. If it ended without a blow (the body bled out first, or was
+## taken by somebody else), the decision was made for you.
+func _execution_finished(report: Dictionary) -> void:
+	player_body.velocity = Vector3.ZERO
+	player = player_body.position + Vector3.UP * 0.6
+	if not _pending_execution.is_empty():
+		_pending_execution = {}
+		if str(report.get("reason", "")) in ["died_first", "victim_gone"]:
+			prompt.text = "THEY WERE DECIDED FOR YOU."
+	if str(report.get("reason", "")) == "deadline":
+		push_warning("ExecutionBeat hit its deadline: %s" % str(report))
 
 
 ## Mercy already has one canonical production fact above: npc_resolution. Ask

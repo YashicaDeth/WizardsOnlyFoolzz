@@ -427,6 +427,9 @@ func _recover_remains(remains_id: String) -> bool:
 var arsenal: HunterArsenal
 var melee: MeleeDriver
 var cleaver_held: Node3D
+## Fix-58: the downed guard can be finished (R1 / LMB in reach) with the
+## cleaver or the ram. Before, a downed guard could only be dragged.
+var execution: ExecutionBeat
 
 func _arm_cleaver() -> void:
 	if not (VAT_REBIRTH.carries(DoctorRoute.AXE_LABEL) or VAT_REBIRTH.carries(DoctorRoute.LEGACY_AXE_LABEL)):
@@ -471,6 +474,51 @@ func _on_cleaver_struck(collider: Object, at: Vector3, direction: Vector3, packe
 	WORLD_BREAK.hit(collider, damage, "melee", at, direction, "cleaver", "melee")
 
 
+## What would finish the guard right now: the cleaver, the ram, or nothing.
+func _finisher_weapon() -> String:
+	if melee != null:
+		return "cleaver"
+	return "ram" if weapon_taken else ""
+
+
+## R1 / LMB on the downed guard within his post's reach: the finisher.
+func execute_guard() -> bool:
+	if died or guard_post == null or guard_post.guard == null:
+		return false
+	var weapon := _finisher_weapon()
+	if weapon.is_empty() or not guard_post.guard.is_downed():
+		return false
+	if guard_post._distance_to_guard(player.global_position) > FacilityGuardPost.REACH + 0.4:
+		return false
+	if execution == null:
+		execution = ExecutionBeat.new()
+		execution.name = "Execution"
+		add_child(execution)
+		execution.landed.connect(func(report: Dictionary) -> void:
+			BODY_CAM.hit(camera, float((ExecutionBeat.STYLES.get(str(report.style), {}) as Dictionary).get("kick", 0.06)))
+			guard_post.record_execution(report, "a cleaver" if str(report.style) == "cleaver" else "a breach ram")
+			post_message = "%s // %s" % [guard_post.guard_name, str(report.verb)]
+			post_message_timer = 2.0)
+	return execution.begin(player, guard_post.guard, weapon)
+
+
+## The held blade (or the ram) drawn back over him and brought down.
+func _pose_execution() -> void:
+	var held: Node3D = cleaver_held if melee != null else weapon_visual
+	if execution == null or held == null or not is_instance_valid(held):
+		return
+	if not execution.active:
+		if held.has_meta("execution_rest"):
+			held.transform = held.get_meta("execution_rest")
+			held.remove_meta("execution_rest")
+		return
+	if not held.has_meta("execution_rest"):
+		held.set_meta("execution_rest", held.transform)
+	var rest: Transform3D = held.get_meta("execution_rest")
+	var draw := execution.wind()
+	held.transform = rest.translated_local(Vector3(0, 0.14, 0.12) * draw).rotated_local(Vector3.RIGHT, 0.9 * draw)
+
+
 func _carry_add(item: Dictionary) -> void:
 	var carry := CARRY.new()
 	carry.items.append(item)
@@ -499,12 +547,21 @@ func _unhandled_input(event: InputEvent) -> void:
 	# No fighting while a dressing goes on (hold 4).
 	if meds.busy() and event is InputEventMouseButton and event.pressed:
 		return
+	# The finisher owns the body until it ends (always, by its deadline).
+	if execution != null and execution.active:
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("attack") and execute_guard():
+		get_viewport().set_input_as_handled()
+		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		yaw -= LOOK.dx(event.relative) * 0.0026
 		pitch = clampf(pitch - LOOK.dy(event.relative) * 0.0024, -1.15, 0.95)
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
+	# USE by its action, so Square / X on the pad reaches it too (the arcade
+	# reads no synthetic keys; KEY_E alone left the pad unable to use anything).
+	if event.is_action_pressed("interact"):
 		_interact()
 	# Greg, 26 September: jump and climb everywhere.
 	if JUMP_CLIMB.is_jump_key(event):
@@ -547,8 +604,14 @@ func _discharge_at_gate() -> bool:
 func _physics_process(delta: float) -> void:
 	var input := Vector3(Input.get_axis("move_left", "move_right"), 0.0, Input.get_axis("move_forward", "move_back"))
 	var direction := (Basis(Vector3.UP, yaw) * input).normalized()
+	if execution != null and execution.active:
+		# The beat places the body; the view turns onto the guard.
+		input = Vector3.ZERO
+		player.velocity = Vector3.ZERO
+		yaw = lerp_angle(yaw, execution.view_yaw, clampf(delta * 14.0, 0.0, 1.0))
+		pitch = lerpf(pitch, -0.62, clampf(delta * 14.0, 0.0, 1.0))
 	# Mid-climb the haul owns the body; the gate check below still runs.
-	if not JUMP_CLIMB.busy(player):
+	elif not JUMP_CLIMB.busy(player):
 		# Sprint here too (Greg, 26 September), and sprint + Ctrl slides.
 		var sprinting := Input.is_action_pressed("sprint")
 		var pace := 3.4 * (1.6 if sprinting else 1.0)
@@ -564,6 +627,7 @@ func _physics_process(delta: float) -> void:
 		var fall_hurt := JUMP_CLIMB.landing_damage(player)
 		if fall_hurt > 0.0:
 			blood = maxf(1.0, blood - fall_hurt)
+	_pose_execution()
 	meds.step(self, delta, func() -> void: blood = minf(100.0, blood + FIELD_MEDS.HEALS))
 	if melee != null:
 		if input.length_squared() > 0.25:
@@ -701,6 +765,10 @@ func _update_hud() -> void:
 	if weapon_taken:
 		vitals.text += "   BREACH TOOL // READY"
 	var post_prompt := guard_post.prompt_for(player.global_position, weapon_taken)
+	if execution != null and execution.active:
+		post_prompt = ""
+	elif not _finisher_weapon().is_empty() and guard_post.guard != null and guard_post.guard.is_downed() and guard_post._distance_to_guard(player.global_position) <= FacilityGuardPost.REACH + 0.4:
+		post_prompt = ("%s   //   " % post_prompt if not post_prompt.is_empty() else "") + "[LMB] EXECUTE"
 	if not _nearest_remains().is_empty() and (remains_nodes[_nearest_remains()][1] as Label3D).text != "STRIPPED":
 		post_prompt = "[E] TAKE YOUR GEAR BACK OFF YOUR OLD BODY"
 		osd.point_at((remains_nodes[_nearest_remains()][0] as Node3D).global_position + Vector3(0, 0.6, 0))

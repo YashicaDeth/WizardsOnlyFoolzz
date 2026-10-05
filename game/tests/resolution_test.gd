@@ -99,6 +99,9 @@ func _ready() -> void:
 	var loot_before: int = hunt.loose_loot.size()
 	hunt._open_resolution(doomed)
 	hunt.resolution_ui.buttons[0].pressed.emit()
+	# Fix-58: EXECUTE is a beat; run it to its blow.
+	check(hunt.execution.active and not doomed.anatomy.dead, "execute starts the finisher beat rather than killing on the press")
+	hunt.execution.complete_now()
 	check(doomed.anatomy.dead and WorldHistory.subject(doomed.subject_id).status == "dead", "execution persists death")
 	check(hunt.loose_loot.size() == loot_before + 1, "execution drops loot once")
 	check(hunt.kill_cam.active and hunt.kill_cam.anatomy_state.organs.heart.ruptured, "execution camera carries actual ruptured heart")

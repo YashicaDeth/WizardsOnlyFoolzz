@@ -327,6 +327,22 @@ func _voice_hold(holding: bool) -> void:
 func _input(event: InputEvent) -> void:
 	if not visible:
 		return
+	# Fix-58. The pad drives the form by its own actions: the Hunt reads no
+	# synthetic keys, so D-pad / stick, Cross and Circle reached nothing here
+	# and a pad player could neither choose EXECUTE nor back out.
+	if event is InputEventJoypadButton or event is InputEventJoypadMotion:
+		if event.is_action_pressed("ui_cancel"):
+			cancel_menu()
+		elif event.is_action_pressed("ui_up"):
+			buttons[(highlighted + 2) % 3].grab_focus()
+		elif event.is_action_pressed("ui_down"):
+			buttons[(highlighted + 1) % 3].grab_focus()
+		elif event.is_action_pressed("ui_accept"):
+			_choose(highlighted)
+		else:
+			return
+		get_viewport().set_input_as_handled()
+		return
 	if not (event is InputEventKey):
 		return
 	if event.keycode == KEY_V and not event.echo:
