@@ -23,6 +23,10 @@ const BAIL_ROLL_SECONDS := 0.45
 const BAIL_SECONDS := 0.85
 const DOOR_LEFT := -1
 const DOOR_RIGHT := 1
+## BaselineHuman.SEATED puts its head centre at y=1.16. Keeping the body root
+## 0.42 m below the chassis aligns that centre with VehicleInterior.EYE.y and
+## prevents the proxy from poking through the roof.
+const SEATED_BODY_Y := -0.42
 ## Visual layer for the player's own body while it is seen from outside (the
 ## entry/exit sequence and the seated driver). The first-person eyes and the
 ## cab camera skip it, so the camera never renders the inside of its own head.
@@ -489,17 +493,17 @@ func _ensure_cab() -> void:
 
 func _ensure_seat_avatar() -> void:
 	if _seat_avatar != null and is_instance_valid(_seat_avatar) and _seat_avatar.get_parent() == car:
-		_seat_avatar.position.x = -0.38 if seat_side < 0 else 0.38
+		_seat_avatar.position = Vector3(-0.38 if seat_side < 0 else 0.38, SEATED_BODY_Y, 0.15)
 		return
 	if _seat_avatar != null and is_instance_valid(_seat_avatar):
 		_seat_avatar.visible = false
 	_seat_avatar = car.get_node_or_null("PlayerSeatBody") as BaselineHuman
 	if _seat_avatar != null:
-		_seat_avatar.position.x = -0.38 if seat_side < 0 else 0.38
+		_seat_avatar.position = Vector3(-0.38 if seat_side < 0 else 0.38, SEATED_BODY_Y, 0.15)
 		return
 	_seat_avatar = BaselineHuman.new()
 	_seat_avatar.name = "PlayerSeatBody"
-	_seat_avatar.position = Vector3(-0.38 if seat_side < 0 else 0.38, -0.2, 0.15)
+	_seat_avatar.position = Vector3(-0.38 if seat_side < 0 else 0.38, SEATED_BODY_Y, 0.15)
 	car.add_child(_seat_avatar)
 	_seat_avatar.build("vehicle_player", {"seated": true, "gore": false, "blood": 4800.0})
 	_seat_avatar.visible = false

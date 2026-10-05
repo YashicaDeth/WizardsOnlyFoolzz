@@ -59,6 +59,9 @@ func _door_entry() -> void:
 	await _seconds(0.95)
 	check(driver.seated and driver.driving and driver.phase == "idle", "enter through the door sets the driver seat")
 	check(damage.door_open_amount(VehicleDriver.DOOR_LEFT) < 0.02, "the driver door closes after sitting")
+	var seated_body := car.get_node_or_null("PlayerSeatBody") as BaselineHuman
+	var seated_head := seated_body.parts.get("head") as Node3D if seated_body != null else null
+	check(seated_head != null and absf(seated_body.position.y + seated_head.position.y - VehicleInterior.EYE.y) < 0.08, "the seated body stays inside the cab at eye height")
 	Input.action_press("pad_combat_r2")
 	await _seconds(1.5)
 	Input.action_release("pad_combat_r2")

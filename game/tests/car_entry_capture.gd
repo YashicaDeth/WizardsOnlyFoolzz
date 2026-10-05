@@ -49,10 +49,10 @@ func _ready() -> void:
 	damage._detach("DoorLeft", -car.global_basis.x, (part.node as Node3D).global_position)
 	body.global_position = driver.standing_point(car, VehicleDriver.DOOR_LEFT)
 	driver.begin_entry(car, VehicleDriver.DOOR_LEFT)
-	await get_tree().create_timer(0.72).timeout
+	await get_tree().create_timer(0.58).timeout
 	proof_camera.current = true
 	await _shot("07_torn_door_climb_in")
-	await get_tree().create_timer(0.7).timeout
+	await get_tree().create_timer(0.84).timeout
 	proof_camera.current = true
 	await _shot("08_torn_door_seated")
 	get_tree().quit(0)
@@ -112,7 +112,7 @@ func _build_stage() -> void:
 	proof_camera.fov = 55.0
 	proof_camera.cull_mask &= ~(1 << (VehicleInterior.CAB_LAYER - 1))
 	add_child(proof_camera)
-	proof_camera.global_position = Vector3(-7.0, 3.0, 5.2)
+	proof_camera.global_position = Vector3(-5.5, 2.4, 3.4)
 	proof_camera.look_at(Vector3(-0.4, 0.7, 0.0))
 
 
