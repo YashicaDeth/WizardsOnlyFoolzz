@@ -62,6 +62,9 @@ var rebinding_action := ""
 ## project.godot's own bindings, captured once before any stored rebind is
 ## applied — what RESET TO DEFAULT puts back.
 var _default_binds: Dictionary = {}
+## The dummy display server cannot change modes. Keep the requested mode so
+## headless verification can still exercise the real settings path.
+var _headless_fullscreen := false
 
 var _rows: Array[Dictionary] = []
 ## Greg, 24 September: the menus match the re-animated logo. The row you're on
@@ -183,13 +186,17 @@ func _cycle_gore() -> void:
 ## changed it — a settings screen that disagrees with the window is worse than
 ## none.
 func _fullscreen() -> bool:
+	if DisplayServer.get_name() == "headless":
+		return _headless_fullscreen
 	return DisplayServer.window_get_mode() in [DisplayServer.WINDOW_MODE_FULLSCREEN, DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN]
 
 
 func _set_fullscreen(on: bool, persist := true) -> void:
 	# Headless verification has no window to resize; the preference still needs
 	# to be testable and persist without asking the dummy display server to wait.
-	if DisplayServer.get_name() != "headless":
+	if DisplayServer.get_name() == "headless":
+		_headless_fullscreen = on
+	else:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if on else DisplayServer.WINDOW_MODE_WINDOWED)
 	if persist:
 		WorldHistory.update_subject(SETTINGS_ID, {"fullscreen": on}, "screen_setting_changed")

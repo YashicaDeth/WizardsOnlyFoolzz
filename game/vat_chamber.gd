@@ -338,6 +338,7 @@ func _ready() -> void:
 		facility_map.call("attach_player", player, camera)
 		rebirth_site = RebirthSite.new()
 		add_child(rebirth_site)
+		rebirth_site.recovered.connect(_on_remains_recovered)
 		rebirth_site.setup("growing_floor", player)
 	doctor_route = DOCTOR_ROUTE.new()
 	add_child(doctor_route)
@@ -1727,6 +1728,10 @@ func _activate_field_item(_index: int) -> void:
 	# remains in the physical hands/interact verbs; inventory never invents a
 	# second activation path.
 	_close_field_inventory()
+
+
+func _on_remains_recovered(_remains_id: String, _result: Dictionary, message: String) -> void:
+	subtitle.text = message
 
 
 func _resume_from_checkpoint() -> void:
