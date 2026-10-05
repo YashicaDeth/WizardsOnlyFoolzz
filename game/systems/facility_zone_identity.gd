@@ -24,9 +24,15 @@ const TEXTURE_DIR := "res://art/textures/facility/"
 const PROP_DIR := "res://art/props/polyhaven/"
 const LAMP_COLOR := Color("d2ecc0")
 ## Dial (REMASTER_LOG imp-67): the ember glow on the Lower Works vessels. It is
-## heat, not danger: dull orange in the metal, never the danger red. 0 = off.
+## heat, not danger: copper-amber in the metal, never the danger red (the
+## first pass, b5521d, rendered as four red bars over the heat lift). 0 = off.
 const HEAT_GLOW_ENERGY := 1.4
-const HEAT_COLOR := Color("b5521d")
+const HEAT_COLOR := Color("b0782e")
+## The painted route line wears into each zone's own floor set: this much of
+## the paint colour over the floor's tint (it read as a lit debug stripe on
+## the darker tile and plate in concrete).
+const ROUTE_PAINT := 0.3
+const ROUTE_COLOR := Color("81906f")
 ## Dial: the one sign over the arcade stalls flickers. false = steady.
 const SIGN_FLICKER := true
 
@@ -114,7 +120,7 @@ func _process(delta: float) -> void:
 	for entry: Array in _flicker:
 		var level := _flicker_level(_clock)
 		(entry[0] as StandardMaterial3D).emission_energy_multiplier = 1.6 * level
-		(entry[1] as OmniLight3D).light_energy = 3.2 * level
+		(entry[1] as OmniLight3D).light_energy = 4.5 * level
 
 
 ## A tube on its way out: mostly on, a stutter every few seconds, now and
@@ -150,7 +156,10 @@ func _service_arcade() -> void:
 	var box := MeshInstance3D.new()
 	box.name = "StallLightbox"
 	var mesh := BoxMesh.new()
-	mesh.size = Vector3(0.14, 0.42, 2.2)
+	# A blank blade sign standing out from the wall over the middle stall,
+	# so it faces you down the hall from the entry (laid flat on the wall it
+	# showed only its edge from there).
+	mesh.size = Vector3(1.1, 0.5, 0.12)
 	box.mesh = mesh
 	var glow := StandardMaterial3D.new()
 	glow.albedo_color = Color("2a3326")
@@ -158,15 +167,15 @@ func _service_arcade() -> void:
 	glow.emission = LAMP_COLOR
 	glow.emission_energy_multiplier = 1.6
 	box.material_override = glow
-	box.position = Vector3(21.0, 2.8, -17.95)
+	box.position = Vector3(21.65, 3.0, -17.95)
 	_register(box, "service_arcade", "landmark")
 	var spill := OmniLight3D.new()
 	spill.name = "LightboxSpill"
 	spill.light_color = LAMP_COLOR
-	spill.light_energy = 3.2
-	spill.omni_range = 8.0
+	spill.light_energy = 4.5
+	spill.omni_range = 9.0
 	spill.omni_attenuation = 1.0
-	spill.position = Vector3(21.9, 2.6, -17.95)
+	spill.position = Vector3(22.6, 2.7, -17.95)
 	add_child(spill)
 	if SIGN_FLICKER:
 		_flicker.append([glow, spill])
@@ -238,7 +247,7 @@ func _heat_lift() -> void:
 	slat_hot.albedo_color = Color("1a0d08")
 	slat_hot.emission_enabled = true
 	slat_hot.emission = HEAT_COLOR
-	slat_hot.emission_energy_multiplier = maxf(HEAT_GLOW_ENERGY, 0.3) * 0.8
+	slat_hot.emission_energy_multiplier = maxf(HEAT_GLOW_ENERGY, 0.3) * 0.5
 	var frame := surface_material("MetalPlates011", Color("6a5446"))
 	for row in 4:
 		var slat := MeshInstance3D.new()
@@ -303,18 +312,31 @@ func _reskin(facility: Node3D) -> void:
 	for lift: Node3D in facility.get("lifts").values():
 		var zone := "heat_lift" if lift.name == "HeatElevator" else "transit_lift"
 		for body in lift.get_children():
-			if body is StaticBody3D:
+			# The moving car keeps the kit's local-triplanar steel: a world-
+			# triplanar zone set would swim over it as it rides.
+			if body is StaticBody3D and body != lift.get("cab"):
 				for part in body.get_children():
 					if part is MeshInstance3D:
 						walls[part] = zone
 	for mesh: MeshInstance3D in facility.find_children("*", "MeshInstance3D", true, false):
-		if mesh.is_in_group("facility_story_props") or mesh.get_parent().is_in_group("facility_story_props"):
+		var is_route: bool = mesh.get_meta("facility_story_prop", "") == "route"
+		if not is_route and (mesh.is_in_group("facility_story_props") or mesh.get_parent().is_in_group("facility_story_props")):
 			continue
 		var zone := ""
 		var surface := ""
 		if walls.has(mesh):
 			zone = walls[mesh]
 			surface = "wall"
+		elif mesh.get_meta("facility_story_prop", "") == "route":
+			zone = zone_at(mesh.global_position)
+			# The line runs on past the halls into the lift mouths: it is the
+			# hall's paint, so it wears the hall's floor on that level.
+			if zone == "" or not SURFACES[zone].has("floor"):
+				zone = "lower_works" if mesh.global_position.y < -1.0 else "service_arcade"
+			if mesh.global_position.y < 18.0:
+				var floor_set: Array = SURFACES[zone]["floor"]
+				mesh.material_override = surface_material(floor_set[0], (floor_set[1] as Color).lerp(ROUTE_COLOR, ROUTE_PAINT))
+			continue
 		elif kit.has(mesh.material_override):
 			surface = kit[mesh.material_override]
 			zone = zone_at(mesh.global_position)

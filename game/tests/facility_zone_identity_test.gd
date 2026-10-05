@@ -57,10 +57,22 @@ func _ready() -> void:
 		return ["drums", "crates", "pipes", "vent", "junction"].has(str(p.get_meta("facility_story_prop", ""))) \
 			and ["service_arcade", "lower_works"].has(str(p.get_meta("facility_zone", ""))))
 	check(generic.is_empty(), "the shared kit wall clutter is replaced by each hall's own set (%d left)" % generic.size())
+	# The arcade's landmark is its stalls: no Lower Works vessel stands in front.
+	var arcade_tanks := get_tree().get_nodes_in_group("facility_story_props").filter(func(p: Node) -> bool:
+		return p.name.begins_with("ProcessTank") and p.get_meta("facility_zone", "") == "service_arcade")
+	check(arcade_tanks.is_empty(), "the arcade keeps its vessels out of the stall sightline (%d)" % arcade_tanks.size())
+	# The route paint wears into each hall's own floor, not the kit concrete
+	# (the surface head-house is not a facility zone and keeps it).
+	var stripes := get_tree().get_nodes_in_group("facility_story_props").filter(func(p: Node) -> bool:
+		return p.get_meta("facility_story_prop", "") == "route" and (p as Node3D).global_position.y < 18.0)
+	var on_own_floor := stripes.filter(func(p: Node) -> bool:
+		var m := (p as MeshInstance3D).material_override as StandardMaterial3D
+		return m != null and m.albedo_texture != null and m.albedo_texture.resource_path.contains("/textures/facility/"))
+	check(stripes.is_empty() or on_own_floor.size() == stripes.size(), "the route paint wears each zone's floor (%d of %d)" % [on_own_floor.size(), stripes.size()])
 	# Red only on danger: nothing this pass lights is red.
 	var reds := 0
 	for light: Light3D in facility.identity.find_children("*", "Light3D", true, false):
-		if light.light_color.r > 0.5 and light.light_color.g < 0.25:
+		if light.light_color.r > 0.5 and light.light_color.g < 0.4:
 			reds += 1
 	check(reds == 0, "no zone light is danger red")
 	check(IDENTITY._flicker_level(5.4) < 0.2 and IDENTITY._flicker_level(1.0) > 0.8, "the stall sign fails and recovers")

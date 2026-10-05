@@ -576,7 +576,10 @@ func _build_service_arcade_dressing() -> void:
 		_story_box("ArcadeFrame", Vector3(0.34, 5.4, 0.34), Vector3(34.0, 2.7, z), "frame", "service_arcade", "frame")
 		_story_box("ArcadeFrame", Vector3(12.35, 0.34, 0.34), Vector3(28.0, 5.4, z), "frame", "service_arcade", "frame")
 	for z: float in [-8.5, -25.0, -41.5]:
-		_story_tank(Vector3(23.0, 1.45, z), 0.75, 2.9, "service_arcade")
+		# Zone identity: vessels are the Lower Works' own; here the stalls
+		# are the landmark, and the first tank stood in front of them.
+		if identity == null:
+			_story_tank(Vector3(23.0, 1.45, z), 0.75, 2.9, "service_arcade")
 		_story_monitor(Vector3(33.9, 1.25, z - 2.2), PI * 0.5, "service_arcade", false)
 	_story_box("CableTray", Vector3(0.22, 0.16, 55.0), Vector3(33.5, 6.85, -25.5), "cable", "service_arcade", "cable")
 	_story_box("CableTray", Vector3(0.16, 0.12, 55.0), Vector3(33.15, 6.78, -25.5), "cable", "service_arcade", "cable")
