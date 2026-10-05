@@ -18,6 +18,9 @@ func _ready() -> void:
 		if argument.begins_with("--shots="):
 			shots = argument.trim_prefix("--shots=")
 	DirAccess.make_dir_recursive_absolute(shots)
+	# Measure the frame, not the monitor's refresh.
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+	Engine.max_fps = 0
 	lab = load("res://lab/mechanics_lab.tscn").instantiate()
 	add_child(lab)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -31,10 +34,17 @@ func _ready() -> void:
 	var suv: RigidBody3D = pad.cars[1]
 	var damage := car.get_node("Damage") as VehicleDamage
 	await _shot_car("1_before", car)
+	# The lab standing still, for comparison with the runs.
+	await _until(func() -> bool: return false, 2.0)
+	var idle := _fps.duplicate()
+	_fps.clear()
 
 	# Into the concrete wall, full throttle from the pad.
 	car.enabled = true
 	car.throttle = 1.0
+	# The pad is 13 m from the wall: arrive at 15 m/s (54 km/h), as from a
+	# lap of the yard, so the hit is past steel's ram tier.
+	car.linear_velocity = -car.global_basis.z * 15.0
 	await _until(func() -> bool: return damage.hits > 0, 5.0)
 	car.throttle = 0.0
 	await _seconds(1.5)
@@ -49,9 +59,9 @@ func _ready() -> void:
 	await _seconds(0.3)
 	suv.enabled = true
 	suv.throttle = 1.0
+	suv.linear_velocity = -suv.global_basis.z * 15.0
 	var before := damage.hits
 	await _until(func() -> bool: return damage.hits > before, 5.0)
-	print("VEHICLE_PAD_CAPTURE suv from ", start, " now ", suv.global_position, " speed ", suv.signed_speed, " car at ", car.global_position)
 	suv.throttle = 0.0
 	await _seconds(1.5)
 	suv.enabled = false
@@ -64,8 +74,12 @@ func _ready() -> void:
 	for value in _fps:
 		mean += value
 	mean /= maxf(1.0, float(_fps.size()))
-	var text := "adapter %s\nfps over both runs: mean %.0f, min %.0f (%d samples)\ncar after: %s\nsuv after: %s\n" % [
-		RenderingServer.get_video_adapter_name(), mean, low, _fps.size(), report, (suv.get_node("Damage") as VehicleDamage).report()]
+	var idle_mean := 0.0
+	for value in idle:
+		idle_mean += value
+	idle_mean /= maxf(1.0, float(idle.size()))
+	var text := "adapter %s\nfps idle (cars parked): mean %.0f\nfps over both runs: mean %.0f, min %.0f (%d samples)\ncar after: %s\nsuv after: %s\n" % [
+		RenderingServer.get_video_adapter_name(), idle_mean, mean, low, _fps.size(), report, (suv.get_node("Damage") as VehicleDamage).report()]
 	var file := FileAccess.open("%s/fps.txt" % shots, FileAccess.WRITE)
 	if file != null:
 		file.store_string(text)
@@ -81,12 +95,12 @@ func _until(done: Callable, limit: float) -> void:
 		_fps.append(Engine.get_frames_per_second())
 
 
-## From the car's front-right quarter, where the nose and the right side show.
+## From the car's front-left quarter: the nose and the driver's side.
 func _shot_car(label: String, car: RigidBody3D) -> void:
 	var basis := car.global_basis
 	var flat_x := basis.x.slide(Vector3.UP).normalized()
 	var flat_z := basis.z.slide(Vector3.UP).normalized()
-	await _shot(label, car.global_position + flat_x * 4.2 - flat_z * 4.6 + Vector3.UP * 2.0, car.global_position + Vector3.UP * 0.1)
+	await _shot(label, car.global_position + -flat_x * 4.6 - flat_z * 2.6 + Vector3.UP * 1.8, car.global_position + Vector3.UP * 0.1)
 
 
 func _shot(label: String, from: Vector3, at: Vector3) -> void:

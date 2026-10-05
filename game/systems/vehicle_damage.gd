@@ -55,6 +55,8 @@ const DENT_THRESHOLD := 3.0
 ## the body can travel from where it was built.
 const DENT_PER_MS := 0.045
 const MAX_CRUSH := 0.6
+## Sideways crumple, as a share of how far a point was pushed in.
+const WRINKLE := 0.35
 ## A part within this many metres of the dent's edge shares the blow.
 const PART_REACH := 0.9
 ## Part hp lost per m/s past the threshold at the middle of the blow.
@@ -77,6 +79,8 @@ var parts: Dictionary = {}
 var detached: Array[String] = []
 var max_crush := 0.0
 var hits := 0
+## Slowest crumple pass so far (one impact), for the frame budget.
+var dent_usec_max := 0
 var driver: BaselineHuman
 var _meshes: Array[Dictionary] = []
 var _steam: CPUParticles3D
@@ -165,7 +169,7 @@ func _bolt_on(shell: Node3D, box: AABB) -> void:
 		parts["Wheel%d" % WHEELS[wheel_name]] = {"node": wheel, "material": "steel_sheet", "hp": 45.0, "mass": 22.0, "wheel": WHEELS[wheel_name]}
 	for node in shell.find_children("*", "MeshInstance3D", true, false):
 		if not str(node.name).begins_with("wheel"):
-			_track_mesh(node as MeshInstance3D)
+			_track_mesh(node as MeshInstance3D, true)
 
 
 func _part(part_name: String, scene: PackedScene, at: Vector3, turn: Vector3, size: Vector3, material: String, hp: float, kilos: float) -> void:
@@ -231,18 +235,63 @@ func _windscreen(shell: Node3D, box: AABB, hood_y: float) -> void:
 
 ## A private, editable copy of a mesh: its rest positions kept so a dent is
 ## always measured from how the car was built.
-func _track_mesh(mi: MeshInstance3D) -> void:
+## `finer` splits every triangle in four first: the kit's body is a few
+## hundred faces, too coarse for a crease to show.
+func _track_mesh(mi: MeshInstance3D, finer := false) -> void:
 	var source := mi.mesh
 	var copy := ArrayMesh.new()
 	var entry := {"mi": mi, "mesh": copy, "arrays": [], "rest": [], "materials": []}
 	for index in source.get_surface_count():
 		var arrays := source.surface_get_arrays(index)
+		if finer:
+			arrays = _split_in_four(arrays)
 		copy.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 		copy.surface_set_material(index, source.surface_get_material(index))
 		entry.arrays.append(arrays)
 		entry.rest.append((arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).duplicate())
 	mi.mesh = copy
 	_meshes.append(entry)
+
+
+## One midpoint subdivision, unindexed. Positions, normals and UVs only; a
+## shared edge gets the same midpoint from both sides, so no cracks open.
+static func _split_in_four(arrays: Array) -> Array:
+	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV] if arrays[Mesh.ARRAY_TEX_UV] != null else PackedVector2Array()
+	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+	if indices.is_empty():
+		for i in verts.size():
+			indices.append(i)
+	var out_v := PackedVector3Array()
+	var out_n := PackedVector3Array()
+	var out_uv := PackedVector2Array()
+	for t in range(0, indices.size() - 2, 3):
+		var corner := [indices[t], indices[t + 1], indices[t + 2]]
+		var v := [verts[corner[0]], verts[corner[1]], verts[corner[2]]]
+		var n := [normals[corner[0]], normals[corner[1]], normals[corner[2]]]
+		var v_mid := [(v[0] + v[1]) * 0.5, (v[1] + v[2]) * 0.5, (v[2] + v[0]) * 0.5]
+		var n_mid := [(n[0] + n[1]).normalized(), (n[1] + n[2]).normalized(), (n[2] + n[0]).normalized()]
+		var faces := [[0, 3, 5], [3, 1, 4], [5, 4, 2], [3, 4, 5]]
+		var all_v: Array = v + v_mid
+		var all_n: Array = n + n_mid
+		var all_uv: Array = []
+		if not uvs.is_empty():
+			var u := [uvs[corner[0]], uvs[corner[1]], uvs[corner[2]]]
+			all_uv = u + [(u[0] + u[1]) * 0.5, (u[1] + u[2]) * 0.5, (u[2] + u[0]) * 0.5]
+		for face in faces:
+			for k in face:
+				out_v.append(all_v[k])
+				out_n.append(all_n[k])
+				if not all_uv.is_empty():
+					out_uv.append(all_uv[k])
+	var result := []
+	result.resize(Mesh.ARRAY_MAX)
+	result[Mesh.ARRAY_VERTEX] = out_v
+	result[Mesh.ARRAY_NORMAL] = out_n
+	if not out_uv.is_empty():
+		result[Mesh.ARRAY_TEX_UV] = out_uv
+	return result
 
 
 func _seat_driver(seed_value: int) -> void:
@@ -257,22 +306,22 @@ func _ready() -> void:
 	_steam = CPUParticles3D.new()
 	_steam.name = "RadiatorSteam"
 	_steam.emitting = false
-	_steam.amount = 24
+	_steam.amount = 16
 	_steam.lifetime = 1.4
 	_steam.direction = Vector3.UP
 	_steam.spread = 25.0
 	_steam.initial_velocity_min = 1.0
 	_steam.initial_velocity_max = 2.2
 	_steam.gravity = Vector3(0, 0.6, 0)
-	_steam.scale_amount_min = 0.25
-	_steam.scale_amount_max = 0.6
+	_steam.scale_amount_min = 0.15
+	_steam.scale_amount_max = 0.4
 	var puff := SphereMesh.new()
-	puff.radius = 0.2
-	puff.height = 0.4
+	puff.radius = 0.16
+	puff.height = 0.32
 	var haze := StandardMaterial3D.new()
 	haze.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	haze.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	haze.albedo_color = Color(0.78, 0.76, 0.7, 0.18)
+	haze.albedo_color = Color(0.72, 0.7, 0.66, 0.08)
 	puff.material = haze
 	_steam.mesh = puff
 	if _driver_seed >= 0:
@@ -327,7 +376,7 @@ func hit(at: Vector3, push: Vector3, speed: float, source := "vehicle", params :
 	hits += 1
 	var local := car.to_local(at)
 	var inward := (car.global_basis.inverse() * push).normalized()
-	var radius := 0.5 + over * 0.04
+	var radius := 0.8 + over * 0.05
 	result.dent = _dent(local, inward, minf(over * DENT_PER_MS * crumple, MAX_CRUSH), radius)
 	for part_name in parts.keys():
 		var part: Dictionary = parts[part_name]
@@ -357,6 +406,7 @@ func strike(at: Vector3, direction: Vector3) -> Dictionary:
 
 
 func _dent(local: Vector3, inward: Vector3, depth: float, radius: float) -> float:
+	var started := Time.get_ticks_usec()
 	var deepest := 0.0
 	var car_inverse := car.global_transform.affine_inverse()
 	for entry in _meshes:
@@ -378,11 +428,23 @@ func _dent(local: Vector3, inward: Vector3, depth: float, radius: float) -> floa
 			moved.resize(verts.size())
 			var any := false
 			for i in verts.size():
-				var distance := verts[i].distance_to(p)
-				if distance >= reach:
+				# A crush plane, not a point push: everything standing out past
+				# `depth` behind the contact is folded back to it, the way a
+				# wall flattens a nose, fading out sideways across `reach`.
+				var rel := verts[i] - p
+				var along := rel.dot(-dir)
+				var lateral := (rel + dir * along).length()
+				if lateral >= reach:
 					continue
-				var falloff := 1.0 - distance / reach
-				var v := verts[i] + dir * depth * unit * falloff * falloff
+				var side := lateral / reach
+				var push := along + depth * unit * (1.0 - side * side)
+				if push <= 0.0:
+					continue
+				# Wrinkles: a sideways kick keyed on where the vertex was built,
+				# so split (flat-shaded) copies of one corner move together.
+				var key := rest[i].snapped(Vector3.ONE * 0.001)
+				var wrinkle := Vector3(sin(key.x * 91.7 + key.z * 37.1), sin(key.y * 53.3 + key.x * 17.9), sin(key.z * 71.3 + key.y * 29.3))
+				var v := verts[i] + dir * push + wrinkle.slide(dir) * push * WRINKLE
 				var offset := v - rest[i]
 				if offset.length() > cap:
 					v = rest[i] + offset.normalized() * cap
@@ -405,6 +467,7 @@ func _dent(local: Vector3, inward: Vector3, depth: float, radius: float) -> floa
 				mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, entry.arrays[surface])
 				mesh.surface_set_material(surface, materials[surface])
 	max_crush = maxf(max_crush, deepest)
+	dent_usec_max = maxi(dent_usec_max, Time.get_ticks_usec() - started)
 	return deepest
 
 
@@ -501,5 +564,5 @@ func _hurt_driver(at: Vector3, push: Vector3, over: float, local: Vector3) -> vo
 
 ## Everything a test or a HUD wants in one place.
 func report() -> Dictionary:
-	return {"engine": engine, "max_crush": max_crush, "detached": detached.duplicate(), "hits": hits,
+	return {"engine": engine, "max_crush": max_crush, "detached": detached.duplicate(), "hits": hits, "dent_usec_max": dent_usec_max,
 		"wheels_lost": (car.wheel_lost as Array).count(true) if car != null else 0}
