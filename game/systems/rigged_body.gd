@@ -238,6 +238,8 @@ static var _flesh_materials: Dictionary = {}
 var _pristine_tint: Dictionary = {}
 ## See `wear_kit`.
 var kit: Dictionary = {}
+var _look_cache: Dictionary = {}
+var _last_waist: Array = []
 
 var _back_local: Dictionary = {}
 var _hidden: Dictionary = {}
@@ -313,9 +315,11 @@ func build(host: BaselineHuman) -> bool:
 		triangles_by_zone[zone] = 0
 		modes[zone] = ""
 		_hidden[zone] = {}
-	var sources: Array[MeshInstance3D] = _human_sources(source) if HUMAN_SKIN else []
+	var sources: Array[MeshInstance3D] = []
+	if HUMAN_SKIN:
+		sources = _human_sources(source)
 	if sources.is_empty():
-		sources = [source]
+		sources.append(source)
 	else:
 		source.get_parent().remove_child(source)
 		source.queue_free()
@@ -939,13 +943,19 @@ func in_skin_mode(zone: String) -> bool:
 
 
 func _zones() -> void:
+	var waist_changed := false
+	if not human.is_empty():
+		var waist := _waist()
+		waist_changed = waist != _last_waist
+		_last_waist = waist
 	for zone: String in ZONES:
 		var skin_mode := in_skin_mode(zone)
 		var part := body.parts.get(zone) as MeshInstance3D
 		var shown := skin_mode and part != null and is_instance_valid(part) and part.visible
 		_shown[zone] = skin_mode
-		var material: Material = _skin_material(zone, part) if shown else null
-		var tone := _tone_for(material, zone, part) if shown else Color.WHITE
+		var look: Array = _zone_look(zone, part) if shown else [null, null, null, Color.WHITE]
+		var material: Material = look[2]
+		var tone: Color = look[3]
 		for instance: MeshInstance3D in zone_meshes[zone]:
 			if instance.visible != shown:
 				instance.visible = shown
@@ -953,9 +963,7 @@ func _zones() -> void:
 				continue
 			if instance.material_override != material:
 				instance.material_override = material
-			if material is ShaderMaterial and instance.get_meta("skin_tone", Color.BLACK) != tone:
-				_tone(instance, tone)
-			elif material is ShaderMaterial and instance.get_meta("waist", []) != _waist():
+			if material is ShaderMaterial and (waist_changed or instance.get_meta("skin_tone", Color.BLACK) != tone):
 				_tone(instance, tone)
 		if part != null and is_instance_valid(part):
 			if skin_mode:
@@ -1012,6 +1020,21 @@ func _skin_material(zone: String, part: MeshInstance3D) -> Material:
 func _garment_plain(part: MeshInstance3D) -> Material:
 	var garment := part.get_node_or_null("Garment") as GeometryInstance3D
 	return garment.material_override if garment != null else null
+
+
+## [flesh material, garment material, skin material, tone] for a zone, worked
+## out again only when BaselineHuman has swapped either material in (every
+## blow, stain or re-dress makes new ones): this runs every few frames for
+## every body on screen.
+func _zone_look(zone: String, part: MeshInstance3D) -> Array:
+	var garment := _garment_plain(part)
+	var cached: Array = _look_cache.get(zone, [])
+	if not cached.is_empty() and cached[0] == part.material_override and cached[1] == garment:
+		return cached
+	var material := _skin_material(zone, part)
+	var look := [part.material_override, garment, material, _tone_for(material, zone, part)]
+	_look_cache[zone] = look
+	return look
 
 
 ## The per-instance colour a human skin material wears: the flesh tone under
@@ -1114,8 +1137,7 @@ func _tone(instance: GeometryInstance3D, tone: Color) -> void:
 	instance.set_instance_shader_parameter("seed", float(absi(hash(body.subject_id)) % 997) * 0.37)
 	if instance.material_override == _flesh_materials.get("cloth_" + human):
 		instance.set_instance_shader_parameter("cloth_colour", tone)
-		var waist := _waist()
-		instance.set_meta("waist", waist)
+		var waist := _last_waist if not _last_waist.is_empty() else _waist()
 		instance.set_instance_shader_parameter("upper_colour", waist[0])
 		instance.set_instance_shader_parameter("lower_colour", waist[1])
 		for key: String in ["vest_colour", "plate_colour", "belt_colour"]:

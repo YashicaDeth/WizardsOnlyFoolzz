@@ -1,10 +1,10 @@
 extends Node3D
 
 ## imp-60 (Greg, 5 Oct ~19:00: "improve the bodies further (checker skin,
-## helmet heads, hunched idle, ankle gaps)"). The four rigged people of the
-## first thirty minutes, built the way the game builds them, in one dim room:
-## the player base, a numbered guard, a freed subject and the examiner. Each
-## is shot from the front, the side and close on the face.
+## helmet heads, hunched idle, ankle gaps)"). The rigged people of the first
+## thirty minutes, built the way the game builds them, in one dim room: the
+## player base (bare, then dressed), a numbered guard, a freed subject and the
+## examiner. Each is shot from the front, the side and close on the face.
 ## Run windowed: render_one.cmd body_look_capture --out=DIR
 
 const GUARD := preload("res://systems/v01_guard.gd")
@@ -24,12 +24,13 @@ func _ready() -> void:
 	WorldHistory.clear_history()
 	_build_room()
 	var people := {
+		"player_base": _player_base(),
 		"player": _player(),
 		"guard": _guard(),
 		"freed_subject": _freed(),
 		"examiner": _examiner(),
 	}
-	var x := -2.4
+	var x := -3.2
 	for key: String in people:
 		var holder := people[key] as Node3D
 		holder.position = Vector3(x, 0, 0)
@@ -44,6 +45,29 @@ func _ready() -> void:
 	for _frame in 90:
 		await get_tree().process_frame
 	_shoot_at(Vector3(0, 1.0, 7.0), Vector3(0, 0.9, 0), 45.0)
+	# Two seconds of the whole line-up on screen, for the frame rate, uncapped.
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+	Engine.max_fps = 0
+	for _settle in 30:
+		await get_tree().process_frame
+	var viewport_rid := get_viewport().get_viewport_rid()
+	RenderingServer.viewport_set_measure_render_time(viewport_rid, true)
+	var started := Time.get_ticks_msec()
+	var frames := 0
+	var process_ms := 0.0
+	var render_cpu_ms := 0.0
+	var render_gpu_ms := 0.0
+	while Time.get_ticks_msec() - started < 2000:
+		await get_tree().process_frame
+		frames += 1
+		process_ms += Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
+		render_cpu_ms += RenderingServer.viewport_get_measured_render_time_cpu(viewport_rid) + RenderingServer.get_frame_setup_time_cpu()
+		render_gpu_ms += RenderingServer.viewport_get_measured_render_time_gpu(viewport_rid)
+	var fps_line := "BODY_LOOK_FPS %.1f (%d people on screen, vsync mode %d) process %.2f ms, render cpu %.2f ms, gpu %.2f ms" % [frames * 1000.0 / float(Time.get_ticks_msec() - started), people.size(), DisplayServer.window_get_vsync_mode(), process_ms / frames, render_cpu_ms / frames, render_gpu_ms / frames]
+	print(fps_line)
+	var fps_file := FileAccess.open(out_dir + "/fps.txt", FileAccess.WRITE)
+	if fps_file != null:
+		fps_file.store_line(fps_line)
 	await _capture("lineup_front")
 	for key: String in people:
 		# Alone, so the side shot is not taken from inside a neighbour.
@@ -95,6 +119,18 @@ func _build_room() -> void:
 	fill.omni_range = 9.0
 	fill.position = Vector3(-3.0, 1.2, 3.5)
 	add_child(fill)
+
+
+## The player's base body before anything is put on it: the face the jester
+## cap hides in the dressed shots.
+func _player_base() -> Node3D:
+	var holder := Node3D.new()
+	add_child(holder)
+	var rig := BaselineHuman.new()
+	rig.name = "PlayerBase"
+	holder.add_child(rig)
+	rig.build("player", BaselineHuman.config_from_subject({}).merged({"rigged": true, "gore": true}, true))
+	return holder
 
 
 ## As bone_yard_hunt builds the player: their papers, the forced rig, the outfit.
