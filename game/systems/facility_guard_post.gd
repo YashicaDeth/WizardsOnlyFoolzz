@@ -374,6 +374,21 @@ func _after_blow(event_id: String, weapon: String) -> void:
 		_say("%s: \"Hh--\"" % guard_name, 1.0)
 
 
+## Fix-58. He was on the floor and the player finished him (`ExecutionBeat`).
+## Same history shape as a blow that kills, plus the act itself.
+func record_execution(report: Dictionary, weapon: String) -> void:
+	WorldHistory.record_event("facility_guard_executed", {
+		"subject_id": guard_id, "finisher": str(report.get("style", "")),
+		"zone": str(report.get("zone", "")), "organ": str(report.get("organ", "")),
+	})
+	coerced = false
+	WorldHistory.amend_subject(guard_id, {
+		"status": "dead", "anatomy_state": guard.anatomy.snapshot(),
+		"memory": "Finished on the floor at his own door by a decanted subject with %s." % weapon,
+	})
+	_say("")
+
+
 ## E. One press, one act, in the order the situation asks for it.
 func interact(player_position: Vector3, holding_ram: bool, arsenal: Node = null) -> String:
 	if guard == null or _distance_to_guard(player_position) > REACH:
