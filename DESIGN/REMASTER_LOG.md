@@ -264,3 +264,15 @@ Defaults set behind dials, all in `OrganSystem` unless named. None of these is G
   1. Queued `remaster-job7-p1` (70, claude) to make the sigil a dark pooled blood decal, swap the floating label for an in-reach prompt (or a dial that defaults to off), and re-render it in facility light.
   2. job6 must fix the examiner-office overlay blur and use the low-poly base for the examiner, not the Higgsfield skin (carried; it's running now).
   3. Render the fix-56 ADS capture, and get a real-GPU fps number for lab-46/47/48 (carried).
+
+## Manager notes, 2026-10-05 23:10
+
+- **Merged since 21:08:** nothing (76f8f0c1 is only a brief tweak).
+- **job6 built but did not land:** hub/job6-the-examiner has the finished boss (d212548a, 448141ec), but its merge into claude/launch-latest conflicted, and the hub put the full job back in pending to be rebuilt. I moved that rebuild to `queue/held/job6-the-examiner.md` and queued `land-job6-examiner` (priority 101, claude): merge the base into the kept branch, resolve the conflicts, rerun the gate, and render once. The builder's own notes say his head still reads as stacked boxes (a placeholder until Greg draws him), there's no fps number yet, and `blood_pool.gd` prints "cast a freed object" when a second test world loads.
+- **Priority order was broken:** imp-64/67/60/68 (98-95) were outranking job6 (94) and job9 (93), and those four are now running on claude-default and claude-alt. Pending headers are now job9 99; imp-61 90, 62 89, 63 88, 66 87, 65 86; art-69 85, art-49 84; v02-51 dropped to 40 (backlog).
+- **Rendering:** skipped. Nothing new merged, and every Claude slot is building.
+- **Failures:** job6, a merge conflict (see above). job2, job2b and lane-exit-routes are old.
+- **Top three:**
+  1. Land job6 (queued, 101).
+  2. job9 enemies next (99).
+  3. Render the fix-56 ADS capture, and get a real-GPU fps number for lab-46/47/48 and for job6 (carried).
