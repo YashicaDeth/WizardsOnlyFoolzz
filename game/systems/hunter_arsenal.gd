@@ -710,7 +710,7 @@ func apply_grip(grip_name: String) -> bool:
 ## parented to that arm inherits the pitch a second time unless it is cancelled;
 ## read from the constant rather than copied, so retuning the pose does not
 ## quietly lay the blade down across the view again.
-func _build_weapon_model(weapon_id: String) -> Node3D:
+static func _build_weapon_model(weapon_id: String) -> Node3D:
 	var root := Node3D.new()
 	root.name = "%s_mount" % weapon_id
 	root.position = Vector3(0.098, -0.232, -0.706)
