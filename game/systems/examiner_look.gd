@@ -17,6 +17,10 @@ const GAUNT := 0.88
 const MASK_COLOUR := Color("93aaa2")
 const LOUPE_METAL := Color("2d2a26")
 const LENS := Color("5f7d74")
+## Head part space on the human skin (see `_on_human_face`).
+const HUMAN_LOUPES := Vector3(0, 0.075, -0.095)
+const HUMAN_MASK_UP := Vector3(0, 0.0, -0.1)
+const HUMAN_MASK_DOWN := Vector3(0, -0.13, -0.075)
 
 
 ## Stains and dresses `body` as the examiner and adds the mask and loupes.
@@ -46,6 +50,8 @@ static func add_gear(body: BaselineHuman, mask_up := false) -> Node3D:
 	var mask := Node3D.new()
 	mask.name = "SurgicalMask"
 	head.add_child(mask)
+	if _on_human_face(body):
+		mask.set_meta("human_face", true)
 	_box(mask, Vector3(0.19, 0.105, 0.035), Vector3.ZERO, _matte(MASK_COLOUR))
 	# Pleats: three darker lines across it.
 	for row in 3:
@@ -58,7 +64,7 @@ static func add_gear(body: BaselineHuman, mask_up := false) -> Node3D:
 	var loupes := Node3D.new()
 	loupes.name = "Loupes"
 	head.add_child(loupes)
-	loupes.position = Vector3(0, 0.035, -0.13)
+	loupes.position = HUMAN_LOUPES if _on_human_face(body) else Vector3(0, 0.035, -0.13)
 	_box(loupes, Vector3(0.2, 0.022, 0.02), Vector3(0, 0.02, 0.005), _matte(LOUPE_METAL))
 	for side in [-1.0, 1.0]:
 		var barrel := MeshInstance3D.new()
@@ -95,8 +101,17 @@ static func add_gear(body: BaselineHuman, mask_up := false) -> Node3D:
 static func set_mask(mask: Node3D, up: bool) -> void:
 	if mask == null:
 		return
-	mask.position = Vector3(0, -0.035, -0.128) if up else Vector3(0, -0.17, -0.1)
+	if mask.has_meta("human_face"):
+		mask.position = HUMAN_MASK_UP if up else HUMAN_MASK_DOWN
+	else:
+		mask.position = Vector3(0, -0.035, -0.128) if up else Vector3(0, -0.17, -0.1)
 	mask.rotation.x = 0.0 if up else 0.55
+
+
+## imp-60: a rigged body wearing RiggedBody's human skin has a real face,
+## higher and shallower than the procedural head's boxes; the gear sits on it.
+static func _on_human_face(body: BaselineHuman) -> bool:
+	return body.rigged != null and not body.rigged.human.is_empty()
 
 
 static func _box(parent: Node3D, size: Vector3, at: Vector3, material: Material) -> MeshInstance3D:
