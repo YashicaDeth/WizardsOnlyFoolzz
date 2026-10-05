@@ -18,6 +18,9 @@ extends RefCounted
 ## claim, so the two agree about who has you.
 
 const CARRY := preload("res://systems/carry.gd")
+## Job 7 OPEN dial. Fragments recover and persist in v0.1, but buy nothing
+## until Greg defines the brain-board economy.
+const BLOOD_FRAGMENTS_SPEND_ENABLED := false
 const CLOTHING := preload("res://systems/clothing.gd")
 const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 

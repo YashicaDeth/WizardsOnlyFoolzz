@@ -27,6 +27,8 @@ func _ready() -> void:
 	WorldHistory.register_subject("player", {
 		"kind": "person", "name": "THE HUNTER", "blood_fragments": 3,
 	})
+	check(not VatRebirth.BLOOD_FRAGMENTS_SPEND_ENABLED,
+		"the v0.1 blood-fragment economy remains explicitly off until the brain board exists")
 	var carry := Carry.new()
 	carry.items.append({"label": "HOTLINE CLEAVER", "kind": "weapon"})
 	carry.save_to_history()
