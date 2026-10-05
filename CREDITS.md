@@ -8,6 +8,15 @@ lists: `game/art/textures/lab/CREDITS.md` (ambientCG, CC0).
 |---|---|---|---|
 | `game/art/characters/ual_mannequin.glb` (`UAL1_Standard.glb` from "Universal Animation Library [Standard]", Unreal-Godot folder, no root motion; 65-bone skeleton, 43 clips; downloaded 2026-10-04; also used by the procedural vehicle door entry/exit body) | https://quaternius.itch.io/universal-animation-library | Quaternius | CC0 1.0 |
 | `game/art/vehicles/kenney_car_kit/sedan.glb`, `suv.glb`, `debris-door.glb`, `debris-bumper.glb`, `debris-plate-a.glb`, `Textures/colormap.png` (Car Kit 3.1; `colormap_biopunk.png` is our regrade of `colormap.png`; lab-53, 2026-10-05) | https://kenney.nl/assets/car-kit | Kenney | CC0 1.0 (`License.txt` beside the files) |
+| `game/audio/fp_combat/hit_bone.ogg` ("Hard Candy / Bone Crunch", trimmed and re-encoded to Ogg; imp-64, 2026-10-05) | https://freesound.org/people/clif_creates/sounds/392883/ | clif_creates | CC0 1.0 |
+| `game/audio/fp_combat/hit_concrete.ogg` ("Concrete Hit", trimmed and re-encoded to Ogg; imp-64, 2026-10-05) | https://freesound.org/people/dslrguide/sounds/321477/ | dslrguide | CC0 1.0 |
+| `game/audio/fp_combat/hit_flesh.ogg` ("Pound of Flesh 1", trimmed and re-encoded to Ogg; imp-64, 2026-10-05) | https://freesound.org/people/magnuswaker/sounds/522091/ | magnuswaker | CC0 1.0 |
+| `game/audio/fp_combat/hit_glass.ogg` ("hit - glass - window 01.wav", trimmed and re-encoded to Ogg; imp-64, 2026-10-05) | https://freesound.org/people/Anthousai/sounds/406261/ | Anthousai | CC0 1.0 |
+| `game/audio/fp_combat/hit_metal.ogg` ("Sword clash 1.wav", trimmed and re-encoded to Ogg; imp-64, 2026-10-05) | https://freesound.org/people/spycrah/sounds/471095/ | spycrah | CC0 1.0 |
+| `game/audio/fp_combat/whoosh_bare.ogg` ("Basic Melee Swing / Miss / Whoosh", trimmed and re-encoded to Ogg; imp-64, 2026-10-05) | https://freesound.org/people/SypherZent/sounds/420668/ | SypherZent | CC0 1.0 |
+| `game/audio/fp_combat/whoosh_heavy.ogg` ("swing.mp3", trimmed and re-encoded to Ogg; imp-64, 2026-10-05) | https://freesound.org/people/GaussTheWizard/sounds/367182/ | GaussTheWizard | CC0 1.0 |
+| `game/audio/fp_combat/whoosh_light.ogg` ("swosh swinging sword 37.flac", trimmed and re-encoded to Ogg; imp-64, 2026-10-05) | https://freesound.org/people/qubodup/sounds/60024/ | qubodup | CC0 1.0 |
+| `game/audio/fp_combat/whoosh_staff.ogg` ("Wooden Stick Swing 1_4", trimmed and re-encoded to Ogg; imp-64, 2026-10-05) | https://freesound.org/people/Joao_Janz/sounds/485279/ | Joao_Janz | CC0 1.0 |
 
 ## Code and shader references (no files copied)
 

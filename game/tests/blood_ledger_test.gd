@@ -49,7 +49,7 @@ func _ready() -> void:
 	hunt.add_child(arsenal)
 	arsenal.configure(rig)
 	hunt.arsenal = arsenal
-	var base_sword := float(arsenal.weapon_definition("sword").damage)
+	var base_cleaver := float(arsenal.weapon_definition("cleaver").damage)
 	var base_spread := float(arsenal.weapon_definition("sidearm").spread)
 
 	var ledger := BloodLedger.new()
@@ -65,30 +65,30 @@ func _ready() -> void:
 	second.queue_free()
 
 	# --- Live facts in the Hunt, each to its own weapon.
-	PlayerActionLedger.record("npc_anatomy_hit", {"subject_id": "mark_a", "weapon": "sword", "zone": "torso", "result": {"damage": 44.0}})
-	check(ledger.weapon_blood("sword") == 11, "a 44-damage cleaver hit pays the cleaver 11 (got %d)" % ledger.weapon_blood("sword"))
+	PlayerActionLedger.record("npc_anatomy_hit", {"subject_id": "mark_a", "weapon": "cleaver", "zone": "torso", "result": {"damage": 44.0}})
+	check(ledger.weapon_blood("cleaver") == 11, "a 44-damage cleaver hit pays the cleaver 11 (got %d)" % ledger.weapon_blood("cleaver"))
 	WorldHistory.record_event("firearm_anatomy_hit", {"subject_id": "mark_b", "weapon": "sidearm", "zones": ["torso"], "damage": 24.0})
 	check(ledger.weapon_blood("sidearm") == 6, "a 24-damage pistol hit pays the pistol 6")
 	WorldHistory.update_subject("mark_b", {"status": "dead", "killed_by": "player"}, "npc_killed")
 	check(ledger.weapon_blood("sidearm") == 18 and int(ledger.weapon_record("sidearm").kills) == 1, "the kill pays the weapon that last hurt that body, 12")
-	check(ledger.weapon_blood("sword") == 11, "a pistol kill pays nothing to the cleaver")
+	check(ledger.weapon_blood("cleaver") == 11, "a pistol kill pays nothing to the cleaver")
 	WorldHistory.record_event("npc_resolution", {"subject_id": "mark_a", "outcome": "execute", "actor": "player"})
 	WorldHistory.update_subject("mark_a", {"status": "dead", "killed_by": "player"}, "npc_killed")
-	check(ledger.weapon_blood("sword") == 41, "an execution pays the cleaver 30, and the death it causes is not paid again (got %d)" % ledger.weapon_blood("sword"))
-	check(int(ledger.weapon_record("sword").get("finishers", 0)) == 1 and int(ledger.weapon_record("sword").get("kills", 0)) == 0, "the finisher is counted as a finisher")
+	check(ledger.weapon_blood("cleaver") == 41, "an execution pays the cleaver 30, and the death it causes is not paid again (got %d)" % ledger.weapon_blood("cleaver"))
+	check(int(ledger.weapon_record("cleaver").get("finishers", 0)) == 1 and int(ledger.weapon_record("cleaver").get("kills", 0)) == 0, "the finisher is counted as a finisher")
 	WorldHistory.update_subject("player", {"anatomy_state": {"blood": 5000}}, "anatomy_changed")
 	WorldHistory.update_subject("player", {"anatomy_state": {"blood": 4600}}, "anatomy_changed")
-	check(ledger.weapon_blood("sword") == 51, "400 ml of your own blood pays the weapon in hand 10 (got %d)" % ledger.weapon_blood("sword"))
+	check(ledger.weapon_blood("cleaver") == 51, "400 ml of your own blood pays the weapon in hand 10 (got %d)" % ledger.weapon_blood("cleaver"))
 	WorldHistory.update_subject("player", {"anatomy_state": {"blood": 5000}}, "anatomy_changed")
-	check(ledger.weapon_blood("sword") == 51, "blood coming back pays nothing")
+	check(ledger.weapon_blood("cleaver") == 51, "blood coming back pays nothing")
 	PlayerActionLedger.record("grapple_takedown", {"subject_id": "mark_c"})
 	check(ledger.weapon_blood("grapple") == 15 and ledger.style_earned("martial") == 15, "a grapple takedown is martial blood")
 	hunt.player_unseen = true
-	PlayerActionLedger.record("npc_anatomy_hit", {"subject_id": "mark_d", "weapon": "sword", "zone": "head", "result": {"damage": 8.0}})
+	PlayerActionLedger.record("npc_anatomy_hit", {"subject_id": "mark_d", "weapon": "cleaver", "zone": "head", "result": {"damage": 8.0}})
 	hunt.player_unseen = false
-	check(ledger.weapon_blood("sword") == 53 and ledger.weapon_blood("unseen") == 2 and ledger.style_earned("stealth") == 2, "a blow nobody saw also feeds the stealth tree")
+	check(ledger.weapon_blood("cleaver") == 53 and ledger.weapon_blood("unseen") == 2 and ledger.style_earned("stealth") == 2, "a blow nobody saw also feeds the stealth tree")
 	ledger.flush()
-	check(int((WorldHistory.subject(BloodLedger.SUBJECT).weapons as Dictionary).sword.blood) == 53, "the world's record holds the cleaver's blood")
+	check(int((WorldHistory.subject(BloodLedger.SUBJECT).weapons as Dictionary).cleaver.blood) == 53, "the world's record holds the cleaver's blood")
 
 	# --- Spending it changes the weapon.
 	# Greg: small nodes open by themselves at a threshold, bigger ones cost blood.
@@ -99,10 +99,10 @@ func _ready() -> void:
 	check(not ledger.is_unlocked("soft_foot"), "stealth has earned 2, short of its first node")
 	check(ledger.can_unlock("light_hand") and ledger.unlock("light_hand"), "LIGHT HAND is bought with the cleaver's blood")
 	check(ledger.available("melee") == melee_pool - 40, "opening it spent 40 from the melee pool")
-	check(is_equal_approx(float(arsenal.weapon_definition("sword").damage), base_sword * 1.10), "the cleaver now does 10%% more damage (%.2f -> %.2f)" % [base_sword, float(arsenal.weapon_definition("sword").damage)])
-	arsenal.select_weapon("sword")
+	check(is_equal_approx(float(arsenal.weapon_definition("cleaver").damage), base_cleaver * 1.10), "the cleaver now does 10%% more damage (%.2f -> %.2f)" % [base_cleaver, float(arsenal.weapon_definition("cleaver").damage)])
+	arsenal.select_weapon("cleaver")
 	var swing: Dictionary = arsenal.begin_attack()
-	check(is_equal_approx(float(swing.damage), base_sword * 1.10), "the swing report the Hunt resolves carries the learned damage")
+	check(is_equal_approx(float(swing.damage), base_cleaver * 1.10), "the swing report the Hunt resolves carries the learned damage")
 	check(is_equal_approx(float(arsenal.weapon_definition("sidearm").spread), base_spread), "a melee node leaves the pistol alone")
 	check(WorldHistory.event_count("blood_node_unlocked") == 2, "both openings are recorded as player acts")
 	check(ledger.style_earned("firearm") == 18 and not ledger.is_unlocked("steady_hand"), "IRON has earned 18, short of STEADY HAND's 20")
@@ -115,7 +115,7 @@ func _ready() -> void:
 	var reloaded := BloodLedger.new()
 	add_child(reloaded)
 	reloaded.apply_to_arsenal(fresh)
-	check(is_equal_approx(float(fresh.weapon_definition("sword").damage), base_sword * 1.10), "a reloaded ledger reapplies what was learned to a fresh arsenal")
+	check(is_equal_approx(float(fresh.weapon_definition("cleaver").damage), base_cleaver * 1.10), "a reloaded ledger reapplies what was learned to a fresh arsenal")
 
 	# --- Tree view and popup plumbing.
 	ledger.tree_view.toggle()
@@ -123,9 +123,9 @@ func _ready() -> void:
 	ledger.tree_view.move(0, 1)
 	check(ledger.tree_view.selected_node() in ["light_hand", "clean_killer"], "down walks the melee tree")
 	ledger.readout.lines.clear()
-	ledger.readout.push("sword", "ASHLINE CLEAVER", 4, Color.RED)
-	ledger.readout.push("sword", "ASHLINE CLEAVER", 3, Color.RED)
-	check(ledger.readout.active_count() == 1 and ledger.readout.text_of(0) == "+7 BLOOD // ASHLINE CLEAVER", "blood from one weapon in quick succession is one line")
+	ledger.readout.push("cleaver", "HOTLINE CLEAVER", 4, Color.RED)
+	ledger.readout.push("cleaver", "HOTLINE CLEAVER", 3, Color.RED)
+	check(ledger.readout.active_count() == 1 and ledger.readout.text_of(0) == "+7 BLOOD // HOTLINE CLEAVER", "blood from one weapon in quick succession is one line")
 
 	print("BLOOD_LEDGER_RESULT failures=%d" % failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
