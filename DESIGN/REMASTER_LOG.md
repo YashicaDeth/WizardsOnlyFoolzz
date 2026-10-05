@@ -221,3 +221,11 @@ Defaults set behind dials, all in `OrganSystem` unless named. None of these is G
   1. remaster-job5-p1 at 18:04 (walls, story props, floating quads, lift signage).
   2. job6 must fix the examiner-office overlay blur (carried).
   3. Render the fix-56 ADS capture and check that the sights no longer fill the screen.
+
+## remaster-job5-p1, 2026-10-05: the facility halls show their walls
+
+- **Walls and props:** the Service Arcade (6 rows) and Lower Works (8 rows) get a caged wall lamp on each long wall at every pool row, washing the wall face, plus one service prop in that wash on alternating sides: the kit's pipe runs and vent, drum clusters, crate stacks, a fuse cabinet with conduit to the ceiling (`facility.gd` `_dress_walls`). Nothing named or written on. Tanks, consoles, ducts, drums and crates now wear the kit's ambientCG painted-metal / metal-plate grime instead of flat colour.
+- **Floating quads:** the "white rectangles" in the arcade and Lower Works were the service-monitor screens (1.8x emission) seen at the frame edge; now a dim banded CRT (0.12x) with a close, low spill on its cabinet. The surface-gate white-out moved to just past the threshold (no shadow) so it fills the doorway to the floor instead of hanging over a dark strip; a daylight spill lights the jambs.
+- **Lift rides:** shaft strips 5x -> 0.6x, thinner, so they read as lit tubes rather than a flat white bar; floor indicators in the house bone/amber (`c8a070`), about half the size, plus a readout over each side slot so a rider watching the shaft reads the floor in frame. The lintel indicator still runs off the top edge when you look out of the slot (it is above the door).
+- **Dials (Greg can flip):** `facility.gd` `ROUTE_LINE` = `"worn"` (default: broken, scuffed painted dashes on the concrete texture, muted) or `"off"`; `WALL_WASH_ENERGY` = 7.0 (0 turns the wall lamps off).
+- **Proof:** `render_one.cmd facility_one_map_capture`, before `P:/GameDev/Temp/job5-p1-before/`, after `P:/GameDev/Temp/job5-p1-after/` (sheet `job5_p1_after_sheet.png`). fps 1280x720: average 313, min 5 (first-frame shader compile).
