@@ -53,7 +53,7 @@ func _ready() -> void:
 
 	var heart: MeshInstance3D = close.organ_parts.heart
 	check(heart.visible, "the organs of a swept body are actually shown")
-	var heart_material: StandardMaterial3D = (heart.mesh as PrimitiveMesh).material as StandardMaterial3D
+	var heart_material: StandardMaterial3D = heart.mesh.surface_get_material(0) as StandardMaterial3D
 	check(heart_material.no_depth_test, "and they draw through whatever is in front of them")
 	var skull: MeshInstance3D = (close.bones.head as Node3D).get_child(0)
 	check((skull.material_override as StandardMaterial3D).no_depth_test, "so does the bone")

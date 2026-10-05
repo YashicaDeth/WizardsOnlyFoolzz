@@ -63,10 +63,11 @@ const PROFILE_EFFECTS := {
 	"bellows": "slow", "filter_stack": "slow", "spine_cage": "slow",
 }
 ## Head to toe, so a stick pushed down walks down the body.
-const ORDER := ["eyes", "head", "brain", "left_arm", "right_arm", "torso", "left_lung", "right_lung", "heart", "liver", "spine", "gut", "left_leg", "right_leg"]
+const ORDER := ["eyes", "head", "brain", "left_arm", "right_arm", "torso", "left_lung", "right_lung", "heart", "liver", "stomach", "spine", "left_kidney", "right_kidney", "gut", "left_leg", "right_leg"]
 const LABELS := {
 	"eyes": "EYES", "brain": "BRAIN", "heart": "HEART", "left_lung": "LEFT LUNG",
 	"right_lung": "RIGHT LUNG", "liver": "LIVER", "gut": "GUT", "spine": "SPINE",
+	"stomach": "STOMACH", "left_kidney": "LEFT KIDNEY", "right_kidney": "RIGHT KIDNEY",
 	"left_arm": "LEFT ARM", "right_arm": "RIGHT ARM", "left_leg": "LEFT LEG", "right_leg": "RIGHT LEG",
 }
 

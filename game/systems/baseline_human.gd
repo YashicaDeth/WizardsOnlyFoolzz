@@ -166,14 +166,24 @@ static var detail := 1.0
 
 ## Organs are positioned relative to the zone that contains them, so the seated
 ## and standing layouts both place them correctly without a second table.
+## Front is -Z (the rig faces -Z, as `BodyForms.REGIONS` says). Lab-48: this
+## table had the spine at -Z, in front of the heart, so the X-ray showed every
+## body inside out; the organs now sit behind the sternum and the spine behind
+## them.
 const ORGAN_LAYOUT := {
 	"brain": {"zone": "head", "at": Vector3(0, 0.01, 0), "size": 0.072, "tint": "9c8a86"},
-	"heart": {"zone": "torso", "at": Vector3(-0.05, 0.10, 0.03), "size": 0.060, "tint": "6d100e"},
+	"heart": {"zone": "torso", "at": Vector3(-0.05, 0.10, -0.04), "size": 0.060, "tint": "6d100e"},
 	"left_lung": {"zone": "torso", "at": Vector3(-0.12, 0.14, 0.0), "size": 0.076, "tint": "8a4d4a"},
 	"right_lung": {"zone": "torso", "at": Vector3(0.12, 0.14, 0.0), "size": 0.076, "tint": "8a4d4a"},
-	"liver": {"zone": "torso", "at": Vector3(0.08, -0.07, 0.02), "size": 0.070, "tint": "5a2015"},
-	"gut": {"zone": "torso", "at": Vector3(0.0, -0.18, 0.03), "size": 0.088, "tint": "8d7a52"},
-	"spine": {"zone": "torso", "at": Vector3(0.0, 0.0, -0.10), "size": 0.042, "tint": "cfc2a4"},
+	"liver": {"zone": "torso", "at": Vector3(0.08, -0.06, -0.03), "size": 0.070, "tint": "5a2015"},
+	"gut": {"zone": "torso", "at": Vector3(0.0, -0.19, -0.04), "size": 0.088, "tint": "8d7a52"},
+	"spine": {"zone": "torso", "at": Vector3(0.0, 0.0, 0.10), "size": 0.042, "tint": "cfc2a4"},
+	# Lab-48 (Greg, 5 Oct: "heart, lungs, liver, stomach, guts, kidneys,
+	# brain"). The stomach under the heart on the left, the kidneys low
+	# against the spine either side of it.
+	"stomach": {"zone": "torso", "at": Vector3(-0.08, -0.06, -0.04), "size": 0.058, "tint": "a86a5a"},
+	"left_kidney": {"zone": "torso", "at": Vector3(-0.08, -0.12, 0.06), "size": 0.042, "tint": "5e1a22"},
+	"right_kidney": {"zone": "torso", "at": Vector3(0.08, -0.13, 0.06), "size": 0.042, "tint": "5e1a22"},
 }
 
 var anatomy: AnatomyComponent
@@ -492,12 +502,10 @@ func _build_organs() -> void:
 			continue
 		var organ := MeshInstance3D.new()
 		organ.name = "organ_%s" % organ_id
-		var mesh := SphereMesh.new()
-		# Organs are inside a body, so they are the size that body is.
-		mesh.radius = float(spec.size) * build_factor
-		mesh.height = mesh.radius * (2.6 if organ_id == "spine" else 2.0)
-		mesh.material = WorldLook.surface(Color(str(spec.tint)), "bone" if organ_id == "spine" else "flesh", _variation + ORGAN_LAYOUT.keys().find(organ_id))
-		organ.mesh = mesh
+		# Organs are inside a body, so they are the size that body is. Shaped
+		# and wet (`OrganMeshes`), with the material on the surface as before.
+		organ.mesh = OrganMeshes.mesh_for(str(organ_id), float(spec.size) * build_factor, Color(str(spec.tint)), _variation + ORGAN_LAYOUT.keys().find(organ_id))
+		organ.set_meta("radius", float(spec.size) * build_factor)
 		organ.position = (spec.at as Vector3) * build_factor
 		organ.visible = false
 		host.add_child(organ)
@@ -552,11 +560,13 @@ func _build_bones(layout: Dictionary) -> void:
 				# They stay legible as a continuous column at normal camera distance.
 				for index in SPINE_VERTEBRAE:
 					var fraction := float(index) / float(SPINE_VERTEBRAE - 1)
-					var vertebra := _bone_piece(frame, BodyMesh.vertebra(), Vector3(0, lerpf(length * 0.43, -length * 0.43, fraction), -0.072))
+					# Behind the organs: front is -Z (lab-48 turned this round).
+					var vertebra := _bone_piece(frame, BodyMesh.vertebra(), Vector3(0, lerpf(length * 0.43, -length * 0.43, fraction), 0.072))
 					vertebra.set_meta("vertebra", index + 1)
 				for index in 5:
-					var rib := _bone_piece(frame, BodyMesh.arc_tube(0.148, 0.098, 0.011, PI * 0.12, PI * 0.88), Vector3(0, length * 0.30 - index * 0.052, -0.012))
-					rib.rotation.x = 0.14
+					# The arc bulges toward -Z, the chest, and opens at the spine.
+					var rib := _bone_piece(frame, BodyMesh.arc_tube(0.148, 0.098, 0.011, PI * 0.12, PI * 0.88), Vector3(0, length * 0.30 - index * 0.052, 0.012))
+					rib.rotation = Vector3(0.14, PI, 0.0)
 			_:
 				_bone_piece(frame, BodyMesh.long_bone(length * 0.92, 0.019), Vector3.ZERO)
 
@@ -609,6 +619,8 @@ func _set_depth_override(piece: MeshInstance3D, enabled: bool) -> void:
 	if material == null and piece.mesh is PrimitiveMesh:
 		# Organs carry their material on the mesh rather than as an override.
 		material = (piece.mesh as PrimitiveMesh).material as StandardMaterial3D
+	elif material == null and piece.mesh != null and piece.mesh.get_surface_count() > 0:
+		material = piece.mesh.surface_get_material(0) as StandardMaterial3D
 	if material == null:
 		return
 	material.no_depth_test = enabled
@@ -1073,7 +1085,7 @@ func _spill_organ(organ_id: String) -> void:
 
 	var shape_node := CollisionShape3D.new()
 	var shape := SphereShape3D.new()
-	shape.radius = maxf(0.03, (organ.mesh as SphereMesh).radius)
+	shape.radius = maxf(0.03, float(organ.get_meta("radius", 0.05)))
 	shape_node.shape = shape
 	body.add_child(shape_node)
 

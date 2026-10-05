@@ -78,6 +78,27 @@ var _prompt: Label
 var _menu: Label
 var _note_age := 0.0
 
+# --- lab-48: organs, cybernetics and the X-ray --------------------------------
+## The player's own body: the same anatomy as everyone else's, built out of
+## sight (the lab's player is a camera on a capsule). Organ failure, shorted
+## implants and anything installed from the bag happen to this.
+var player_body: BaselineHuman
+var carry: Carry
+var organ_scan: XrayScanOverlay
+## The hand in a body: `OrganSystem.begin_rip()`'s session while it lasts.
+var rip: Dictionary = {}
+## Tests (and scripts) hold the rip with this; play holds `interact`.
+var rip_held := false
+var _rip_idle := 0.0
+var _rip_home := Vector3.ZERO
+## What the aim line is on right now, for the prompt and the press.
+var aimed: Dictionary = {}
+## What came out, in your hand, and its place in the bag.
+var hand: Node3D
+var hand_item: Dictionary = {}
+var _hand_age := 0.0
+var _hand_beat := false
+
 
 func _ready() -> void:
 	_build_world()
@@ -115,6 +136,7 @@ func _ready() -> void:
 			sparring.interrupt())
 	_hold_current()
 	_build_hud()
+	_build_organ_kit()
 	if OS.get_environment("ATG_TEST_MODE") != "1":
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -333,7 +355,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	if melee.handle_input(event):
 		return
 	if event.is_action_pressed("interact"):
-		use_nearest()
+		# Lab-48: a hand into an opened body before the plinth button.
+		if not begin_rip_aimed():
+			use_nearest()
+	elif not hand_item.is_empty() and event.is_action_pressed("reload"):
+		install_hand_item()
+	elif not hand_item.is_empty() and event.is_action_pressed("heal"):
+		sell_hand_item()
 	elif event.is_action_pressed("attack"):
 		attack(false)
 	elif event.is_action_pressed("heavy"):
@@ -519,6 +547,8 @@ func _physics_process(delta: float) -> void:
 	var input := Vector2.ZERO
 	if not menu_open:
 		input = _move_input()
+	if player_body != null:
+		mover.winded = bool(OrganSystem.failure(player_body.anatomy).no_sprint)
 	if not JUMP_CLIMB.busy(player):
 		mover.tick(player, input, yaw, delta, melee)
 		JUMP_CLIMB.fall(player, delta)
@@ -533,6 +563,7 @@ func _physics_process(delta: float) -> void:
 	_pose_held(delta)
 	var feet := player.global_position - Vector3(0, 0.85, 0)
 	liquid.wade(player, feet, player.velocity, delta)
+	_organ_frame(delta)
 	_note_age += delta
 	_update_hud()
 
@@ -619,9 +650,24 @@ func _land(collider: Object, at: Vector3, direction: Vector3, attack_data: Dicti
 		node = owner_rig
 	while node != null and node != self:
 		if node is BaselineHuman:
-			var result := (node as BaselineHuman).hit_at(at, damage, float(attack_data.get("impulse", 0.0)), str(attack_data.get("damage_type", "blunt")), direction, -1.0, plane)
+			var body := node as BaselineHuman
+			var damage_type := str(attack_data.get("damage_type", "blunt"))
+			var result := body.hit_at(at, damage, float(attack_data.get("impulse", 0.0)), damage_type, direction, -1.0, plane)
 			last_hit = {"what": "body", "zone": str(result.get("zone", "")), "severed": bool(result.get("severed", false))}
 			_note("%s // %s" % [str(result.get("zone", "")).to_upper().replace("_", " "), "OFF" if bool(result.get("severed", false)) else "HIT"])
+			# Lab-48: a deep enough torso wound opens the chest; the PRODSTAFF
+			# shorts whatever powered hardware is in the body it touches.
+			if not OrganSystem.after_hit(body, result, direction, damage_type).is_empty():
+				last_hit["opened"] = true
+				_note("CHEST OPEN")
+			if bool(attack_data.get("shock", false)):
+				var shorted := OrganSystem.shock_rig(body, 1.0)
+				last_hit["shorted"] = shorted
+				if not shorted.is_empty():
+					var tags: Array[String] = []
+					for entry in shorted:
+						tags.append("%s%s" % [str(entry.tag), " OVERLOADED" if bool(entry.overloaded) else ""])
+					_note("SHORTED // " + ", ".join(tags))
 			return
 		if node.has_meta("lab_station"):
 			var station = node.get_meta("lab_station")
@@ -678,14 +724,287 @@ func _update_hud() -> void:
 	if arsenal.current_id == "cleaver":
 		extra = "   HEAT %d%%%s" % [roundi(melee.heat * 100.0), "  VENTING" if melee.vent_left > 0.0 else ""]
 	lines.append("HP %d   STAMINA %d%s   [%s] BLOCK  [%s] PARRY/AIM  [%s] LOCK  [%s] ROLL" % [roundi(player_health), roundi(melee.stamina), extra, InputProfile.glyph("guard"), InputProfile.glyph("parry"), InputProfile.glyph("lock_on"), InputProfile.glyph("crouch" if InputProfile.device_family() == "keyboard" else "dodge")])
+	if player_body != null:
+		lines.append(_body_line())
 	if _note_age < 3.0 and not last_note.is_empty():
 		lines.append("> " + last_note)
 	_hud.text = "\n".join(lines)
 	var near := _nearest_plinth()
 	_prompt.text = "" if near.is_empty() else "[%s] %s" % [InputProfile.glyph("interact"), str(near.title)]
+	var organ_prompt := _organ_prompt()
+	if not organ_prompt.is_empty():
+		_prompt.text = organ_prompt
 	_menu.visible = menu_open
 	if menu_open:
 		var rows := ["STATIONS   [%s] GO" % InputProfile.glyph("ui_accept")]
 		for index in stations.size():
 			rows.append("%s %s" % [">" if index == menu_index else " ", str(stations[index].title)])
 		_menu.text = "\n".join(rows)
+
+
+# --- lab-48: organs, cybernetics and the X-ray --------------------------------
+
+func _build_organ_kit() -> void:
+	carry = Carry.new()
+	player_body = BaselineHuman.new()
+	player_body.name = "PlayerBody"
+	add_child(player_body)
+	player_body.position = Vector3(0, -40, 0)
+	player_body.build("lab_player", {"gore": false, "blood": 4800.0})
+	player_body.visible = false
+	player_body.anatomy.undying = true
+	# The decanting loadout: the regulator keeps a burst heart beating until
+	# a shock stops it. The arm stays empty, as on the real route.
+	player_body.anatomy.install_factory_loadout(["left_arm"] as Array[String])
+	OrganSystem.attach(player_body)
+	var layer := CanvasLayer.new()
+	layer.layer = 2
+	add_child(layer)
+	organ_scan = XrayScanOverlay.new()
+	organ_scan.name = "XrayScan"
+	layer.add_child(organ_scan)
+	organ_scan.visible = false
+
+
+## Every body a hand can reach in the lab.
+func organ_rigs() -> Array:
+	var out: Array = bodies.rigs()
+	if sparring != null and sparring.rig != null and is_instance_valid(sparring.rig):
+		out.append(sparring.rig)
+	return out
+
+
+## The PRODSTAFF landed on you: your own powered hardware shorts.
+func on_player_shocked() -> void:
+	if player_body == null:
+		return
+	var shorted := OrganSystem.shock(player_body.anatomy, 1.0)
+	if not shorted.is_empty():
+		_note("YOUR %s SHORTED" % str(shorted[0].tag))
+
+
+## The press: start a rip on the part the aim line is on, if a hand can get
+## in. Returns true when the press was used (a refusal is still said).
+func begin_rip_aimed() -> bool:
+	if not rip.is_empty():
+		return true
+	aimed = OrganSystem.aimed_part(organ_rigs(), camera.global_position, -camera.global_basis.z)
+	if aimed.is_empty() or not _aimed_visible():
+		return false
+	var rig := aimed.rig as BaselineHuman
+	var refusal := OrganSystem.rip_refusal(rig, str(aimed.id))
+	if refusal != "":
+		_note("%s // %s" % [OrganSystem.label_of(rig, str(aimed.id)), refusal])
+		return true
+	rip = OrganSystem.begin_rip(rig, str(aimed.id))
+	_rip_idle = 0.0
+	var node := _rip_node()
+	_rip_home = node.position if node != null else Vector3.ZERO
+	_note("RIPPING %s" % OrganSystem.label_of(rig, str(aimed.id)))
+	return true
+
+
+## Only what can be seen can be grabbed: an organ is seen through the X-ray or
+## an opening, hardware through its own piece showing.
+func _aimed_visible() -> bool:
+	var rig := aimed.get("rig") as BaselineHuman
+	if rig == null:
+		return false
+	return bodies.xray or OrganSystem.is_opened(rig, OrganSystem.zone_of(rig, str(aimed.id)))
+
+
+func _rip_node() -> Node3D:
+	if rip.is_empty():
+		return null
+	var rig := rip.rig as BaselineHuman
+	if rig == null or not is_instance_valid(rig):
+		return null
+	var id := str(rip.id)
+	if id.begins_with("implant:"):
+		var zone_node := rig.parts.get(str(rip.zone)) as Node3D
+		return zone_node.get_node_or_null("Implant_%s" % id.trim_prefix("implant:")) as Node3D if zone_node != null else null
+	return rig.organ_parts.get(id) as Node3D
+
+
+func _organ_frame(delta: float) -> void:
+	if player_body == null:
+		return
+	aimed = OrganSystem.aimed_part(organ_rigs(), camera.global_position, -camera.global_basis.z)
+	_tick_rip(delta)
+	_tick_hand(delta)
+	_tick_scan()
+
+
+func _tick_rip(delta: float) -> void:
+	if rip.is_empty():
+		return
+	var rig := rip.rig as BaselineHuman
+	if rig == null or not is_instance_valid(rig):
+		rip = {}
+		return
+	var holding := rip_held or Input.is_action_pressed("interact")
+	var before := float(rip.tension)
+	OrganSystem.tug(rip, delta, holding)
+	var node := _rip_node()
+	if node != null and is_instance_valid(node):
+		# Out through the hole toward the hand, jerking on each tug.
+		var toward := (camera.global_position - node.global_position).normalized()
+		var parent := node.get_parent() as Node3D
+		node.position = _rip_home + parent.global_basis.inverse() * toward * OrganSystem.pull_offset(rip)
+	if holding and before > 0.5 and float(rip.tension) <= 0.5:
+		BODY_CAM.hit(camera, 0.012)
+	if not holding:
+		_rip_idle += delta
+		if float(rip.progress) <= 0.0 and _rip_idle > 0.3:
+			if node != null:
+				node.position = _rip_home
+			rip = {}
+			return
+	else:
+		_rip_idle = 0.0
+	if bool(rip.complete):
+		if node != null:
+			node.position = _rip_home
+		var source_mesh: Mesh = (node as MeshInstance3D).mesh if node is MeshInstance3D else null
+		var source_material: Material = (node as MeshInstance3D).material_override if node is MeshInstance3D else null
+		var id := str(rip.id)
+		var label := OrganSystem.label_of(rig, id)
+		var info := OrganSystem.finish_rip(rip)
+		rip = {}
+		if info.is_empty():
+			return
+		var item := OrganSystem.carry_item(carry, info)
+		_put_in_hand(source_mesh, source_material, item, str(info.get("organ_id", "")) == "heart")
+		BODY_CAM.hit(camera, 0.05)
+		_note("%s IN HAND // %d%% // SELLS %d" % [label, roundi(float(item.get("condition", 0.0)) * 100.0), int(item.get("value", 0))])
+
+
+func _put_in_hand(mesh: Mesh, material: Material, item: Dictionary, beating: bool) -> void:
+	if hand != null and is_instance_valid(hand):
+		hand.queue_free()
+	hand_item = item
+	_hand_age = 0.0
+	_hand_beat = beating
+	hand = null
+	if mesh == null:
+		return
+	var held := MeshInstance3D.new()
+	held.name = "HandItem"
+	held.mesh = mesh.duplicate(true)
+	if material != null:
+		held.material_override = (material as Material).duplicate()
+		if held.material_override is BaseMaterial3D:
+			(held.material_override as BaseMaterial3D).no_depth_test = false
+			(held.material_override as BaseMaterial3D).render_priority = 0
+	elif held.mesh.get_surface_count() > 0 and held.mesh.surface_get_material(0) is BaseMaterial3D:
+		var own := (held.mesh.surface_get_material(0) as BaseMaterial3D).duplicate() as BaseMaterial3D
+		own.no_depth_test = false
+		own.render_priority = 0
+		held.material_override = own
+	held.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Up close it is the size it is: a fist-sized heart in the lower right.
+	held.position = Vector3(0.12, -0.13, -0.34)
+	held.rotation = Vector3(0.3, -0.6, 0.15)
+	camera.add_child(held)
+	hand = held
+
+
+func _tick_hand(delta: float) -> void:
+	if held_mount != null:
+		# One hand: what came out of somebody, or the weapon.
+		held_mount.visible = hand == null or not is_instance_valid(hand)
+	if hand == null or not is_instance_valid(hand):
+		return
+	_hand_age += delta
+	if _hand_beat:
+		# Still going for a few seconds after it came out.
+		var fade := clampf(1.0 - _hand_age / 5.0, 0.0, 1.0)
+		var beat := pow(maxf(0.0, sin(_hand_age * TAU * 1.3)), 6.0) * 0.12 * fade
+		hand.scale = Vector3.ONE * (1.0 + beat)
+
+
+## The thing in your hand, into your body (`OrganSystem.install_into_self`).
+func install_hand_item() -> Dictionary:
+	var index := carry.items.find(hand_item)
+	if index < 0:
+		return {}
+	var done := OrganSystem.install_into_self(carry, index, player_body)
+	if not done.is_empty():
+		_note("INSTALLED IN YOU // %s" % str(done.get("organ", done.get("implant", ""))).to_upper().replace("_", " "))
+		_drop_hand()
+	return done
+
+
+## The thing in your hand, sold for its value (`Carry.sell`).
+func sell_hand_item() -> Dictionary:
+	var index := carry.items.find(hand_item)
+	if index < 0:
+		return {}
+	var sold := carry.sell(index)
+	if not sold.is_empty():
+		_note("SOLD // %d SCRIP" % int(sold.price))
+		_drop_hand()
+	return sold
+
+
+func _drop_hand() -> void:
+	hand_item = {}
+	if hand != null and is_instance_valid(hand):
+		hand.queue_free()
+	hand = null
+
+
+## X-ray on: the body nearest the middle of the view, in reach, is scanned.
+func _tick_scan() -> void:
+	if organ_scan == null:
+		return
+	if not bodies.xray:
+		if organ_scan.visible:
+			organ_scan.show_scan(null, camera)
+		return
+	var target: BaselineHuman = lock_target if lock_target != null and is_instance_valid(lock_target) else null
+	if target == null:
+		var best := 0.93
+		var forward := -camera.global_basis.z
+		for rig: BaselineHuman in organ_rigs():
+			var to := rig.global_position + Vector3.UP * 1.1 - camera.global_position
+			if to.length() > 12.0:
+				continue
+			var facing := forward.dot(to.normalized())
+			if facing > best:
+				best = facing
+				target = rig
+	if target != organ_scan.rig or organ_scan.camera != camera:
+		organ_scan.show_scan(target, camera)
+
+
+func _organ_prompt() -> String:
+	if not rip.is_empty():
+		var bar := roundi(float(rip.progress) * 10.0)
+		return "[%s] HOLD // RIPPING %s  %s" % [InputProfile.glyph("interact"), OrganSystem.label_of(rip.rig, str(rip.id)), "#".repeat(bar) + "-".repeat(10 - bar)]
+	if not hand_item.is_empty() and hand != null:
+		return "%s IN HAND   [%s] INSTALL IN YOU   [%s] SELL %d" % [str(hand_item.get("label", "")), InputProfile.glyph("reload"), InputProfile.glyph("heal"), int(hand_item.get("value", 0))]
+	if aimed.is_empty() or not _aimed_visible():
+		return ""
+	var rig := aimed.rig as BaselineHuman
+	var refusal := OrganSystem.rip_refusal(rig, str(aimed.id))
+	if refusal != "":
+		return "%s // %s" % [OrganSystem.label_of(rig, str(aimed.id)), refusal]
+	return "[%s] HOLD // RIP OUT %s" % [InputProfile.glyph("interact"), OrganSystem.label_of(rig, str(aimed.id))]
+
+
+func _body_line() -> String:
+	var state := OrganSystem.failure(player_body.anatomy)
+	var words: Array[String] = []
+	if bool(state.breathless):
+		words.append("BREATHLESS")
+	if bool(state.heart_failing):
+		words.append("HEART STOPPING %.1f" % maxf(0.0, OrganSystem.HEART_DEATH_SECONDS - float(player_body.anatomy.get_meta("heart_stopped_for", 0.0))))
+	if bool(state.slow_bleed):
+		words.append("BLEEDING INSIDE")
+	if player_body.anatomy.failed:
+		words.append("BODY FAILED")
+	for site_id in player_body.anatomy.installed_parts:
+		if OrganSystem.is_shorted(player_body.anatomy.installed_parts[site_id]):
+			words.append("%s SHORTED" % OrganSystem.tag_of(player_body.anatomy.installed_parts[site_id]))
+	return "BODY  BLOOD %d  %s   BAG %d" % [roundi(player_body.anatomy.blood_remaining), "OK" if words.is_empty() else " ".join(words), carry.items.size()]
