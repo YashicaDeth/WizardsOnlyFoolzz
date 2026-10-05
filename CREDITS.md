@@ -6,7 +6,7 @@ lists: `game/art/textures/lab/CREDITS.md` (ambientCG, CC0).
 
 | File | Source | Author | Licence |
 |---|---|---|---|
-| `game/art/characters/ual_mannequin.glb` (`UAL1_Standard.glb` from "Universal Animation Library [Standard]", Unreal-Godot folder, no root motion; 65-bone skeleton, 43 clips; downloaded 2026-10-04) | https://quaternius.itch.io/universal-animation-library | Quaternius | CC0 1.0 |
+| `game/art/characters/ual_mannequin.glb` (`UAL1_Standard.glb` from "Universal Animation Library [Standard]", Unreal-Godot folder, no root motion; 65-bone skeleton, 43 clips; downloaded 2026-10-04; also used by the procedural vehicle door entry/exit body) | https://quaternius.itch.io/universal-animation-library | Quaternius | CC0 1.0 |
 | `game/art/vehicles/kenney_car_kit/sedan.glb`, `suv.glb`, `debris-door.glb`, `debris-bumper.glb`, `debris-plate-a.glb`, `Textures/colormap.png` (Car Kit 3.1; `colormap_biopunk.png` is our regrade of `colormap.png`; lab-53, 2026-10-05) | https://kenney.nl/assets/car-kit | Kenney | CC0 1.0 (`License.txt` beside the files) |
 
 ## Code and shader references (no files copied)
