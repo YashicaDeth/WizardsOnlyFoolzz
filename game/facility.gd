@@ -732,6 +732,24 @@ func _build_arcade_stalls_and_cover() -> void:
 		var at: Vector3 = ARCADE_COVER[index][0]
 		_box(Vector3(2.4, 0.95, 0.6), at + Vector3(0, 0.475, 0), CONCRETE)
 		_story_box("BarrierCap", Vector3(2.44, 0.08, 0.64), at + Vector3(0, 0.99, 0), "frame", "service_arcade", "cover")
+	# Past the barriers the hall went black to the lift: two wide floods
+	# under the last frames wash both walls and the floor up to the doors.
+	for z: float in [-44.5, -52.5]:
+		var wash := SpotLight3D.new()
+		wash.name = "ArcadeFarWash"
+		wash.light_color = LAMP_COLOR
+		wash.light_energy = 5.0
+		wash.spot_range = 9.0
+		wash.spot_angle = 72.0
+		wash.spot_attenuation = 0.4
+		wash.distance_fade_enabled = true
+		wash.distance_fade_begin = 50.0
+		wash.distance_fade_length = 10.0
+		wash.position = Vector3(28.0, 5.1, z)
+		wash.rotation.x = -PI * 0.5
+		add_child(wash)
+		_story_box("HighBayHood", Vector3(0.8, 0.22, 0.8), Vector3(28.0, 5.3, z), "duct", "service_arcade", "lamp")
+		_story_box("HighBayLens", Vector3(0.62, 0.03, 0.62), Vector3(28.0, 5.18, z), "wall_tube", "service_arcade", "lamp")
 
 
 ## Lower Works reads across its full height: a clear painted run to the heat
