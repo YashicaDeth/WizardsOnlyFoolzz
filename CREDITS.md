@@ -44,6 +44,7 @@ lists: `game/art/textures/lab/CREDITS.md` (ambientCG, CC0).
 | `game/audio/fp_combat/whoosh_heavy.ogg` ("swing.mp3", trimmed and re-encoded to Ogg; imp-64, 2026-10-05) | https://freesound.org/people/GaussTheWizard/sounds/367182/ | GaussTheWizard | CC0 1.0 |
 | `game/audio/fp_combat/whoosh_light.ogg` ("swosh swinging sword 37.flac", trimmed and re-encoded to Ogg; imp-64, 2026-10-05) | https://freesound.org/people/qubodup/sounds/60024/ | qubodup | CC0 1.0 |
 | `game/audio/fp_combat/whoosh_staff.ogg` ("Wooden Stick Swing 1_4", trimmed and re-encoded to Ogg; imp-64, 2026-10-05) | https://freesound.org/people/Joao_Janz/sounds/485279/ | Joao_Janz | CC0 1.0 |
+| `game/audio/fluid/*.ogg` (glass cracks 1-3, glass burst, gush, pour loop, splash, splat, wade 1-3; imp-61, 2026-10-06) | synthesised by `tools/synth_fluid_sounds.py` (noise, Minnaert bubble chirps, inharmonic pings) | this project | ours |
 
 ## Code and shader references (no files copied)
 
@@ -59,6 +60,14 @@ lists: `game/art/textures/lab/CREDITS.md` (ambientCG, CC0).
   shaders, which do not run headless, so the test suite could not exercise
   them, and one tank's spill does not need tens of thousands of particles.
   The CPU SPH-lite pour and depth-grid pool are our own.
+- Pour surface (`game/systems/fluid_surface.gd`, `fluid_splat.gdshader`,
+  `fluid_surface.gdshader`, imp-61): the screen-space fluid rendering method
+  of van der Laan, Green and Sainz, "Screen Space Fluid Rendering with
+  Curvature Flow" (I3D 2009) and Simon Green, "Screen Space Fluid Rendering
+  for Games" (GDC 2010): splat depth and thickness, smooth, reconstruct
+  normals, shade with refraction and Beer-Lambert absorption. Written fresh
+  (the smoothing here is a kernel-weighted mean depth, not a bilateral blur);
+  no code copied.
 - Destruction (`game/systems/voxel_structure.gd`, `dig_terrain.gd`, lab-47):
   looked at Zylann's Voxel Tools (https://github.com/Zylann/godot_voxel, MIT;
   GDExtension 1.7 for Godot 4.5+) as the diggable-terrain engine, and the
