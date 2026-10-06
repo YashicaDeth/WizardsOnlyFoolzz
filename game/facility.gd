@@ -13,6 +13,9 @@ extends Node3D
 
 signal zone_exit_reached()
 
+## Closer than this a hall title is hidden (it fades in over the next 3 m).
+const TITLE_HIDE_INSIDE := 8.0
+
 ## Job 5's cut-down v0.1 route. Turning this off restores the older room
 ## scenes and their optional puzzles without deleting them.
 const V01_ONE_MAP := true
@@ -423,7 +426,12 @@ func _room(title: String, y: float, xs: Vector2, zs: Vector2, height: float, gap
 	if not skip.has("e"):
 		_wall_z(xs.y, zs, y, height, gaps.get("e", []))
 	var centre := Vector3((xs.x + xs.y) * 0.5, y, (zs.x + zs.y) * 0.5)
-	_sign(title, centre + Vector3(0, minf(height - 0.5, 3.2), 0))
+	# A hall's title hangs over its middle: read from the entry, gone before
+	# you walk under it, where it rode up into the subtitle line (bughunt-79).
+	var title_sign := _sign(title, centre + Vector3(0, minf(height - 0.5, 3.2), 0))
+	title_sign.visibility_range_begin = TITLE_HIDE_INSIDE
+	title_sign.visibility_range_begin_margin = 3.0
+	title_sign.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 	# Pools on a ~10 m grid, hung on drop rods at working height: from an 8 m
 	# or 12 m ceiling the old fittings never reached the floor and the arcade
 	# and Lower Works rendered black. Black still sits between the pools.
@@ -903,7 +911,7 @@ func _danger_light(at: Vector3, reach: float) -> void:
 	add_child(light)
 
 
-func _sign(text: String, at: Vector3) -> void:
+func _sign(text: String, at: Vector3) -> Label3D:
 	var label := Label3D.new()
 	label.text = text
 	label.font_size = 64
@@ -912,3 +920,4 @@ func _sign(text: String, at: Vector3) -> void:
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.position = at
 	add_child(label)
+	return label
