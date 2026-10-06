@@ -63,6 +63,7 @@ func build() -> void:
 	rig = BaselineHuman.new()
 	rig.name = "PlayerBody"
 	add_child(rig)
+	PlayerLook.mark(rig)
 	rig.build("sandbox_player", {"gore": BaselineHuman.apply_gore_setting(), "blood": 4300.0, "rigged": true})
 	HunterAppearance.style_world_rig(rig, "sandbox_player", true)
 	rig.dress(ClothingShell.humiliation_wardrobe())

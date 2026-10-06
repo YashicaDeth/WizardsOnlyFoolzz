@@ -184,6 +184,20 @@ const LOD_DISTANT := 40.0
 const HIT_LEAN_SECONDS := 0.42
 const DOWN_THEN_DEAD_MSEC := 400
 const HIT_LEAN_ANGLE := 0.42
+## player-81: how far the player's fingers open from the clips' claw (0 = as
+## clipped, 1 = the rest pose's flat hand), during these empty-handed clips.
+const HAND_RELAX := 0.55
+const RELAX_CLIPS := ["Idle", "Idle_Talking", "Walk", "Walk_Formal", "Jog_Fwd", "Sprint", "Crouch_Idle", "Crouch_Fwd", "Jump", "Jump_Start", "Jump_Land", "Roll"]
+## player-81: outfit extras built for the boxed head and torso sit low on the
+## human skin (the jester cap's brow band ran across the eyes, the ruff round
+## the chest). While the zone shows the skin they are lifted by this much.
+const SKIN_EXTRA_LIFT := {"GarmentExtra_bell_cap": 0.075, "GarmentExtra_ruff": 0.06}
+## The factory implant plate on an arm sat at the boxed arm's mid-chord, which
+## on a bent human arm is open air by the elbow, at the boxed arm's size, in
+## grain whose texels read as a checkerboard. While the skin shows it sits on
+## the upper arm (up the chord toward the shoulder), smaller, finer-grained.
+const SKIN_HARDWARE_SEAT := Vector3(0.0, 0.17, 0.012)
+const SKIN_HARDWARE_SCALE := Vector3(0.55, 0.5, 0.6)
 
 
 ## Bends the spine and neck away from a blow, after the animation has posed
@@ -206,11 +220,27 @@ class HitLean extends SkeletonModifier3D:
 			skeleton.set_bone_pose_rotation(bone, parent_turn.inverse() * extra * parent_turn * skeleton.get_bone_pose_rotation(bone))
 
 
+## player-81: the library's idle and walk curl every finger into a claw. On
+## the player, while a clip with nothing in the hands plays, the fingers are
+## eased part of the way back toward the rest pose's open hand.
+class HandRelax extends SkeletonModifier3D:
+	var amount := 0.0
+	var bones: PackedInt32Array = []
+
+	func _process_modification() -> void:
+		var skeleton := get_skeleton()
+		if skeleton == null or amount < 0.001:
+			return
+		for bone in bones:
+			skeleton.set_bone_pose_rotation(bone, skeleton.get_bone_pose_rotation(bone).slerp(skeleton.get_bone_rest(bone).basis.get_rotation_quaternion(), amount))
+
+
 var body: BaselineHuman
 var model: Node3D
 var skeleton: Skeleton3D
 var player: AnimationPlayer
 var hit_lean: HitLean
+var hand_relax: HandRelax
 var simulator: PhysicalBoneSimulator3D
 ## Optional driver whose `state`, `first_person`, `crouch_blend` and friends
 ## pick the clip (HunterBodyMotion). Found automatically as a sibling.
@@ -351,6 +381,15 @@ func build(host: BaselineHuman) -> bool:
 	# skeleton update of every body.
 	hit_lean.active = false
 	skeleton.add_child(hit_lean)
+	if PlayerLook.is_player(body):
+		hand_relax = HandRelax.new()
+		hand_relax.name = "HandRelax"
+		for bone in skeleton.get_bone_count():
+			var bone_name := skeleton.get_bone_name(bone)
+			for finger: String in ["index_", "middle_", "ring_", "pinky_", "thumb_"]:
+				if bone_name.begins_with(finger) and not bone_name.contains("leaf"):
+					hand_relax.bones.append(bone)
+		skeleton.add_child(hand_relax)
 	body.went_down.connect(func(): _downed_at_msec = Time.get_ticks_msec())
 	motion_source = _find_motion_source()
 	_last_position = body.global_position if body.is_inside_tree() else Vector3.ZERO
@@ -536,6 +575,9 @@ func _human_sources(mannequin_source: MeshInstance3D) -> Array[MeshInstance3D]:
 	meshes.sort_custom(func(a: MeshInstance3D, b: MeshInstance3D) -> bool: return a.mesh.get_aabb().size.y > b.mesh.get_aabb().size.y)
 	var parent := mannequin_source.get_parent()
 	for instance in meshes:
+		if PlayerLook.is_player(body) and instance.mesh is ArrayMesh:
+			# player-81: the player's own build, slimmed on the same bones.
+			instance.mesh = PlayerLook.lean_mesh(instance.mesh as ArrayMesh, instance.skin, human_skeleton, "%s:%s" % [path, instance.name], PlayerLook.LEAN_FEMALE if kind == "female" else 1.0)
 		var rebound := Skin.new()
 		var skin := instance.skin
 		for bind in skin.get_bind_count():
@@ -818,6 +860,9 @@ func _locomotion_clip() -> String:
 func _play(clip: String, rate: float) -> void:
 	if not player.has_animation(clip):
 		clip = "Idle"
+	if hand_relax != null:
+		hand_relax.amount = HAND_RELAX if clip in RELAX_CLIPS else 0.0
+		hand_relax.active = hand_relax.amount > 0.0
 	if clip != _clip or not player.is_playing():
 		_clip = clip
 		player.play(clip, 0.2)
@@ -948,6 +993,7 @@ func _zones() -> void:
 		var waist := _waist()
 		waist_changed = waist != _last_waist
 		_last_waist = waist
+	var look_id := PlayerLook.id_of(body)
 	for zone: String in ZONES:
 		var skin_mode := in_skin_mode(zone)
 		var part := body.parts.get(zone) as MeshInstance3D
@@ -963,7 +1009,7 @@ func _zones() -> void:
 				continue
 			if instance.material_override != material:
 				instance.material_override = material
-			if material is ShaderMaterial and (waist_changed or instance.get_meta("skin_tone", Color.BLACK) != tone):
+			if material is ShaderMaterial and (waist_changed or instance.get_meta("skin_tone", Color.BLACK) != tone or instance.get_meta("look", "") != look_id):
 				_tone(instance, tone)
 		if part != null and is_instance_valid(part):
 			if skin_mode:
@@ -1105,6 +1151,8 @@ static func flesh_material(kind: String) -> ShaderMaterial:
 		material.set_shader_parameter("normal_texture", load(root + "T_Superhero_Female_Normal.png"))
 		material.set_shader_parameter("roughness_texture", load(root + "T_Superhero_Female_Roughness.png"))
 		material.set_shader_parameter("texture_skin", Vector3(0.381, 0.177, 0.083))
+		material.set_shader_parameter("marks_y", Vector4(1.485, 0.944, 0.535, 0.071))
+		material.set_shader_parameter("marks_x", Vector4(0.152, 0.392, 0.641, -0.04))
 	else:
 		material.set_shader_parameter("base_texture", load(root + "T_Superhero_Male_Dark.png"))
 		material.set_shader_parameter("normal_texture", load(root + "T_Superhero_Male_Normal.png"))
@@ -1134,6 +1182,7 @@ func _skin_tone(part: MeshInstance3D) -> Color:
 
 func _tone(instance: GeometryInstance3D, tone: Color) -> void:
 	instance.set_meta("skin_tone", tone)
+	instance.set_meta("look", PlayerLook.id_of(body))
 	instance.set_instance_shader_parameter("seed", float(absi(hash(body.subject_id)) % 997) * 0.37)
 	if instance.material_override == _flesh_materials.get("cloth_" + human):
 		instance.set_instance_shader_parameter("cloth_colour", tone)
@@ -1144,6 +1193,12 @@ func _tone(instance: GeometryInstance3D, tone: Color) -> void:
 			instance.set_instance_shader_parameter(key, kit.get(key, Color(0, 0, 0, 0)))
 	else:
 		instance.set_instance_shader_parameter("skin_tone", tone)
+		# player-81: the player's garment, painted on the flesh in rest space.
+		var look := PlayerLook.of(body)
+		instance.set_instance_shader_parameter("garment_mode", float(look.get("mode", 0.0)))
+		instance.set_instance_shader_parameter("garment_a", look.get("a", Color(0, 0, 0, 0)))
+		instance.set_instance_shader_parameter("garment_b", look.get("b", Color(0, 0, 0, 0)))
+		instance.set_instance_shader_parameter("muscle", PlayerLook.MUSCLE if not look.is_empty() else 1.0)
 
 
 ## Kit painted onto the cloth of a human skin rather than boxed over it
@@ -1163,6 +1218,18 @@ func _hide_rig_pieces(zone: String, part: Node3D) -> void:
 	var hidden: Dictionary = _hidden[zone]
 	for child in part.get_children():
 		var piece := child as Node3D
+		if piece != null and not human.is_empty() and SKIN_EXTRA_LIFT.has(str(piece.name)) and not piece.has_meta("skin_lift_from"):
+			piece.set_meta("skin_lift_from", piece.transform)
+			piece.position += Vector3.UP * float(SKIN_EXTRA_LIFT[str(piece.name)])
+		if piece != null and not human.is_empty() and zone.ends_with("_arm") and str(piece.name) == "InstalledHardware" and not piece.has_meta("skin_lift_from"):
+			piece.set_meta("skin_lift_from", piece.transform)
+			piece.position += SKIN_HARDWARE_SEAT
+			piece.scale *= SKIN_HARDWARE_SCALE
+			var plate := (piece as GeometryInstance3D).material_override as BaseMaterial3D if piece is GeometryInstance3D else null
+			if plate != null:
+				plate = plate.duplicate() as BaseMaterial3D
+				plate.uv1_scale *= 8.0
+				(piece as GeometryInstance3D).material_override = plate
 		if piece == null or not piece.visible or hidden.has(piece):
 			continue
 		if piece.has_meta("mutation"):
@@ -1181,6 +1248,11 @@ func _is_body_piece(piece_name: String) -> bool:
 		if piece_name.begins_with(prefix):
 			return true
 	if not human.is_empty():
+		# HunterAppearance's prosthetic readout bands were sized round the
+		# boxed limb and ride its straight chord: on a bent human arm they
+		# floated off the elbow. The installed hardware itself stays.
+		if piece_name.contains("_ServoBand_"):
+			return true
 		for prefix: String in HUMAN_FACE_PIECES:
 			if piece_name.begins_with(prefix):
 				return true
@@ -1194,6 +1266,10 @@ func _give_back(zone: String, part: Node3D) -> void:
 		if is_instance_valid(piece):
 			(piece as Node3D).visible = true
 	hidden.clear()
+	for child in part.get_children():
+		if child is Node3D and child.has_meta("skin_lift_from"):
+			(child as Node3D).transform = child.get_meta("skin_lift_from")
+			child.remove_meta("skin_lift_from")
 	part.scale = part.get_meta("rest_scale", Vector3.ONE)
 	(part as GeometryInstance3D).transparency = 0.62 if body.get("_xray") == true else 0.0
 	if body.get("_xray") != true:

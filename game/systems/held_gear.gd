@@ -211,7 +211,7 @@ static func build_humiliation_hand(side: int) -> Node3D:
 	hand.scale = Vector3.ONE * 1.16
 	hand.set_meta("screen_entry_side", side)
 	for child in hand.find_children("*", "MeshInstance3D", true, false):
-		(child as MeshInstance3D).material_override = _leather(Color("28151e"), 70 + side)
+		(child as MeshInstance3D).material_override = _glove(Color("28151e"), 70 + side)
 
 	var cuff := Node3D.new()
 	cuff.name = "HumiliationCuff"
@@ -232,7 +232,7 @@ static func build_humiliation_hand(side: int) -> Node3D:
 		puff.mesh = puff_mesh
 		puff.position = Vector3(cos(angle) * 0.037, sin(angle) * 0.037, 0.0)
 		puff.scale = Vector3(1.0, 1.0, 0.82)
-		puff.material_override = _leather(Color("651d2a") if index % 2 == 0 else Color("c6ae7a"), 90 + index)
+		puff.material_override = _glove(Color("651d2a") if index % 2 == 0 else Color("c6ae7a"), 90 + index)
 		cuff.add_child(puff)
 
 	var shackle := MeshInstance3D.new()
@@ -277,7 +277,7 @@ static func build_humiliation_hand(side: int) -> Node3D:
 	# Authored along +Y so the live view can stretch it exactly from a lower
 	# screen edge to the wrist without guessing through the prop's rotations.
 	sleeve.position = Vector3(0.0, 0.18, 0.0)
-	sleeve.material_override = _leather(Color("40121e"), 140 + side)
+	sleeve.material_override = _glove(Color("40121e"), 140 + side)
 	forearm.add_child(sleeve)
 	# A broad entry puff hides the far cap at the screen edge and makes the arm
 	# widen toward the unseen elbow instead of ending as a cut-off tube.
@@ -292,7 +292,7 @@ static func build_humiliation_hand(side: int) -> Node3D:
 		entry_mesh.rings = 6
 		entry_puff.mesh = entry_mesh
 		entry_puff.position = Vector3(cos(angle) * 0.040, 0.018, sin(angle) * 0.040)
-		entry_puff.material_override = _leather(Color("651d2a") if index % 2 == 0 else Color("c6ae7a"), 150 + index)
+		entry_puff.material_override = _glove(Color("651d2a") if index % 2 == 0 else Color("c6ae7a"), 150 + index)
 		forearm.add_child(entry_puff)
 	return hand
 
@@ -1331,6 +1331,16 @@ static func _wood(tint: Color, seed_value: int) -> StandardMaterial3D:
 	material.emission_enabled = true
 	material.emission = tint
 	material.emission_energy_multiplier = 0.18
+	return material
+
+
+## player-81: the jester glove and sleeve. The world's grain is sized for a
+## wall seen across a room; forty centimetres from the lens its texels were
+## thumb-sized squares drifting purple, green and orange. Same surface, grain
+## fifteen times finer.
+static func _glove(tint: Color, seed_value: int) -> StandardMaterial3D:
+	var material := _leather(tint, seed_value)
+	material.uv1_scale *= 15.0
 	return material
 
 
