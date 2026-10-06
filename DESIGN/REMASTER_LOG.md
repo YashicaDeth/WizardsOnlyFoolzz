@@ -637,3 +637,10 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 - Recommendations: 1) old-body read (corpse plus bloodstain, no glow); already in remaster-job7-p1's scope, so no duplicate queued. 2) fix-95 ragdoll quit crash stays first among the fixes when a Claude account frees up. 3) Give Codex small, mechanical BUGS.md items so it does not sit idle.
 - Queued for Codex: fix-82 narrowed to the one thing left (the support address line's ~12 px inset in country_town_menu.gd `_build_support_row`); bughunt-79-c already restored the row.
 - Failures: none new (job2, job2b, lane-exit-routes are old).
+
+## Manager notes, 2026-10-07 10:10
+- Merged: fix-82 (4e1d39b6, merge f6b6e851), the menu support address now uses the same left inset as the settings rows. Re-rendered menu_capture and looked at P:/GameDev/Temp/menu_01_settings_support.png: the address lines up with BLOOM/SUPPORT/BACK, it is in a readable font and inside the panel.
+- Weak (same shot): the address is grey sans-serif among copper pixel-font rows. That is on purpose (the pixel font has no "@"), so it stays.
+- Accounts: Claude main/alt are parked until 10-10 19:04, claude-alt2 until 10-11, three Codex accounts parked; codex-allusions-plus is the only builder ready.
+- Recommendations: 1) Keep Codex fed. fix-78 (ending: hide the view model during the whiteout/title drop, scale up the TO BE CONTINUED card, Start-on-pad test) is specific enough, so it moves to agent codex at priority 72. 2) fix-95 ragdoll quit crash is still the first Claude fix when an account frees up. 3) remaster-job7-p1 (old body reads as a ghost) after that.
+- Failures: none new (job2, job2b, lane-exit-routes are old).
