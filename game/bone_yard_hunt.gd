@@ -1322,7 +1322,8 @@ func _ready() -> void:
 	# not both at once. Surfacing says when its title is done.
 	if surfacing != null and not facility_handoff.is_empty():
 		surfacing.title_done.connect(func() -> void: exit_reveal = ExitReveal.attach(self, facility_handoff, camera), CONNECT_ONE_SHOT)
-	else:
+	elif not v01_ending:
+		# The v0.1 ending's title drop is the first view; it ends at the menu.
 		exit_reveal = ExitReveal.attach(self, facility_handoff, camera)
 	# A wreck in the derby already routed the player through `DefeatRouter`
 	# before this scene loaded (`rift_derby.gd::_finish_round`), so a lost heat

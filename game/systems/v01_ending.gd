@@ -113,7 +113,7 @@ func begin(world_scene: String = WORLD_SCENE) -> void:
 	_logo.anchor_right = 0.8
 	_logo.anchor_top = 0.16
 	_logo.anchor_bottom = 0.52
-	_logo.modulate.a = 0.0
+	_logo.visible = false
 	add_child(_logo)
 	_wind = AudioStreamPlayer.new()
 	_wind.stream = SIGHT_AUDIO.stream("wind")
@@ -139,6 +139,8 @@ func _process(delta: float) -> void:
 		WorldHistory.record_event("surfaced", {"location": "hunt"})
 		if WorldHistory.event_count("title_drop_seen") == 0:
 			WorldHistory.record_event("title_drop_seen", {"location": "surface_gate"})
+	if _recorded_surface:
+		# Every frame: the Hunt's own systems turn its HUD back on.
 		_hide_world_hud()
 	if clock >= WIND_AT:
 		if not _wind.playing:
@@ -148,16 +150,20 @@ func _process(delta: float) -> void:
 		var back := clampf((clock - SILENCE) / 1.4, 0.0, 1.0)
 		AudioServer.set_bus_volume_db(0, lerpf(-80.0, _master_db, sqrt(back)))
 		_sound_back = back >= 1.0
+	# logo_fx writes COLOR itself, so modulate cannot fade it: it burns in
+	# through `reveal` and burns back out the same way.
 	var burn := clampf((clock - TITLE_AT) / TITLE_BURN, 0.0, 1.0)
-	_logo_fx.set_shader_parameter("reveal", burn)
-	_logo.modulate.a = title_alpha()
+	var off := clampf((TITLE_AT + TITLE_BURN + TITLE_HOLD + TITLE_FADE - clock) / TITLE_FADE, 0.0, 1.0)
+	_logo_fx.set_shader_parameter("reveal", burn * off)
+	_logo.visible = title_alpha() > 0.0
 	if _card == null and clock >= CARD_AT + CARD_FADE_IN * 0.6 and not run_summary.is_empty():
 		_card = RUN_CARD.new()
 		_card.hold_seconds = CARD_HOLD
 		_card.centred = true
 		add_child(_card)
-		_card.layer = layer + 1
 		_card.show_summary(run_summary)
+		# show_summary sets its own layer; this card sits over the black.
+		_card.layer = layer + 1
 	if clock >= CARD_AT + CARD_FADE_IN + CARD_HOLD + OUT_FADE:
 		go_to_menu()
 		return
@@ -229,8 +235,8 @@ func _draw_sheet() -> void:
 		CellOutzType.draw_stamped(_sheet, Vector2((view.x - width) * 0.5, view.y * 0.3), words, cap, Color(BONE, text), Color(BLOOD, 0.55 * text), 3.0)
 		if can_skip() and text >= 1.0:
 			var hint := "PRESS TO RETURN TO THE TITLE"
-			var hint_width := CellOutzType.width_condensed(hint, 9.0, 1.4)
-			CellOutzType.draw_condensed(_sheet, Vector2((view.x - hint_width) * 0.5, view.y - 48.0), hint, 9.0, Color(COPPER, 0.7 * text), 1.4)
+			var hint_width := CellOutzType.width_condensed(hint, 12.0, 1.6)
+			CellOutzType.draw_condensed(_sheet, Vector2((view.x - hint_width) * 0.5, view.y - 56.0), hint, 12.0, Color(COPPER, 0.8 * text), 1.6)
 	var white := white_alpha()
 	if white > 0.0:
 		_sheet.draw_rect(Rect2(Vector2.ZERO, view), Color(DAY_WHITE, white))
