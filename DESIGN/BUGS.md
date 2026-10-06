@@ -62,7 +62,7 @@ bughunt-79-c (2026-10-06, after the v0.1 sound pass merged) re-ran the six route
 - **Legacy doctor chase**: doctor_chase_route_test failed 8 ("his door comes down (80 blows)" onward) at the base commit too: it drove the pre-hands-on breakout instead of the examiner's dropped-keycard path. Minor (stale test, not the route). FIXED fix-83: the suite now takes the dropped keycard and opens the staff door through the real interaction path, leaves the detailed card assertions to examiner_keycard_test, and retains the current Support Unit -> empty vehicle bay -> surface chase handoffs.
 - **First-person sleeves "purple checker" (REMASTER_LOG imp-64 Still weak)**: it is the jester leather pattern on `held_gear` sleeves, not a missing texture. Art call, not a lane fix. OPEN (look).
 
-- **Service Arcade, guard's "SEEN 100%" awareness tag**: BlockTracker's tag sits over his speech line at the old-body spot (rebirth_old_body). Minor. OPEN (presentation; move the tag or the line).
+- **Service Arcade, guard's "SEEN 100%" awareness tag**: BlockTracker's tag sits over his speech line at the old-body spot (rebirth_old_body). Minor. FIXED fix-94: awareness box stays, tag text yields for the guard's spoken line and returns when it ends (`P:/GameDev/Temp/rebirth_old_body.png`).
 - **Main menu settings**: the support address line sits ~12 px left of the plate's row inset. Minor. OPEN.
 
 ## Not verified by bughunt-79-a

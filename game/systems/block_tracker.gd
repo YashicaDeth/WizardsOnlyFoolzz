@@ -126,8 +126,9 @@ func _draw() -> void:
 		var half := Vector2(26, 52) * clampf(8.0 / maxf(camera.global_position.distance_to(at), 1.0), 0.35, 1.6)
 		var rect := Rect2(centre - half, half * 2.0)
 		_corners(rect, WATCH_INK, 1.0, 8.0)
-		var tag := "SEEN %02d%%" % roundi(float(watcher.get("certainty", 1.0)) * 100.0)
-		draw_string(font, rect.position + Vector2(0, -4), tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, WATCH_INK)
+		if not bool(watcher.get("hide_tag", false)):
+			var tag := "SEEN %02d%%" % roundi(float(watcher.get("certainty", 1.0)) * 100.0)
+			draw_string(font, rect.position + Vector2(0, -4), tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, WATCH_INK)
 		centres.append(centre)
 	for index in range(1, centres.size()):
 		draw_line(centres[index - 1], centres[index], WATCH_INK * Color(1, 1, 1, 0.45), 1.0)

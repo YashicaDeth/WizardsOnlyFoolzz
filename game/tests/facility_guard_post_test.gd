@@ -68,6 +68,9 @@ func _ready() -> void:
 	arcade._physics_process(0.016)
 	check(post.warned, "he warns you when you come into view")
 	check(arcade.block_tracker.watchers.size() == 1, "once he has seen you he carries an awareness box")
+	check(bool(arcade.block_tracker.watchers[0].get("hide_tag", false)), "his awareness tag text yields while his spoken line is visible")
+	post.step(post.speech_timer + 0.01, post.guard.global_position + Vector3(0, 0, FacilityGuardPost.WARN_RANGE + 1.0))
+	check(not bool(post.watcher_entries()[0].get("hide_tag", false)), "his awareness tag text returns when the spoken line ends")
 	check(arcade.blood == 100.0 and WorldHistory.event_count("facility_guard_fired") == 1, "his first shot inside range is a warning")
 	post.fire_cooldown = 0.0
 	arcade.player.global_position = in_range
