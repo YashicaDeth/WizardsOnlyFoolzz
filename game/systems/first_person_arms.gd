@@ -64,6 +64,10 @@ const RELOAD := {"swing": Vector3(-0.20, -0.20, 0.0), "wrist": Vector3(0.55, 0.3
 const MAGAZINE_DROP := Vector3(0, -0.145, 0.012)
 
 var weapon_id := "-"
+## player-81: true keeps the jester gloves (the forced humiliation set, worn
+## from the Hunt on); false wears the player's look (PlayerLook): bare skin
+## hands and the look's own sleeve, as in the facility before the jester set.
+var gloved := false
 var held: Node3D
 var left_hand: Node3D
 ## The one driving blows: `MeleeDriver` when one is given, else our own
@@ -92,6 +96,7 @@ var _guard_amount := 0.0
 var _audio: FpCombatAudio
 var _whoosh_due := false
 var _heavy_due := false
+var _look := ""
 
 
 func _init() -> void:
@@ -145,6 +150,10 @@ func take(id: String) -> void:
 		left_hand.name = "FreeLeftHand"
 		left_hand.set_meta("forearm_entry", Vector3(-0.47, -0.53, -0.31))
 		add_child(left_hand)
+	if not gloved:
+		for hand_name in ["RightGripHand", "LeftGripHand"]:
+			PlayerLook.restyle_hand(held.find_child(hand_name, true, false) as Node3D)
+		PlayerLook.restyle_hand(left_hand)
 	_magazine = held.find_child("magazine", true, false) as Node3D
 	if _magazine != null:
 		_magazine_rest = _magazine.position
@@ -188,9 +197,13 @@ func active_moveset() -> SwordMoveset:
 
 
 func _process(delta: float) -> void:
+	if not gloved and _look != PlayerLook.current():
+		# The look was changed (pause menu): the hands are rebuilt in it.
+		_look = PlayerLook.current()
+		weapon_id = "-"
 	if arsenal != null:
 		take(str(arsenal.current_id))
-	elif held == null:
+	elif held == null or weapon_id == "-":
 		take("")
 	if driver == null:
 		moveset.tick(delta)
