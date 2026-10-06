@@ -188,6 +188,11 @@ func card_alpha() -> float:
 	return clampf((clock - CARD_AT) / CARD_FADE_IN, 0.0, 1.0)
 
 
+func return_key() -> String:
+	var profile := get_node_or_null("/root/InputProfile")
+	return "CROSS" if profile != null and bool(profile.using_pad) else "ENTER"
+
+
 func can_skip() -> bool:
 	return skippable or clock >= CARD_AT
 
@@ -234,7 +239,9 @@ func _draw_sheet() -> void:
 		var text := clampf((clock - CARD_AT - CARD_FADE_IN * 0.4) / 0.8, 0.0, 1.0)
 		CellOutzType.draw_stamped(_sheet, Vector2((view.x - width) * 0.5, view.y * 0.3), words, cap, Color(BONE, text), Color(BLOOD, 0.55 * text), 3.0)
 		if can_skip() and text >= 1.0:
-			var hint := "PRESS TO RETURN TO THE TITLE"
+			# The button was missing from this line ("PRESS TO RETURN"); name the
+			# one the player is holding, as the inventory and pause footers do.
+			var hint := "PRESS %s TO RETURN TO THE TITLE" % return_key()
 			var hint_width := CellOutzType.width_condensed(hint, 12.0, 1.6)
 			CellOutzType.draw_condensed(_sheet, Vector2((view.x - hint_width) * 0.5, view.y - 56.0), hint, 12.0, Color(COPPER, 0.8 * text), 1.6)
 	var white := white_alpha()

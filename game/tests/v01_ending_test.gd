@@ -83,6 +83,7 @@ func _ready() -> void:
 		if ending.card_alpha() >= 1.0 and ending._card != null:
 			if not saw_card:
 				check(ending.can_skip(), "once TO BE CONTINUED is up, it can be skipped")
+				check(ending.return_key() in ["CROSS", "ENTER"], "and the card names the button that skips it (%s)" % ending.return_key())
 			saw_card = true
 	Engine.time_scale = 1.0
 	check(saw_world, "the world loads under the white")
