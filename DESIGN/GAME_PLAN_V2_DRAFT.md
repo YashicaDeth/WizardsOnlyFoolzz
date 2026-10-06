@@ -24,6 +24,7 @@ Started by the hourly build manager, 2026-10-05 15:10. This is a draft. It does 
 | lab-52 Duelist and Shade | landed (ef93a996, 6 Oct) | Lab-only station 6: Duelist (strike, heavy, block, parry into a doubled riposte, lock, roll) and Shade (rear takedown, physical throwable, darkness, stalking crouch) on their own pad layers. Off by default; not in the facility. | No visual identity yet (no stance, trail or swap flash; imp-65 does that). Shade still holds the cleaver. v01_weapons_test and souls_pad_test are red on the base (fix-76 queued). |
 
 Fixes that also landed: fix-hidden-cache-test, fix-58 (an execution on a downed body is one beat and ends with them dead), and fix-55 (the examiner no longer uses the Higgsfield skin).
+| intake-29 pad-first intake | landed (42fdbd02, 6 Oct) | NEURAL INTAKE is fully playable on a PS4/PS5 pad: L1/R1 tabs, D-pad rows, face-button actions, device-aware hints, push-to-talk on R3 with a text fallback, on-screen rename. | Header overlaps the tabs, labels run off the edge, the subject preview is still the checker body (fix-77 queued). Not tried on a real pad. |
 
 ## 2. What v0.1 still needs before v0.2 starts
 
