@@ -33,6 +33,11 @@ func _ready() -> void:
 	var hints: KeyHints = vat.key_hints
 	vat._on_hack_finished(false)
 	await get_tree().process_frame
+	check(not hints._panel.visible, "no hint sits on the BRAIN HACKED card")
+	# bughunt-79: hints wait out a mission card, then show.
+	vat.mission_card.skip()
+	await get_tree().process_frame
+	await get_tree().process_frame
 	check(hints._panel.visible and hints._key.text == "K", "after the hack, K is offered first (%s)" % hints._key.text)
 	var bottom: float = hints._panel.position.y + hints._panel.size.y
 	check(bottom > vat.get_viewport().get_visible_rect().size.y * 0.6, "bottom of the screen")

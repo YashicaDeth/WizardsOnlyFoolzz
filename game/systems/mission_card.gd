@@ -15,6 +15,8 @@ const CellOutzType := preload("res://systems/celloutz_type.gd")
 
 signal finished(card_id: String)
 
+const GROUP := "mission_cards"
+
 const BONE := Color("e8dcc0")
 const BLOOD := Color("a8281a")
 const DRIED := Color("4a0f0a")
@@ -50,6 +52,8 @@ func play(id: String, words: String, seconds := 5.2) -> void:
 	duration = seconds
 	clock = 0.0
 	playing = true
+	# KeyHints holds its hint while a card plays (both claim screen centre).
+	add_to_group(GROUP)
 	_seed = hash(id)
 	visible = true
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -228,3 +232,11 @@ class CelloutzEase:
 		if t >= 1.0:
 			return 1.0
 		return (1.0 - pow(1.0 - t, 3.0)) + 0.3 * sin(t * PI)
+
+
+## True while any card in the tree is on screen.
+static func any_playing(tree: SceneTree) -> bool:
+	for card in tree.get_nodes_in_group(GROUP):
+		if card is MissionCard and (card as MissionCard).playing and (card as MissionCard).is_visible_in_tree():
+			return true
+	return false
