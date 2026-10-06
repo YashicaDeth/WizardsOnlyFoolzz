@@ -36,6 +36,13 @@ const BROKEN_SHARE := 0.1
 ## A blast's shock reaches this far past its radius, at `shock` x its damage:
 ## weak walls (brick, drywall) blow out wide, hard ones only where it hit.
 const SHOCK_REACH := 1.6
+## imp-63: a blast blackens surviving cells out to this many times its radius:
+## black at the edge of what it blew out, fading to clean. The soot is kept
+## per cell and goes with a piece.
+const SOOT_REACH := 3.2
+const SOOT := Color(0.05, 0.04, 0.035)
+## Visual layer of loose pieces, so the floor's scorch decals skip them.
+const DEBRIS_VISUAL := 1 << 1
 ## Meta on a `Ballistics` scar that sits on a voxel wall (names get uniquified).
 const SCAR := &"voxel_scar"
 
@@ -58,6 +65,8 @@ var size := Vector3i.ONE
 ## 0 empty, else index + 1 into `palette`.
 var cells := PackedByteArray()
 var hp := PackedFloat32Array()
+## 0 clean, 255 black (imp-63). Sized with `cells` on the first rebuild.
+var soot := PackedByteArray()
 var palette: Array[String] = []
 ## Cells when built whole; 0 for a piece that broke off.
 var start_cells := 0
@@ -174,19 +183,55 @@ func damage_sphere(world_point: Vector3, radius: float, source: String, damage: 
 				if hp[i] <= 0.0:
 					result.material = material
 					gone.append(Vector3i(x, y, z))
+	var sooted := shock > 0.0 and _blacken(centre, core, core * SOOT_REACH)
 	if gone.is_empty():
+		if sooted:
+			# Only the colour changed: the collider stays as it is.
+			rebuild(false)
 		return result
 	var away := push if push.length_squared() > 0.0 else Vector3.UP
+	var flown := {}
 	for n in gone.size():
 		var c := gone[n]
-		if n < CUBES_PER_HIT:
+		var material := cell_at(c)
+		flown[material] = int(flown.get(material, 0)) + 1
+		if int(flown[material]) <= BlastFx.pieces_of(material, CUBES_PER_HIT):
 			spawn_cube(get_parent(), cell_centre(c), voxel * 0.9, cell_at(c), (away.normalized() * 3.0 + (cell_centre(c) - world_point).normalized() * 2.5) * clampf(damage / 60.0, 0.4, 3.0))
 		cells[index(c)] = 0
 	result.removed = gone.size()
 	MaterialToughness.play_break(self, world_point, str(result.material))
+	var fx := BlastFx.of(self)
+	if fx != null:
+		fx.break_dust(world_point, str(result.material), gone.size(), away)
 	result.fell = _split(away)
 	rebuild()
 	return result
+
+
+## Soot on every standing cell within `reach` cells of `centre` (grid units),
+## full out to `core`. Returns whether any cell got darker.
+func _blacken(centre: Vector3, core: float, reach: float) -> bool:
+	if soot.size() != cells.size():
+		soot.resize(cells.size())
+	var low := Vector3i(floori(centre.x - reach), floori(centre.y - reach), floori(centre.z - reach)).max(Vector3i.ZERO)
+	var high := Vector3i(floori(centre.x + reach), floori(centre.y + reach), floori(centre.z + reach)).min(size - Vector3i.ONE)
+	var changed := false
+	for z in range(low.z, high.z + 1):
+		for y in range(low.y, high.y + 1):
+			for x in range(low.x, high.x + 1):
+				var i := x + y * size.x + z * size.x * size.y
+				if cells[i] == 0:
+					continue
+				var distance := (Vector3(x, y, z) + Vector3(0.5, 0.5, 0.5)).distance_to(centre)
+				var t := 1.0 - maxf(distance - core, 0.0) / maxf(reach - core, 0.001)
+				if t <= 0.0:
+					continue
+				# Ragged, not a perfect disc: each cell takes a share of it.
+				var level := int(255.0 * clampf(t * 1.4, 0.0, 1.0) * (0.65 + 0.35 * float(hash(i) % 100) / 100.0))
+				if level > soot[i]:
+					soot[i] = level
+					changed = true
+	return changed
 
 
 ## Anything no longer joined to an anchor breaks off and falls. Returns the
@@ -264,10 +309,15 @@ func _break_off(island: Array, push: Vector3) -> void:
 	piece.cells.resize(piece.size.x * piece.size.y * piece.size.z)
 	piece.hp.resize(piece.cells.size())
 	var mass_total := 0.0
+	var dirty := soot.size() == cells.size()
+	if dirty:
+		piece.soot.resize(piece.cells.size())
 	for c: Vector3i in island:
 		var material := cell_at(c)
 		piece.set_cell(c - low, material)
 		piece.hp[piece.index(c - low)] = hp[index(c)]
+		if dirty:
+			piece.soot[piece.index(c - low)] = soot[index(c)]
 		mass_total += float((MaterialToughness.MATERIALS.get(material, {}) as Dictionary).get("mass", 2.0))
 		cells[index(c)] = 0
 	piece.freeze = false
@@ -281,8 +331,9 @@ func _break_off(island: Array, push: Vector3) -> void:
 
 
 ## The exposed faces as one mesh (vertex colour per material, a little grain
-## per cell so a wall reads as blocks), and the matching collider.
-func rebuild() -> void:
+## per cell so a wall reads as blocks), and the matching collider unless
+## `collide` is false (a soot-only change keeps the old one).
+func rebuild(collide := true) -> void:
 	if _mesh == null:
 		_mesh = MeshInstance3D.new()
 		_mesh.name = "Voxels"
@@ -298,6 +349,8 @@ func rebuild() -> void:
 	for material in palette:
 		colour_of.append((MaterialToughness.MATERIALS.get(material, MaterialToughness.MATERIALS.dirt) as Dictionary).colour)
 	var layer := size.x * size.y
+	if soot.size() != cells.size():
+		soot.resize(cells.size())
 	for z in size.z:
 		for y in size.y:
 			for x in size.x:
@@ -306,6 +359,9 @@ func rebuild() -> void:
 					continue
 				var grain := 0.86 + 0.14 * float(hash(Vector3i(x, y, z)) % 100) / 100.0
 				var tint: Color = colour_of[id - 1] * grain
+				var black := soot[x + y * size.x + z * layer]
+				if black > 0:
+					tint = tint.lerp(SOOT, float(black) / 255.0 * 0.88)
 				tint.a = 1.0
 				var base := Vector3(x, y, z)
 				for face in FACES:
@@ -337,6 +393,8 @@ func rebuild() -> void:
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	mesh.surface_set_material(0, look())
 	_mesh.mesh = mesh
+	if not collide and _shape.shape != null:
+		return
 	if freeze:
 		var faces := PackedVector3Array()
 		for i in indices:
@@ -397,19 +455,20 @@ static func spawn_cube(parent: Node, at: Vector3, edge: float, material: String,
 	# Own layer, so tool rays (mask 1) reach past the rubble to the wall.
 	cube.collision_layer = DEBRIS_LAYER
 	cube.collision_mask = 1 | DEBRIS_LAYER | RagdollBody.BODY_LAYER
-	cube.mass = float((MaterialToughness.MATERIALS.get(material, {}) as Dictionary).get("mass", 2.0)) * 0.4
+	# imp-63: the piece is the material's (`BlastFx.DEBRIS`): brick chunks,
+	# concrete grit, wood splinters, steel shards. One shared mesh and look each.
+	var dims := BlastFx.piece_size(material, edge)
+	var full := edge * edge * edge
+	cube.mass = maxf(0.05, float((MaterialToughness.MATERIALS.get(material, {}) as Dictionary).get("mass", 2.0)) * 0.4 * (dims.x * dims.y * dims.z) / full)
 	var visual := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = Vector3.ONE * edge
-	var tint := StandardMaterial3D.new()
-	tint.albedo_color = (MaterialToughness.MATERIALS.get(material, MaterialToughness.MATERIALS.dirt) as Dictionary).colour
-	tint.roughness = 0.9
-	box.material = tint
-	visual.mesh = box
+	visual.mesh = BlastFx.unit_box()
+	visual.material_override = BlastFx.piece_look(material)
+	visual.scale = dims
+	visual.layers = DEBRIS_VISUAL
 	cube.add_child(visual)
 	var collision := CollisionShape3D.new()
 	var shape := BoxShape3D.new()
-	shape.size = box.size
+	shape.size = dims
 	collision.shape = shape
 	cube.add_child(collision)
 	parent.add_child(cube)
