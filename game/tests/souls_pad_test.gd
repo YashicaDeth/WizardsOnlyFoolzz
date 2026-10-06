@@ -19,6 +19,15 @@ func _frames(count: int) -> void:
 		await get_tree().physics_frame
 
 
+## Triggers are polled in SoulsPad._process. Headless, the sandbox runs several
+## physics steps per drawn frame, so physics frames alone can pass without the
+## pad ever looking at the trigger.
+func _ticks(count: int) -> void:
+	for _i in count:
+		await get_tree().process_frame
+	await get_tree().physics_frame
+
+
 func _button(index: JoyButton, down: bool) -> void:
 	var event := InputEventJoypadButton.new()
 	event.device = demo.pad.device
@@ -52,7 +61,7 @@ func _ready() -> void:
 	demo = load("res://gore_demo.tscn").instantiate()
 	add_child(demo)
 	await _frames(3)
-	demo.arsenal.select_slot(HunterArsenal.SLOT_ORDER.find("sword"))
+	demo.arsenal.select_slot(HunterArsenal.SLOT_ORDER.find("cleaver"))
 
 	# --- Touchpad: over the shoulder. ---
 	_press(JOY_BUTTON_TOUCHPAD)
@@ -120,16 +129,16 @@ func _ready() -> void:
 	await _frames(90)
 	demo.stamina = 100.0
 	_axis(JOY_AXIS_TRIGGER_RIGHT, 1.0)
-	await _frames(2)
+	await _ticks(2)
 	_axis(JOY_AXIS_TRIGGER_RIGHT, 0.0)
-	await _frames(2)
+	await _ticks(2)
 	check(demo.moveset.current_attack() == "heavy", "R2 pressed and let go is the heavy")
 	await _frames(120)
 	demo.stamina = 100.0
 	_axis(JOY_AXIS_TRIGGER_RIGHT, 1.0)
 	await _frames(55)
 	_axis(JOY_AXIS_TRIGGER_RIGHT, 0.0)
-	await _frames(2)
+	await _ticks(2)
 	check(demo.moveset.current_attack() == "charged_heavy", "R2 held past the charge is the charged heavy (%s)" % demo.moveset.current_attack())
 	_press(JOY_BUTTON_Y)
 	check(demo.stance == "two_hand", "triangle switches to two hands")
@@ -142,10 +151,10 @@ func _ready() -> void:
 	_button(JOY_BUTTON_LEFT_SHOULDER, false)
 	check(not demo.guarding, "and lowers it")
 	_axis(JOY_AXIS_TRIGGER_LEFT, 1.0)
-	await _frames(2)
-	check(demo.guarding and demo.guard_held < 0.1, "L2 raises a fresh guard: the parry window")
+	await _ticks(1)
+	check(demo.guarding and demo.guard_held < 0.1, "L2 raises a fresh guard: the parry window (%.2f s held)" % demo.guard_held)
 	_axis(JOY_AXIS_TRIGGER_LEFT, 0.0)
-	await _frames(2)
+	await _ticks(2)
 	check(not demo.guarding, "and L2 let go lowers it")
 
 	# --- The same data layer changes only the firearm meanings. ---
@@ -158,17 +167,17 @@ func _ready() -> void:
 	await _frames(2)
 	check(int(demo.arsenal.state().get("loaded", 0)) == loaded_before, "R1 does not become a second firearm trigger")
 	_axis(JOY_AXIS_TRIGGER_LEFT, 1.0)
-	await _frames(2)
+	await _ticks(2)
 	check(demo.firearm_aiming, "with a firearm L2 aims")
 	_axis(JOY_AXIS_TRIGGER_LEFT, 0.0)
-	await _frames(2)
+	await _ticks(2)
 	check(not demo.firearm_aiming, "releasing L2 lowers the firearm")
 	_axis(JOY_AXIS_TRIGGER_RIGHT, 1.0)
-	await _frames(2)
+	await _ticks(2)
 	_axis(JOY_AXIS_TRIGGER_RIGHT, 0.0)
-	await _frames(2)
+	await _ticks(2)
 	check(int(demo.arsenal.state().get("loaded", 0)) == loaded_before - 1, "with a firearm R2 fires")
-	demo.arsenal.select_slot(HunterArsenal.SLOT_ORDER.find("sword"))
+	demo.arsenal.select_slot(HunterArsenal.SLOT_ORDER.find("cleaver"))
 	demo.pad.set_combat_context("melee")
 	demo.yaw = atan2(-(demo.bodies[0].holder.global_position.x - demo.eye.x), -(demo.bodies[0].holder.global_position.z - demo.eye.z))
 	await _frames(30)

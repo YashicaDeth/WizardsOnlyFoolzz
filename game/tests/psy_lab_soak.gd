@@ -105,7 +105,7 @@ func _process(delta: float) -> void:
 	if demo == null:
 		demo = lab.get("demo")
 		if demo != null:
-			demo.arsenal.select_slot(HunterArsenal.SLOT_ORDER.find("sword"))
+			demo.arsenal.select_slot(HunterArsenal.SLOT_ORDER.find("cleaver"))
 			demo._toggle_view()
 			demo._set_enemies_enabled(true)
 			demo.spar_level = 1
