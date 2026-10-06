@@ -32,6 +32,18 @@ extends Node3D
 ##
 ## Reused: BloodPool takes a share of every landing as the stain left under
 ## the sheet (dial `stain`), which is also what Footprints reads to print.
+##
+## imp-61 (Greg, 5 Oct ~19:00: "Fix and improve the pour (a real liquid
+## surface, not spheres) and add sound"):
+## - The pour draws through FluidSurface (screen-space fluid: one glossy,
+##   red, see-through surface over the blobs) unless `surface` is off, which
+##   brings back the old stretched spheres.
+## - A fast landing throws a crown of small droplets back up (`crown`), which
+##   join the same surface, so impacts read as splashes.
+## - The pool no longer runs under solid things: the first landing scans the
+##   floor for static bodies (the plinth, props) and those cells stay dry;
+##   fluid that lands on one goes to the nearest open cell.
+## - Sounds through FluidSound: splashes and splats where it lands, wading.
 
 signal shocked(target: Node, damage: float)
 
@@ -47,6 +59,12 @@ signal shocked(target: Node, damage: float)
 ## Feed BloodPool (stain + footprints) with this share of what lands.
 @export var stain := 1.0
 @export var colour := Color(0.42, 0.04, 0.03)
+## Draw the pour as one screen-space surface (false: the old spheres).
+@export var surface := true
+## The surface's buffer size as a share of the view.
+@export var surface_resolution := 0.5
+## Droplets thrown back up by a fast landing: 0 none, 1 default.
+@export var crown := 1.0
 
 const MAX_BLOBS := 260
 const BLOB_RADIUS := 0.055
@@ -54,6 +72,11 @@ const NEIGHBOUR := 0.13
 const GRID_HZ := 30.0
 ## Below this depth a cell is dry for wading and current.
 const WET_MIN := 0.0012
+## How often landed fluid is handed to BloodPool as stain.
+const STAIN_SECONDS := 0.1
+## Global dial (a graphics setting): false draws every pour as the old
+## spheres, whatever each FluidBody's own `surface` says.
+static var surface_allowed := true
 
 var grid := 64
 var cell := 0.12
@@ -67,6 +90,11 @@ var ripple_prev := PackedFloat32Array()
 var drained := 0.0
 var landed := 0.0
 var splashes := 0
+## Crowns thrown by landings (not counted in `splashes`, which is wading/shots).
+var impact_splashes := 0
+## 1 where a solid stands on the floor: the pool never enters it.
+var blocked := PackedByteArray()
+var obstacles_scanned := false
 var shocks := 0
 var shock_left := 0.0
 var shock_cells: Dictionary = {}
@@ -75,7 +103,14 @@ var _pos := PackedVector3Array()
 var _vel := PackedVector3Array()
 var _vol := PackedFloat32Array()
 var _age := PackedFloat32Array()
+var _size := PackedFloat32Array()
+var _drop := PackedByteArray()
 var _blobs: MultiMeshInstance3D
+var _multimesh: MultiMesh
+var _surface: FluidSurface
+var _sound_clock := 0.0
+var _stain_owed: Dictionary = {}
+var _stain_clock := 0.0
 var _sheet: MeshInstance3D
 var _sheet_material: ShaderMaterial
 var _field: Image
@@ -105,6 +140,9 @@ func setup(owner_root: Node, half_extent := 3.84, grate_at := Vector2(2.6, 0.0),
 	depth.fill(0.0)
 	ripple.fill(0.0)
 	ripple_prev.fill(0.0)
+	blocked.resize(count)
+	blocked.fill(0)
+	obstacles_scanned = false
 	# The floor creeps a hair down toward the grate (2 mm a metre), enough
 	# for standing fluid to find it over a minute and no more.
 	for z in grid:
@@ -123,11 +161,17 @@ func setup(owner_root: Node, half_extent := 3.84, grate_at := Vector2(2.6, 0.0),
 func emit(from: Vector3, velocity: Vector3, volume: float) -> bool:
 	if _pos.size() >= MAX_BLOBS:
 		return false
-	_pos.append(to_local(from))
-	_vel.append(global_basis.inverse() * velocity)
+	_add_blob(to_local(from), global_basis.inverse() * velocity, volume, 1.0, false)
+	return true
+
+
+func _add_blob(at: Vector3, velocity: Vector3, volume: float, size: float, drop: bool) -> void:
+	_pos.append(at)
+	_vel.append(velocity)
 	_vol.append(volume)
 	_age.append(0.0)
-	return true
+	_size.append(size)
+	_drop.append(1 if drop else 0)
 
 
 func blob_count() -> int:
@@ -137,7 +181,7 @@ func blob_count() -> int:
 func _step_blobs(delta: float) -> void:
 	var count := _pos.size()
 	if count == 0:
-		_blobs.multimesh.visible_instance_count = 0
+		_multimesh.visible_instance_count = 0
 		return
 	# Spatial hash, then SPH-lite: neighbours share velocity (viscosity, the
 	# gloop), push apart when crowded and pull together when near (cohesion,
@@ -186,7 +230,7 @@ func _step_blobs(delta: float) -> void:
 		var query := PhysicsRayQueryParameters3D.create(to_global(from), to_global(to + velocity.normalized() * BLOB_RADIUS * 0.5), 1)
 		var hit := space.intersect_ray(query)
 		if to.y <= BLOB_RADIUS * 0.4 or (not hit.is_empty() and (hit.normal as Vector3).y > 0.7 and to_local(hit.position).y < 0.08):
-			_land(Vector3(to.x, 0.0, to.z), _vol[index], velocity)
+			_land(Vector3(to.x, 0.0, to.z), _vol[index], velocity, _drop[index] == 1)
 			continue
 		if not hit.is_empty():
 			var normal: Vector3 = global_basis.inverse() * (hit.normal as Vector3)
@@ -195,7 +239,7 @@ func _step_blobs(delta: float) -> void:
 			# and runs along it (off a ledge, down a wall).
 			velocity = (velocity - normal * minf(velocity.dot(normal), 0.0)) * (0.92 if normal.y > 0.7 else 0.6)
 		if _age[index] > 4.0:
-			_land(Vector3(to.x, 0.0, to.z), _vol[index], Vector3.ZERO)
+			_land(Vector3(to.x, 0.0, to.z), _vol[index], Vector3.ZERO, true)
 			continue
 		_pos[index] = to
 		_vel[index] = velocity
@@ -205,20 +249,30 @@ func _step_blobs(delta: float) -> void:
 		var vel := PackedVector3Array()
 		var vol := PackedFloat32Array()
 		var age := PackedFloat32Array()
+		var size := PackedFloat32Array()
+		var drop := PackedByteArray()
+		# Crowns thrown this frame by `_land` sit after `count`: keep them too.
+		for index in range(count, _pos.size()):
+			keep.append(index)
 		for index in keep:
 			pos.append(_pos[index])
 			vel.append(_vel[index])
 			vol.append(_vol[index])
 			age.append(_age[index])
+			size.append(_size[index])
+			drop.append(_drop[index])
 		_pos = pos
 		_vel = vel
 		_vol = vol
 		_age = age
+		_size = size
+		_drop = drop
+	_sound_clock = maxf(_sound_clock - delta, 0.0)
 	_draw_blobs()
 
 
 func _draw_blobs() -> void:
-	var multimesh := _blobs.multimesh
+	var multimesh := _multimesh
 	multimesh.visible_instance_count = _pos.size()
 	for index in _pos.size():
 		var velocity := _vel[index]
@@ -229,28 +283,70 @@ func _draw_blobs() -> void:
 			var side := along.cross(Vector3.UP if absf(along.y) < 0.95 else Vector3.RIGHT).normalized()
 			basis = Basis(side, along, side.cross(along)).orthonormalized()
 			basis = basis * Basis.from_scale(Vector3(1.0, 1.0 + minf(speed * 0.35, 1.6), 1.0))
-		multimesh.set_instance_transform(index, Transform3D(basis, _pos[index]))
+		multimesh.set_instance_transform(index, Transform3D(basis * Basis.from_scale(Vector3.ONE * _size[index]), _pos[index]))
 
 
-func _land(at: Vector3, volume: float, velocity: Vector3) -> void:
-	deposit(at, volume)
+## A blob reaching the floor. Fast ones splash: a crown of droplets thrown
+## up and out (a share of the volume rides them and lands a moment later),
+## a ripple, and a splash (or a splat on dry floor) to hear. `quiet` blobs
+## (crown droplets, blobs that aged out) only deposit.
+func _land(at: Vector3, volume: float, velocity: Vector3, quiet := false) -> void:
 	var speed := velocity.length()
+	var kept := volume
+	if not quiet and crown > 0.0 and speed > 2.0 and _pos.size() < MAX_BLOBS - 6:
+		var drops := clampi(int(speed * 0.9 * crown), 2, 5)
+		var share := volume * 0.12
+		var around := randf() * TAU
+		var flat := Vector3(velocity.x, 0.0, velocity.z) * 0.25
+		for drop in drops:
+			var turn := around + TAU * float(drop) / float(drops) + randf_range(-0.4, 0.4)
+			var out := Vector3(cos(turn), 0.0, sin(turn))
+			var throw := out * speed * randf_range(0.18, 0.32) + flat + Vector3(0, speed * randf_range(0.28, 0.42) * crown, 0)
+			_add_blob(at + out * BLOB_RADIUS + Vector3(0, BLOB_RADIUS * 0.6, 0), throw, share, randf_range(0.45, 0.7), true)
+			kept -= share
+		impact_splashes += 1
+	deposit(at, kept)
 	if speed > 1.5:
 		disturb(at, minf(speed * 0.0015, 0.006))
+	if not quiet and speed > 1.2 and _sound_clock <= 0.0:
+		_sound_clock = 0.07
+		var pooled := depth_at(to_global(at)) > film * 2.0
+		FluidSound.play(self, "fluid_splash" if pooled else "fluid_splat", to_global(at), clampf(speed / 6.0, 0.25, 1.0))
 
 
 # --- the pool ----------------------------------------------------------------
 
 ## Pour `volume` m³ onto the floor at `at` (this node's local space).
 func deposit(at: Vector3, volume: float) -> void:
+	if not obstacles_scanned and is_inside_tree():
+		scan_obstacles()
 	var index := _index_at(at)
 	if index < 0 or volume <= 0.0:
 		return
+	if blocked[index] == 1:
+		# On top of the plinth or a prop: it runs off to the nearest open floor.
+		index = _nearest_open(index, int(ceil(1.5 / cell)))
+		if index < 0:
+			return
+		at = _cell_centre_v3(index)
 	depth[index] += volume / (cell * cell)
 	landed += volume
 	_dirty = true
 	if stain > 0.0 and root != null:
-		BloodPool.keep(root, to_global(at) * Vector3(1, 0, 1), volume * stain * 80000.0)
+		# Batched per cell (`_flush_stain`): BloodPool rebuilds a pool's mesh
+		# on every call, and a pour lands hundreds of blobs a second.
+		_stain_owed[index] = float(_stain_owed.get(index, 0.0)) + volume
+
+
+## Hand the stain owed since the last flush to BloodPool, one call per cell.
+func _flush_stain() -> void:
+	_stain_clock = 0.0
+	if _stain_owed.is_empty():
+		return
+	if root != null and root.is_inside_tree():
+		for index: int in _stain_owed:
+			BloodPool.keep(root, to_global(_cell_centre_v3(index)) * Vector3(1, 0, 1), float(_stain_owed[index]) * stain * 80000.0)
+	_stain_owed.clear()
 
 
 ## A ripple at `at` (local), `height` metres.
@@ -286,6 +382,8 @@ func wet_cells() -> int:
 
 
 func clear() -> void:
+	obstacles_scanned = false
+	_stain_owed.clear()
 	depth.fill(0.0)
 	ripple.fill(0.0)
 	ripple_prev.fill(0.0)
@@ -295,6 +393,8 @@ func clear() -> void:
 	_vel.clear()
 	_vol.clear()
 	_age.clear()
+	_size.clear()
+	_drop.clear()
 	_dirty = true
 	_upload()
 
@@ -318,7 +418,7 @@ func _step_grid(delta: float) -> void:
 			var neighbours := [index - 1 if x > 0 else -1, index + 1 if x < grid - 1 else -1, index - grid if z > 0 else -1, index + grid if z < grid - 1 else -1]
 			for side in 4:
 				var other: int = neighbours[side]
-				if other < 0:
+				if other < 0 or blocked[other] == 1:
 					continue
 				var drop := level - (ground[other] + depth[other])
 				if drop > 0.0:
@@ -375,6 +475,71 @@ func _upload() -> void:
 	_field_tex.update(_field)
 
 
+## Mark the floor cells a solid stands on (static bodies on layer 1 that
+## reach down into the first few centimetres: the plinth, a pedestal, crates),
+## so the pool flows around them instead of under. Bodies that move (shards,
+## floaters, people) are not obstacles. Runs at the first landing after
+## setup or clear().
+func scan_obstacles() -> void:
+	obstacles_scanned = true
+	blocked.fill(0)
+	if not is_inside_tree():
+		return
+	var space := get_world_3d().direct_space_state
+	var probe := BoxShape3D.new()
+	probe.size = Vector3(cell * 0.8, 0.05, cell * 0.8)
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = probe
+	query.collision_mask = 1
+	query.collide_with_areas = false
+	var marked := 0
+	for z in grid:
+		for x in grid:
+			var centre := _cell_centre(x, z)
+			query.transform = Transform3D(global_basis, to_global(Vector3(centre.x, 0.045, centre.y)))
+			for found in space.intersect_shape(query, 4):
+				var collider: Object = found.get("collider")
+				if collider is StaticBody3D or collider is CSGShape3D:
+					blocked[x + z * grid] = 1
+					marked += 1
+					break
+	# A floor that sits a little high would read as one big obstacle: then
+	# nothing is, rather than a pool that cannot exist.
+	if marked > blocked.size() * 0.6:
+		push_warning("FluidBody %s: %d of %d cells read as solid; obstacle scan ignored" % [name, marked, blocked.size()])
+		blocked.fill(0)
+
+
+func blocked_cells() -> int:
+	var count := 0
+	for value in blocked:
+		count += value
+	return count
+
+
+func blocked_at(global_point: Vector3) -> bool:
+	var index := _index_at(to_local(global_point))
+	return index >= 0 and blocked[index] == 1
+
+
+func _nearest_open(start: int, reach: int) -> int:
+	var sx := start % grid
+	var sz := start / grid
+	var best := -1
+	var best_d := INF
+	for dz in range(-reach, reach + 1):
+		for dx in range(-reach, reach + 1):
+			var x := sx + dx
+			var z := sz + dz
+			if x < 0 or z < 0 or x >= grid or z >= grid:
+				continue
+			var index := x + z * grid
+			if blocked[index] == 0 and dx * dx + dz * dz < best_d:
+				best_d = dx * dx + dz * dz
+				best = index
+	return best
+
+
 # --- wading ------------------------------------------------------------------
 
 ## Called each physics frame by whoever walks: feet (global), their velocity,
@@ -394,6 +559,7 @@ func wade(walker: Object, feet: Vector3, velocity: Vector3, delta: float) -> boo
 		stride.clock = 0.75
 		stride.left = not stride.left
 		splash(feet, clampf(speed / 6.0, 0.2, 1.0))
+		FluidSound.play(self, "wade_%d" % (randi() % 3 + 1), feet, clampf(speed / 5.0, 0.35, 1.0))
 		Footprints.step(root, walker, feet * Vector3(1, 0, 1) + Vector3(0, 0, 0), "left" if stride.left else "right")
 	_stride[id] = stride
 	return true
@@ -568,6 +734,9 @@ func _physics_process(delta: float) -> void:
 	if _grid_clock >= 1.0 / GRID_HZ:
 		_step_grid(_grid_clock)
 		_grid_clock = 0.0
+	_stain_clock += delta
+	if _stain_clock >= STAIN_SECONDS:
+		_flush_stain()
 
 
 func _process(delta: float) -> void:
@@ -613,6 +782,15 @@ func _build_sheet() -> void:
 
 
 func _build_blobs() -> void:
+	if surface and surface_allowed:
+		_surface = FluidSurface.new()
+		_surface.name = "Surface"
+		_surface.resolution = surface_resolution
+		add_child(_surface)
+		var extent := AABB(Vector3(-grid * cell * 0.5, -0.5, -grid * cell * 0.5), Vector3(grid * cell, 4.0, grid * cell))
+		_surface.setup(self, MAX_BLOBS, BLOB_RADIUS, extent, colour)
+		_multimesh = _surface.multimesh
+		return
 	var sphere := SphereMesh.new()
 	sphere.radius = BLOB_RADIUS
 	sphere.height = BLOB_RADIUS * 2.0
@@ -633,6 +811,7 @@ func _build_blobs() -> void:
 	_blobs.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_blobs.custom_aabb = AABB(Vector3(-grid * cell * 0.5, -0.5, -grid * cell * 0.5), Vector3(grid * cell, 4.0, grid * cell))
 	add_child(_blobs)
+	_multimesh = multimesh
 
 
 func _build_grate() -> void:
