@@ -96,6 +96,9 @@ func build(id: String, at: Vector3, round: Array[Vector3], alarm: AlarmDirector,
 	speech.modulate = Color("f2e2c4")
 	speech.outline_modulate = Color("120606")
 	speech.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	# A spoken line reads through the room: depth-tested, a tank or pillar
+	# between you and him cut the sentence off mid-word (bughunt-79-c).
+	speech.no_depth_test = true
 	speech.position = Vector3(0, 2.2, 0)
 	add_child(speech)
 	var record := WorldHistory.subject(subject_id)

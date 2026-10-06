@@ -239,6 +239,9 @@ func _build_guard() -> void:
 	# sized label was a few pixels tall (bughunt-79). Fixed screen size,
 	# about 20 px caps at 720p.
 	speech.fixed_size = true
+	# A spoken line reads through the room: depth-tested, a tank or pillar
+	# between you and him cut the sentence off mid-word (bughunt-79-c).
+	speech.no_depth_test = true
 	speech.pixel_size = 0.0013
 	speech.position = GUARD_AT + Vector3(0, 2.25, 0)
 	add_child(speech)

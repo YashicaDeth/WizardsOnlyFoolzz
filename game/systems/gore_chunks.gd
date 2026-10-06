@@ -600,8 +600,11 @@ static func play_impact(host: Node3D, at: Vector3, layer: int, level := 1.0, del
 		# Deliberately a time-scaled timer: under the sandbox's held slow motion
 		# the layers should spread out with everything else. It is only ever a
 		# few tens of milliseconds of real time either way.
+		# The id, not the Node: a body freed inside the delay (a kill, a scene
+		# reload) would otherwise be a freed lambda capture and an engine error.
+		var host_id := host.get_instance_id()
 		host.get_tree().create_timer(delay).timeout.connect(
-			func() -> void: play_impact(host, at, layer, level, 0.0)
+			func() -> void: play_impact(instance_from_id(host_id) as Node3D, at, layer, level, 0.0)
 		)
 		return
 	var scene := host.get_tree().current_scene

@@ -53,12 +53,12 @@ static func step(root: Node, walker: Object, at: Vector3, side: String) -> bool:
 	node.position = Vector3(at.x, at.y + LIFT, at.z)
 	node.rotation.y = randf() * TAU + (0.2 if side == "left" else -0.2)
 	root.add_child(node)
-	var prints: Array = _prints.get(_scene_key(root), [])
+	# Static, so a reloaded scene (vat rebirth) inherits its freed prints;
+	# typing one of those was a SCRIPT ERROR that aborted the step (bughunt-79-c).
+	var prints: Array = (_prints.get(_scene_key(root), []) as Array).filter(func(held: Variant) -> bool: return is_instance_valid(held))
 	prints.append(node)
 	while prints.size() > MAX_PRINTS:
-		var oldest: Node = prints.pop_front()
-		if is_instance_valid(oldest):
-			oldest.queue_free()
+		(prints.pop_front() as Node).queue_free()
 	_prints[_scene_key(root)] = prints
 	_wet[id] = wet * PRINT_COST
 	return true
@@ -77,7 +77,7 @@ static func print_count(root: Node) -> int:
 static func _print_count(root: Node) -> int:
 	if root == null:
 		return 0
-	return (_prints.get(_scene_key(root), []) as Array).size()
+	return (_prints.get(_scene_key(root), []) as Array).filter(func(held: Variant) -> bool: return is_instance_valid(held)).size()
 
 
 static func print_material(wet: float) -> StandardMaterial3D:

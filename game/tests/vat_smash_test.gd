@@ -74,8 +74,25 @@ func _ready() -> void:
 	var medium := tank.medium as MeshInstance3D
 	check(medium.scale.y < 0.1, "the liquid drains out (level %.2f)" % medium.scale.y)
 	check(tank.puddle != null and (tank.puddle as Node3D).scale.x > 0.8, "and spreads across the grating")
+	# Job 9: on the v0.1 one map the first subject out is the hostile one,
+	# owned by the fight (V01Encounters), not a loose bingyanger that bolts.
+	var first = tank.freed
+	check(first is V01FreedSubject and is_instance_valid(first) and first == vat.encounters.subject, "the first subject out turns on you (the fight owns it)")
+	# Every tank after that frees a loose subject.
+	var second: Dictionary = smash.tanks[4]
+	face(vat, second)
+	await get_tree().process_frame
+	for blow in smash.blows_needed(vat.doctor_route.held_weapon()):
+		click(vat)
+	for _step in 30:
+		smash.step(0.1)
+	tank = second
 	var loose = tank.freed
-	check(loose != null and is_instance_valid(loose) and loose.state == "loose", "the subject inside climbs out, loose")
+	check(loose != null and is_instance_valid(loose) and not (loose is V01FreedSubject) and loose.state == "loose", "the next subject inside climbs out, loose")
+	if loose == null or loose is V01FreedSubject:
+		print("VAT_SMASH_TEST_RESULT failures=%d" % failures.size())
+		get_tree().quit(1)
+		return
 	check(loose.attitude in ["friendly", "hostile"], "friendly or hostile by its own roll (%s)" % loose.attitude)
 	var record := WorldHistory.subject("growing_floor_subject_%d" % int(tank.seed))
 	check(str(record.get("status", "")) == "loose" and str(record.get("place", "")) == "growing_floor", "and the world knows it was freed from the Growing Floor")
@@ -87,7 +104,7 @@ func _ready() -> void:
 	check(loose.state == "escaped" and str(WorldHistory.subject(loose.subject_id).get("status", "")) == "escaped", "it bolts for the pit door and is gone")
 	var curled = tank.curled
 	check(curled == null or not (curled as Node3D).visible, "nothing is left floating in the empty tank")
-	check(smash.aimed(vat.camera) != 3, "a broken tank can't be broken again")
+	check(smash.aimed(vat.camera) != 4, "a broken tank can't be broken again")
 	check(smash.blows_needed("restraint") < smash.blows_needed(""), "the restraint breaks glass faster than fists")
 	print("VAT_SMASH_TEST_RESULT failures=%d" % failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

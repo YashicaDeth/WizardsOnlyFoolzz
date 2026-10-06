@@ -37,7 +37,8 @@ func _ready() -> void:
 		card.hide()
 	await _shot(menu, "menu_00_the_column")
 
-	menu.get_node("HUD/SettingsPanel").visible = true
+	# The real open path: it dresses the panel (centred plate) before showing it.
+	menu._open_settings()
 	await _shot(menu, "menu_01_settings_support")
 
 	# And what pressing it says when no mail client answers, which on this
