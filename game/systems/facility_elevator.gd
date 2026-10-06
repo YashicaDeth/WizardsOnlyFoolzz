@@ -157,7 +157,9 @@ func _floor_text() -> String:
 			nearest = index
 	var arrow := ""
 	if state == "moving":
-		arrow = "UP " if float(stops[target]) > cab.position.y else "DOWN "
+		arrow = "UP
+" if float(stops[target]) > cab.position.y else "DOWN
+"
 	return arrow + str(stop_names[nearest])
 
 
@@ -214,22 +216,34 @@ func _build_shaft() -> void:
 	# Remaster job5 p1: at 5x a strip a metre past the slot burned to a flat
 	# white bar across the ride; this keeps it a lit tube with its colour.
 	strip.emission_energy_multiplier = 0.6
+	# map-84: a short caged tube in a dark housing, not a bar the length of
+	# the slot, and a lamp strong enough to show the shaft wall going by.
+	var housing := StandardMaterial3D.new()
+	housing.albedo_color = Color("15130f")
+	housing.roughness = 0.9
 	var y := bottom + 1.5
 	var count := 0
 	while y < top - 0.5:
 		for side: int in [-1, 1]:
 			var bar := MeshInstance3D.new()
 			var mesh := BoxMesh.new()
-			mesh.size = Vector3(0.04, 0.05, SHAFT_HALF.y * 1.2)
+			mesh.size = Vector3(0.04, 0.05, 0.6)
 			bar.mesh = mesh
 			bar.material_override = strip
-			bar.position = Vector3(side * (SHAFT_HALF.x - 0.03), y, 0)
+			bar.position = Vector3(side * (SHAFT_HALF.x - 0.05), y, 0.3 if count % 2 == 0 else -0.3)
 			add_child(bar)
+			var back := MeshInstance3D.new()
+			var box := BoxMesh.new()
+			box.size = Vector3(0.05, 0.16, 0.8)
+			back.mesh = box
+			back.material_override = housing
+			back.position = bar.position + Vector3(side * 0.03, 0.02, 0)
+			add_child(back)
 		if count % 2 == 0:
 			var lamp := OmniLight3D.new()
 			lamp.light_color = Color("d2ecc0")
-			lamp.light_energy = 1.6
-			lamp.omni_range = 2.8
+			lamp.light_energy = 3.0
+			lamp.omni_range = 3.6
 			lamp.position = Vector3(SHAFT_HALF.x - 0.3, y, 0)
 			add_child(lamp)
 		y += STRIP_EVERY
@@ -279,18 +293,14 @@ func _build_cab() -> void:
 	lamp.position = Vector3(0, CAR_HEIGHT - 0.15, 0)
 	lamp.rotation.x = -PI * 0.5
 	cab.add_child(lamp)
-	indicator = _label(cab, Vector3(0, DOOR_HEIGHT + 0.2, -CAR_HALF.y + 0.1), 0.0)
-	var back := _label(cab, Vector3(0, DOOR_HEIGHT + 0.2, CAR_HALF.y - 0.1), PI)
+	# map-84: the readout is a small lit panel on the door jamb at eye height.
+	# Over the lintel it hung in the black and rode into the HUD objective;
+	# the big ones over the side slots read as curved text floating in space.
+	indicator = _panel(cab, Vector3(DOOR_HALF + 0.2, 1.55, -CAR_HALF.y + 0.06), 0.0)
+	var back := _panel(cab, Vector3(-DOOR_HALF - 0.2, 1.55, CAR_HALF.y - 0.06), PI)
 	back.name = "IndicatorBack"
 	indicator.text = str(stop_names[stop])
-	# A readout over each side slot too: a rider watching the shaft go by
-	# reads the floor there instead of craning at the lintel.
-	var twins: Array = [back]
-	for side: int in [-1, 1]:
-		var over_slot := _label(cab, Vector3(side * (CAR_HALF.x - 0.02), 2.12, 0), -side * PI * 0.5)
-		over_slot.name = "IndicatorSlot"
-		twins.append(over_slot)
-	indicator.set_meta("twins", twins)
+	indicator.set_meta("twins", [back])
 	_hum = AudioStreamPlayer3D.new()
 	_hum.name = "Hum"
 	var generator := AudioStreamGenerator.new()
@@ -347,6 +357,44 @@ func _leaf(parent: Node3D, at: Vector3, color: Color) -> AnimatableBody3D:
 	parent.add_child(leaf)
 	_shape(leaf, Vector3(DOOR_HALF, DOOR_HEIGHT, 0.06), Vector3.ZERO, color)
 	return leaf
+
+
+## A floor readout set in a dark backlit housing, facing into the car.
+func _panel(parent: Node3D, at: Vector3, turn: float) -> Label3D:
+	var housing := MeshInstance3D.new()
+	housing.name = "ReadoutPanel"
+	var box := BoxMesh.new()
+	box.size = Vector3(0.36, 0.2, 0.03)
+	housing.mesh = box
+	var glass := StandardMaterial3D.new()
+	glass.albedo_color = Color("0e100c")
+	glass.emission_enabled = true
+	glass.emission = Color("3c4832")
+	glass.emission_energy_multiplier = 1.6
+	housing.material_override = glass
+	housing.set_meta("own_material", true)
+	housing.position = at
+	housing.rotation.y = turn
+	parent.add_child(housing)
+	# A lit rim round the dark face: on its own the face was dark on dark and
+	# the two lines still read as text hanging in the black.
+	var rim := MeshInstance3D.new()
+	rim.name = "ReadoutRim"
+	var rim_box := BoxMesh.new()
+	rim_box.size = Vector3(0.42, 0.26, 0.02)
+	rim.mesh = rim_box
+	var tube := StandardMaterial3D.new()
+	tube.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	tube.albedo_color = Color("9fb88a")
+	rim.material_override = tube
+	rim.set_meta("own_material", true)
+	rim.position = at - Basis(Vector3.UP, turn) * Vector3(0, 0, 0.01)
+	rim.rotation.y = turn
+	parent.add_child(rim)
+	var label := _label(parent, at + Basis(Vector3.UP, turn) * Vector3(0, 0, 0.02), turn)
+	label.pixel_size = 0.00062
+	label.line_spacing = -8.0
+	return label
 
 
 func _label(parent: Node3D, at: Vector3, turn: float) -> Label3D:

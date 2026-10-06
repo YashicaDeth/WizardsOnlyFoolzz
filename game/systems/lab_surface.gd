@@ -52,6 +52,13 @@ static func material(role: String) -> StandardMaterial3D:
 	# clean engine demo. Nearest within a mip level, mipmapped so distance
 	# does not shimmer.
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
+	if role == "floor":
+		# map-84: the clean black-and-cream tile read as a chessboard in
+		# the staff-door shot. Wall concrete multiplied over it: grime and
+		# wear across the tiles, the checker still there under it.
+		material.detail_enabled = true
+		material.detail_blend_mode = BaseMaterial3D.BLEND_MODE_MUL
+		material.detail_albedo = _texture(str(ROLES.wall[0]) + "_Color.jpg")
 	_cache[role] = material
 	return material
 

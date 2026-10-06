@@ -55,6 +55,7 @@ const SURFACES := {CONCRETE: "floor", RUST: "wall", CEILING: "ceiling"}
 const ROUTE_COLOR := Color("81906f")
 const SCREEN_COLOR := Color("b8d49f")
 const DANGER_COLOR := Color("a52d20")
+const CABLE_DARK := Color("0d0c0a")
 ## Fittings in tall halls hang on rods to this height above the floor.
 const LAMP_HANG := 4.6
 ## Dial (DESIGN/REMASTER_LOG.md, job5 p1): "worn" lays the route as a broken,
@@ -249,32 +250,49 @@ func _build_surface() -> void:
 		{"s": [[28.0, 3.6, 4.0]], "n": [[28.0, 3.0, 3.0]]})
 	_sign("SURFACE GATE // THE ASHBLOOM", Vector3(28, SURFACE_Y + 3.4, -134.6))
 	_route_strip(Vector3(28, SURFACE_Y + 0.025, -129.4), Vector3(0.55, 0.025, 10.5))
-	_box(Vector3(30, 0.4, 20), Vector3(28, SURFACE_Y - 0.2, -145), Color("3a3026"))
-	var day := OmniLight3D.new()
-	day.light_color = Color("fff1d8")
-	day.light_energy = 4.0
-	day.omni_range = 18.0
-	day.position = Vector3(28, SURFACE_Y + 6.0, -142)
-	add_child(day)
-	# The v0.1 ending is blinding daylight: the open gate reads as a white-out
-	# from the whole head-house, and the light pours in along the floor.
+	# map-84: the gate opens onto ground that runs away into the day, not a
+	# white card in the doorway. Open gate leaves, the yard past them, a broken
+	# wall line and fence posts dark against a far daylight backdrop, so the
+	# exit has depth from the lift doors.
+	_box(Vector3(40, 0.4, 40), Vector3(28, SURFACE_Y - 0.2, -155), Color("6a5e50"))
+	for side: int in [-1, 1]:
+		var leaf := MeshInstance3D.new()
+		leaf.name = "GateLeaf"
+		var slab := BoxMesh.new()
+		slab.size = Vector3(1.5, 3.0, 0.1)
+		leaf.mesh = slab
+		leaf.material_override = _prop_material("frame")
+		# Hinged on the 3 m opening's jambs, swung out ~66 degrees.
+		leaf.position = Vector3(28 + side * 1.5, SURFACE_Y + 1.5, -135.2) + Vector3(side * cos(1.15), 0, -sin(1.15)) * 0.75
+		leaf.rotation.y = side * 1.15
+		add_child(leaf)
+	for spot: Vector3 in [Vector3(21.5, 1.6, -147.0), Vector3(34.5, 2.6, -150.0), Vector3(25.0, 1.1, -158.0), Vector3(38.0, 1.8, -161.0)]:
+		_box(Vector3(3.2, spot.y, 0.5), Vector3(spot.x, SURFACE_Y + spot.y * 0.5, spot.z), CONCRETE, false)
+	for index in 9:
+		var post_x := 18.0 + index * 2.5
+		_box(Vector3(0.12, 2.0 + _wear(index) * 0.5, 0.12), Vector3(post_x, SURFACE_Y + 1.0, -153.5 + _wear(index + 3) * 0.6), CABLE_DARK, false)
 	var glare := MeshInstance3D.new()
 	glare.name = "DaylightGlare"
 	var sheet := BoxMesh.new()
-	sheet.size = Vector3(14.0, 10.0, 0.05)
+	sheet.size = Vector3(90.0, 40.0, 0.05)
 	glare.mesh = sheet
 	var white := StandardMaterial3D.new()
 	white.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	white.albedo_color = Color("fff4e0")
 	white.emission_enabled = true
 	white.emission = Color("fff4e0")
-	white.emission_energy_multiplier = 6.0
+	white.emission_energy_multiplier = 2.2
 	glare.material_override = white
-	# Just past the threshold, so the white fills the doorway down to the
-	# floor instead of hanging as a card over a dark strip of ground.
-	glare.position = Vector3(28, SURFACE_Y + 3.0, -136.3)
+	glare.position = Vector3(28, SURFACE_Y + 6.0, -175.0)
 	glare.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(glare)
+	var day := OmniLight3D.new()
+	day.light_color = Color("fff1d8")
+	day.light_energy = 9.0
+	day.omni_range = 30.0
+	day.omni_attenuation = 0.6
+	day.position = Vector3(28, SURFACE_Y + 6.0, -148)
+	add_child(day)
 	# Daylight spilling back through the gate lights its jambs and the
 	# head-house wall, so the white-out reads as a doorway, not a floating card.
 	var spill := OmniLight3D.new()
@@ -657,6 +675,81 @@ func _build_service_arcade_dressing() -> void:
 	_story_cctv(Vector3(21.2, 4.6, -0.6), Vector3(26.0, 0.0, -4.0), "service_arcade")
 	_story_cctv(Vector3(30.6, 2.8, -58.2), Vector3(28.0, 0.0, -52.0), "service_arcade")
 	_dress_walls("service_arcade", 0.0, Vector2(20.75, 35.25), [-4.0, -14.5, -25.5, -36.0, -46.5, -55.0], 6.4)
+	_build_arcade_stalls_and_cover()
+
+
+## map-84: the arcade read as one long empty box. Stall counters in front of
+## the shutters, a booth on the east wall and waist-high barriers mid-hall:
+## real cover for the three guard fights, each in its own work light, with
+## the painted route (x 26.5..29.5) left clear. `ARCADE_COVER` doubles as the
+## guards' avoid circles (v01_encounters.gd).
+const ARCADE_COVER := [
+	[Vector3(33.4, 0.0, -31.4), 1.9],
+	[Vector3(24.9, 0.0, -38.0), 1.5],
+	[Vector3(31.3, 0.0, -41.2), 1.5],
+]
+
+
+func _build_arcade_stalls_and_cover() -> void:
+	# Three stalls between the west frames, one bay each: counter, partitions
+	# back to the wall, a sheet-steel awning and a bare work lamp over it.
+	for z: float in [-13.4, -17.95, -22.5]:
+		_box(Vector3(0.7, 1.05, 3.9), Vector3(22.55, 0.525, z), RUST)
+		_story_box("StallTop", Vector3(0.86, 0.06, 4.0), Vector3(22.55, 1.08, z), "duct", "service_arcade", "stall")
+		_story_box("StallAwning", Vector3(1.6, 0.06, 4.3), Vector3(21.75, 2.75, z), "frame", "service_arcade", "stall")
+		var bulb := SpotLight3D.new()
+		bulb.name = "StallLamp"
+		bulb.light_color = LAMP_COLOR
+		bulb.light_energy = 6.0
+		bulb.spot_range = 5.0
+		bulb.spot_angle = 55.0
+		bulb.spot_attenuation = 0.7
+		bulb.distance_fade_enabled = true
+		bulb.distance_fade_begin = 34.0
+		bulb.distance_fade_length = 8.0
+		add_child(bulb)
+		bulb.look_at_from_position(Vector3(22.6, 2.6, z), Vector3(21.6, 0.6, z))
+	for z: float in [-11.15, -15.7, -20.25, -24.8]:
+		_box(Vector3(1.25, 2.7, 0.12), Vector3(21.4, 1.35, z), RUST)
+	# The east booth: a cashier's cubicle, half walls to chest height.
+	var booth: Vector3 = ARCADE_COVER[0][0]
+	_box(Vector3(0.14, 1.15, 3.2), Vector3(booth.x - 1.2, 0.575, booth.z), RUST)
+	for side: int in [-1, 1]:
+		_box(Vector3(1.8, 1.15, 0.14), Vector3(booth.x - 0.3, 0.575, booth.z + side * 1.6), RUST)
+		_story_box("BoothPost", Vector3(0.1, 2.6, 0.1), Vector3(booth.x - 1.2, 1.3, booth.z + side * 1.6), "frame", "service_arcade", "stall")
+	_story_box("BoothRoof", Vector3(2.0, 0.08, 3.4), Vector3(booth.x - 0.3, 2.62, booth.z), "duct", "service_arcade", "stall")
+	_story_monitor(Vector3(booth.x + 0.4, 1.25, booth.z), -PI * 0.5, "service_arcade", false)
+	var booth_lamp := OmniLight3D.new()
+	booth_lamp.name = "BoothLamp"
+	booth_lamp.light_color = LAMP_COLOR
+	booth_lamp.light_energy = 3.0
+	booth_lamp.omni_range = 4.0
+	booth_lamp.position = Vector3(booth.x - 0.3, 2.3, booth.z)
+	add_child(booth_lamp)
+	# Waist-high barriers across the approach to the pressure beam: the
+	# pistol guard's cover and yours.
+	for index in [1, 2]:
+		var at: Vector3 = ARCADE_COVER[index][0]
+		_box(Vector3(2.4, 0.95, 0.6), at + Vector3(0, 0.475, 0), CONCRETE)
+		_story_box("BarrierCap", Vector3(2.44, 0.08, 0.64), at + Vector3(0, 0.99, 0), "frame", "service_arcade", "cover")
+	# Past the barriers the hall went black to the lift: two wide floods
+	# under the last frames wash both walls and the floor up to the doors.
+	for z: float in [-44.5, -52.5]:
+		var wash := SpotLight3D.new()
+		wash.name = "ArcadeFarWash"
+		wash.light_color = LAMP_COLOR
+		wash.light_energy = 5.0
+		wash.spot_range = 9.0
+		wash.spot_angle = 72.0
+		wash.spot_attenuation = 0.4
+		wash.distance_fade_enabled = true
+		wash.distance_fade_begin = 50.0
+		wash.distance_fade_length = 10.0
+		wash.position = Vector3(28.0, 5.1, z)
+		wash.rotation.x = -PI * 0.5
+		add_child(wash)
+		_story_box("HighBayHood", Vector3(0.8, 0.22, 0.8), Vector3(28.0, 5.3, z), "duct", "service_arcade", "lamp")
+		_story_box("HighBayLens", Vector3(0.62, 0.03, 0.62), Vector3(28.0, 5.18, z), "wall_tube", "service_arcade", "lamp")
 
 
 ## Lower Works reads across its full height: a clear painted run to the heat
@@ -677,6 +770,41 @@ func _build_lower_works_dressing() -> void:
 	_story_cctv(Vector3(30.4, -9.2, -66.6), Vector3(28.0, -12.0, -74.0), "lower_works")
 	_story_cctv(Vector3(31.4, -8.4, -119.6), Vector3(28.0, -12.0, -112.0), "lower_works")
 	_dress_walls("lower_works", -12.0, Vector2(13.0, 43.0), [-70.0, -78.0, -86.0, -94.0, -102.0, -110.0, -118.0, -126.0], 9.0)
+	_build_lower_works_high_bays()
+
+
+## map-84: Lower Works rendered near black past the first pool. High-bay
+## floods slung under the trusses throw a wide, soft fill over each machine
+## bay, so the crane, the vessels and the sentinel's run read from the lift;
+## a hard flood over the heat elevator mouth makes the exit the brightest
+## thing at the far end. No shadows: the pools and props cast their own.
+func _build_lower_works_high_bays() -> void:
+	for z: float in [-74.0, -90.0, -106.0]:
+		for x: float in [20.5, 35.5]:
+			var bay := SpotLight3D.new()
+			bay.name = "HighBay"
+			bay.light_color = LAMP_COLOR
+			bay.light_energy = 7.0
+			bay.spot_range = 15.0
+			bay.spot_angle = 62.0
+			bay.spot_attenuation = 0.35
+			bay.distance_fade_enabled = true
+			bay.distance_fade_begin = 50.0
+			bay.distance_fade_length = 10.0
+			bay.position = Vector3(x, -3.35, z)
+			bay.rotation.x = -PI * 0.5
+			add_child(bay)
+			_story_box("HighBayHood", Vector3(0.8, 0.22, 0.8), Vector3(x, -3.15, z), "duct", "lower_works", "lamp")
+			_story_box("HighBayLens", Vector3(0.62, 0.03, 0.62), Vector3(x, -3.27, z), "wall_tube", "lower_works", "lamp")
+	var mouth := SpotLight3D.new()
+	mouth.name = "HeatMouthFlood"
+	mouth.light_color = LAMP_COLOR
+	mouth.light_energy = 9.0
+	mouth.spot_range = 9.0
+	mouth.spot_angle = 40.0
+	mouth.spot_attenuation = 0.6
+	add_child(mouth)
+	mouth.look_at_from_position(Vector3(28.0, -7.4, -117.6), Vector3(28.0, -12.0, -115.0))
 
 
 ## The painted route line, worn: dashes of uneven length with scuffed-out

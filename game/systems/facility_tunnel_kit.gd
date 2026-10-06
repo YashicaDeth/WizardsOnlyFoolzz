@@ -193,7 +193,9 @@ static func dress_lift(lift: Node3D) -> void:
 	for child in lift.get_children():
 		if child is StaticBody3D:
 			for part in child.get_children():
-				if part is MeshInstance3D:
+				# The Cab is an AnimatableBody3D (a StaticBody3D) too; the
+				# floor readout's lit panel keeps its own glass (map-84).
+				if part is MeshInstance3D and not part.has_meta("own_material"):
 					(part as MeshInstance3D).material_override = material("wall")
 		elif child is AnimatableBody3D and child.name != "Cab":
 			for part in child.get_children():
@@ -204,7 +206,7 @@ static func dress_lift(lift: Node3D) -> void:
 	var cab := lift.get("cab") as Node3D
 	if cab != null:
 		for part in cab.get_children():
-			if part is MeshInstance3D:
+			if part is MeshInstance3D and not part.has_meta("own_material"):
 				(part as MeshInstance3D).material_override = material("wall", true)
 			elif part is AnimatableBody3D:
 				for leaf in part.get_children():
