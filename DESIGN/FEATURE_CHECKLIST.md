@@ -58,9 +58,9 @@ cyberpunk-ish post-apocalyptic biopunk occult horror; pad first.
 - [ ] Underground cities, bunkers, raiding (later, after v0.1)
 
 ## Black Mirror (the phone)
-- [~] Raise and lower with one button; MAP page, night-vision camera, link to inventory (v02-51 now priority 95)
-- [ ] TouchDesigner-style depth camera: LiDAR depth, contours, scan line, tagged boxes on bodies, useful in the dark
-- [ ] Picked up in the examiner office as part of the demo
+- [x] Raise and lower with one button; MAP page, night-vision camera, link to inventory (v02-51, facility route: CREATE, d-pad pages CAMERA / MAP / CARRY; the Hunt still uses the old Tab + L phone)
+- [x] TouchDesigner-style depth camera: LiDAR depth, contours, scan line, tagged boxes on bodies, useful in the dark (v02-51)
+- [x] Picked up in the examiner office as part of the demo (v02-51, on his desk)
 
 ## Look, HUD, feel
 - [~] Each facility zone its own identity; harsh green-white light pools; red only for danger; grimy story props
