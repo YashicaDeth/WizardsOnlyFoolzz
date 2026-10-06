@@ -35,6 +35,7 @@ const TUNNEL_NETWORK := preload("res://facility_tunnel_network.tscn")
 const TUNNEL_KIT := preload("res://systems/facility_tunnel_kit.gd")
 const ZONE_IDENTITY_SCRIPT := preload("res://systems/facility_zone_identity.gd")
 const V01_ENDING := preload("res://systems/v01_ending.gd")
+const AMBIENT_BED := preload("res://systems/ambient_bed.gd")
 
 ## The vat. The player wakes in front of it, facing deeper in (-Z).
 const START := Vector3(0, 1.0, -2.4)
@@ -115,12 +116,55 @@ func _ready() -> void:
 	if not embedded:
 		_build_player()
 		_build_hud()
+		if AMBIENT_BED.wanted():
+			add_child(AMBIENT_BED.new().setup("vat"))
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
 func attach_player(body: CharacterBody3D, view: Camera3D) -> void:
 	player = body
 	camera = view
+	update_soundscape(player.global_position)
+
+
+## One-map sound routing. Legacy rooms own their bed through scene startup;
+## this route never changes scene, so position must choose both the room bed
+## and what the player's bare feet are actually striking.
+func update_soundscape(at: Vector3) -> void:
+	if player == null:
+		return
+	player.set_meta("surface", surface_for(at))
+	player.set_meta("barefoot", true)
+	var owner := get_parent() if embedded else self
+	var bed := owner.get_node_or_null("AmbientBed") as AmbientBed
+	if bed != null:
+		bed.set_profile(profile_for(at))
+
+
+static func profile_for(at: Vector3) -> String:
+	if _in_lift(at):
+		return "bay"
+	if at.y < -6.0:
+		return "city"
+	if at.x < 8.0:
+		return "vat"
+	if at.x < 20.75:
+		return "support"
+	return "arcade"
+
+
+static func surface_for(at: Vector3) -> String:
+	if _in_lift(at):
+		return "metal"
+	if at.x < 8.0 and at.y > -6.0:
+		return "tile"
+	return "concrete"
+
+
+static func _in_lift(at: Vector3) -> bool:
+	var transit := absf(at.x - 28.0) <= 1.35 and absf(at.z + 62.0) <= 1.35 and at.y >= -12.5 and at.y <= 0.5
+	var heat := absf(at.x - 28.0) <= 1.35 and absf(at.z + 122.0) <= 1.35 and at.y >= -12.5 and at.y <= SURFACE_Y + 0.5
+	return transit or heat
 
 
 # --- 0C: Growing Floor, Examination Room, service artery, Service Arcade -----
@@ -336,6 +380,7 @@ func _physics_process(delta: float) -> void:
 		player.move_and_slide()
 	player.rotation.y = yaw
 	BODY_CAM.apply(camera, player, delta, pitch)
+	update_soundscape(player.global_position)
 	_update_hud()
 	if not exit_reached and player.global_position.y > SURFACE_Y - 1.0 and player.global_position.z < GATE_Z:
 		_leave()
