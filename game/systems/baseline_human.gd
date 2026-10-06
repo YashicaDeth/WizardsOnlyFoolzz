@@ -2141,10 +2141,7 @@ func _land_splat(at: Vector3, size: float, velocity := Vector3.DOWN) -> void:
 	# also feeds the pool set, which is what finally makes a body bleeding out
 	# onto one spot leave a stain that grows.
 	BloodPool.keep(root, landed, BloodPool.DROP_VOLUME)
-	while splats.size() > splat_budget():
-		var oldest: Node3D = splats.pop_front()
-		if is_instance_valid(oldest):
-			oldest.queue_free()
+	_trim_splats()
 
 
 ## Both scenes read the GORE setting through here, so the Hunt Grounds and the
@@ -2215,10 +2212,17 @@ static func mark_ground_for_chunk(world: World3D, root: Node, at: Vector3, veloc
 	root.add_child(splat)
 	splats.append(splat)
 	_remember_blood(root, splat)
+	_trim_splats()
+
+
+## `splats` is static and outlives the scene (a vat rebirth reloads it), so it
+## can hold freed marks; popping one into a typed variable was a SCRIPT ERROR
+## that aborted the trim, once per landed drop (bughunt-79-c).
+static func _trim_splats() -> void:
+	splats = splats.filter(func(splat: Variant) -> bool: return is_instance_valid(splat))
 	while splats.size() > splat_budget():
 		var oldest: Node3D = splats.pop_front()
-		if is_instance_valid(oldest):
-			oldest.queue_free()
+		oldest.queue_free()
 
 
 static func _blood_scene_key(root: Node) -> String:
