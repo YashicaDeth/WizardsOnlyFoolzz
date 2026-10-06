@@ -4,8 +4,9 @@ extends Node
 ## shock and the frame rate at the station. Windowed only (headless draws
 ## nothing and says so), one window on the right monitor:
 ##   Godot --path game --resolution 1600x900 res://tests/fluid_glass_capture.tscn -- --shots=P:/GameDev/Temp/fluid_glass
-## Writes 01_intact, 02_cracked_1..04_cracked_3, 05_burst, 06_pouring,
-## 07_pooled, 08_waded, 09_shock .png and fps.txt into the folder.
+## Writes 01_intact, 02_cracked_1..04_cracked_3, 05_burst, 05_pour_1..6 (the
+## pour as a sequence), 06_pouring, 07_pooled, 08_waded, 09_shock .png and
+## fps.txt into the folder. `--surface=0` draws the pour as the old spheres.
 
 var lab: Node3D
 var eye: Camera3D
@@ -17,6 +18,9 @@ func _ready() -> void:
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--shots="):
 			shots = argument.trim_prefix("--shots=")
+		# imp-61 A/B: --surface=0 draws the pour as the old spheres.
+		if argument == "--surface=0":
+			FluidBody.surface_allowed = false
 	DirAccess.make_dir_recursive_absolute(shots)
 	BloodPool.clear()
 	Footprints.clear()
@@ -45,7 +49,13 @@ func _ready() -> void:
 	station.strike(face, Vector3.FORWARD)
 	await _frames(4)
 	await _shot("05_burst", close_from, close_at)
-	await _seconds(0.8)
+	# imp-61: the pour as a sequence, low and three-quarter on the struck face,
+	# where the stream leaves the glass and lands.
+	var pour_from: Vector3 = tank.to_global(Vector3(-1.3, 0.5, 2.9))
+	var pour_at: Vector3 = tank.to_global(Vector3(0.1, 0.0, 1.0))
+	for frame in 6:
+		await _seconds(0.3)
+		await _shot("05_pour_%d" % (frame + 1), pour_from, pour_at)
 	await _shot("06_pouring", wide_from, wide_at)
 	await _fps("pouring")
 	await _seconds(7.0)
@@ -72,8 +82,28 @@ func _ready() -> void:
 
 
 func _fps(label: String) -> void:
-	await _seconds(1.5)
-	var line := "%s: %d fps (%s)" % [label, Engine.get_frames_per_second(), RenderingServer.get_video_adapter_name()]
+	# imp-61: GPU milliseconds per viewport too, since fps on a shared,
+	# vsync-capped desktop is noisy: the game frame, and the pour's splat
+	# buffer when the surface is drawing.
+	var main_rid := get_viewport().get_viewport_rid()
+	RenderingServer.viewport_set_measure_render_time(main_rid, true)
+	var splats: SubViewport = lab.liquid.fluid.get_node_or_null("Surface/FluidSplats")
+	if splats:
+		RenderingServer.viewport_set_measure_render_time(splats.get_viewport_rid(), true)
+	var main_gpu := 0.0
+	var splat_gpu := 0.0
+	var samples := 0
+	var started := Time.get_ticks_usec()
+	var frames := 0
+	while Time.get_ticks_usec() - started < 1500000:
+		await RenderingServer.frame_post_draw
+		frames += 1
+		main_gpu += RenderingServer.viewport_get_measured_render_time_gpu(main_rid)
+		if splats:
+			splat_gpu += RenderingServer.viewport_get_measured_render_time_gpu(splats.get_viewport_rid())
+		samples += 1
+	var seconds := float(Time.get_ticks_usec() - started) / 1000000.0
+	var line := "%s: %d fps (%s), gpu game view %.2f ms, gpu splat buffer %.2f ms, %d blobs" % [label, roundi(frames / seconds), RenderingServer.get_video_adapter_name(), main_gpu / maxi(samples, 1), splat_gpu / maxi(samples, 1), lab.liquid.fluid.blob_count()]
 	fps_lines.append(line)
 	print("FLUID_GLASS_CAPTURE ", line)
 
