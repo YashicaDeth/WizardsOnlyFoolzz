@@ -1008,7 +1008,9 @@ func _ready() -> void:
 	var surfacing: Node = null
 	if came_up and WorldHistory.event_count("surfaced") == 0:
 		WorldHistory.world_minute = WorldClock.OPENING_MINUTE
-	if came_up or not run_summary.is_empty():
+	# The v0.1 ending (systems/v01_ending.gd) owns the surfacing beat itself.
+	var v01_ending := get_tree().root.has_meta("v01_ending_active")
+	if (came_up or not run_summary.is_empty()) and not v01_ending:
 		# Greg, 28 September: surfacing is the payoff (Surfacing): daylight,
 		# silence then wind, the title, the keys, then the run card.
 		surfacing = preload("res://systems/surfacing.gd").new()

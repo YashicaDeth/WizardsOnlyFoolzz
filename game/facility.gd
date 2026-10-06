@@ -19,6 +19,10 @@ const V01_ONE_MAP := true
 ## OPEN dial: keep removed branches visibly sealed instead of presenting
 ## misleading dead ends. Greg can flip this without restoring their puzzles.
 const V01_DISABLED_ROUTES_AS_SEALED := true
+## Greg, 5 Oct: v0.1 ends at the Surface Gate (systems/v01_ending.gd):
+## daylight, silence then wind, the title over the first view, TO BE
+## CONTINUED, back to the title menu. false = walk on into the Hunt as before.
+const V01_ENDS_AT_GATE := true
 
 const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
 const BODY_CAM := preload("res://systems/body_cam_feel.gd")
@@ -27,6 +31,7 @@ const FACILITY_ROUTES := preload("res://systems/facility_routes.gd")
 const TUNNEL_NETWORK := preload("res://facility_tunnel_network.tscn")
 const TUNNEL_KIT := preload("res://systems/facility_tunnel_kit.gd")
 const ZONE_IDENTITY_SCRIPT := preload("res://systems/facility_zone_identity.gd")
+const V01_ENDING := preload("res://systems/v01_ending.gd")
 
 ## The vat. The player wakes in front of it, facing deeper in (-Z).
 const START := Vector3(0, 1.0, -2.4)
@@ -67,6 +72,10 @@ var tunnels: Node3D
 var prompt: Label
 var where: Label
 var exit_reached := false
+## Tests leave the gate inert; one that wants the real ending sets this.
+var play_ending_in_tests := false
+## The running ending, once the gate is reached.
+var ending: CanvasLayer
 ## When embedded in vat_chamber the authored opening keeps its one player,
 ## camera and HUD. This node contributes the connected geometry and lifts.
 var embedded := false
@@ -377,7 +386,7 @@ func location_for(at: Vector3) -> String:
 func _leave() -> void:
 	exit_reached = true
 	zone_exit_reached.emit()
-	if OS.get_environment("ATG_TEST_MODE") == "1":
+	if OS.get_environment("ATG_TEST_MODE") == "1" and not play_ending_in_tests:
 		return
 	WorldHistory.begin_ledger_batch()
 	if str(FACILITY_ROUTES.ensure().get("active_route", "")) != FACILITY_ROUTES.ROUTE_HEAT_ELEVATOR:
@@ -386,6 +395,12 @@ func _leave() -> void:
 	WorldHistory.record_event("facility_surface_gate_reached", {"location": "surface_head_house"})
 	WorldHistory.commit_ledger_batch()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if V01_ENDS_AT_GATE:
+		# On the tree root: it outlives this scene into the world and the menu.
+		ending = V01_ENDING.new()
+		get_tree().root.add_child(ending)
+		ending.begin()
+		return
 	Interstitial.travel("res://bone_yard_hunt.tscn", "surface gate // out into the ashbloom expanse")
 
 
