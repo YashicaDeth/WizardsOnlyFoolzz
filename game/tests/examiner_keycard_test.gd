@@ -182,7 +182,10 @@ func _run(run: int, seed_value: int) -> void:
 	var early_down := false
 	var frames := 0
 	var side := 1.0
-	while fight.state == "fighting" and frames < 3000:
+	# Job 6 raised him to ~nine cleaver blows; bare-handed (the 30% of seeds
+	# that skip the axe) that is ~29 blows, which never fit in 3000 frames.
+	var budget := 3000 if str(route.call("held_weapon")) == "axe" else 9000
+	while fight.state == "fighting" and frames < budget:
 		frames += 1
 		vat.anatomy.blood_remaining = vat.anatomy.blood_capacity
 		vat.anatomy.dead = false
@@ -206,7 +209,7 @@ func _run(run: int, seed_value: int) -> void:
 		if fight.state == "fighting":
 			head_ok = head_ok and _head_on(fight)
 			early_down = early_down or bool(fight.body.anatomy.get("dead")) or bool(fight.body.anatomy.get("downed"))
-	check(fight.state == "won", tag + "he goes down (%d frames, %d blows, %d telegraphs, %d parries)" % [frames, fight.hits_landed, fight.telegraphs, fight.parries])
+	check(fight.state == "won", tag + "he goes down (%d frames, %d blows, %d telegraphs, %d parries, %s, %.0f left)" % [frames, fight.hits_landed, fight.telegraphs, fight.parries, str(route.call("held_weapon")), fight.health])
 	check(head_ok, tag + "his head stays on through the fight (no mesh break, no early sever)")
 	check(not early_down, tag + "his rig never drops before the fight is won")
 	check(fight.phase == 2 and WorldHistory.event_count("examiner_fight_phase") == 1, tag + "he turned desperate under half health")
