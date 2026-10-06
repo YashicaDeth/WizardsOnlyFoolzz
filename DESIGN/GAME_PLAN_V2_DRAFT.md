@@ -2,7 +2,15 @@
 
 Started by the hourly build manager, 2026-10-05 15:10. This is a draft. It does not change GAME_PLAN.html or BUILD_PLAN.html, and no v0.2 job has been queued from it. Anything not taken from Greg's recorded decisions is marked **proposal, needs Greg**.
 
-## 1. What v0.1 "Escape" actually delivered (as of 05:10, 6 Oct)
+## 0. v2: refining v0.1 into a really good demo (refreshed 6 Oct 22:10)
+
+Greg's north star (6 Oct night): "a really enjoyable gameplay shell" he can texture himself. So v2 is not new content; it is making the START-to-daylight route play well.
+
+- **Plays well:** the examiner fight (telegraphed, fair, keycard always drops); the one-map route with real lifts and no loading screens (map-84 lit Lower Works and gave the arcade real cover, min 174 fps); the vat wake through the flood; the ending; the pad-first intake; route suites green with no script errors (bughunt-79-a/b/c).
+- **Plays worst:** (1) the first-person melee still reads as a pose, not a swing (feel-86 queued); (2) encounters are flat: rooms are one long tile hall each with a guard in it (feel-87 queued); (3) lab systems (organs, X-ray, liquid, destruction) barely touch the route (route-88 queued); (4) lift rides are near-black; (5) the player model, which Greg hates (player-81 queued).
+- **Next refinement passes, in order:** bug list (DESIGN/BUGS.md) > player-81 > feel-86 > feel-87 > route-88 > imp-66 vat room > the Black Mirror in the route (v02-51 running now). Each pass ships a before/after render and keeps the route suites green.
+
+## 1. What v0.1 "Escape" actually delivered (as of 22:10, 6 Oct)
 
 6 of the 10 v0.1 jobs have landed on `claude/launch-latest`. Details are in DESIGN/REMASTER_LOG.md.
 
@@ -14,7 +22,7 @@ Started by the hourly build manager, 2026-10-05 15:10. This is a draft. It does 
 | lab-47 Teardown destruction | yes (c73a2e0e) | The 5 toughness tiers are one table. 15 cm voxel walls break where hit and drop loose pieces. There is a diggable dirt patch. One blast system covers the grenade, charge, drill and shovel. | Explosions have no smoke or sparks. The ground is one colour. It was never rendered on the GPU. `remaster-lab-47-p1` is queued. |
 | job3 moving and fighting | yes | HOTLINE CLEAVER and PRODSTAFF work with buffer, hitstop, stagger, block and parry. Movement has sprint, crouch and roll. There is lab ADS and lock-on. The arcade guard can be cut. | The first-person swing is a pose, not an animated arm. There is no swing or hit sound. The Hunt still issues the old sword. `remaster-job3-p1` is pending. |
 | job4 waking in the vat | yes | First-person wake in red liquid, real glass and a flood. | It was not rendered at landing. `remaster-job4-p1` is pending. |
-| job5 one facility map | running | | Greg's top priority ("the map is the main thing"). |
+| job5 one facility map | landed; map-84 pass (5c18d817, 6 Oct) | One map: vat floor, examiner office, service artery, arcade, transit lift, Lower Works, heat lift, surface gate. Real lifts with lit floor-readout panels; arcade cover the guards path round; Lower Works lit; min 174 fps on the 2060 SUPER. | Lift cab rides are near-black; arcade and Lower Works still read as the same green tile room. |
 | job6 examiner | landed (39782473, 6 Oct) | A fair, telegraphed boss on the rigged base body. His keycard always drops and opens the staff door. | His head is still a placeholder (Greg's call). The open doorway reads flat, and there is red light that isn't a danger cue (fix-72 queued). |
 | job9 enemies | landed (2efeed7b, 6 Oct) | 2-3 CellOutz guards (staff and pistol; block, parry, call each other), the freed vat subject and the Lower Works sentinel (X-ray plates, weak core). Each one has a telegraph and a headless duel test, and a careful player wins with every weapon. 110-200 fps per room. | A guard turns his back to you during the shock wind-up. The sentinel's ram telegraph is faint from range. A kill subtitle stays up between rooms. The subject is lost in the red vat room. v01_weapons_test has 6 failures (cause unknown). fix-73 queued. |
 | job7 death, saves, HUD | pending | | |
