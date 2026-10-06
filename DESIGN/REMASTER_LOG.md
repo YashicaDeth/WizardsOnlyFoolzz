@@ -626,3 +626,6 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 - Plan risk: dec-89's WIP carries imp-66's DisciplineLobes while hub/imp-66-vat-room is unmerged; whoever lands imp-66 must keep one copy, not two.
 - Top three: fix-95 ragdoll quit crash (queued, claude, 70); brain screen pad glyph + done state (add to fix-93 or a follow-up); a regrowth capture for render_one.
 - All 7 accounts parked (claude-alt2 until 07:04, codex-allusions-plus 08:17, codex-sircuteskingdom-team 06:17); nothing to spawn until then.
+
+## 2026-10-07, fix-92 thought clear of mission card
+- The vat thought now reads the live mission-card title bounds each frame, moves above GET REVENGE when their rectangles meet, and returns to its authored 196-226 strip when the card clears. If a title leaves no room above, the thought uses the gap below it and above the visible key hint. Card timing, wording, type and key hints are unchanged.
