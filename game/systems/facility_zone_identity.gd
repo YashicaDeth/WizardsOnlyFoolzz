@@ -35,6 +35,9 @@ const ROUTE_PAINT := 0.3
 const ROUTE_COLOR := Color("81906f")
 ## Dial: the one sign over the arcade stalls flickers. false = steady.
 const SIGN_FLICKER := true
+## Dial (map-84): how much of a surface set's metalness map is kept. 1.0 =
+## the scan's own full metal, which reads black without a reflection probe.
+const METAL_SHARE := 0.3
 
 ## Zone -> surface -> [ambientCG set, tint]. The tint pulls each set into
 ## the house darkness; the sets themselves are what tell the zones apart.
@@ -370,7 +373,11 @@ func surface_material(set_name: String, tint: Color) -> StandardMaterial3D:
 					made.roughness = 1.0
 				"Metalness":
 					made.metallic_texture = load(path)
-					made.metallic = 1.0
+					# map-84: no sky or reflection probe down here, so full
+					# metal has no diffuse and every lamp landed on black: the
+					# Lower Works and both shafts rendered near-black. Painted,
+					# dirty plate (as `_matte` does for props).
+					made.metallic = METAL_SHARE
 		made.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
 		made.uv1_triplanar = true
 		made.uv1_world_triplanar = true
