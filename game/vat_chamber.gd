@@ -383,8 +383,11 @@ func _ready() -> void:
 	add_child(sight)
 	sight.call("setup", camera)
 	# The phone camera shows signals too (SignalSight), as it does in the Hunt.
-	phone.raised_changed.connect(func(up: bool, page: String) -> void:
-		sight.set("phone_lens", up and page == "CAMERA"))
+	# The key-hint box (layer 45) would sit on the raised glass.
+	phone.raised_changed.connect(func(up: bool, _page: String) -> void:
+		sight.set("phone_lens", phone.signal_lens())
+		if key_hints != null:
+			key_hints.visible = not up)
 	# The failed subject in the jammed tank died here.
 	sight.set("spirits", [Vector3(-3.4, 0.0, 2.6)])
 	sight.set("hidden", [{"id": WEAK_WALL_ID, "at": WEAK_WALL_AT + Vector3(0.26, 0, 0), "size": WEAK_WALL_SIZE, "across": Vector3.BACK}])

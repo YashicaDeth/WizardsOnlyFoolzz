@@ -54,6 +54,23 @@ var world_environment: Environment
 ## Returns [Vector3 feet, float yaw] for the carrier, each frame.
 var pose_provider: Callable
 var _graded: Environment
+## The rail is stroke-drawn type too; it is re-recorded only when what it says
+## changes (page, device), not every frame.
+var _rail_said := ""
+## The handheld is thousands of stroke-drawn primitives (chassis, glass, type).
+## Drawn straight onto the HUD it cost ~60 fps on Greg's RTX 2060 SUPER (v02-51
+## probe). It renders into its own viewport instead, every frame while it moves
+## and PAGE_HZ while it is steady, and the HUD draws one texture.
+const PAGE_HZ := 15.0
+var _page_view: SubViewport
+var _page_sprite: TextureRect
+var _page_due := 0.0
+## The same for the stroke-type readouts (the lens strip and the page rail):
+## they change at 10 Hz, so they render into one cached layer at 10 Hz.
+const READOUT_HZ := 10.0
+var _readout_view: SubViewport
+var _readout_sprite: TextureRect
+var _readout_due := 0.0
 
 
 ## Picks the phone up for good: the handheld record says possessed, and the
@@ -79,21 +96,53 @@ func _ready() -> void:
 	lens = CAMERA.new()
 	lens.name = "BlackMirrorSensor"
 	add_child(lens)
+	_page_view = SubViewport.new()
+	_page_view.name = "HandheldView"
+	_page_view.transparent_bg = true
+	_page_view.disable_3d = true
+	_page_view.gui_disable_input = true
+	_page_view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	add_child(_page_view)
 	handheld = HANDHELD.new()
 	handheld.name = "Handheld"
-	add_child(handheld)
+	_page_view.add_child(handheld)
+	_page_sprite = TextureRect.new()
+	_page_sprite.name = "HandheldPicture"
+	_page_sprite.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_page_sprite.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_page_sprite.texture = _page_view.get_texture()
+	_page_sprite.visible = false
+	add_child(_page_sprite)
 	handheld.set_available_modes(HANDHELD_PAGES)
 	handheld.show_tab_rail = false
+	handheld.steady_redraw_hz = 12.0
 	# Nothing in the facility can hold a dropped phone (the Hunt spawns one);
 	# the handheld's DELETE drop would lose it for good, so it is off here.
 	handheld.drop_key_override = false
+	_readout_view = SubViewport.new()
+	_readout_view.name = "ReadoutView"
+	_readout_view.transparent_bg = true
+	_readout_view.disable_3d = true
+	_readout_view.gui_disable_input = true
+	_readout_view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	add_child(_readout_view)
+	# The lens strip is drawn by BlackMirrorCamera; it only moves house.
+	var strip: Control = lens.get("overlay")
+	strip.reparent(_readout_view, false)
 	rail = Control.new()
 	rail.name = "PageRail"
 	rail.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	rail.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rail.draw.connect(_draw_rail)
-	add_child(rail)
+	_readout_view.add_child(rail)
 	rail.visible = false
+	_readout_sprite = TextureRect.new()
+	_readout_sprite.name = "ReadoutPicture"
+	_readout_sprite.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_readout_sprite.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_readout_sprite.texture = _readout_view.get_texture()
+	_readout_sprite.visible = false
+	add_child(_readout_sprite)
 
 
 ## camera / environment: the carrier's view and the room's own grade.
@@ -109,6 +158,12 @@ func setup(camera: Camera3D, environment: Environment, plan_source: Node, target
 		map.call("set_plan_source", plan_source)
 		# No satellite underground: the plan is the map.
 		map.call("set_satellite_available", false, "underground")
+
+
+## The night lens shows signals the way the Hunt's does (SignalSight). The
+## depth image is its own picture; SignalSight's screen pass smeared it.
+func signal_lens() -> bool:
+	return raised and page == "CAMERA" and str(lens.get("mode")) == "night"
 
 
 func held() -> bool:
@@ -127,6 +182,7 @@ func raise_phone() -> bool:
 		return false
 	raised = true
 	rail.visible = true
+	_rail_said = ""
 	_show_page()
 	raised_changed.emit(true, page)
 	return true
@@ -165,6 +221,7 @@ func page_verb(direction: int) -> void:
 	match page:
 		"CAMERA":
 			lens.call("set_mode", "depth" if str(lens.get("mode")) == "night" else "night")
+			raised_changed.emit(true, page)
 		"CARRY":
 			handheld.step_carry(direction)
 
@@ -246,7 +303,9 @@ func handle_input(event: InputEvent) -> bool:
 	return false
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	_drive_page_view(delta)
+	_drive_readout_view(delta)
 	if not raised:
 		return
 	if not held():
@@ -267,7 +326,47 @@ func _process(_delta: float) -> void:
 		"action_MAP": "FACILITY PLAN",
 		"action_CARRY": "%s BRAIN INDEX" % glyphs.accept,
 	}
-	rail.queue_redraw()
+	var said := "%s|%s" % [page, pad]
+	if said != _rail_said:
+		_rail_said = said
+		rail.queue_redraw()
+		_readout_due = 0.0
+
+
+func _drive_page_view(delta: float) -> void:
+	var showing: bool = handheld.visible
+	_page_sprite.visible = showing
+	if not showing:
+		_page_view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+		return
+	var want := Vector2i(get_viewport_rect().size)
+	if _page_view.size != want:
+		_page_view.size = want
+		_page_due = 0.0
+	var moving: bool = float(handheld.raised) < 0.999 or int(handheld.pending_mode_index) >= 0
+	_page_due -= delta
+	if moving or _page_due <= 0.0:
+		_page_due = 1.0 / PAGE_HZ
+		_page_view.render_target_update_mode = SubViewport.UPDATE_ONCE
+
+
+func _drive_readout_view(delta: float) -> void:
+	var strip: Control = lens.get("overlay")
+	strip.visible = lens.visible
+	var showing := rail.visible or strip.visible
+	_readout_sprite.visible = showing
+	if not showing:
+		_readout_view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+		return
+	var want := Vector2i(get_viewport_rect().size)
+	if _readout_view.size != want:
+		_readout_view.size = want
+		strip.size = Vector2(want)
+		_readout_due = 0.0
+	_readout_due -= delta
+	if _readout_due <= 0.0:
+		_readout_due = 1.0 / READOUT_HZ
+		_readout_view.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 
 func _on_pad() -> bool:

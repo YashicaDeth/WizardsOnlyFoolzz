@@ -18,7 +18,7 @@ render_mode unshaded, cull_disabled, depth_draw_never, depth_test_disabled, fog_
 
 uniform sampler2D depth_texture : hint_depth_texture, filter_nearest;
 uniform float near_range = 0.35;
-uniform float far_range = 32.0;
+uniform float far_range = 18.0;
 // Size of one sensor point in screen pixels.
 uniform float point_pitch = 3.0;
 // Metres the scan wave travels each second, and how long a struck point glows.
@@ -71,7 +71,7 @@ void fragment() {
 
 	// 1. LiDAR ramp: near white, falling to black by far_range.
 	float t = clamp((d - near_range) / (far_range - near_range), 0.0, 1.0);
-	float ramp = pow(1.0 - t, 1.6);
+	float ramp = pow(1.0 - t, 2.2);
 
 	// 2. Edge TOP: Sobel on linear depth, relative to distance so a wall far
 	// away and a hand close up cut equally clean outlines.
@@ -131,7 +131,8 @@ void fragment() {
 	float grey = points * (0.55 + 0.45 * struck) + edge * 0.95 + contour * 0.6;
 	vec3 colour = mix(VOID, BONE, clamp(grey, 0.0, 1.0));
 	colour += COPPER * wave_front * dot_mask * (1.0 - t) * 0.7;
-	colour = mix(colour, mix(ARTERIAL, BONE, edge * 0.6) * (0.35 + 0.9 * max(points, edge)), tracked * 0.85);
+	// Hot points and outline only: the box itself is the tracker's hairline.
+	colour = mix(colour, mix(ARTERIAL, BONE, edge * 0.6) * (0.25 + 1.1 * max(points, edge)), tracked * 0.7 * max(dot_mask, edge));
 	colour += BONE * scan_line * 0.35;
 	colour *= 1.0 - sky;
 	vec2 centred = SCREEN_UV - 0.5;

@@ -88,8 +88,9 @@ func target_rect(entry: Dictionary) -> Rect2:
 	for corner in 8:
 		var offset := Vector3(half.x if corner & 1 else -half.x, half.y if corner & 2 else -half.y, half.z if corner & 4 else -half.z)
 		var point := at + offset
+		# A box half behind the lens projects to nonsense: no box at all.
 		if camera.is_position_behind(point):
-			continue
+			return Rect2()
 		var screen := camera.unproject_position(point)
 		lo = Vector2(minf(lo.x, screen.x), minf(lo.y, screen.y))
 		hi = Vector2(maxf(hi.x, screen.x), maxf(hi.y, screen.y))

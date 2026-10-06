@@ -38,6 +38,10 @@ var tracker: Control
 ## Set by a host that prints its own pad-aware controls. Empty keeps the
 ## Hunt's keyboard legend.
 var hint_line := ""
+## The readout is stroke-drawn type (CellOutzType): re-recording it every frame
+## cost ~20 fps on the RTX 2060 SUPER (v02-51 probe). It changes at 10 Hz.
+const OVERLAY_HZ := 10.0
+var _overlay_due := 0.0
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -164,7 +168,10 @@ func _process(delta: float) -> void:
 	material_value.set_shader_parameter("bloom", sensor.bloom)
 	if mode == "depth":
 		_update_depth_tracking()
-	overlay.queue_redraw()
+	_overlay_due -= delta
+	if _overlay_due <= 0.0:
+		_overlay_due = 1.0 / OVERLAY_HZ
+		overlay.queue_redraw()
 	if not sensor.enabled:
 		set_active(false)
 
@@ -255,7 +262,8 @@ func _draw_camera() -> void:
 	overlay.draw_rect(Rect2(Vector2(size.x * 0.5 - line_width * 0.5 - 12, size.y - 108), Vector2(line_width + 24, 24)), Color(0, 0, 0, 0.62))
 	CellOutzType.draw_condensed(overlay, Vector2(size.x * 0.5 - line_width * 0.5, size.y - 100), line, 9.0, INK * Color(1, 1, 1, 0.85), 0.7)
 	if mode == "depth":
-		_draw_operator_chain(Vector2(34, size.y - 160))
+		# Centred above the readout: the corners belong to the field HUD.
+		_draw_operator_chain(Vector2(size.x * 0.5 - (CHAIN.size() * 64.0 - 12.0) * 0.5, size.y - 140))
 
 
 ## The TouchDesigner network this image is, drawn as the operator chain in the

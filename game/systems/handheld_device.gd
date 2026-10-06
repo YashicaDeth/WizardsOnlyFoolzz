@@ -85,6 +85,12 @@ var control_hints := {}
 ## A host that draws its own page rail across every page (camera included)
 ## turns the chassis tabs off so the device never shows two rails.
 var show_tab_rail := true
+## 0 redraws the whole device every frame (the Hunt, as before). A host can
+## set a rate for when the device is steady (fully raised, no page shutter,
+## no lean or turn in motion): the chassis, glass and pages are stroke-drawn
+## and re-recording them every frame cost ~70 fps in the facility (v02-51).
+var steady_redraw_hz := 0.0
+var _redraw_due := 0.0
 const PAGE_ACTIONS := {
 	"INDEX": "POINT / OPEN RECORD",
 	"MAP": "LEAN / SURVEY",
@@ -1014,6 +1020,12 @@ func _process(delta: float) -> void:
 			lead_found.emit(found)
 	elif mode == "RADIO":
 		radio.release_lock()
+	var moving := raised < 0.999 or pending_mode_index >= 0 or (lean > 0.001 and lean < 0.999) or (turn > 0.001 and turn < 0.999) or wave.length_squared() > 0.0001
+	if steady_redraw_hz > 0.0 and not moving:
+		_redraw_due -= delta
+		if _redraw_due > 0.0:
+			return
+		_redraw_due = 1.0 / steady_redraw_hz
 	_overlay.queue_redraw()
 	queue_redraw()
 
@@ -1385,7 +1397,8 @@ func _drive_backlight(delta: float) -> void:
 	# as a fault rather than as a fade.
 	var rate: float = 9.0 if want > backlight else 34.0
 	backlight = move_toward(backlight, clampf(want, 0.05, 1.0), delta * rate)
-	if _overlay != null and is_instance_valid(_overlay):
+	# A throttled host redraws the overlay on its own clock (end of _process).
+	if steady_redraw_hz <= 0.0 and _overlay != null and is_instance_valid(_overlay):
 		_overlay.queue_redraw()
 
 
@@ -2152,6 +2165,13 @@ func _fit_into_aperture(panel: Control) -> void:
 	var design := get_viewport_rect().size
 	if design.x <= 1.0 or design.y <= 1.0:
 		design = Vector2(1280, 720)
+	# v02-51. Re-laying a hosted panel out every frame re-sized it every frame,
+	# which re-laid and redrew the whole map: ~15 fps in the facility. Only a
+	# changed aperture needs a new fit.
+	var fit_key := [design, _content_rect, _page_rect]
+	if panel.get_meta("aperture_fit", []) == fit_key:
+		return
+	panel.set_meta("aperture_fit", fit_key)
 	# Hosted pages are explicitly sized and scaled below. Their own fullscreen
 	# ready paths leave stretch anchors behind, which made every assignment emit
 	# a layout warning even though the final pixels happened to fit.

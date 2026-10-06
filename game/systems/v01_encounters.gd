@@ -325,7 +325,10 @@ func _poll_input() -> void:
 	var inventory = chamber.get("field_inventory")
 	if inventory != null and bool(inventory.get("visible")):
 		return
-	if Input.is_action_just_pressed("xray"):
+	# D-UP is also the raised Black Mirror's camera switch (BlackMirrorPhone).
+	var phone = chamber.get("phone")
+	var phone_up: bool = phone != null and bool(phone.get("raised"))
+	if Input.is_action_just_pressed("xray") and not phone_up:
 		xray_on = not xray_on
 		if not xray_on and xray != null:
 			xray.show_scan(null, chamber.camera)

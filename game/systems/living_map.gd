@@ -102,6 +102,10 @@ signal travel_requested(place: Dictionary)
 ## surface survey, so walking the facility cannot chart the Ashbloom.
 var plan_source: Node = null
 var plan_feet := Vector3.ZERO
+## The plan is a few dozen rects and some stroke type; redrawn at 12 Hz, not
+## every frame (v02-51 probe: the MAP page cost ~70 fps redrawn per frame).
+const PLAN_HZ := 12.0
+var _plan_due := 0.0
 
 
 func _ready() -> void:
@@ -144,8 +148,6 @@ func observe_interior(world_position: Vector3, yaw: float) -> void:
 	plan_feet = world_position
 	player_at = Vector2(world_position.x, world_position.z)
 	player_yaw = yaw
-	if visible:
-		queue_redraw()
 
 
 func _load_survey() -> void:
@@ -271,6 +273,12 @@ func _process(delta: float) -> void:
 	if not visible:
 		return
 	clock += delta
+	if plan_source != null and is_instance_valid(plan_source):
+		_plan_due -= delta
+		if _plan_due <= 0.0:
+			_plan_due = 1.0 / PLAN_HZ
+			queue_redraw()
+		return
 	for row: Dictionary in HOLDINGS.overview().holdings:
 		var id := str(row.id)
 		var current := float(_holding_reveal.get(id, 0.0))
@@ -1309,6 +1317,9 @@ func _draw_facility_sheet() -> void:
 ## room they are in lights; lifts carry the levels they join. The header says
 ## where they are and what the route asks next, from the same facility calls
 ## the body-cam stamp already uses.
+const PLAN_SPAN := 60.0
+
+
 func _draw_facility_plan() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.035, 0.026, 0.019, 0.96))
 	draw_rect(_chart, PLATE)
@@ -1320,15 +1331,14 @@ func _draw_facility_plan() -> void:
 	if level.is_empty():
 		_draw_frame()
 		return
-	var bounds: Rect2 = level[0].rect
-	for entry: Dictionary in level:
-		bounds = bounds.merge(entry.rect)
-	bounds = bounds.grow(4.0)
 	var inner := _chart.grow(-24.0)
 	inner.position.y += 70.0
 	inner.size.y -= 70.0
-	var scale := minf(inner.size.x / bounds.size.x, inner.size.y / bounds.size.y)
-	var offset := inner.position + (inner.size - bounds.size * scale) * 0.5 - bounds.position * scale
+	# A window of PLAN_SPAN metres around the carrier, not the whole level: the
+	# level runs 140 m north to south and fitting it all made a thin strip.
+	var scale := inner.size.x / PLAN_SPAN
+	var bounds := Rect2(player_at - inner.size / scale * 0.5, inner.size / scale)
+	var offset := inner.position - bounds.position * scale
 	var to_sheet := func(world: Vector2) -> Vector2: return offset + world * scale
 	# A faint 4 m grid, the facility module, under everything.
 	var grid_from: Vector2 = to_sheet.call(Vector2(floorf(bounds.position.x / 4.0) * 4.0, floorf(bounds.position.y / 4.0) * 4.0))
@@ -1354,7 +1364,10 @@ func _draw_facility_plan() -> void:
 			if str(entry.kind) != pass_kind:
 				continue
 			var world: Rect2 = entry.rect
-			var rect := Rect2(to_sheet.call(world.position), world.size * scale)
+			var full := Rect2(to_sheet.call(world.position), world.size * scale)
+			if not full.intersects(inner):
+				continue
+			var rect := full.intersection(inner)
 			var tone := BILE
 			var fill := 0.10
 			var line := 0.55

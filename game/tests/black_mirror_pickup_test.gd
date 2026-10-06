@@ -26,7 +26,12 @@ func _ready() -> void:
 		return
 	WorldHistory.clear_history()
 	var vat = VAT.instantiate()
-	add_child(vat)
+	# As in the game: the vat room is the root's current scene, so PadBridge
+	# leaves the pad to the migrated route instead of synthesizing keys
+	# (D-UP = K). current_scene must be a direct child of the root.
+	await get_tree().process_frame
+	get_tree().root.add_child(vat)
+	get_tree().current_scene = vat
 	await get_tree().process_frame
 	await _stand_up(vat)
 	var route = vat.doctor_route
@@ -75,6 +80,12 @@ func _ready() -> void:
 	_place(vat, him + Vector3(2.6, 0, 0.4), him + Vector3(0, 1.0, 0))
 	await _press(JOY_BUTTON_DPAD_UP)
 	check(str(phone.lens.mode) == "depth", "D-UP turns the camera to the depth image")
+	check(not bool(vat.sight.phone_lens), "the signal pass stays off the depth image")
+	for _frame in 3:
+		await get_tree().physics_frame
+	check(not vat.encounters.xray_on, "D-UP on the raised phone does not also switch the X-ray")
+	check(str(vat.sight.mode) == "", "nor the wizard eyes")
+	check(not vat.key_hints.visible, "the key-hint box is out of the way of the raised phone")
 	check(phone.lens.depth_quad != null and phone.lens.depth_quad.visible, "the depth pass is on the camera")
 	for _frame in 6:
 		await get_tree().process_frame
