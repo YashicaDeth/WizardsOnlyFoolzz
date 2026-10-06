@@ -45,9 +45,14 @@ bughunt-79-c (2026-10-06, after the v0.1 sound pass merged) re-ran the six route
 - **Service Arcade after rebirth, guard's spoken line**: depth-tested Label3D, so the growing tank cut "You again. They grew you back." off at "They grew you ba". Major (his line is the beat). FIXED bughunt-79-c: `no_depth_test` on his and the Support Unit's speech (rebirth_old_body before/after).
 - **impact_feel_test "a sever rings longer"**: failed on the base commit under load; awaited ~50 ms headless frames measured the shot's 54 ms ring as ~0.15 s. Not a game bug. FIXED bughunt-79-c in the test (fixed 60 Hz steps).
 
+- **Lower Works and both lift shafts near-black (map-84)**: the zone surface sets (DiamondPlate, MetalPlates, CorrugatedSteel) loaded their Metalness maps at full metal; with no sky or reflection probe underground, metal has no diffuse, so every lamp landed on black. Major. FIXED map-84: `FacilityZoneIdentity.METAL_SHARE` 0.3, plus six high-bay floods under the trusses and a flood over the heat elevator mouth. The vessels, crane, sentinel and floor read from the transit lift (facility_one_map_capture 05/05b/05c, P:/GameDev/Temp/map-84/).
+- **Service Arcade one long empty box (map-84)**: stall counters, partitions, awnings and work lamps in front of the shutters, a cashier booth on the east wall and two waist-high barriers mid-hall; guards walk round them (`ARCADE_COVER`), and pistol guard 49 stands behind the barrier at (30.6, -43.4) instead of being a speck at the far end. Two wide floods under the last frames wash the far half up to the transit lift. Major. FIXED map-84 (02b/03/03a/03b).
+- **Transit lift and heat elevator rides (map-84)**: the readout moved off the lintel (it rode into the HUD objective box) onto a small dark panel with a lit rim on the door jamb at eye height; the big curved readouts over the side slots are gone; the shaft strip is a short tube in a housing and the shaft wall takes light. Major. FIXED map-84 (04/07).
+- **Surface gate a flat white square (map-84)**: open gate leaves, a lit yard, wall stubs and fence posts against a far daylight backdrop. Major. FIXED map-84 (08).
+- **Staff-door start shot (map-84)**: the "floating red slabs" were opening debris mid-flight in the capture's first frames, not in play; the capture now waits 3 s. The Growing Floor checker tile has wall concrete multiplied over it as grime: still a checker, less clean. Minor. FIXED map-84 (01); whether the lab floor should stay a checker at all is an art call.
+
 ## Open
 
-- **Transit lift and heat elevator rides**: the floor readout is a big curved "DOWN 0C SERVICE ARCADE" / "UP 0D LOWER WORKS" floating in the black, the lintel "DOWN" overlaps the HUD objective box, the shaft strip is one flat green bar (REMASTER_LOG job5 "Still weak"; facility_one_map_capture 04, 07). Major (looks broken). OPEN, owned by the pending `remaster-job5-p2` job (lift readout and HUD overlap); not duplicated here.
 - **Rebirth, old body in the arcade**: glowing orange ghost body with red discs and a ring, plus a floating "YOUR OLD BODY" label like debug text (REMASTER_LOG job7 "Still weak"; rebirth_old_body.png). Major (looks broken). OPEN: needs a real corpse/bloodstain read; Greg's art direction.
 - **Vat, cord beat**: the subtitle "The cord is still down your throat." (sentence case) and the thought "IT'S DOWN MY THROAT. PULL." show at once, two lines saying the same thing (bo_1_cord.png). Minor. OPEN: Greg's opening text; a question, not a lane fix.
 - **Examiner fight, bare-handed**: with no axe and no restraint he takes ~29 blows (260 health, 9 per fist) for a ~1 min fight. Minor (balance). OPEN: Greg's dial (Job 6).
@@ -58,7 +63,6 @@ bughunt-79-c (2026-10-06, after the v0.1 sound pass merged) re-ran the six route
 
 - **Service Arcade, guard's "SEEN 100%" awareness tag**: BlockTracker's tag sits over his speech line at the old-body spot (rebirth_old_body). Minor. OPEN (presentation; move the tag or the line).
 - **Main menu settings**: the support address line sits ~12 px left of the plate's row inset. Minor. OPEN.
-- **Lower Works (05/05b) and arcade (02/03)**: still mostly black between light pools. Major for readability, already owned by the running map-84 "route readable and alive" job. OPEN, not duplicated.
 
 ## Not verified by bughunt-79-a
 
