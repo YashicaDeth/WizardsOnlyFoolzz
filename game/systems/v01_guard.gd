@@ -95,7 +95,7 @@ func _build_body() -> void:
 	var rig := BaselineHuman.new()
 	rig.name = "Guard%s" % number
 	add_child(rig)
-	rig.build(foe_id, {"flesh": Color("7a5f48").lerp(Color("5c4a3a"), float(number.hash() % 7) / 7.0), "variation": 11 + number.hash() % 5, "build": 1.05, "rigged": true})
+	rig.build(foe_id, {"flesh": Color("7a5f48").lerp(Color("5c4a3a"), float(number.hash() % 7) / 7.0), "variation": 11 + number.hash() % 5, "build": 1.05, "rigged": true, "ragdoll": V01Encounters.RAGDOLL_DEATHS})
 	var uniform := ClothingShell.fresh_wardrobe()
 	uniform.erase("head")
 	rig.dress(uniform)

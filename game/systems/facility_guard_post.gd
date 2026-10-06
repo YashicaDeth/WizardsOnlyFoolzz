@@ -54,6 +54,8 @@ const READER_AT := Vector3(2.05, 1.35, 0.42)
 const WARN_RANGE := 11.0
 const FIRE_RANGE := 7.5
 const REACH := 2.4
+## dec-89 (Greg, 6 Oct night): a guard killed or executed goes limp.
+const RAGDOLL_DEATHS := true
 const FIRE_COOLDOWN := 1.6
 ## Greg, 24 September: warning shots, then wounds, then lethal. One shot over
 ## your head, then every shot lands; six landed shots empty a fresh body.
@@ -215,9 +217,9 @@ func _build_guard() -> void:
 	# Greg, 25 September: "a better in-game model" for Hollis. Heavy and
 	# tired; the numbered guard is leaner and younger.
 	if guard_number.is_empty():
-		guard.build(guard_id, {"flesh": Color("5c4a3a"), "variation": 3, "build": 1.3})
+		guard.build(guard_id, {"flesh": Color("5c4a3a"), "variation": 3, "build": 1.3, "ragdoll": RAGDOLL_DEATHS})
 	else:
-		guard.build(guard_id, {"flesh": Color("7a5f48"), "variation": 11, "build": 1.05})
+		guard.build(guard_id, {"flesh": Color("7a5f48"), "variation": 11, "build": 1.05, "ragdoll": RAGDOLL_DEATHS})
 	var uniform := ClothingShell.fresh_wardrobe()
 	# Bare-headed: a full wardrobe hoods the head too, and the man whose face
 	# the player has to remember should have one.

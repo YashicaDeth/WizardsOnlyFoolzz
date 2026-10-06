@@ -68,6 +68,7 @@ func _build_body() -> void:
 		"variation": 4 + _seed * 5 + 4,
 		"build": 0.96,
 		"rigged": true,
+		"ragdoll": V01Encounters.RAGDOLL_DEATHS,
 	})
 	HunterAppearance.style_world_rig(rig, foe_id, false)
 	body = rig

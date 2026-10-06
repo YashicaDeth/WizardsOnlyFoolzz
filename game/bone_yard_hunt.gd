@@ -5,6 +5,9 @@ const AMBIENT_AUDIO := preload("res://systems/ambient_audio.gd")
 # Ashbloom Expanse vertical slice. World Zero is the development milestone;
 # Limbo is the realm; Ashbloom is this first irradiated region.
 const PLAYER_SPEED := 7.0
+## dec-89 (Greg, 6 Oct night): every Hunt death and execution goes limp on the
+## body's ragdoll (was execution-58-01).
+const RAGDOLL_DEATHS := true
 const SPRINT_SPEED := 12.0
 ## AD1.1. Jumping worth doing. `HunterMotor.move_body()` already runs real
 ## gravity, air acceleration and floor-stick every physics frame and nothing
@@ -10730,6 +10733,8 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> Dictionary:
 		"gore": viscera_fx,
 		"blood": float(encounter.get("blood", 5200.0 if str(encounter.kind) == "boss" else 4300.0)),
 		"rigged": true,
+		# dec-89 (Greg, 6 Oct night): every death and execution goes limp.
+		"ragdoll": RAGDOLL_DEATHS,
 	}
 	# Named, not just an armour number. Before B2 an implant *was* its armour
 	# value, so this passed an anonymous dictionary and every Ashline body

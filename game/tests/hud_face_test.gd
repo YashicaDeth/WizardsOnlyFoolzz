@@ -20,7 +20,7 @@ func _ready() -> void:
 	WorldHistory.clear_history()
 	var hud := preload("res://systems/gothic_field_hud.gd").new()
 	add_child(hud)
-	check(hud.face_style == FaceMonitor.DEFAULT_STYLE and FaceMonitor.DEFAULT_STYLE == "xray", "the default face is the skull plate")
+	check(hud.face_style == FaceMonitor.DEFAULT_STYLE and FaceMonitor.DEFAULT_STYLE == "bodycam", "the default face is the body-cam (Greg, 6 Oct night)")
 	check(hud.face_monitor.visible and hud.nerve_rig.pocket_style == "spine", "default: the CRT face and pockets as tags off the spine")
 	hud.face_style = "mask"
 	check(not hud.face_monitor.visible and hud.nerve_rig.pocket_style == "rack", "mask: the old face and the bottle rack come back together")

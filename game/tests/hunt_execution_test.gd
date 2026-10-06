@@ -104,6 +104,7 @@ func _weapon(id: String, pad: bool, at: Vector3) -> void:
 		clock += get_process_delta_time() / maxf(Engine.time_scale, 0.001)
 	check(not hunt.execution.active and str(hunt.execution.report.get("reason", "")) == "done", "%s: the beat completes (%s, %.2fs)" % [tag, str(hunt.execution.report.get("reason", "")), clock])
 	check(actor.rig.anatomy.dead, "%s: the body is dead" % tag)
+	check((actor.rig.rigged != null and actor.rig.rigged.ragdolled) or actor.rig.ragdoll_body != null, "%s: and limp on its ragdoll (dec-89)" % tag)
 	check(not hunt.encounter_actors.has(actor), "%s: and gone the one death route" % tag)
 	var resolutions := _resolutions(subject)
 	check(resolutions.size() == before_resolutions.size() + 1, "%s: one npc_resolution is written" % tag)
@@ -119,8 +120,7 @@ func _weapon(id: String, pad: bool, at: Vector3) -> void:
 		await get_tree().process_frame
 		clock += get_process_delta_time() / maxf(Engine.time_scale, 0.001)
 	check(not hunt.kill_cam.active and is_equal_approx(Engine.time_scale, 1.0), "%s: the kill cam ends and time runs at 1" % tag)
-	# Hunt bodies are built without ragdoll (an open call of Greg's): the
-	# corpse keeps the fall pose rather than standing back up or animating.
+	# Hunt bodies go limp on their ragdoll (Greg, 6 Oct night, dec-89).
 	var lying: bool = actor.rig.ragdoll_body != null or (actor.rig.rigged != null and actor.rig.rigged.ragdolled) or actor.rig.rotation.x < -1.2
 	check(lying, "%s: the corpse lies where it was finished" % tag)
 	check(not hunt.resolution_ui.visible and hunt._pending_execution.is_empty(), "%s: nothing is left holding the controls" % tag)

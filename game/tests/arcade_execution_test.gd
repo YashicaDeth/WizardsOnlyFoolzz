@@ -74,6 +74,7 @@ func _case(weapon: String, pad: bool) -> void:
 		waited += get_physics_process_delta_time()
 	check(not arcade.execution.active and str(arcade.execution.report.get("reason", "")) == "done", "%s: the beat completes (%.2fs)" % [tag, waited])
 	check(guard.anatomy.dead, "%s: he is dead" % tag)
+	check((guard.rigged != null and guard.rigged.ragdolled) or guard.ragdoll_body != null, "%s: and limp on his ragdoll (dec-89)" % tag)
 	check(WorldHistory.event_count("facility_guard_executed") == 1, "%s: the execution is recorded once" % tag)
 	check(str(WorldHistory.subject(arcade.guard_post.guard_id).get("status", "")) == "dead", "%s: and his record says dead" % tag)
 	var stand: float = Vector2(arcade.player.global_position.x - arcade.execution.stand_at.x, arcade.player.global_position.z - arcade.execution.stand_at.z).length()

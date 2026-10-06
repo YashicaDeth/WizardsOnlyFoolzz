@@ -33,13 +33,19 @@ const VAT_REBIRTH := preload("res://systems/vat_rebirth.gd")
 const CARRY := preload("res://systems/carry.gd")
 const FACILITY := preload("res://facility.gd")
 
-## DIALS (DESIGN/REMASTER_LOG.md, job9). Defaults are the assistant's, not Greg's.
+## DIALS (DESIGN/REMASTER_LOG.md, job9). GUARD_COUNT and the blow numbers are
+## the assistant's defaults; the three below it Greg settled on 6 Oct night.
 const GUARD_COUNT := 3
 ## The near tank's living subject breaks out as you pass if you have not
-## freed it yourself, so the Growing Floor always has its fight.
+## freed it yourself, so the Growing Floor always has its fight (Greg: keep).
 const SUBJECT_BREAKS_OUT := true
 const SUBJECT_TRIGGER := 3.0
+## Guards drop their weapons; the pistol guard's sidearm is the first gun
+## (Greg: keep).
 const GUARD_DROPS_WEAPON := true
+## Every foe on the route goes limp on its ragdoll when it dies or is executed
+## (Greg, 6 Oct night; was execution-58-01).
+const RAGDOLL_DEATHS := true
 ## Player blows on foes, per weapon (light). Heavy x1.6, charged x2.2,
 ## riposte (after your parry) x1.75.
 const PLAYER_DAMAGE := {"cleaver": 30.0, "staff": 22.0, "restraint": 16.0, "fists": 9.0, "gun": 45.0}
