@@ -41,6 +41,9 @@ const NEUTRAL := {
 	"lut_strength": 0.0,
 	"kaleidoscope_segments": 0.0,
 	"kaleidoscope_spin": 0.0,
+	# drug-70: radius (0-1.4 of the half-screen) left unfolded in the middle,
+	# so the world you aim at stays the world while the fold blooms round it.
+	"kaleidoscope_clear": 0.0,
 	"feedback_strength": 0.0,
 	"feedback_zoom": 1.0,
 	"feedback_spin": 0.0,
@@ -50,6 +53,16 @@ const NEUTRAL := {
 	"cut_intensity": 0.0,
 	"cut_seed": 0.0,
 	"cut_rate": 8.0,
+	# drug-70: the materia classes' dials, neutral at zero like the six above.
+	"palette_cycle": 0.0,
+	"mirror_fold": 0.0,
+	"melt_strength": 0.0,
+	"pulse_strength": 0.0,
+	"beat_level": 0.0,
+	"saturation_shift": 0.0,
+	"darkness": 0.0,
+	"tunnel": 0.0,
+	"edge_figures": 0.0,
 }
 
 var _material: ShaderMaterial
@@ -81,7 +94,9 @@ func _ready() -> void:
 	_material = ShaderMaterial.new()
 	_material.shader = PSYCHEDELIC_SHADER
 	_material.set_shader_parameter("lut_texture", _build_placeholder_lut())
-	_material.set_shader_parameter("noise_texture", _build_placeholder_noise())
+	# drug-70: a flow field baked out of TouchDesigner wins when one is there.
+	var baked_flow := MateriaBakes.texture("flow.png")
+	_material.set_shader_parameter("noise_texture", baked_flow if baked_flow != null else _build_placeholder_noise())
 	_display.material = _material
 	add_child(_display)
 	_apply_all_dials()
@@ -94,6 +109,15 @@ func set_dial(dial_name: String, value: float) -> void:
 		return
 	_dials[dial_name] = value
 	_material.set_shader_parameter(dial_name, value)
+
+
+## drug-70: swap the palette (`lut_texture`) or the flow field
+## (`noise_texture`). A materia class brings its own palette; a LUT or flow map
+## baked out of TouchDesigner (DESIGN/TOUCHDESIGNER_PIPELINE.md) goes in here
+## too. Anything else is ignored, like an unknown dial.
+func set_texture(slot: String, texture: Texture2D) -> void:
+	if slot in ["lut_texture", "noise_texture"] and texture != null:
+		_material.set_shader_parameter(slot, texture)
 
 
 func dial(dial_name: String) -> float:
@@ -119,10 +143,11 @@ func _apply_all_dials() -> void:
 func _is_engaged() -> bool:
 	if dial("kaleidoscope_segments") >= 2.0:
 		return true
-	for key in ["lut_strength", "feedback_strength", "chromatic_offset", "displacement_strength", "cut_intensity"]:
+	for key in ["lut_strength", "feedback_strength", "chromatic_offset", "displacement_strength", "cut_intensity",
+			"mirror_fold", "melt_strength", "pulse_strength", "darkness", "tunnel", "edge_figures"]:
 		if dial(key) > 0.0:
 			return true
-	return false
+	return absf(dial("saturation_shift")) > 0.0
 
 
 func _process(_delta: float) -> void:

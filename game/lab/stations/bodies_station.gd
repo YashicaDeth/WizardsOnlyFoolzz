@@ -24,6 +24,10 @@ const LOADOUTS := [
 var lab: Node3D
 var rows: Array[Dictionary] = []
 var xray := false
+## drug-70: how far the X-ray reads, as a share of `WorldXray.RANGE`. The
+## materia station moves this: a psychedelic reads further, a deliriant barely
+## past arm's length.
+var reach_scale := 1.0
 const SWEEP_EVERY := 0.1
 var _sweep_clock := 0.0
 
@@ -112,7 +116,7 @@ func _sweep() -> void:
 	if lab != null and lab.get("sparring") != null and lab.sparring.rig != null and is_instance_valid(lab.sparring.rig):
 		everyone.append(lab.sparring.rig)
 	var lit := {}
-	for entry in WorldXray.sweep(from, everyone, xray):
+	for entry in WorldXray.sweep(from, everyone, xray, WorldXray.RANGE * reach_scale):
 		lit[str(entry.subject_id)] = true
 	# Lab-48: the hardware shows under the X-ray, tagged by the scan.
 	for rig: BaselineHuman in everyone:

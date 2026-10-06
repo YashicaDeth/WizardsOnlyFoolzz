@@ -202,6 +202,13 @@ func _ready() -> void:
 			"the exhale layers long wisps instead of bright round beads")
 		check(wisp_material.shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED,
 			"the close lighter cannot bleach the smoke plume in daylight")
+	# drug-70: the breath is drawn by the simulated volume; the puffs above stay
+	# for the air's bookkeeping but are hidden while the volume is on.
+	var volume: SmokeVolume = hunt.get("smoke_volume")
+	if volume != null:
+		volume.step(1.0)
+	check(volume != null and volume.count() > 10 and cigarette_plume != null and not cigarette_plume.visible,
+		"the exhale is a simulated smoke volume, not sprite puffs")
 	var herb_tint: Color = hunt.call("_smoke_tint", "joint")
 	check(herb_tint.g > herb_tint.r + 0.04 and herb_tint.g > herb_tint.b,
 		"joint, spliff and bong smoke receive only a subtle green bias")
