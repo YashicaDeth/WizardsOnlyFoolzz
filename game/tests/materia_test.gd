@@ -201,12 +201,12 @@ func _station() -> void:
 	add_child(lab)
 	await _frames(3)
 	var station = lab.materia
-	check(station != null and lab.stations.size() == 6, "the materia station stands in the lab")
+	check(station != null and lab.stations.any(func(s: Dictionary) -> bool: return s.node == station), "the materia station stands in the lab")
 	check(not station.osc_enabled and not station.bridge.listening, "the TouchDesigner OSC link is off by default")
 	# Mapping, with it off: nothing a patch sends reaches the screen unless asked.
 	check(station.trip.playing == false and not station.rig._display.visible, "nothing is on screen before anything is taken")
 
-	lab.go_to(5)
+	lab.go_to(lab.stations.find_custom(func(s: Dictionary) -> bool: return s.node == lab.materia))
 	await _frames(3)
 	check(station.near_plinth(), "the station menu takes you to the materia plinth")
 	# Choose the psychedelic sample with the D-pad and take it with USE.

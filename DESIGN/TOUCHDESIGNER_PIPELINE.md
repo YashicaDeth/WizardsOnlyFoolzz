@@ -25,7 +25,7 @@ those dials live over OSC and you see the game change.
 ## 1. Seeing it live (about five minutes)
 
 1. Start the mechanics lab: `Start-MechanicsLab.ps1`.
-2. Walk to station 6, **MATERIA** (or Start / Tab opens the station menu: pick MATERIA).
+2. Walk to station 7, **MATERIA** (or Start / Tab opens the station menu: pick MATERIA).
 3. At the plinth, D-pad left/right (keyboard: the `heal` / `inspect` keys) to
    **TOUCHDESIGNER OSC LINK (DEV)**, then USE. The lab line reads
    `OSC LISTENING ON 9000`. USE again turns it off. It is **off by default**,

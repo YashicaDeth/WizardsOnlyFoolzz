@@ -168,6 +168,8 @@ func _land_blow(distance: float) -> void:
 					lab.on_player_shocked()
 	outcomes.append(outcome)
 	if outcome == "parried":
+		if lab.get("disciplines") != null:
+			lab.disciplines.open_riposte(rig)
 		var away: Vector3 = holder.global_position - lab.player.global_position
 		away.y = 0.0
 		MeleeDriver.reel(rig, {"shove": away.normalized() * 0.35, "knockdown": false, "shock": true})

@@ -153,7 +153,7 @@ func _ember() -> void:
 	await _seconds(1.2)
 	await _save("ember_landed")
 	# The lungs: a real draw in hand, so the pulmonary panel shows the smoke.
-	lab.go_to(5)
+	lab.go_to(lab.stations.find_custom(func(s: Dictionary) -> bool: return s.node == lab.materia))
 	await _frames(3)
 	lab.camera.current = true
 	station.take_smokeable("cigarette")
@@ -186,7 +186,7 @@ func _trip() -> void:
 
 
 func _fps() -> void:
-	lab.go_to(5)
+	lab.go_to(lab.stations.find_custom(func(s: Dictionary) -> bool: return s.node == lab.materia))
 	await _frames(2)
 	lab.camera.current = true
 	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)

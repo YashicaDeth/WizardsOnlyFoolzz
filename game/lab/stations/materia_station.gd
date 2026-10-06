@@ -1,6 +1,6 @@
 extends Node3D
 
-## Station 6: materia (drug-70). The table of everything takeable that already
+## Station 7: materia (drug-70). The table of everything takeable that already
 ## exists (`SubstanceStation`, the same node the Hunt and the shed drop), a rack
 ## of class samples so each of the nine classes can be tried on its own, and
 ## the smoke, the body it curls round and the wall it slides along.
