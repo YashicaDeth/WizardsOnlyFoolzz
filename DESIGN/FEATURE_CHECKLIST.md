@@ -13,7 +13,7 @@ cyberpunk-ish post-apocalyptic biopunk occult horror; pad first.
 - [~] Wake in first person in red liquid; tear cords, glass cracks and bursts, flood (vat room pass imp-66 queued)
 - [~] Pick 2 of 4 disciplines on the brain screen (Brawler, Marksman, Duelist, Shade; Greg 6 Oct), active in the route (dec-89, route-88)
 - [x] Examiner boss: telegraphed scalpel/syringe, parry and riposte, desperate phase, keycard opens the staff door
-- [~] One facility map with real lifts, no loading screens: artery, arcade, Lower Works, heat lift (map-84 readability pass running)
+- [~] One facility map with real lifts, no loading screens: artery, arcade, Lower Works, heat lift (map-84 landed 5c18d817: lit Lower Works, arcade cover, lift panels; lift cab rides still near-black)
 - [x] Enemies: numbered guards, freed vat subject, sentinel (shoot the eye, hit the core)
 - [~] Death: short vat regrowth, then the nearest checkpoint (Greg 6 Oct, dec-89); bloodstain should be a dark pulsing organ-sigil, not the orange ghost
 - [x] Ending: daylight, silence then wind, title drop, TO BE CONTINUED card (fix-78 tidies it)
