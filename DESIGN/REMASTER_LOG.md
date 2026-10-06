@@ -619,3 +619,10 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 - Capacity: claude-default, claude-alt parked to 10-10 19:04; codex-sircuteskingdom-team to 06:17, codex-allusions-plus to 08:17, the other two Codex to 10-11. claude-alt2 is building dec-89. No idle account.
 - Top three: 1) queued `remaster-player-81-p1` (claude, 70): fixes 1-3 above, before/after renders. 2) fix-93 (brain-screen overlay) stays the most important pending Claude job after dec-89 (both touch the brain screen; dec-89 first is right). 3) FP hands are still the old procedural hands; leave that to remaster-imp-64-p1 (first-person arms) rather than a parallel version.
 
+
+## Manager notes, 2026-10-07 04:10
+- Merged: dec-89 Greg's 6 Oct answers (23c53034, gate green): brain screen offers all 4 disciplines, route death regrows in the vat 3 s then resumes at the last checkpoint, ragdoll on every route death and execution, BODYCAM default HUD face. Checklist lines already ticked by the builder.
+- Looked at P:/GameDev/Temp/dec89/brain_screen_four_duelist_shade.png. Weak: (1) with both slots filled it still reads "SLOT 2 OF 2" and the button says "ENTER LOCK IN" (keyboard word on a pad-first screen) plus "THIRD PERSON ON", which is noise; (2) Shade's card says "SHIV // DARKNESS": no shiv is in Greg's weapon list (cleaver, staff, MERCY NINE), so flag as a possible stray name for Greg; (3) ragdoll teardown crashes on quit (exit 139, 2 of 7 arcade_execution runs) and no window check of regrowth exists.
+- Plan risk: dec-89's WIP carries imp-66's DisciplineLobes while hub/imp-66-vat-room is unmerged; whoever lands imp-66 must keep one copy, not two.
+- Top three: fix-95 ragdoll quit crash (queued, claude, 70); brain screen pad glyph + done state (add to fix-93 or a follow-up); a regrowth capture for render_one.
+- All 7 accounts parked (claude-alt2 until 07:04, codex-allusions-plus 08:17, codex-sircuteskingdom-team 06:17); nothing to spawn until then.
