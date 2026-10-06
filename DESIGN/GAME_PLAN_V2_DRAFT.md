@@ -20,6 +20,7 @@ Started by the hourly build manager, 2026-10-05 15:10. This is a draft. It does 
 | job7 death, saves, HUD | pending | | |
 | imp-60 body look | landed (2bd20958, 6 Oct) | Every body is a low-poly human with flesh and cloth shaders, faces, eyes and brows; 470 fps with five bodies. | Faces render smeared with no readable features, the neckline is jagged, the guard vest is a box (fix-74 queued). Face sliders no longer show on a healthy head (question for Greg). |
 | imp-68 HUD face and vials | landed (ffe07171, 6 Oct) | The face portrait is a third CRT with three looks behind a dial (xray skull by default, live bodycam, mask). The vials become specimen tags hung on the spine. | The bodycam frames the cap instead of the face, a wound label overlaps BLEED, and the pocket slots read weakly (remaster-imp-68-p1 queued). |
+| imp-61 liquid surface and sound | landed (ee4668d9, 6 Oct) | The pour is drawn as one screen-space liquid surface, not spheres (spheres kept as a graphics fallback). The pool flows round solid props. Glass cracks, bursts, pours, splashes and wading all have synthesised sounds. | The pour still beads up, the pool is a flat matte stain, and wade ripples aren't visible (remaster-imp-61-p1 queued). Nobody has listened to the sounds yet. |
 
 Fixes that also landed: fix-hidden-cache-test, fix-58 (an execution on a downed body is one beat and ends with them dead), and fix-55 (the examiner no longer uses the Higgsfield skin).
 
