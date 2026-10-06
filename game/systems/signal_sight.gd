@@ -59,6 +59,11 @@ var shock_flash := 0.0
 var seen: Dictionary = {}
 ## How close a hidden thing has to be to be noticed, in metres.
 const HIDDEN_RANGE := 9.0
+## drug-70: how far and how long the modes read. 1.0 everywhere unless a host
+## sets it; the materia station sets it from the class you are on (some
+## substances let you see further and hold the view longer, the deliriant
+## shrinks it). Scales HIDDEN_RANGE and STRAIN_SECONDS together.
+var reach_scale := 1.0
 var view: Camera3D
 var layer: CanvasLayer
 var screen: ColorRect
@@ -168,7 +173,7 @@ func _notice_hacked() -> void:
 func _process(delta: float) -> void:
 	clock += delta
 	if mode != "":
-		strain = minf(1.0, strain + delta / STRAIN_SECONDS)
+		strain = minf(1.0, strain + delta / (STRAIN_SECONDS * maxf(reach_scale, 0.1)))
 	else:
 		strain = maxf(0.0, strain - delta / RECOVER_SECONDS)
 	# Off, the whole layer sleeps: a screen-reading shader copies the frame
@@ -374,7 +379,7 @@ func _draw_hidden() -> void:
 		if bool(thing.get("gone", false)):
 			continue
 		var at: Vector3 = thing.get("at", Vector3.ZERO)
-		if view == null or not is_instance_valid(view) or view.global_position.distance_to(at) > HIDDEN_RANGE:
+		if view == null or not is_instance_valid(view) or view.global_position.distance_to(at) > HIDDEN_RANGE * reach_scale:
 			continue
 		var size: Vector2 = thing.get("size", Vector2.ONE)
 		var across: Vector3 = (thing.get("across", Vector3.RIGHT) as Vector3).normalized()
@@ -423,7 +428,7 @@ func _notice_hidden() -> void:
 		if seen.has(id) or bool(thing.get("gone", false)):
 			continue
 		var at: Vector3 = thing.get("at", Vector3.ZERO)
-		if view.global_position.distance_to(at) > HIDDEN_RANGE:
+		if view.global_position.distance_to(at) > HIDDEN_RANGE * reach_scale:
 			continue
 		var centre = _project(at)
 		if centre == null or not screen_rect.has_point(centre):
@@ -439,7 +444,7 @@ func _draw_wires() -> void:
 	var tone := COPPER if mode == "wizard" else COLD
 	for wire: Dictionary in wires:
 		var points: Array = wire.get("points", [])
-		if points.size() < 2 or view == null or view.global_position.distance_to(points[0]) > HIDDEN_RANGE * 2.0:
+		if points.size() < 2 or view == null or view.global_position.distance_to(points[0]) > HIDDEN_RANGE * 2.0 * reach_scale:
 			continue
 		var cut := bool(wire.get("cut", false))
 		var flat := PackedVector2Array()
@@ -481,7 +486,7 @@ func _notice_wires() -> void:
 		if bool(wire.get("seen", false)) and (bool(wire.get("seen_in_wizard", false)) or mode != "wizard"):
 			continue
 		var points: Array = wire.get("points", [])
-		if points.is_empty() or view.global_position.distance_to(points[0]) > HIDDEN_RANGE:
+		if points.is_empty() or view.global_position.distance_to(points[0]) > HIDDEN_RANGE * reach_scale:
 			continue
 		var at = _project(points[0])
 		if at != null and screen_rect.has_point(at):

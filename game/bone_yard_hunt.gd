@@ -878,6 +878,14 @@ const SMOKE_TRICKS := ["O", "DOUBLE O", "GHOST"]
 var smoke_trick_index := 0
 var smoke_trick_window := 0.0
 var smoke_last_exhale: Dictionary = {}
+## drug-70: the breath as a simulated volume (SmokeVolume: momentum, wind,
+## lingers and thins) instead of ContaminatedAir's particle puffs, which keep
+## their node for the air's own bookkeeping but stop drawing. Dial: false
+## brings the puffs back. Wind follows the storm (m/s per unit of severity).
+var smoke_volume_enabled := true
+var smoke_volume: SmokeVolume
+const SMOKE_WIND_CALM := 0.35
+const SMOKE_WIND_PER_STORM := 2.4
 ## Hold I to turn whichever object is actually in the player's hands through a
 ## slow, close reading. This is a pose rather than a separate inventory screen:
 ## the object, its wear and the hands holding it remain in the live world.
@@ -4180,7 +4188,11 @@ func _exhale_smoke() -> void:
 	var forward: Vector3 = emission.forward
 	var mouth: Vector3 = emission.mouth
 	var device_id := str(smoke_pending_exhale.get("device", ""))
-	air.emit_exhale(mouth, forward, float(smoke_pending_exhale.get("exhale", 1.0)), _smoke_tint(device_id))
+	var puffs := air.emit_exhale(mouth, forward, float(smoke_pending_exhale.get("exhale", 1.0)), _smoke_tint(device_id))
+	if smoke_volume_enabled:
+		_exhale_smoke_volume(device_id, mouth, forward, float(smoke_pending_exhale.get("exhale", 1.0)))
+		if puffs != null:
+			puffs.visible = false
 	smoke_last_exhale = smoke_pending_exhale.duplicate(true)
 	smoke_trick_window = 1.15
 	prompt.text = "%s // CLICK TO SHAPE THE SMOKE" % str(smoke_pending_exhale.get("grade", "")).to_upper()
@@ -4191,6 +4203,16 @@ func _exhale_smoke() -> void:
 		"location": HUNT_LOCATION,
 	})
 	smoke_pending_exhale = {}
+
+
+func _exhale_smoke_volume(device_id: String, mouth: Vector3, forward: Vector3, density: float) -> void:
+	if smoke_volume == null or not is_instance_valid(smoke_volume):
+		smoke_volume = SmokeVolume.new()
+		smoke_volume.name = "SmokeVolume"
+		add_child(smoke_volume)
+	var storm := storm_weather.severity() if storm_weather != null and is_instance_valid(storm_weather) else 0.0
+	smoke_volume.wind = Vector3(1.0, 0.0, 0.35).normalized() * (SMOKE_WIND_CALM + storm * SMOKE_WIND_PER_STORM)
+	smoke_volume.exhale(device_id, mouth, forward, 1.0, clampf(density / 1.2, 0.3, 1.6))
 
 
 func _shape_smoke_trick() -> void:

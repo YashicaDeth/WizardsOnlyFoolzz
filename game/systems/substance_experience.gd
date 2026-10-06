@@ -29,6 +29,7 @@ const REST := {
 	"lut_strength": 0.0,
 	"kaleidoscope_segments": 0.0,
 	"kaleidoscope_spin": 0.0,
+	"kaleidoscope_clear": 0.0,
 	"feedback_strength": 0.0,
 	"feedback_zoom": 1.0,
 	"feedback_spin": 0.0,
@@ -38,6 +39,15 @@ const REST := {
 	"cut_intensity": 0.0,
 	"cut_seed": 0.0,
 	"cut_rate": 8.0,
+	"palette_cycle": 0.0,
+	"mirror_fold": 0.0,
+	"melt_strength": 0.0,
+	"pulse_strength": 0.0,
+	"beat_level": 0.0,
+	"saturation_shift": 0.0,
+	"darkness": 0.0,
+	"tunnel": 0.0,
+	"edge_figures": 0.0,
 }
 
 ## The three substances, each a different *shape* rather than a different

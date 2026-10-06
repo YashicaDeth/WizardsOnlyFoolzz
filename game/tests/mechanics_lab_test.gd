@@ -23,7 +23,9 @@ func _ready() -> void:
 	lab = load("res://lab/mechanics_lab.tscn").instantiate()
 	add_child(lab)
 	await _frames(3)
-	check(lab.stations.size() == 5, "five stations stand in the yard")
+	# drug-70 added the materia station (sixth, after the vehicle pad, so the
+	# indices below are unchanged).
+	check(lab.stations.size() == 6, "six stations stand in the yard")
 
 	# START opens the station menu; down once and accept goes to the second.
 	await _press("pause")
