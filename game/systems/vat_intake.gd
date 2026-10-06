@@ -54,6 +54,13 @@ const BIRTH_PAGE := 5
 const STYLE_PAGE := 7
 const FORM_REVEAL_AT := 5.5
 const FORM_REVEAL_DURATION := 0.55
+## intake-29: the tabs are two rows of real targets, pushing the page down.
+const TAB_HEIGHT := 24.0
+const TAB_TEXT := 13.0
+const TAB_SHIFT := 36.0
+## The tabs start right of the page drive gear and its arm (PAGE_HINGE),
+## which hid BODY.
+const TAB_LEFT := 74.0
 
 ## What the handler says while he works. He is not talking to you so much as
 ## near you, which is the register the whole scene runs in.
@@ -360,6 +367,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventJoypadButton or event is InputEventJoypadMotion:
 		if pad_keyboard != null and is_instance_valid(pad_keyboard):
 			return
+		# intake-29: R3 is the pad's V. Held, the tank's pickup listens; with
+		# no pickup it opens the pad keyboard with his answers as presets.
+		if event is InputEventJoypadButton and (event as InputEventJoypadButton).button_index == TALK_BUTTON:
+			var talk_down: bool = (event as InputEventJoypadButton).pressed
+			if intake_armed and procedure.is_empty() and not verdict_started:
+				_think_key(talk_down, true)
+			get_viewport().set_input_as_handled()
+			return
 		var translated := _pad_to_key(event)
 		if translated == KEY_NONE:
 			get_viewport().set_input_as_handled()
@@ -447,6 +462,15 @@ func _unhandled_input(event: InputEvent) -> void:
 func _pad_to_key(event: InputEvent) -> Key:
 	if event is InputEventJoypadMotion:
 		var motion := event as InputEventJoypadMotion
+		# intake-29: the triggers turn tabs as well as the bumpers.
+		if motion.axis == JOY_AXIS_TRIGGER_LEFT or motion.axis == JOY_AXIS_TRIGGER_RIGHT:
+			var trigger_key := "l2" if motion.axis == JOY_AXIS_TRIGGER_LEFT else "r2"
+			var squeezed := motion.axis_value > 0.6
+			var was_squeezed := bool(_stick_dir.get(trigger_key, false))
+			_stick_dir[trigger_key] = squeezed
+			if not squeezed or was_squeezed or not procedure.is_empty() or verdict_started:
+				return KEY_NONE
+			return KEY_LEFT if trigger_key == "l2" else KEY_RIGHT
 		if motion.axis != JOY_AXIS_LEFT_X and motion.axis != JOY_AXIS_LEFT_Y:
 			return KEY_NONE
 		var dir := 0 if absf(motion.axis_value) < 0.5 else (1 if motion.axis_value > 0.0 else -1)
@@ -457,7 +481,9 @@ func _pad_to_key(event: InputEvent) -> Key:
 			return KEY_NONE
 		if axis_key == "y":
 			return KEY_DOWN if dir > 0 else KEY_UP
-		return _value_key()
+		# Sideways on the stick only turns dials; a drifting diagonal must not
+		# flip the page under the player.
+		return KEY_ENTER if page in VALUE_PAGES else KEY_NONE
 	if not (event is InputEventJoypadButton) or not event.pressed:
 		return KEY_NONE
 	var button := (event as InputEventJoypadButton).button_index
@@ -488,7 +514,10 @@ func _pad_to_key(event: InputEvent) -> Key:
 		JOY_BUTTON_DPAD_DOWN:
 			return KEY_DOWN
 		JOY_BUTTON_DPAD_LEFT, JOY_BUTTON_DPAD_RIGHT:
-			return _value_key()
+			# A dial on the face and body pages; elsewhere the d-pad turns tabs.
+			if page in VALUE_PAGES:
+				return KEY_ENTER
+			return KEY_LEFT if button == JOY_BUTTON_DPAD_LEFT else KEY_RIGHT
 		JOY_BUTTON_A:
 			return KEY_ENTER
 		JOY_BUTTON_B:
@@ -505,12 +534,10 @@ func _pad_to_key(event: InputEvent) -> Key:
 
 
 var _stick_dir := {}
-
-
-## Sideways on the stick turns the value on a page whose rows are values
-## (the face and body dials); elsewhere a row is a choice, not a dial.
-func _value_key() -> Key:
-	return KEY_ENTER if page in [3, 4] else KEY_NONE
+## Pages whose rows are dials (face, body): sideways turns the value.
+const VALUE_PAGES := [3, 4]
+## intake-29: the pad's push-to-talk (the keyboard's V).
+const TALK_BUTTON := JOY_BUTTON_RIGHT_STICK
 
 
 ## Triangle: a whole new body from the lottery, every page filled.
@@ -530,12 +557,28 @@ var pad_keyboard: Control
 
 
 func open_rename() -> void:
+	_open_pad_keyboard(str(sheet.display_name), "WHAT DOES HE WRITE AT THE TOP", [], _on_renamed)
+
+
+## The one on-screen keyboard: rename, birthday, and thinking out loud on a
+## pad with no mic. Presets are whole answers, submitted as written.
+func _open_pad_keyboard(start: String, heading: String, presets: Array, on_submit: Callable, length := PadKeyboard.MAX_LENGTH) -> void:
 	if pad_keyboard != null and is_instance_valid(pad_keyboard):
 		return
 	pad_keyboard = PadKeyboard.new()
 	add_child(pad_keyboard)
-	pad_keyboard.call("open", str(sheet.display_name), "WHAT DOES HE WRITE AT THE TOP")
-	pad_keyboard.connect("submitted", _on_renamed)
+	pad_keyboard.call("open", start, heading, presets, length)
+	pad_keyboard.connect("submitted", on_submit)
+
+
+## What a pad player with no mic can think at him: his own question's answers
+## first, then the spoken form commands `_voice_command` already understands.
+func think_presets() -> Array:
+	var list: Array = []
+	for answer in answers:
+		list.append(str(answer))
+	list.append_array(["NEXT PAGE", "BACK", "CONFIRM", "FILE IT"])
+	return list
 
 
 func _on_renamed(text: String) -> void:
@@ -547,10 +590,11 @@ func _on_renamed(text: String) -> void:
 
 ## Device-aware key names for the hints drawn on the form.
 func _hint_key(keyboard: String, pad_button: JoyButton) -> String:
-	var profile := get_node_or_null("/root/InputProfile")
-	if profile == null or not bool(profile.get("using_pad")):
-		return keyboard
-	return str(profile.call("_joy_button_name", pad_button, str(profile.call("device_family")))).replace("PAD ", "")
+	return PadKeyboard.pad_name(self, pad_button) if _on_pad() else keyboard
+
+
+func _on_pad() -> bool:
+	return PadKeyboard.on_pad(self)
 
 
 func _unconfirmed() -> Array[String]:
@@ -614,7 +658,7 @@ func _answer(index: int) -> void:
 
 ## V down/up. With the tank's pickup running (Vosk) it listens while held;
 ## without one it opens a line to type the thought into instead.
-func _think_key(pressed: bool) -> void:
+func _think_key(pressed: bool, from_pad := false) -> void:
 	if voice == null:
 		voice = VoiceInput.new()
 		voice.name = "TankPickup"
@@ -627,7 +671,11 @@ func _think_key(pressed: bool) -> void:
 			thought = "..."
 			thought_life = 2.0
 		return
-	if pressed and thought_edit != null:
+	# No pickup. A pad cannot type into a line edit, so it gets the pad
+	# keyboard with presets; a keyboard gets the line, as before.
+	if pressed and from_pad:
+		_open_pad_keyboard("", "THINK OUT LOUD", think_presets(), _think, 40)
+	elif pressed and thought_edit != null:
 		thought_edit.visible = true
 		thought_edit.grab_focus()
 
@@ -814,8 +862,11 @@ func _commit() -> void:
 					sheet.appearance["piercings"] = fmod(float(sheet.appearance.get("piercings", 0.0)) + 0.25, 1.01)
 			_transcribe("BODY")
 		BIRTH_PAGE:
-			# He asked for it; you tell him. Typed here, or said with V.
-			if thought_edit != null:
+			# He asked for it; you tell him. Typed here, or said with V. On the
+			# pad, spelled on the pad keyboard ("11 MAR 1994 14:30").
+			if _on_pad():
+				_open_pad_keyboard("", "YOUR BIRTHDAY: DAY MONTH YEAR, TIME IF KNOWN", [], _think, 24)
+			elif thought_edit != null:
 				thought_edit.placeholder_text = "your birthday: day month year, and the time if you know it"
 				thought_edit.visible = true
 				thought_edit.grab_focus()
@@ -910,6 +961,7 @@ func _draw() -> void:
 	_draw_tank(viewport)
 	var board := Rect2(Vector2(viewport.x * 0.325, 54), Vector2(viewport.x * 0.375, viewport.y - 130))
 	_draw_clipboard(board)
+	_draw_control_strip(Rect2(Vector2(board.position.x, board.end.y + 16.0), Vector2(board.size.x, viewport.y - board.end.y - 22.0)))
 	_draw_mirror(_vat_rect())
 	_draw_handler(viewport)
 	_draw_doctor(viewport)
@@ -965,7 +1017,7 @@ func _draw_clipboard(rect: Rect2) -> void:
 	draw_rect(Rect2(Vector2(rect.size.x * 0.5 - 44, 6), Vector2(88, 22)), HOT, false, 1.5)
 
 	var ink := INK
-	var y := 124.0
+	var y := 124.0 + TAB_SHIFT
 	# The page swings in on its arm while it prints, then hangs still.
 	var clip_xform := Transform2D(-0.022, rect.position + Vector2(0, 12))
 	if page_print < 1.0:
@@ -990,7 +1042,7 @@ func _draw_clipboard(rect: Rect2) -> void:
 	draw_set_transform_matrix(clip_xform)
 	# The header goes on after the page, over a strip of paper, so a page
 	# swinging in comes out from under it rather than across it.
-	draw_rect(Rect2(Vector2(12, 34), Vector2(rect.size.x - 24, 74)), PAPER)
+	draw_rect(Rect2(Vector2(12, 34), Vector2(rect.size.x - 24, 74 + TAB_SHIFT)), PAPER)
 	_draw_form_header(rect, ink)
 	IntakePageMotion.draw_runs(self, blood_runs)
 
@@ -1001,56 +1053,118 @@ func _draw_clipboard(rect: Rect2) -> void:
 	IntakePageMotion.draw_train(self, PAGE_HINGE, page_print, elapsed)
 	draw_line(Vector2(26, footer - 12), Vector2(rect.size.x - 26, footer - 12), ink * Color(1, 1, 1, 0.3), 1.0)
 	_draw_gauges(rect, ink, footer)
-	_keep_hit = Rect2(Vector2(26, footer - 70), Vector2(rect.size.x - 52, 28))
+	_keep_hit = Rect2(Vector2(26, footer - 76), Vector2(rect.size.x - 52, 34))
 	var keep_hot := _keep_hit.has_point(_board_xform.affine_inverse() * get_local_mouse_position())
 	draw_rect(_keep_hit, HOT * Color(1, 1, 1, 0.28 if keep_hot else 0.12))
 	draw_rect(_keep_hit, (MOSS if touched_pages.has(page) else HOT) * Color(1, 1, 1, 0.7), false, 1.0)
 	var keep := "[%s]  CONFIRM %s AS IS" % [_hint_key("SPACE", JOY_BUTTON_X), PAGES[page]]
-	var keep_size := minf(15.0, 15.0 * (_keep_hit.size.x - 20.0) / CellOutzType.width_condensed(keep, 15.0, 0.8))
+	var keep_size := minf(18.0, 18.0 * (_keep_hit.size.x - 20.0) / CellOutzType.width_condensed(keep, 18.0, 0.8))
 	CellOutzType.draw_condensed(self, _keep_hit.position + Vector2(10, (_keep_hit.size.y - keep_size) * 0.5), keep, keep_size, ink, 0.8)
 	CellOutzType.draw_condensed(self, Vector2(26, footer + 36), "%s // %s RISING // %s" % [sheet.sun_sign(), sheet.ascendant(), sheet.modality().to_upper()], 9.0, ink * Color(1, 1, 1, 0.55), 0.7)
 	var done := touched_pages.size()
-	var on_pad := _hint_key("K", JOY_BUTTON_A) != "K"
-	var change := ("%s CHANGES A ROW  //  %s %s TAB  //  %s REROLL  //  %s RENAME" % [_hint_key("", JOY_BUTTON_A), _hint_key("", JOY_BUTTON_LEFT_SHOULDER), _hint_key("", JOY_BUTTON_RIGHT_SHOULDER), _hint_key("", JOY_BUTTON_Y), _hint_key("", JOY_BUTTON_BACK)]) if on_pad else "ENTER OR CLICK CHANGES A ROW  //  R REROLL  //  N RENAME  //  HOLD V TO SPEAK"
-	var hint := ("CONFIRMED %d/%d  //  %s" % [done, PAGES.size(), change]) if done < PAGES.size() else "ALL %d CONFIRMED  //  %s FILES YOU" % [PAGES.size(), _hint_key("F", JOY_BUTTON_START)]
+	# intake-29: the controls moved to the strip under the form, so this line
+	# is progress only and every key on it is the player's own device.
+	var hint := ("CONFIRMED %d/%d  //  THE TICKED TABS ARE DONE" % [done, PAGES.size()]) if done < PAGES.size() else "ALL %d CONFIRMED  //  %s FILES YOU" % [PAGES.size(), _hint_key("F", JOY_BUTTON_START)]
 	var hint_room := rect.size.x - 52.0
 	var hint_size := minf(15.0, 15.0 * hint_room / CellOutzType.width_condensed(hint, 15.0, 0.8))
 	CellOutzType.draw_condensed(self, Vector2(rect.size.x - 26 - CellOutzType.width_condensed(hint, hint_size, 0.8), footer + 50), hint, hint_size, HOT if done < PAGES.size() else MOSS, 0.8)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
+## intake-29 (Greg on the pad, 4 Oct: "this entire section needs to be
+## reworked so that it works for controller keys"). The controls, under the
+## form, big, in the player's own device: pad buttons on a pad, keys on a
+## keyboard. What it lists follows the moment (filling in, his procedure,
+## his verdict).
+func control_chips() -> Array:
+	var pad := _on_pad()
+	if not procedure.is_empty():
+		return [[_hint_key("ENTER", JOY_BUTTON_A), "NEXT"], [_hint_key("ESC", JOY_BUTTON_B), "STOP IT"]]
+	if verdict_started:
+		return [[_hint_key("ENTER", JOY_BUTTON_A), "HURRY HIM"]]
+	var tabs := ("%s %s" % [_hint_key("", JOY_BUTTON_LEFT_SHOULDER), _hint_key("", JOY_BUTTON_RIGHT_SHOULDER)]) if pad else "LEFT RIGHT"
+	var chips: Array = [
+		[_hint_key("ENTER", JOY_BUTTON_A), "CHANGE" if pad else "OR CLICK CHANGE"],
+		["D-PAD" if pad else "UP DOWN", "MOVE"],
+		[tabs, "TAB"],
+		[_hint_key("SPACE", JOY_BUTTON_X), "KEEP"],
+		[_hint_key("R", JOY_BUTTON_Y), "REROLL"],
+		[_hint_key("N", JOY_BUTTON_BACK), "RENAME"],
+		["HOLD " + _hint_key("V", TALK_BUTTON), "SPEAK"],
+	]
+	if _can_file():
+		chips.append([_hint_key("F", JOY_BUTTON_START), "FILE"])
+	elif pad:
+		chips.append([_hint_key("", JOY_BUTTON_B), "BACK"])
+	return chips
+
+
+func _draw_control_strip(strip: Rect2) -> void:
+	if strip.size.y < 30.0 or (pad_keyboard != null and is_instance_valid(pad_keyboard)):
+		return
+	var chips := control_chips()
+	var line_h := minf(28.0, (strip.size.y - 4.0) / 2.0)
+	# Flowed at natural width over two lines; the text only shrinks if even
+	# that will not fit, and then every chip shrinks together.
+	var text_h := line_h * 0.55
+	while text_h > 7.0 and _chip_lines(chips, text_h, strip.size.x) > 2:
+		text_h -= 0.5
+	var at := strip.position
+	for chip: Array in chips:
+		var width := _chip_width(chip, text_h)
+		if at.x + width > strip.end.x + 4.0:
+			at = Vector2(strip.position.x, at.y + line_h + 4.0)
+		var key := str(chip[0])
+		var key_w := CellOutzType.width_condensed(key, text_h, 0.8) + 14.0
+		var key_box := Rect2(at, Vector2(key_w, line_h))
+		draw_rect(key_box, HOT * Color(1, 1, 1, 0.55))
+		draw_rect(key_box, INK * Color(1, 1, 1, 0.7), false, 1.5)
+		CellOutzType.draw_condensed(self, at + Vector2(7, (line_h - text_h) * 0.5), key, text_h, INK, 0.8)
+		CellOutzType.draw_condensed(self, at + Vector2(key_w + 6, (line_h - text_h) * 0.5), str(chip[1]), text_h, INK * Color(1, 1, 1, 0.85), 0.8)
+		at.x += width
+
+
+func _chip_lines(chips: Array, text_h: float, room: float) -> int:
+	var lines := 1
+	var x := 0.0
+	for chip: Array in chips:
+		var width := _chip_width(chip, text_h)
+		if x + width > room + 4.0:
+			lines += 1
+			x = 0.0
+		x += width
+	return lines
+
+
+func _chip_width(chip: Array, text_h: float) -> float:
+	return CellOutzType.width_condensed(str(chip[0]), text_h, 0.8) + 14.0 + 6.0 + CellOutzType.width_condensed(str(chip[1]), text_h, 0.8) + 18.0
+
+
 func _draw_form_header(rect: Rect2, ink: Color) -> void:
 	CellOutzType.draw_stamped(self, Vector2(26, 46), "NEURAL INTAKE", 20.0, ink, HOT * Color(1, 1, 1, 0.32), 1.6)
 	CellOutzType.draw_condensed(self, Vector2(26, 72), Branding.copy_for("intake", "header"), 9.0, ink * Color(1, 1, 1, 0.6), 0.7)
 
-	# Page tabs along the top of the paper. Eight tabs no longer fit at the
-	# old size, so the row shrinks until the last one (STYLE) is on the paper.
-	var tab_x := 26.0
-	var tab_size := 10.0
-	var tab_pad := 16.0
-	var room := rect.size.x - 52.0
-	var needed := 0.0
-	for label in PAGES:
-		needed += CellOutzType.width_condensed(str(label), 10.0, 0.8) + 16.0 + 12.0 + 6.0
-	if needed > room:
-		var squeeze := room / needed
-		tab_size = 10.0 * squeeze
-		tab_pad = 16.0 * squeeze
+	# Page tabs along the top of the paper (intake-29: Greg on the pad, "the
+	# tiny tabs get bigger"): two rows of four equal cells, each a real target.
+	var room := rect.size.x - TAB_LEFT - 26.0
+	var per_row := 4
+	var gap := 6.0
+	var cell := Vector2((room - gap * float(per_row - 1)) / float(per_row), TAB_HEIGHT)
 	for index in PAGES.size():
 		var label: String = PAGES[index]
-		var width := CellOutzType.width_condensed(label, tab_size, 0.8) + tab_pad
+		var at := Vector2(TAB_LEFT + float(index % per_row) * (cell.x + gap), 80.0 + float(index / per_row) * (cell.y + 4.0))
+		var box := Rect2(at, cell)
 		var confirmed := touched_pages.has(index)
-		width += 12.0 if confirmed else 0.0
-		_tab_hits.append(Rect2(Vector2(tab_x - 5, 82), Vector2(width, 24)))
-		if index == page:
-			draw_rect(Rect2(Vector2(tab_x - 5, 86), Vector2(width, 18)), HOT * Color(1, 1, 1, 0.16))
-			draw_line(Vector2(tab_x - 5, 104), Vector2(tab_x - 5 + width, 104), HOT, 1.6)
-		CellOutzType.draw_condensed(self, Vector2(tab_x, 90), label, tab_size, ink * Color(1, 1, 1, 1.0 if index == page else 0.45), 0.8)
+		_tab_hits.append(box)
+		var current := index == page
+		draw_rect(box, HOT * Color(1, 1, 1, 0.42 if current else 0.08))
+		draw_rect(box, (INK if current else COPPER) * Color(1, 1, 1, 0.9 if current else 0.35), false, 2.0 if current else 1.0)
+		var label_size := minf(TAB_TEXT, TAB_TEXT * (cell.x - 26.0) / CellOutzType.width_condensed(label, TAB_TEXT, 0.8))
+		CellOutzType.draw_condensed(self, at + Vector2(8, (cell.y - label_size) * 0.5), label, label_size, ink * Color(1, 1, 1, 1.0 if current else 0.6), 0.8)
 		if confirmed:
-			var tick := Vector2(tab_x + width - 18, 91)
+			var tick := at + Vector2(cell.x - 16, cell.y * 0.5 - 5)
 			draw_line(tick + Vector2(0, 4), tick + Vector2(3, 8), MOSS, 2.0)
 			draw_line(tick + Vector2(3, 8), tick + Vector2(9, 0), MOSS, 2.0)
-		tab_x += width + 6.0 * tab_size / 10.0
 
 
 func _update_gauges(delta: float) -> void:
@@ -1108,9 +1222,16 @@ func _draw_gauges(rect: Rect2, ink: Color, footer: float) -> void:
 		column += rect.size.x * 0.22
 
 
-func _row_mark(ink: Color, at: Vector2, active: bool, ticked: bool) -> void:
-	# Every row passes through here, so it is where the row becomes clickable.
-	_row_hits.append(Rect2(Vector2(20, at.y - 6), Vector2(_board_width - 40, 23)))
+func _row_mark(ink: Color, at: Vector2, active: bool, ticked: bool, band := 24.0) -> void:
+	# Every row passes through here, so it is where the row becomes clickable,
+	# and (intake-29) where the focused row gets a band a pad player can see
+	# from the sofa. `band` is the row's own pitch, so the target is the row.
+	var hit := Rect2(Vector2(20, at.y - 8), Vector2(_board_width - 40, band))
+	_row_hits.append(hit)
+	if active:
+		draw_rect(hit, HOT * Color(1, 1, 1, 0.22 + 0.06 * sin(elapsed * 4.0)))
+		draw_rect(hit, INK * Color(1, 1, 1, 0.55), false, 1.5)
+		draw_rect(Rect2(hit.position, Vector2(5, hit.size.y)), HOT)
 	draw_rect(Rect2(at, Vector2(11, 11)), ink * Color(1, 1, 1, 0.55), false, 1.2)
 	if ticked:
 		draw_line(at + Vector2(2, 6), at + Vector2(4.5, 9), ink, 1.8)
@@ -1122,12 +1243,12 @@ func _row_mark(ink: Color, at: Vector2, active: bool, ticked: bool) -> void:
 func _draw_routes(_rect: Rect2, ink: Color, y: float) -> void:
 	for index in ROUTES.size():
 		var label: String = ROUTES[index]
-		_row_mark(ink, Vector2(30, y - 9), index == row, sheet.route == label.to_lower())
+		_row_mark(ink, Vector2(30, y - 9), index == row, sheet.route == label.to_lower(), 50.0)
 		# Walkthrough 2: the blank space used, the text larger. Four routes had
 		# the bottom half of the form to themselves; the note now sits under
 		# the name at a size that can be read.
 		CellOutzType.draw_condensed(self, Vector2(50, y - 13), label, 17.0, ink, 1.0)
-		var note: String = ["quick start: enter and go", "the decanting lottery", "birth date, time, place", "the questionnaire"][index]
+		var note: String = ["quick start: %s and go" % _hint_key("enter", JOY_BUTTON_A), "the decanting lottery", "birth date, time, place", "the questionnaire"][index]
 		CellOutzType.draw_condensed(self, Vector2(50, y + 10), note.to_upper(), 10.0, ink * Color(1, 1, 1, 0.5), 0.7)
 		y += 58.0
 
@@ -1136,9 +1257,10 @@ func _draw_routes(_rect: Rect2, ink: Color, y: float) -> void:
 ## element each stat drinks from, as bars.
 func _draw_birth(_rect: Rect2, ink: Color, y: float) -> void:
 	var told := touched_pages.has(BIRTH_PAGE)
-	_row_mark(ink, Vector2(30, y - 9), row == 0, told)
+	_row_mark(ink, Vector2(30, y - 9), row == 0, told, 34.0)
 	CellOutzType.draw_condensed(self, Vector2(50, y - 10), "TELL HIM" if not told else "TOLD HIM", 13.0, ink, 0.9)
-	CellOutzType.draw_condensed(self, Vector2(50, y + 6), "ENTER TO TYPE IT  //  HOLD V TO SAY IT", 7.0, ink * Color(1, 1, 1, 0.5), 0.6)
+	var birth_hint := ("%s TO SPELL IT  //  HOLD %s TO SAY IT" % [_hint_key("", JOY_BUTTON_A), _hint_key("", TALK_BUTTON)]) if _on_pad() else "ENTER TO TYPE IT  //  HOLD V TO SAY IT"
+	CellOutzType.draw_condensed(self, Vector2(50, y + 6), birth_hint, 9.0, ink * Color(1, 1, 1, 0.6), 0.6)
 	y += 42.0
 	var birth: Dictionary = sheet.birth
 	var date := "%02d %s %d" % [int(birth.get("day", 1)), str(CharacterSheet.MONTH_NAMES[clampi(int(birth.get("month", 1)), 1, 12) - 1]).left(3), int(birth.get("year", 2000))]
@@ -1168,7 +1290,7 @@ func _draw_styles(_rect: Rect2, ink: Color, y: float) -> void:
 		var style_id: String = BloodTrees.STYLE_ORDER[index]
 		var style: Dictionary = BloodTrees.STYLES[style_id]
 		var tone: Color = style.tone
-		_row_mark(ink, Vector2(30, y - 9), index == row, sheet.fighting_style == style_id)
+		_row_mark(ink, Vector2(30, y - 9), index == row, sheet.fighting_style == style_id, 32.0)
 		draw_rect(Rect2(Vector2(50, y - 12), Vector2(6, 26)), tone)
 		CellOutzType.draw_condensed(self, Vector2(64, y - 10), str(style.label), 13.0, ink, 0.9)
 		var first := BloodTrees.first_node(style_id)
@@ -1182,7 +1304,7 @@ func _draw_races(_rect: Rect2, ink: Color, y: float) -> void:
 	var keys: Array = CharacterSheet.RACES.keys()
 	for index in keys.size():
 		var data: Dictionary = CharacterSheet.RACES[keys[index]]
-		_row_mark(ink, Vector2(30, y - 9), index == row, sheet.race == str(keys[index]))
+		_row_mark(ink, Vector2(30, y - 9), index == row, sheet.race == str(keys[index]), 38.0)
 		CellOutzType.draw_condensed(self, Vector2(50, y - 12), str(data.name), 15.0, ink, 0.9)
 		CellOutzType.draw_condensed(self, Vector2(50, y + 6), str(data.price).to_upper(), 8.5, ink * Color(1, 1, 1, 0.48), 0.6)
 		# AX1.4. What you picked, and what the facility wrote down instead. Shown
@@ -1202,7 +1324,7 @@ func _draw_traits(rect: Rect2, ink: Color, y: float) -> void:
 	for index in keys.size():
 		var data: Dictionary = CharacterSheet.TRAITS[keys[index]]
 		var cost := int(data.get("cost", 0))
-		_row_mark(ink, Vector2(30, y - 9), index == row, sheet.traits.has(str(keys[index])))
+		_row_mark(ink, Vector2(30, y - 9), index == row, sheet.traits.has(str(keys[index])), 30.0)
 		# Walkthrough 2: "the intake's blank space used and its text larger".
 		# Eight traits left a third of the form empty at 24 px; they take the
 		# room the body page's nine rows already fill.
@@ -1218,7 +1340,7 @@ func _draw_face(_rect: Rect2, ink: Color, y: float) -> void:
 	for index in FaceModel.ORDER.size():
 		var axis: String = FaceModel.ORDER[index]
 		var spec: Dictionary = FaceModel.AXES[axis]
-		_row_mark(ink, Vector2(30, y - 9), index == row, false)
+		_row_mark(ink, Vector2(30, y - 9), index == row, false, 26.0)
 		CellOutzType.draw_condensed(self, Vector2(50, y - 10), str(spec.label), 11.0, ink * Color(1, 1, 1, 0.6), 0.8)
 		CellOutzType.draw_condensed(self, Vector2(190, y - 10), FaceModel.reading(sheet.face, axis), 12.0, ink, 0.9)
 		# The axis drawn as a mark on a strip, because the form has no numbers
@@ -1243,7 +1365,7 @@ func _draw_body(_rect: Rect2, ink: Color, y: float) -> void:
 		["METAL", "%.0f%%" % (float(sheet.appearance.get("piercings", 0.0)) * 100.0)],
 	]
 	for index in rows.size():
-		_row_mark(ink, Vector2(30, y - 9), index == row, false)
+		_row_mark(ink, Vector2(30, y - 9), index == row, false, 26.0)
 		CellOutzType.draw_condensed(self, Vector2(50, y - 10), str(rows[index][0]), 11.0, ink * Color(1, 1, 1, 0.6), 0.8)
 		CellOutzType.draw_condensed(self, Vector2(190, y - 10), str(rows[index][1]), 12.0, ink, 0.9)
 		_body_icon(str(rows[index][0]), Vector2(172, y - 4), ink)
@@ -1284,7 +1406,7 @@ func _draw_schedule(_rect: Rect2, ink: Color, y: float) -> void:
 	var keys: Array = CharacterSheet.MODIFIERS.keys()
 	for index in keys.size():
 		var data: Dictionary = CharacterSheet.MODIFIERS[keys[index]]
-		_row_mark(ink, Vector2(30, y - 9), index == row, sheet.modifiers.has(str(keys[index])))
+		_row_mark(ink, Vector2(30, y - 9), index == row, sheet.modifiers.has(str(keys[index])), 38.0)
 		CellOutzType.draw_condensed(self, Vector2(50, y - 10), str(data.name), 12.0, ink, 0.9)
 		CellOutzType.draw_condensed(self, Vector2(50, y + 4), str(data.gives).to_upper(), 7.0, MOSS.darkened(0.4), 0.6)
 		CellOutzType.draw_condensed(self, Vector2(50, y + 14), str(data.costs).to_upper(), 7.0, HOT.darkened(0.3), 0.6)
@@ -1333,6 +1455,8 @@ func _draw_mirror(rect: Rect2) -> void:
 	draw_line(header.position + Vector2(0, header.size.y), header.end, COPPER * Color(1, 1, 1, 0.7), 1.0)
 	CellOutzType.draw_condensed(self, header.position + Vector2(12, 7), "SUBJECT  %s" % subject_name, 21.0, INK, 0.7)
 	CellOutzType.draw_condensed(self, header.position + Vector2(12, 32), "TANK 0C-7  //  LIVE", 12.0, COPPER, 0.7)
+	var rename := "[%s] RENAME" % _hint_key("N", JOY_BUTTON_BACK)
+	CellOutzType.draw_condensed(self, header.position + Vector2(header.size.x - 12 - CellOutzType.width_condensed(rename, 12.0, 0.7), 32), rename, 12.0, INK * Color(1, 1, 1, 0.8), 0.7)
 	CellOutzType.draw_condensed(self, rect.position + Vector2(10, rect.size.y - 16), "THE BODY IS NOT A DRAWING", 9.0, INK * Color(1, 1, 1, 0.45), 0.7)
 
 
@@ -1442,6 +1566,9 @@ func _finish_filing() -> void:
 		"institutional_classification": str(DoctorExamination.classify(sheet).label),
 		"examination_seconds": int(elapsed),
 		"examination_route": "preset:" + preset_loaded if preset_loaded != "" else "deliberate",
+		# intake-29: which ROUTE row the player took (preset / random / chart /
+		# instrument), so the vat opening can be checked against it.
+		"intake_route": sheet.route,
 	}, "examination_filed")
 	# Greg, 24 September: "don't forget the save character preset so you can
 	# reload it if you die without wasting time". CharacterPresets.save() had
@@ -1527,8 +1654,21 @@ func _draw_handler(_viewport: Vector2) -> void:
 		draw_multiline_string(font, Vector2(reply.position.x + 12, y + 22 + 15), thought, HORIZONTAL_ALIGNMENT_LEFT, text_width, 15, 3, BRUISE.lightened(0.55) * Color(1, 1, 1, clampf(thought_life, 0.0, 1.0)))
 
 	var keys := "[V] THINK OUT LOUD" + ("   //   [1-%d] ANSWER" % answers.size() if not answers.is_empty() else "") + "   //   TUBE IN: YOU CANNOT SPEAK"
+	if _on_pad():
+		var answer_buttons: Array[String] = []
+		for index in mini(answers.size(), 3):
+			answer_buttons.append(_hint_key("", [JOY_BUTTON_A, JOY_BUTTON_X, JOY_BUTTON_Y][index]))
+		keys = "[HOLD %s] THINK OUT LOUD" % _hint_key("", TALK_BUTTON) + ("   //   [%s] ANSWER" % " ".join(answer_buttons) if not answers.is_empty() else "") + "   //   TUBE IN: YOU CANNOT SPEAK"
 	if thought_edit == null or not thought_edit.visible:
-		CellOutzType.draw_condensed(self, Vector2(reply.position.x + 12, reply.end.y - 18), keys, 8.0, INK * Color(1, 1, 1, 0.55), 0.7)
+		# Two lines, so neither has to shrink to fit the panel.
+		var parts := keys.split("   //   ")
+		var tube := parts[parts.size() - 1]
+		parts.remove_at(parts.size() - 1)
+		var lines := ["   //   ".join(parts), tube]
+		for index in lines.size():
+			var text: String = lines[index]
+			var text_size := minf(12.0, 12.0 * (reply.size.x - 24.0) / maxf(1.0, CellOutzType.width_condensed(text, 12.0, 0.7)))
+			CellOutzType.draw_condensed(self, Vector2(reply.position.x + 12, reply.end.y - 40 + index * 18), text, text_size, INK * Color(1, 1, 1, 0.75 if index == 0 else 0.45), 0.7)
 
 
 ## One eye per blink the answer asks for, drawn shut; an open eye for
