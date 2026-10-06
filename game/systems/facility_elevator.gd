@@ -372,9 +372,25 @@ func _panel(parent: Node3D, at: Vector3, turn: float) -> Label3D:
 	glass.emission = Color("3c4832")
 	glass.emission_energy_multiplier = 1.6
 	housing.material_override = glass
+	housing.set_meta("own_material", true)
 	housing.position = at
 	housing.rotation.y = turn
 	parent.add_child(housing)
+	# A lit rim round the dark face: on its own the face was dark on dark and
+	# the two lines still read as text hanging in the black.
+	var rim := MeshInstance3D.new()
+	rim.name = "ReadoutRim"
+	var rim_box := BoxMesh.new()
+	rim_box.size = Vector3(0.42, 0.26, 0.02)
+	rim.mesh = rim_box
+	var tube := StandardMaterial3D.new()
+	tube.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	tube.albedo_color = Color("9fb88a")
+	rim.material_override = tube
+	rim.set_meta("own_material", true)
+	rim.position = at - Basis(Vector3.UP, turn) * Vector3(0, 0, 0.01)
+	rim.rotation.y = turn
+	parent.add_child(rim)
 	var label := _label(parent, at + Basis(Vector3.UP, turn) * Vector3(0, 0, 0.02), turn)
 	label.pixel_size = 0.00062
 	label.line_spacing = -8.0
