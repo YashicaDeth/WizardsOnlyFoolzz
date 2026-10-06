@@ -502,15 +502,7 @@ func _build_remains() -> void:
 		body.position = VAT_REBIRTH.remains_position(remains)
 		body.anatomy.dead = true
 		body.rotation.x = -PI * 0.46
-		var tag := Label3D.new()
-		tag.text = "YOUR OLD BODY"
-		tag.font_size = 30
-		tag.outline_size = 8
-		tag.modulate = Color("d9c3a4")
-		tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		tag.position = body.position + Vector3(0, 0.9, 0)
-		add_child(tag)
-		remains_nodes[str(remains.id)] = [body, tag]
+		remains_nodes[str(remains.id)] = [body, null]
 
 
 func _build_sight() -> void:
@@ -883,7 +875,11 @@ func interact() -> String:
 	if not remains_id.is_empty():
 		var result := VAT_REBIRTH.recover(remains_id)
 		if bool(result.get("ok", false)):
-			(remains_nodes[remains_id][1] as Label3D).text = "STRIPPED"
+			var body := remains_nodes[remains_id][0] as Node3D
+			var tag := remains_nodes[remains_id][1] as Label3D
+			body.set_meta("stripped", true)
+			if tag != null:
+				tag.text = "STRIPPED"
 			_refresh_tool()
 			_flash_message("TAKEN BACK OFF YOUR OLD BODY // %d THINGS" % int(result.get("items", 0)))
 			return "remains"
@@ -1012,7 +1008,9 @@ func _update_alarm_lamps() -> void:
 func _nearest_remains() -> String:
 	for remains_id in remains_nodes:
 		var body: Node3D = remains_nodes[remains_id][0]
-		if (remains_nodes[remains_id][1] as Label3D).text != "STRIPPED" and _flat_distance(body.global_position) <= REMAINS_REACH:
+		var tag := remains_nodes[remains_id][1] as Label3D
+		var stripped := bool(body.get_meta("stripped", false)) or (tag != null and tag.text == "STRIPPED")
+		if not stripped and _flat_distance(body.global_position) <= REMAINS_REACH:
 			return str(remains_id)
 	return ""
 
