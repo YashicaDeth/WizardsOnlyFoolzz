@@ -23,6 +23,9 @@ func setup(route_host: Node, body: CharacterBody3D, connected_facility: Node3D) 
 	for lift_id: String in facility.lifts:
 		var lift: FacilityElevator = facility.lifts[lift_id]
 		lift.arrived.connect(_on_lift_arrived.bind(lift_id, lift))
+	# A route already past the vat (Continue, or a regrowth to a checkpoint)
+	# must not have its checkpoint renamed "vat" when breakout is set on resume.
+	_vat_filed = filed()
 	restore()
 
 
