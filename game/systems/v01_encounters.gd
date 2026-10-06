@@ -811,7 +811,8 @@ func _lose() -> void:
 		cause = "crushed by the Lower Works sentinel"
 		location = "lower_works"
 	WorldHistory.record_event("v01_player_killed", {"by": killer.foe_id if killer != null else "", "location": location})
-	var at: Vector3 = _player_at()
+	# The old body and its stain lie on the floor, not at the capsule's middle.
+	var at: Vector3 = _player_at() - Vector3(0, float(chamber.BODY_HALF_HEIGHT), 0)
 	var request := VAT_REBIRTH.die(location, cause, killer.foe_id if killer != null else "facility", at)
 	if OS.get_environment("ATG_V01_NO_DEATH_BEAT") == "1":
 		return

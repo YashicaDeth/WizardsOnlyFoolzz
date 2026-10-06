@@ -52,6 +52,12 @@ func file(checkpoint_id: String, at: Vector3) -> void:
 	WorldHistory.commit_ledger_batch()
 
 
+## A checkpoint is on file for the route (dec-89: a regrowth resumes there).
+static func filed() -> bool:
+	var saved := WorldHistory.subject(SUBJECT)
+	return str(saved.get("scene", "")) == SCENE and (saved.get("position", []) as Array).size() == 3
+
+
 func restore() -> bool:
 	if VatRebirth.is_pending():
 		return false

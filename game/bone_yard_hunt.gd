@@ -1247,7 +1247,9 @@ func _ready() -> void:
 	player_body.add_child(arsenal)
 	arsenal.configure(player_rig)
 	# The fighting style you gave the examiner decides what is in your hand.
-	arsenal.select_weapon(BloodTrees.starting_weapon(str(WorldHistory.subject("player").get("fighting_style", ""))))
+	# imp-66: a discipline pair slotted on the brain screen overrides it: the
+	# first slot is in your hand, the second carried (`DisciplineLobes`).
+	DisciplineLobes.arm(arsenal, BloodTrees.starting_weapon(str(WorldHistory.subject("player").get("fighting_style", ""))))
 	# The shiv from the den comes with you (Greg, 28 September).
 	if VatRebirth.carries("SHIV"):
 		arsenal.acquire_melee("shiv")

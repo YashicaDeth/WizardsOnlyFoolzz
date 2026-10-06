@@ -17,7 +17,11 @@ extends Control
 ## so it names the device used last.
 ##
 ## OPEN (Greg): whether a mismatched pair means anything. Only two exist, so
-## `PAIR_RULES` is empty by default: any pair is allowed and nothing changes.
+## `PAIR_RULES` is empty by default: any pair is allowed.
+##
+## imp-66: the pair now shows and acts (`DisciplineLobes`, dial `PAIR_EFFECT`).
+## Each card names the lobe it runs in, the brain under the cards lights each
+## lobe as it is slotted, and the first slot is the weapon you start holding.
 
 signal finished(disciplines: Array)
 
@@ -34,6 +38,14 @@ const DISCIPLINES := [
 	{"id": "marksman", "name": "MARKSMAN", "kit": "PISTOL  //  AIM DOWN SIGHTS", "line": "SLOW TIME AND TAKE THEM APART"},
 ]
 const SLOTS := 2
+## imp-66 dial: also offer the lab's Duelist and Shade (lab-52). Off: the lab
+## keeps them "until Greg chooses whether either belongs in the facility
+## route" (discipline_station.gd).
+const OFFER_LAB_DISCIPLINES := true
+const LAB_DISCIPLINES := [
+	{"id": "duelist", "name": "DUELIST", "kit": "CLEAVER  //  PARRY", "line": "RIPOSTE"},
+	{"id": "shade", "name": "SHADE", "kit": "SHIV  //  DARKNESS", "line": "TAKEDOWN FROM BEHIND"},
+]
 ## OPEN dial: {"brawler+marksman": {...}} once Greg decides pairs matter.
 const PAIR_RULES := {}
 
@@ -47,6 +59,10 @@ var done := false
 var clock := 0.0
 var _hit_cards: Array[Rect2] = []
 var _hit_lock := Rect2()
+
+
+static func offered() -> Array:
+	return DISCIPLINES + LAB_DISCIPLINES if OFFER_LAB_DISCIPLINES else DISCIPLINES
 
 
 static func wanted() -> bool:
@@ -78,13 +94,13 @@ func confirm() -> void:
 	if ready_to_lock():
 		lock_in()
 		return
-	var id := str(DISCIPLINES[focus].id)
+	var id := str(offered()[focus].id)
 	if not slotted.has(id):
 		slotted.append(id)
 		_cue(0.9)
 	# The next empty card, so Cross Cross Cross is the whole screen.
-	for index in DISCIPLINES.size():
-		if not slotted.has(str(DISCIPLINES[index].id)):
+	for index in offered().size():
+		if not slotted.has(str(offered()[index].id)):
 			focus = index
 			break
 
@@ -97,7 +113,7 @@ func back() -> void:
 
 
 func move(step: int) -> void:
-	focus = wrapi(focus + step, 0, DISCIPLINES.size())
+	focus = wrapi(focus + step, 0, offered().size())
 
 
 func lock_in() -> void:
@@ -211,12 +227,13 @@ func _draw() -> void:
 	CellOutzType.draw_condensed(self, Vector2((view.x - CellOutzType.width_condensed(sub, sub_h, 1.0)) * 0.5, 120.0 * unit), sub, sub_h, COPPER, 1.0)
 	# Two big cards side by side.
 	_hit_cards.clear()
-	var card := Vector2(420.0, 300.0) * unit
-	var gap := 60.0 * unit
-	var left := (view.x - card.x * DISCIPLINES.size() - gap * (DISCIPLINES.size() - 1)) * 0.5
+	var count := offered().size()
+	var card := Vector2(420.0 if count <= 2 else 270.0, 250.0) * unit
+	var gap := (60.0 if count <= 2 else 24.0) * unit
+	var left := (view.x - card.x * offered().size() - gap * (offered().size() - 1)) * 0.5
 	var top := 180.0 * unit
-	for index in DISCIPLINES.size():
-		var entry: Dictionary = DISCIPLINES[index]
+	for index in count:
+		var entry: Dictionary = offered()[index]
 		var rect := Rect2(Vector2(left + index * (card.x + gap), top), card)
 		_hit_cards.append(rect)
 		var is_in := slotted.has(str(entry.id))
@@ -224,15 +241,35 @@ func _draw() -> void:
 		var pulse := 0.5 + 0.5 * sin(clock * 5.0)
 		draw_rect(rect, Color(BLOOD, 0.28 if is_in else 0.1))
 		draw_rect(rect, Color(BONE if lit else COPPER, 0.6 + 0.4 * pulse if lit else 0.5), false, 6.0 * unit if lit else 2.0)
-		var name_h := 42.0 * unit
-		CellOutzType.draw_text(self, rect.position + Vector2(28, 40) * unit, str(entry.name), name_h, BONE if is_in or lit else Color(BONE, 0.6), 2.0)
+		var name_h := (42.0 if count <= 2 else 30.0) * unit
+		CellOutzType.draw_text(self, rect.position + Vector2(28, 34) * unit, str(entry.name), name_h, BONE if is_in or lit else Color(BONE, 0.6), 2.0)
 		var kit_h := 14.0 * unit
-		CellOutzType.draw_condensed(self, rect.position + Vector2(28, 130) * unit, str(entry.kit), kit_h, COPPER, 0.8)
-		CellOutzType.draw_condensed(self, rect.position + Vector2(28, 170) * unit, str(entry.line), kit_h, Color(BONE, 0.8), 0.8)
+		CellOutzType.draw_condensed(self, rect.position + Vector2(28, 104) * unit, str(entry.kit), kit_h, COPPER, 0.8)
+		CellOutzType.draw_condensed(self, rect.position + Vector2(28, 136) * unit, str(entry.line), kit_h, Color(BONE, 0.8), 0.8)
+		if DisciplineLobes.PAIR_EFFECT and DisciplineLobes.LOBES.has(str(entry.id)):
+			var tone := DisciplineLobes.colour(str(entry.id))
+			var lobe_text := "%s LOBE" % DisciplineLobes.lobe(str(entry.id)).to_upper()
+			draw_rect(Rect2(rect.position + Vector2(28, 166) * unit, Vector2(10, 10) * unit), Color(tone, 1.0 if is_in else 0.5))
+			CellOutzType.draw_condensed(self, rect.position + Vector2(46, 164) * unit, lobe_text, kit_h, Color(tone, 1.0 if is_in else 0.6), 0.8)
 		var state := "SLOTTED  %d" % (slotted.find(str(entry.id)) + 1) if is_in else "EMPTY"
 		CellOutzType.draw_condensed(self, rect.position + Vector2(28, card.y / unit - 44) * unit, state, kit_h, BLOOD if is_in else Color(BONE, 0.4), 1.0)
+	# The chip's brain under the cards: each slotted lobe lights, the card in
+	# focus shows faintly, and the first slot is what you will hold.
+	var bar_top := top + card.y + 50.0 * unit
+	if DisciplineLobes.PAIR_EFFECT:
+		var half := 52.0 * unit
+		var brain_at := Vector2(view.x * 0.5, top + card.y + 30.0 * unit + half * 1.1)
+		var faint := "" if done or ready_to_lock() else str(offered()[focus].id)
+		DisciplineLobes.draw_brain(self, brain_at, half, slotted, clock, faint)
+		if not slotted.is_empty():
+			var weapon := DisciplineLobes.starting_weapon("", slotted)
+			var label := str((HunterArsenal.WEAPONS.get(weapon, {}) as Dictionary).get("label", weapon.to_upper()))
+			var hand := "IN HAND  //  %s" % label
+			var hand_h := 14.0 * unit
+			CellOutzType.draw_condensed(self, brain_at + Vector2(half * 1.37 + 28.0 * unit, -hand_h * 0.5), hand, hand_h, DisciplineLobes.colour(str(slotted[0])), 0.8)
+		bar_top = brain_at.y + half * 1.4 + 20.0 * unit
 	# The lock-in bar, big, under the cards.
-	var bar := Rect2(Vector2(view.x * 0.5 - 260.0 * unit, top + card.y + 50.0 * unit), Vector2(520.0, 70.0) * unit)
+	var bar := Rect2(Vector2(view.x * 0.5 - 260.0 * unit, bar_top), Vector2(520.0, 70.0) * unit)
 	_hit_lock = bar
 	var armed := ready_to_lock()
 	draw_rect(bar, Color(BLOOD, 0.55 if armed else 0.12))
