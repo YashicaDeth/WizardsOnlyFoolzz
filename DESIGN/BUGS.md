@@ -54,7 +54,7 @@ bughunt-79-c (2026-10-06, after the v0.1 sound pass merged) re-ran the six route
 
 ## Open
 
-- **Rebirth, old body in the arcade**: glowing orange ghost body with red discs and a ring, plus a floating "YOUR OLD BODY" label like debug text (REMASTER_LOG job7 "Still weak"; rebirth_old_body.png). Major (looks broken). OPEN: needs a real corpse/bloodstain read; Greg's art direction.
+- **Rebirth, old body in the arcade**: glowing orange ghost body with red discs and a ring (REMASTER_LOG job7 "Still weak"; rebirth_old_body.png). Major (looks broken). PARTIAL fix-85: removed the floating "YOUR OLD BODY" billboard; the nearby `[E] TAKE YOUR GEAR BACK...` prompt remains. OPEN: the ghost-body look still needs a real corpse/bloodstain read and Greg's art direction.
 - **Vat, cord beat**: the subtitle "The cord is still down your throat." (sentence case) and the thought "IT'S DOWN MY THROAT. PULL." show at once, two lines saying the same thing (bo_1_cord.png). Minor. OPEN: Greg's opening text; a question, not a lane fix.
 - **Examiner fight, bare-handed**: with no axe and no restraint he takes ~29 blows (260 health, 9 per fist) for a ~1 min fight. Minor (balance). OPEN: Greg's dial (Job 6).
 - **The Hunt, aiming down the sights**: sights are now centred, but in first person the low-poly hands and knuckle spheres fill the lower third of the frame while aimed (aim_down_sights_capture stage2 / third_person_aimed). Minor (after the route). OPEN.

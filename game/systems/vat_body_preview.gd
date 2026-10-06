@@ -11,6 +11,8 @@ const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
 const VAT_FLOAT := preload("res://systems/vat_float.gd")
 
 const VIEW_SIZE := Vector2i(300, 440)
+## player-81. Dial: false puts the boxed procedural specimen back.
+const RIGGED := true
 
 var viewport: SubViewport
 var stage: Node3D
@@ -270,11 +272,15 @@ func present(record: Dictionary) -> void:
 	var config: Dictionary = BASELINE_HUMAN.config_from_subject(normalized)
 	config["gore"] = false
 	config["seated"] = false
+	# player-81: the specimen is the player's own rigged body in their look,
+	# not the old boxed rig in a checker skin.
+	config["rigged"] = RIGGED
 	last_config = config.duplicate(true)
 	rig = BASELINE_HUMAN.new()
 	rig.name = "IntakeSpecimen"
 	rig.position = Vector3(0.0, FLOAT_Y, 0.0)
 	stage.add_child(rig)
+	PlayerLook.mark(rig)
 	var identity := str((normalized.get("appearance", {}) as Dictionary).get("name", "THE HUNTER"))
 	rig.build("intake_preview_" + identity, config)
 	var appearance_node := HUNTER_APPEARANCE.new()

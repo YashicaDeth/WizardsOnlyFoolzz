@@ -364,6 +364,8 @@ func _build_rows() -> void:
 		_rows.append({"id": "hud_style", "label": "HUD STYLE", "value": _hud_style().to_upper()})
 		_rows.append({"id": "reduced_glitch", "label": "REDUCED GLITCH", "value": "ON" if _reduced_glitch() else "OFF"})
 		_rows.append({"id": "hud_face", "label": "HUD FACE", "value": _hud_face().to_upper()})
+		# player-81: Greg picks the player's look (live on the body).
+		_rows.append({"id": "player_look", "label": "PLAYER LOOK", "value": PlayerLook.label()})
 		_rows.append({"id": "settings_back", "label": "BACK", "value": ""})
 		return
 	if page == "controls":
@@ -528,6 +530,8 @@ func _nudge(direction: int) -> void:
 		_toggle_reduced_glitch()
 	elif id == "hud_face":
 		_cycle_hud_face(direction)
+	elif id == "player_look":
+		PlayerLook.cycle(direction)
 	elif id == "look_sensitivity":
 		LOOK.set_value("look_sensitivity", clampf(snappedf(LOOK.sensitivity() + 0.1 * float(direction), 0.05), LOOK.SENSITIVITY_RANGE.x, LOOK.SENSITIVITY_RANGE.y))
 	elif id == "invert_y":
@@ -558,7 +562,7 @@ func _activate() -> void:
 		"back":
 			page = "root"
 			highlighted = 0
-		"gore", "subtitles", "censor", "graphics", "screen", "hud_opacity", "hud_style", "reduced_glitch", "hud_face":
+		"gore", "subtitles", "censor", "graphics", "screen", "hud_opacity", "hud_style", "reduced_glitch", "hud_face", "player_look":
 			_nudge(1)
 		"controls":
 			page = "controls"

@@ -42,15 +42,7 @@ func setup(location_id: String, player_node: Node3D, more_locations: Array = [])
 		body.position = VAT_REBIRTH.remains_position(remains)
 		body.anatomy.dead = true
 		body.rotation.x = -PI * 0.46
-		var tag := Label3D.new()
-		tag.text = "YOUR OLD BODY"
-		tag.font_size = 30
-		tag.outline_size = 8
-		tag.modulate = Color("d9c3a4")
-		tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		tag.position = body.position + Vector3(0, 0.9, 0)
-		add_child(tag)
-		_bodies[str(remains.id)] = [body, tag]
+		_bodies[str(remains.id)] = [body, null]
 		if int(remains.get("blood_fragments", 0)) > 0 and not bool(remains.get("sigil_lost", false)):
 			_build_sigil(str(remains.id), body.position + Vector3(0, 0.07, 0))
 
@@ -155,9 +147,11 @@ func nearest() -> String:
 		return ""
 	for remains_id: String in _bodies:
 		var body: Node3D = _bodies[remains_id][0]
+		var tag := _bodies[remains_id][1] as Label3D
 		var gap := body.global_position - player.global_position
 		gap.y = 0.0
-		if gap.length() <= REACH and str((_bodies[remains_id][1] as Label3D).text) != "STRIPPED":
+		var stripped := bool(body.get_meta("stripped", false)) or (tag != null and tag.text == "STRIPPED")
+		if gap.length() <= REACH and not stripped:
 			return remains_id
 	return ""
 
@@ -178,7 +172,11 @@ func recover(remains_id: String) -> Dictionary:
 	var result := VAT_REBIRTH.recover(remains_id)
 	if not bool(result.get("ok", false)):
 		return result
-	(_bodies[remains_id][1] as Label3D).text = "STRIPPED"
+	var body := _bodies[remains_id][0] as Node3D
+	var tag := _bodies[remains_id][1] as Label3D
+	body.set_meta("stripped", true)
+	if tag != null:
+		tag.text = "STRIPPED"
 	if _sigils.has(remains_id):
 		(_sigils[remains_id] as Node3D).queue_free()
 		_sigils.erase(remains_id)

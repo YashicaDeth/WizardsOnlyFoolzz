@@ -390,7 +390,9 @@ func _build_remains() -> void:
 func _nearest_remains() -> String:
 	for remains_id in remains_nodes:
 		var body: Node3D = remains_nodes[remains_id][0]
-		if _flat_distance(body.global_position) <= REMAINS_REACH:
+		var tag := remains_nodes[remains_id][1] as Label3D
+		var stripped := bool(body.get_meta("stripped", false)) or (tag != null and tag.text == "STRIPPED")
+		if not stripped and _flat_distance(body.global_position) <= REMAINS_REACH:
 			return str(remains_id)
 	return ""
 
@@ -408,7 +410,8 @@ func _on_remains_recovered(remains_id: String, _result: Dictionary, message: Str
 		weapon_taken = true
 		_hold_ram()
 	var tag: Label3D = remains_nodes[remains_id][1]
-	tag.text = "STRIPPED"
+	if tag != null:
+		tag.text = "STRIPPED"
 	post_message = message
 	post_message_timer = 2.4
 
@@ -757,7 +760,9 @@ func _update_hud() -> void:
 	var past_guard := "REACH THE PRESSURE GATE" if guard_post.door_open else "GET THROUGH THE D-SECTION DOOR"
 	var has_remains := false
 	for remains_id in remains_nodes:
-		has_remains = has_remains or (remains_nodes[remains_id][1] as Label3D).text != "STRIPPED"
+		var body := remains_nodes[remains_id][0] as Node3D
+		var tag := remains_nodes[remains_id][1] as Label3D
+		has_remains = has_remains or (not bool(body.get_meta("stripped", false)) and (tag == null or tag.text != "STRIPPED"))
 	if has_remains and not (card_taken and weapon_taken):
 		objective.text = "OBJECTIVE\nRECOVER YOUR GEAR FROM YOUR OLD BODY"
 	else:
@@ -769,9 +774,10 @@ func _update_hud() -> void:
 		post_prompt = ""
 	elif not _finisher_weapon().is_empty() and guard_post.guard != null and guard_post.guard.is_downed() and guard_post._distance_to_guard(player.global_position) <= FacilityGuardPost.REACH + 0.4:
 		post_prompt = ("%s   //   " % post_prompt if not post_prompt.is_empty() else "") + "[LMB] EXECUTE"
-	if not _nearest_remains().is_empty() and (remains_nodes[_nearest_remains()][1] as Label3D).text != "STRIPPED":
+	var nearby_remains := _nearest_remains()
+	if not nearby_remains.is_empty():
 		post_prompt = "[E] TAKE YOUR GEAR BACK OFF YOUR OLD BODY"
-		osd.point_at((remains_nodes[_nearest_remains()][0] as Node3D).global_position + Vector3(0, 0.6, 0))
+		osd.point_at((remains_nodes[nearby_remains][0] as Node3D).global_position + Vector3(0, 0.6, 0))
 	elif post_prompt.begins_with("["):
 		osd.point_at(guard_post.guard.global_position + Vector3(0, 1.3, 0))
 	if post_message_timer > 0.0:

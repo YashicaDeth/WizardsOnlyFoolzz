@@ -1394,6 +1394,7 @@ func _build_player_rig() -> void:
 	# the enemies (Greg, 5 Oct), until his character art replaces it.
 	config["rigged"] = true
 	player_rig.gore = viscera_fx
+	PlayerLook.mark(player_rig)
 	player_rig.build("player", config)
 	# DESIGN.md:245. The elites dress you, not the mirror: the player wakes in
 	# the forced humiliation rig, collar already damaged. Re-issued whole on
