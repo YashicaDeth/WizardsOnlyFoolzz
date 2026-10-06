@@ -41,7 +41,7 @@ cyberpunk-ish post-apocalyptic biopunk occult horror; pad first.
 
 ## Body, organs, cybernetics
 - [~] Every person shares one rigged low-poly base; flesh skin, real faces (faces smeared, neckline jagged: fix-74)
-- [ ] A player model Greg likes (player-81: 2-3 looks to pick from)
+- [~] A player model Greg likes (player-81: 2-3 looks to pick from; landed e98c9457, 3 looks behind Pause > PLAYER LOOK, awaiting Greg)
 - [~] Wounds open the chest/stomach/ribs; rip organs out by hand; install them in yourself or sell them (lab only)
 - [~] X-ray scan: implants, armour, organ health, loot value (lab only)
 - [~] Cybernetics short out from the shock staff (lab only)
