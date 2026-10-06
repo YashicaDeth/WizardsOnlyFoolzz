@@ -186,6 +186,12 @@ func _gui_input(event: InputEvent) -> void:
 		accept_event()
 
 
+## The cap height at which `text` fits in `room` px, never above `cap_h`.
+static func _fit(text: String, cap_h: float, room: float) -> float:
+	var wide := CellOutzType.width_condensed(text, cap_h, 0.8)
+	return cap_h if wide <= room else cap_h * room / wide
+
+
 func _glyph(action: String) -> String:
 	var profile := get_node_or_null("/root/InputProfile")
 	return str(profile.call("glyph", action)) if profile != null else action.to_upper()
@@ -244,8 +250,10 @@ func _draw() -> void:
 		var name_h := (42.0 if count <= 2 else 30.0) * unit
 		CellOutzType.draw_text(self, rect.position + Vector2(28, 34) * unit, str(entry.name), name_h, BONE if is_in or lit else Color(BONE, 0.6), 2.0)
 		var kit_h := 14.0 * unit
-		CellOutzType.draw_condensed(self, rect.position + Vector2(28, 104) * unit, str(entry.kit), kit_h, COPPER, 0.8)
-		CellOutzType.draw_condensed(self, rect.position + Vector2(28, 136) * unit, str(entry.line), kit_h, Color(BONE, 0.8), 0.8)
+		# Four cards are narrower: a long kit or line shrinks to its card.
+		var room := card.x - 56.0 * unit
+		CellOutzType.draw_condensed(self, rect.position + Vector2(28, 104) * unit, str(entry.kit), _fit(str(entry.kit), kit_h, room), COPPER, 0.8)
+		CellOutzType.draw_condensed(self, rect.position + Vector2(28, 136) * unit, str(entry.line), _fit(str(entry.line), kit_h, room), Color(BONE, 0.8), 0.8)
 		if DisciplineLobes.PAIR_EFFECT and DisciplineLobes.LOBES.has(str(entry.id)):
 			var tone := DisciplineLobes.colour(str(entry.id))
 			var lobe_text := "%s LOBE" % DisciplineLobes.lobe(str(entry.id)).to_upper()
