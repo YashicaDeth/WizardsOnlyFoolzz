@@ -30,6 +30,7 @@ const LOOK := preload("res://systems/examiner_look.gd")
 const CARRY := preload("res://systems/carry.gd")
 const CLOTHING := preload("res://systems/clothing.gd")
 const VAT_REBIRTH := preload("res://systems/vat_rebirth.gd")
+const EXAMINER_VOICE := preload("res://systems/examiner_voice.gd")
 
 const SUBJECT := "examiner_fight"
 const LOCATION := "examination_room"
@@ -152,6 +153,7 @@ var brain: Node
 var arena_light: SpotLight3D
 var _glint: OmniLight3D
 var _tool_glow: Dictionary = {}
+var voice: ExaminerVoice
 
 
 ## `owner_route` is the DoctorRoute (for its room bounds and `_can_act`).
@@ -166,6 +168,9 @@ func setup(owner_route: Node3D, bench_at: Vector3, room_x: Vector2, room_z: Vect
 	body.name = "OfficeExaminer"
 	add_child(body)
 	body.build("office_examiner", BaselineHuman.config_from_subject({"race": "decanted"}).merged({"gore": true, "rigged": true}, true))
+	voice = EXAMINER_VOICE.new()
+	voice.level = 0.42
+	body.add_child(voice)
 	var appearance := HunterAppearance.new()
 	body.add_child(appearance)
 	appearance.configure(body, {"axes": {"brow": 0.7, "jaw": 0.6, "cheek": 0.2, "eyes": 0.3, "nose": 0.55, "mouth": 0.4}})
@@ -615,6 +620,8 @@ func _notice() -> void:
 	clock = 0.0
 	LOOK.set_mask(mask, true)
 	_say("THE EXAMINER  //  \"YOU WERE NOT SUPPOSED TO BE AWAKE YET.\"")
+	if voice != null:
+		voice.speak("You were not supposed to be awake yet.", TURN_SECONDS, false)
 	WorldHistory.update_subject(SUBJECT, {"kind": "fight", "status": "fighting", "losses": int(WorldHistory.subject(SUBJECT).get("losses", 0))}, "examiner_fight_started")
 	if bar != null:
 		bar.visible = true

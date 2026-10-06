@@ -36,6 +36,7 @@ var heart: AudioStreamPlayer
 var heart_muted := false
 var scream_in := 12.0
 var screams_heard := 0
+var profile_switches := 0
 
 
 static func wanted() -> bool:
@@ -49,10 +50,8 @@ func setup(room: String) -> AmbientBed:
 
 
 func _ready() -> void:
-	var bus := "SFX" if AudioServer.get_bus_index("SFX") >= 0 else "Master"
-	var room: Dictionary = PROFILES[profile]
-	for kind: String in room.layers:
-		layers[kind] = _loop(kind, float(room.layers[kind]), bus)
+	var bus := "Ambience" if AudioServer.get_bus_index("Ambience") >= 0 else ("SFX" if AudioServer.get_bus_index("SFX") >= 0 else "Master")
+	_build_room_layers(bus)
 	var music_bus := "Music" if AudioServer.get_bus_index("Music") >= 0 else bus
 	for kind: String in MUSIC:
 		music[kind] = _loop(kind, -60.0, music_bus)
@@ -66,6 +65,31 @@ func _ready() -> void:
 	heart.stream = preload("res://systems/sight_audio.gd").stream("heartbeat")
 	add_child(heart)
 	heart.play()
+
+
+## The v0.1 facility is one continuous scene, so entering a new room cannot
+## rely on a scene load to replace its bed. Preserve the quiet music/heartbeat
+## voices and cross the factual room layers at the zone boundary.
+func set_profile(room: String) -> void:
+	var next := room if PROFILES.has(room) else "vat"
+	if next == profile and not layers.is_empty():
+		return
+	profile = next
+	profile_switches += 1
+	for player: AudioStreamPlayer in layers.values():
+		player.stop()
+		player.queue_free()
+	layers.clear()
+	if is_inside_tree():
+		var bus := "Ambience" if AudioServer.get_bus_index("Ambience") >= 0 else ("SFX" if AudioServer.get_bus_index("SFX") >= 0 else "Master")
+		_build_room_layers(bus)
+	scream_in = randf_range(SCREAM_GAP.x, SCREAM_GAP.y)
+
+
+func _build_room_layers(bus: String) -> void:
+	var room: Dictionary = PROFILES[profile]
+	for kind: String in room.layers:
+		layers[kind] = _loop(kind, float(room.layers[kind]), bus)
 
 
 func _loop(kind: String, volume: float, bus: String) -> AudioStreamPlayer:
