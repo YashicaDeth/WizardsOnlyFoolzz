@@ -2,7 +2,7 @@ extends Node
 
 ## Visual proof for the hands-on breakout: the cord, progressively cracked glass, on
 ## your knees while the implant boots the HUD, the HUD up, and standing up
-## facing his door under GET REVENGE.
+## facing his door under GET REVENGE, with the E USE hint under the card.
 ## Run windowed: ... res://tests/hands_on_breakout_capture.tscn -- --out=DIR
 
 func _ready() -> void:
@@ -48,6 +48,11 @@ func _ready() -> void:
 	vat.get_up()
 	await _run(vat, vat.RISE_SECONDS + 0.4)
 	await _capture("%s/bo_5_get_revenge.png" % out_dir)
+	# fix-86: about 1 s into the card the E USE hint is up, under the title.
+	while vat.mission_card.playing and vat.mission_card.clock < 1.0:
+		await _run(vat, 1.0 / 30.0)
+	await _capture("%s/bo_6_revenge_hint.png" % out_dir)
+	print("CARD_CLOCK %0.2f HINT_VISIBLE %s HINT_RECT %s TITLE_RECT %s" % [vat.mission_card.clock, vat.key_hints._panel.visible, Rect2(vat.key_hints._panel.position, vat.key_hints._panel.size), MissionCard.playing_title_rect(get_tree())])
 	get_tree().quit()
 
 

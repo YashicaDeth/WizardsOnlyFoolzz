@@ -83,11 +83,10 @@ func offer(id: String, keycode: Key, key: String, verb: String) -> void:
 
 
 func _process(delta: float) -> void:
-	# A hint waits out a mission card: standing up offers E USE in the same
-	# frame GET REVENGE starts, and the box sat on the card's letters.
-	if MissionCard.any_playing(get_tree()):
-		_panel.visible = false
-		return
+	# Standing up offers E USE in the same frame GET REVENGE starts, and the
+	# box sat on the card's letters. While a card plays the hint drops below
+	# its title (fix-86); only a card with no room under it holds the hint.
+	var title := MissionCard.playing_title_rect(get_tree())
 	if current.is_empty():
 		if queue.is_empty():
 			return
@@ -97,7 +96,9 @@ func _process(delta: float) -> void:
 		var pad := get_node_or_null("/root/PadBridge")
 		_key.text = pad.hint(str(current.key), str(current.verb)) if pad != null else str(current.key)
 		_verb.text = str(current.verb).to_upper()
-		_layout()
+	if not _layout(title):
+		_panel.visible = false
+		return
 	_panel.visible = true
 	age += delta
 	_panel.modulate.a = clampf(age / 0.25, 0.0, 1.0)
@@ -126,7 +127,8 @@ func _done() -> void:
 	_panel.visible = false
 
 
-func _layout() -> void:
+## Places the box; false when a playing card leaves it nowhere clear.
+func _layout(title := Rect2()) -> bool:
 	var view := get_viewport().get_visible_rect().size
 	var key_size := _key.get_minimum_size()
 	var verb_size := _verb.get_minimum_size()
@@ -136,3 +138,9 @@ func _layout() -> void:
 	_panel.position = Vector2((view.x - width) * 0.5, view.y - height - 150.0)
 	_key.position = Vector2(12, (height - key_size.y) * 0.5)
 	_verb.position = Vector2(key_size.x + 30.0, (height - verb_size.y) * 0.5)
+	if title.has_area() and Rect2(_panel.position, _panel.size).intersects(title):
+		# Under the title, still above the screen's bottom edge.
+		_panel.position.y = minf(title.end.y + 12.0, view.y - height - 16.0)
+		if Rect2(_panel.position, _panel.size).intersects(title):
+			return false
+	return true

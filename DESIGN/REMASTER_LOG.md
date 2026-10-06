@@ -560,3 +560,9 @@ Manager look at the map sheet: one dark green corridor over and over. Attempt 1 
 - Lifts: the readout sits on a lit panel on the door jamb, not the lintel. The side-slot readouts are gone, and the shaft strips are housed. Attempt 1's panel never showed because `FacilityTunnelKit.dress_lift` treated the Cab (an AnimatableBody3D, so also a StaticBody3D) as shaft wall and re-skinned the panel as corrugated steel. Meshes tagged `own_material` are now skipped. Both lifts now show the panel.
 - fps, windowed capture on the RTX 2060 SUPER: minimum 174, average 285 over 13 shots (attempt 1 saw a 118 at 03b).
 - Still weak: the arcade is still dim overhead. The lab floor is still a checker under the grime (art call). Guard paths were checked by the route suites, not in a watched fight.
+
+## 2026-10-06, fix-86 key hint during a mission card (Claude, Opus)
+- Before: after bughunt-79-b, `KeyHints` hid its box for the whole of any mission card, so standing up under GET REVENGE gave no E USE prompt until the card ended.
+- Changed: `MissionCard.title_rect()` / `playing_title_rect()` report the area the title letters (and their darker drips) can reach. While a card plays, `KeyHints._layout` drops the box under that area, still above the screen's bottom edge, and puts it back when the card ends. It holds the hint only when there is no room under the title. The card's look and timing are unchanged.
+- Looked at: `hands_on_breakout_capture` now also shoots `bo_6_revenge_hint.png` about 1 s into GET REVENGE (`P:/GameDev/Temp/fix86/`). The hint is readable under REVENGE, and the faint drip tails end above it.
+- Still weak: four-word cards (BRAIN HACKED SOUL OVERTAKEN) fill the screen at 720p, so a hint still waits those out.
