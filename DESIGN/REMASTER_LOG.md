@@ -537,3 +537,10 @@ Greg, 5 Oct: a sound pass when the v0.1 jobs are busy: footsteps, hits, ambience
   - Marks: a dark scorch on the floor, half-brick debris, the hole.
 - perf.txt: blast 189 fps (worst frame 8.9 ms), settled 256, settled after the blast 210. The first charge took 23.5 ms and the second 11.4 ms. All are over the 144 target.
 - Cohesion: the FX stay inside the existing mechanics-lab destruction bay, with no new menu or text. They are not on the v0.1 route yet, because the route has no voxel walls or diggable ground.
+
+## 2026-10-06, tidy-80 mechanics lab declutter (Claude, Opus)
+Greg: the lab is "so cluttered". Rendered with `tests/mechanics_lab_capture.tscn` via `render_one.cmd`, PNGs in `P:/GameDev/Temp/tidy80/shots3/` (overview, plan, bay_0..7, walkway_south, readouts).
+- Seen before: stations overlapped (the 29 m car lane ran through the disciplines booth and past the bodies; weather puddles and scrub spread across the yard middle); seven status lines plus HP/body lines in red, top left, all the time.
+- Changed: one 76 x 40 m hall with eight lined, signed bays (liquid, bodies, disciplines under the roof; destruction, drugs + smoke, weapons in the open; weather across the roof edge; vehicles on their own apron). Signs face the walkway, single-sided, so the rows never stack. START/TAB menu lists the bays. HUD: one neutral line, red only for danger, pad hints, every readout behind SELECT/TOUCHPAD (G). `lab_layout_test` keeps bays apart and every station inside its lines. Removed the dead `lab/stations/lab_liquid.gdshader`.
+- Still weak: the hall is greybox; the covered row is dim from the open half; signs are Label3D in the default font, not CellOutzType.
+- Attempt 2: attempt 1 branched from 34c244f4 and conflicted only in this log with the imp-63 land entries. I cherry-picked it onto f210a29d and put this entry after them. No code file overlaps imp-63. Headless green: lab_layout, mechanics_lab, discipline_lab, execution_beat, fluid_glass, fluid_surface_sound, fp_arms, materia, organ_system, v01_weapons, destruction_toughness, destruction_fx, destruction_cost, smoke_release, smokeables. Re-rendered in `P:/GameDev/Temp/tidy80/shots4/`.

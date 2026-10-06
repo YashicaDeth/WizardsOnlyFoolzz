@@ -67,13 +67,16 @@ func build(owner_lab: Node3D) -> void:
 	storm.position = -position
 	storm.severity_override = 0.0
 	var rain := storm.get_node("Rain") as GPUParticles3D
-	rain.amount = RAIN_DROPS
+	# Across the whole hall (tidy-80 widened it), as thick as it always was.
+	var hall: Variant = lab.get_script().get("HALF_X") if lab.get_script() != null else null
+	var half_x: float = maxf(RAIN_HALF_WIDTH, float(hall) if hall != null else 0.0)
+	rain.amount = roundi(RAIN_DROPS * half_x / RAIN_HALF_WIDTH)
 	var falling := rain.process_material as ParticleProcessMaterial
-	falling.emission_box_extents = Vector3(RAIN_HALF_WIDTH, 1, RAIN_HALF_WIDTH)
+	falling.emission_box_extents = Vector3(half_x, 1, RAIN_HALF_WIDTH)
 	# The rain stops on the roof (the lab's particle colliders), which is the
 	# whole point of a covered half.
 	falling.collision_mode = ParticleProcessMaterial.COLLISION_HIDE_ON_CONTACT
-	rain.visibility_aabb = AABB(Vector3(-24, -26, -24), Vector3(48, 30, 48))
+	rain.visibility_aabb = AABB(Vector3(-half_x - 4.0, -26, -24), Vector3(half_x * 2.0 + 8.0, 30, 48))
 	_rain_material = (rain.draw_pass_1 as QuadMesh).material as StandardMaterial3D
 
 	covered_dummy = BODIES.dummy(self, "lab_acid_covered", Vector3(-2.0, 0, -4.0), PI, 1)
@@ -98,13 +101,14 @@ func build(owner_lab: Node3D) -> void:
 	(hull.shape as BoxShape3D).size = box.size
 	cabinet.add_child(hull)
 
-	# A tarp hung from a frame, and dead scrub.
+	# A tarp hung from a frame, and dead scrub beside the cabinet, inside the
+	# bay's lines.
 	_post(Vector3(-5.6, 0, 5.0), 2.6)
 	_post(Vector3(-3.4, 0, 5.0), 2.6)
 	_post_bar(Vector3(-4.5, 2.6, 5.0), 2.3)
 	_sway(Vector3(-4.5, 0.9, 5.0), Vector2(2.0, 1.7), Color("5e2a1d"), true, false, 1.0)
 	for index in 5:
-		var at := Vector3(6.5 + float(index % 3) * 0.7, 0, 1.6 + float(index) * 0.55)
+		var at := Vector3(5.6 + float(index % 3) * 0.6, 0, 1.6 + float(index) * 0.55)
 		for turn in 2:
 			_sway(at, Vector2(0.9, 1.1 + 0.2 * float(index % 2)), Color("3c3a1e"), false, true, 0.7, PI * 0.5 * float(turn))
 	# The yard's low spots, where standing water collects first.

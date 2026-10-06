@@ -4,7 +4,9 @@ extends Node
 ## Windowed only (headless draws nothing and says so):
 ##   Godot --path game --resolution 1600x900 res://tests/mechanics_lab_capture.tscn -- --shots=P:/GameDev/Temp/mechanics_lab
 ## Writes yard.png, liquid.png, weather.png, destruction.png, bodies.png,
-## bodies_rigged.png, bodies_wounded.png, vehicle_pad.png into the folder.
+## bodies_rigged.png, bodies_wounded.png, vehicle_pad.png into the folder,
+## then (tidy-80) overview.png, plan.png, one bay_N_<name>.png per bay,
+## walkway_south.png and readouts.png (the SELECT dials on).
 
 const WORLD_BREAK := preload("res://systems/world_break.gd")
 
@@ -78,11 +80,51 @@ func _ready() -> void:
 	await _seconds(2.0)
 	await _shot("weather", weather.to_global(Vector3(-1.0, 2.6, 9.5)), weather.to_global(Vector3(0.5, 0.8, 0.0)))
 
-	await _shot("vehicle_pad", Vector3(12, 6, 22), Vector3(12, 0, 12))
+	await _shot("vehicle_pad", lab.vehicles.to_global(Vector3(0, 6, 10)), lab.vehicles.to_global(Vector3(0, 0, 0)))
 	weather.apply("storm")
 	await _seconds(1.5)
 	await _shot("yard", Vector3(0, 24, 34), Vector3(0, 0, 0))
+	weather.apply("clear")
+	await _bays()
 	get_tree().quit(0)
+
+
+## Tidy-80: the hall from above (with the roof, and without it as a plan),
+## then each bay from its walkway edge, standing where the START menu puts
+## you so the HUD reads as it would there.
+func _bays() -> void:
+	await _seconds(1.0)
+	await _shot("overview", Vector3(0, 46, 52), Vector3(0, 0, 2))
+	var roof := lab.get_node_or_null("Roof") as Node3D
+	if roof != null:
+		roof.visible = false
+	await _shot("plan", Vector3(0, 70, 8), Vector3(0, 0, 0))
+	if roof != null:
+		roof.visible = true
+	for index in lab.BAYS.size():
+		var rect: Rect2 = lab.BAYS[index].rect
+		var centre := Vector3(rect.get_center().x, 0.6, rect.get_center().y)
+		var from: Vector3
+		if rect.end.y <= 0.0:
+			# Under the roof: from the walkway, below the roof.
+			from = Vector3(centre.x, 4.0, rect.end.y + 4.0)
+		elif rect.size.y > 25.0:
+			from = Vector3(centre.x - 4.0, 13.0, 26.0)
+		elif rect.position.y < 0.0:
+			from = Vector3(centre.x - 2.0, 4.2, rect.end.y + 3.0)
+			centre.z = -2.0
+		else:
+			from = Vector3(centre.x, 8.0, rect.end.y + 5.0)
+		lab.go_to(index)
+		await _seconds(0.4)
+		var name := "bay_%d_%s" % [index, str(lab.BAYS[index].title).to_lower().replace(" + ", "_").replace(" ", "_")]
+		await _shot(name, from, centre)
+	# From the walkway, the open row's signs turned to you; then SELECT's dials.
+	await _shot("walkway_south", Vector3(-6, 2.2, -1.5), Vector3(-16, 1.2, 10))
+	lab.readouts = true
+	await _seconds(0.3)
+	await _shot("readouts", Vector3(-4, 3.0, 16), Vector3(-4, 1.0, 9))
+	lab.readouts = false
 
 
 func _shot(label: String, from: Vector3, at: Vector3) -> void:
