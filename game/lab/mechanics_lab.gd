@@ -5,15 +5,20 @@ extends Node3D
 ## the weather works… how the destruction physics works with weapons… then we
 ## apply that to the actual full game."
 ##
-## A 40 m greybox yard: the north half (-Z) under a roof, the south half open
-## to the sky, so weather can be compared under cover and out of it. Six
-## stations, each a plinth with a label and one button (USE), each running the
-## same system the game runs. Free walk on the facility's own body (JumpClimb,
-## BodyCam, and job 3's `SoulsMover`: tilt to walk or run, Circle/Ctrl to roll
-## or crouch, sprint); the three v0.1 weapons through `HunterArsenal`,
-## `MeleeDriver` (swing timing, hitstop, heat, shock) and `Ballistics`, the
-## pistol aimed down its sights (`AimDownSights`), and R3 lock-on;
-## START (pad) or TAB opens a menu that takes you to any plinth.
+## One greybox hall (tidy-80, Greg 6 Oct: "so cluttered"): the north half
+## (-Z) under a roof, the south half open to the sky, a walkway along the roof
+## edge, and every mechanic in its own labelled bay with floor lines round it
+## (`BAYS`): liquid, bodies, disciplines under cover; destruction, drugs and
+## weapons in the open; weather straddling the roof edge so cover and sky can
+## be compared; the cars on their own pad at the east end. Each station is a
+## plinth with one button (USE) running the same system the game runs. Free
+## walk on the facility's own body (JumpClimb, BodyCam, and job 3's
+## `SoulsMover`: tilt to walk or run, Circle/Ctrl to roll or crouch, sprint);
+## the three v0.1 weapons through `HunterArsenal`, `MeleeDriver` (swing
+## timing, hitstop, heat, shock) and `Ballistics`, the pistol aimed down its
+## sights (`AimDownSights`), and R3 lock-on; START (pad) or TAB opens a menu
+## that takes you to any bay. The screen carries one line for the bay you are
+## in and the pad hints; SELECT / TOUCHPAD (G) shows every station's readout.
 ##
 ## Nothing here ships: `Start-MechanicsLab.ps1` opens it, the game does not.
 
@@ -31,22 +36,49 @@ const VEHICLES := preload("res://lab/stations/vehicle_station.gd")
 const MATERIA := preload("res://lab/stations/materia_station.gd")
 ## drug-70: the materia station stands in the open half, so the weather's
 ## wind reaches its smoke.
-const MATERIA_AT := Vector3(0, 0, 10)
-## Where the sparring partner (job 3) stands: the covered half, clear of the
-## stations, so a fight has room to move.
-const SPARRING_AT := Vector3(0, 0, -12)
+const MATERIA_AT := Vector3(-15, 0, 7)
+## Where the sparring partner (job 3) stands: the weapons bay, with room round
+## it for a fight.
+const SPARRING_AT := Vector3(-4, 0, 9)
+const LIQUID_AT := Vector3(-30, 0, -7)
+const BODIES_AT := Vector3(-17.5, 0, -7)
+const DISCIPLINES_AT := Vector3(-6, 0, -5.5)
+const WEATHER_AT := Vector3(11.5, 0, 1)
+const VEHICLES_AT := Vector3(30.5, 0, 12)
+## Where the destruction station stands; its dig patch cuts the yard floor.
+const DESTRUCTION_AT := Vector3(-28, 0, 11)
 
+## Half the hall's width (x) and depth (z). The roof covers the north half as
+## far east as `ROOF_END_X`; past it is the vehicle pad, open to the sky.
+const HALF_X := 38.0
 const HALF := 20.0
 const ROOF_Y := 5.5
-const START := Vector3(0, 1.0, 17.0)
-## The v0.1 weapons (job 3), in the order NEXT WEAPON steps through them.
+const ROOF_END_X := 20.5
+const START := Vector3(-4, 1.0, 17.0)
+## The bays, in the START menu's order: the seven stations (in `stations`
+## order, so a station's index is its bay's), then the weapons bay. `rect` is
+## the bay's floor in world x/z; nothing of a station stands outside it and
+## no two overlap (`lab_layout_test`). The walkways are the floor between.
+const BAYS := [
+	{"title": "LIQUID", "rect": Rect2(-37, -16, 13, 13)},
+	{"title": "BODIES", "rect": Rect2(-22.5, -16, 10, 13)},
+	{"title": "WEATHER", "rect": Rect2(3.5, -7, 16, 21)},
+	{"title": "DESTRUCTION", "rect": Rect2(-37.5, 1.8, 17, 18)},
+	{"title": "VEHICLES", "rect": Rect2(21.5, -10.5, 16.3, 30.3)},
+	{"title": "DISCIPLINES", "rect": Rect2(-10.5, -11.5, 9, 8.5)},
+	{"title": "DRUGS + SMOKE", "rect": Rect2(-19, 3, 8, 9)},
+	{"title": "WEAPONS", "rect": Rect2(-9.5, 3, 11, 13)},
+]
+const WEAPONS_BAY := 7
+## HUD colours: neutral for everything but danger.
+const INK := Color("cfc6b8")
+const DANGER := Color("e0442a")
+## The three v0.1 weapons (job 3), in the order NEXT WEAPON steps through them.
 ## Greg replaced the fire axe and the sword: Brawler carries the HOTLINE
 ## CLEAVER and the PRODSTAFF, Marksman the MERCY NINE.
 const WEAPONS := ["cleaver", "staff", "sidearm"]
 const EYE_HEIGHT := 0.77
 const LOCK_RANGE := 14.0
-## Where the destruction station stands; its dig patch cuts the yard floor.
-const DESTRUCTION_AT := Vector3(-12, 0, 11)
 
 var player: CharacterBody3D
 var camera: Camera3D
@@ -80,9 +112,14 @@ var materia: Node3D
 var tool := ""
 var menu_open := false
 var menu_index := 0
+## The long readout (every station's dials, health, the body): SELECT shows it.
+var readouts := false
 var last_note := ""
 var last_hit: Dictionary = {}
 var _hud: Label
+var _danger: Label
+var _readout: Label
+var _hints: Label
 var _prompt: Label
 var _menu: Label
 var _note_age := 0.0
@@ -115,12 +152,12 @@ const EXECUTE_REACH := 2.6
 
 func _ready() -> void:
 	_build_world()
-	liquid = _station(LIQUID, Vector3(-12, 0, -8), Vector3(0, 0, 0))
-	bodies = _station(BODIES, Vector3(10, 0, -8), Vector3(0, 0, 0))
-	weather = _station(WEATHER, Vector3(0, 0, 2), Vector3(0, 0, 0))
+	liquid = _station(LIQUID, LIQUID_AT, Vector3(0, 0, 0))
+	bodies = _station(BODIES, BODIES_AT, Vector3(0, 0, 0))
+	weather = _station(WEATHER, WEATHER_AT, Vector3(0, 0, 0))
 	destruction = _station(DESTRUCTION, DESTRUCTION_AT, DESTRUCTION.PLINTH)
-	vehicles = _station(VEHICLES, Vector3(12, 0, 12), VEHICLES.PLINTH)
-	disciplines = _station(DISCIPLINES, Vector3(12, 0, 2), Vector3(0, 0, 0))
+	vehicles = _station(VEHICLES, VEHICLES_AT, VEHICLES.PLINTH)
+	disciplines = _station(DISCIPLINES, DISCIPLINES_AT, Vector3(0, 0, 0))
 	_build_player()
 	materia = _station(MATERIA, MATERIA_AT, Vector3(0, 0, 0.9))
 	ballistics = Ballistics.new()
@@ -158,6 +195,7 @@ func _ready() -> void:
 		if sparring.rig == rig:
 			sparring.interrupt())
 	_hold_current()
+	_build_bays()
 	_build_hud()
 	_build_organ_kit()
 	PadBridge.set_combat_receiver(self)
@@ -195,9 +233,13 @@ func _build_world() -> void:
 	sun.shadow_enabled = true
 	add_child(sun)
 
-	# Covered half: a concrete slab under a roof on pillars.
+	# Covered half: a concrete slab under a roof on pillars. The vehicle pad
+	# past `ROOF_END_X` is its own concrete apron, open to the sky.
 	var concrete := _surface(Color("4a4640"), 0.85)
-	_solid(Vector3(HALF * 2.0, 0.4, HALF), Vector3(0, -0.2, -HALF * 0.5), concrete)
+	var hall_x := ROOF_END_X + HALF_X
+	_solid(Vector3(hall_x, 0.4, HALF), Vector3((ROOF_END_X - HALF_X) * 0.5, -0.2, -HALF * 0.5), concrete)
+	var apron := _surface(Color("3f3c38"), 0.8)
+	_solid(Vector3(HALF_X - ROOF_END_X, 0.4, HALF * 2.0), Vector3((HALF_X + ROOF_END_X) * 0.5, -0.2, 0), apron)
 	# Open half: packed dirt, the ground rounds dig into (`GroundHole`). Its
 	# material is the one the weather wets.
 	var dirt := _surface(Color("5a4a3a"), 0.95)
@@ -205,32 +247,34 @@ func _build_world() -> void:
 	# yard floor over its own rectangle, so the floor is laid round it.
 	var hole := Rect2(DESTRUCTION.DIG_RECT.position + Vector2(DESTRUCTION_AT.x, DESTRUCTION_AT.z), DESTRUCTION.DIG_RECT.size)
 	for strip: Rect2 in [
-		Rect2(-HALF, 0.0, HALF * 2.0, hole.position.y),
-		Rect2(-HALF, hole.end.y, HALF * 2.0, HALF - hole.end.y),
-		Rect2(-HALF, hole.position.y, hole.position.x + HALF, hole.size.y),
-		Rect2(hole.end.x, hole.position.y, HALF - hole.end.x, hole.size.y),
+		Rect2(-HALF_X, 0.0, hall_x, hole.position.y),
+		Rect2(-HALF_X, hole.end.y, hall_x, HALF - hole.end.y),
+		Rect2(-HALF_X, hole.position.y, hole.position.x + HALF_X, hole.size.y),
+		Rect2(hole.end.x, hole.position.y, ROOF_END_X - hole.end.x, hole.size.y),
 	]:
 		if strip.size.x <= 0.0 or strip.size.y <= 0.0:
 			continue
 		var ground := _solid(Vector3(strip.size.x, 0.4, strip.size.y), Vector3(strip.get_center().x, -0.2, strip.get_center().y), dirt)
 		ground.add_to_group(GroundHole.GROUP)
 	var roof_material := _surface(Color("2b2825"), 0.8)
-	_solid(Vector3(HALF * 2.0, 0.3, HALF), Vector3(0, ROOF_Y + 0.15, -HALF * 0.5), roof_material)
+	_solid(Vector3(hall_x, 0.3, HALF), Vector3((ROOF_END_X - HALF_X) * 0.5, ROOF_Y + 0.15, -HALF * 0.5), roof_material).name = "Roof"
+	# Pillars stand in the gaps between bays, on the walkway's roof edge.
 	var pillar := _surface(Color("37332e"), 0.8)
-	for x in [-18.0, -9.0, 0.0, 9.0, 18.0]:
+	for x in [-23.25, -11.5, 2.5, ROOF_END_X - 0.25]:
 		_solid(Vector3(0.5, ROOF_Y, 0.5), Vector3(x, ROOF_Y * 0.5, -0.4), pillar)
 	# Perimeter: block walls, high enough to keep you in and low enough to see
 	# the sky over.
 	var block := _surface(Color("3d3934"), 0.9)
-	_solid(Vector3(HALF * 2.0, 3.0, 0.4), Vector3(0, 1.5, -HALF), block)
-	_solid(Vector3(HALF * 2.0, 3.0, 0.4), Vector3(0, 1.5, HALF), block)
-	_solid(Vector3(0.4, 3.0, HALF * 2.0), Vector3(-HALF, 1.5, 0), block)
-	_solid(Vector3(0.4, 3.0, HALF * 2.0), Vector3(HALF, 1.5, 0), block)
+	_solid(Vector3(HALF_X * 2.0, 3.0, 0.4), Vector3(0, 1.5, -HALF), block)
+	_solid(Vector3(HALF_X * 2.0, 3.0, 0.4), Vector3(0, 1.5, HALF), block)
+	_solid(Vector3(0.4, 3.0, HALF * 2.0), Vector3(-HALF_X, 1.5, 0), block)
+	_solid(Vector3(0.4, 3.0, HALF * 2.0), Vector3(HALF_X, 1.5, 0), block)
 	# Particle colliders, so rain stops on the roof and spilt fluid lands.
-	_particle_floor(Vector3(HALF * 2.0, 1.0, HALF * 2.0), Vector3(0, -0.5, 0))
-	_particle_floor(Vector3(HALF * 2.0, 0.6, HALF), Vector3(0, ROOF_Y + 0.3, -HALF * 0.5))
-	# Under the roof it is dark at noon; work lamps over each covered station.
-	for at in [Vector3(-12, 4.6, -9), Vector3(10, 4.6, -9), Vector3(0, 4.6, -4), Vector3(-2, 4.6, -12), Vector3(14, 4.6, -15)]:
+	_particle_floor(Vector3(HALF_X * 2.0, 1.0, HALF * 2.0), Vector3(0, -0.5, 0))
+	_particle_floor(Vector3(hall_x, 0.6, HALF), Vector3((ROOF_END_X - HALF_X) * 0.5, ROOF_Y + 0.3, -HALF * 0.5))
+	# Under the roof it is dark at noon; a work lamp over each covered bay
+	# (the disciplines booth has its own).
+	for at in [LIQUID_AT + Vector3(0, 4.6, -2), BODIES_AT + Vector3(0, 4.6, -2), WEATHER_AT + Vector3(-2, 4.6, -4)]:
 		var lamp := OmniLight3D.new()
 		lamp.position = at
 		lamp.light_color = Color("ffb27a")
@@ -280,16 +324,21 @@ func _station(script: GDScript, at: Vector3, plinth: Vector3) -> Node3D:
 	add_child(station)
 	station.build(self)
 	_plinth(station.to_global(plinth), str(script.get("TITLE")), str(script.get("VERB")))
-	stations.append({"node": station, "title": str(script.get("TITLE")), "plinth": station.to_global(plinth)})
+	stations.append({"node": station, "title": str(script.get("TITLE")), "verb": str(script.get("VERB")), "plinth": station.to_global(plinth)})
 	if script == WEATHER:
 		for material in get_meta("open_materials"):
 			station.wet_materials.append(material)
 	return station
 
 
+## The plinth: a stone post with the button on top and the button's verb over
+## it. The bay's sign carries the station's name.
 func _plinth(at: Vector3, title: String, verb: String) -> void:
+	var holder := Node3D.new()
+	holder.name = "Plinth_" + title.capitalize().replace(" ", "")
+	add_child(holder)
 	var stone := _surface(Color("2a2420"), 0.7)
-	_solid(Vector3(0.6, 1.0, 0.6), at + Vector3(0, 0.5, 0), stone)
+	_solid(Vector3(0.6, 1.0, 0.6), at + Vector3(0, 0.5, 0), stone).reparent(holder)
 	var button := MeshInstance3D.new()
 	var cap := CylinderMesh.new()
 	cap.top_radius = 0.12
@@ -303,16 +352,74 @@ func _plinth(at: Vector3, title: String, verb: String) -> void:
 	cap.material = glow
 	button.mesh = cap
 	button.position = at + Vector3(0, 1.03, 0)
-	add_child(button)
+	holder.add_child(button)
 	var label := Label3D.new()
-	label.text = "%s\n%s" % [title, verb]
-	label.font_size = 56
+	label.text = verb
+	label.font_size = 36
 	label.pixel_size = 0.006
-	label.modulate = Color("e0b07a")
+	label.modulate = INK
 	label.outline_modulate = Color("120c09")
 	label.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
-	label.position = at + Vector3(0, 1.55, 0)
-	add_child(label)
+	label.position = at + Vector3(0, 1.4, 0)
+	holder.add_child(label)
+
+
+## Each bay's floor lines and its sign, hung over the edge that faces the
+## walkway along the roof line.
+func _build_bays() -> void:
+	var paint := _surface(Color("7d6845"), 0.7)
+	for bay: Dictionary in BAYS:
+		var rect: Rect2 = bay.rect
+		var holder := Node3D.new()
+		holder.name = "Bay_" + str(bay.title).capitalize().replace(" ", "").replace("+", "")
+		add_child(holder)
+		var width := 0.12
+		for edge: Array in [
+			[Vector3(rect.get_center().x, 0, rect.position.y), Vector3(rect.size.x, 0, width)],
+			[Vector3(rect.get_center().x, 0, rect.end.y), Vector3(rect.size.x, 0, width)],
+			[Vector3(rect.position.x, 0, rect.get_center().y), Vector3(width, 0, rect.size.y)],
+			[Vector3(rect.end.x, 0, rect.get_center().y), Vector3(width, 0, rect.size.y)],
+		]:
+			var line := MeshInstance3D.new()
+			var box := BoxMesh.new()
+			box.size = Vector3(edge[1].x, 0.02, edge[1].z)
+			box.material = paint
+			line.mesh = box
+			line.position = edge[0] + Vector3(0, 0.005, 0)
+			line.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			holder.add_child(line)
+		var sign := Label3D.new()
+		sign.name = "Sign"
+		sign.text = str(bay.title)
+		sign.font_size = 120
+		sign.pixel_size = 0.008
+		sign.modulate = INK
+		sign.outline_size = 18
+		sign.outline_modulate = Color("120c09")
+		# A row's signs face the walkway and show no back, so from anywhere you
+		# read only the signs turned to you and the two rows never stack up.
+		# A bay across the walkway (weather, the pad) turns to whoever looks.
+		if rect.end.y <= 0.0 or rect.position.y >= 0.0:
+			sign.double_sided = false
+			sign.rotation.y = 0.0 if rect.end.y <= 0.0 else PI
+		else:
+			sign.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+		sign.position = bay_sign_at(rect)
+		holder.add_child(sign)
+
+
+## Over the middle of the bay's edge nearest the walkway (z = 0), above head
+## height and under the roof.
+static func bay_sign_at(rect: Rect2) -> Vector3:
+	return Vector3(rect.get_center().x, 3.6, clampf(0.0, rect.position.y, rect.end.y))
+
+
+## The bay `at` stands in, or -1 on a walkway.
+func bay_at(at: Vector3) -> int:
+	for index in BAYS.size():
+		if (BAYS[index].rect as Rect2).has_point(Vector2(at.x, at.z)):
+			return index
+	return -1
 
 
 # --- the player --------------------------------------------------------------
@@ -344,16 +451,22 @@ func _unhandled_input(event: InputEvent) -> void:
 		yaw -= LOOK.dx(event.relative) * 0.0026
 		pitch = clampf(pitch - LOOK.dy(event.relative) * 0.0024, -1.15, 0.95)
 	# START on the pad; the keyboard's Escape stays with the pause screen.
-	var start_pressed: bool = event.is_action_pressed("pause") and InputProfile.is_joy_event(event)
-	if start_pressed or event.is_action_pressed("inventory") or (event is InputEventAction and event.is_action_pressed("pause")):
+	var pad := InputProfile.is_joy_event(event)
+	var start_pressed: bool = event.is_action_pressed("pause") and pad
+	if start_pressed or (event.is_action_pressed("inventory") and not pad) or (event is InputEventAction and event.is_action_pressed("pause")):
 		menu_open = not menu_open
+		get_viewport().set_input_as_handled()
+		return
+	# SELECT / TOUCHPAD (G on the keyboard): every station's readout, or not.
+	if event.is_action_pressed("device") or (event.is_action_pressed("inventory") and pad):
+		readouts = not readouts
 		get_viewport().set_input_as_handled()
 		return
 	if menu_open:
 		if event.is_action_pressed("ui_down") or event.is_action_pressed("move_back"):
-			menu_index = (menu_index + 1) % stations.size()
+			menu_index = (menu_index + 1) % BAYS.size()
 		elif event.is_action_pressed("ui_up") or event.is_action_pressed("move_forward"):
-			menu_index = (menu_index + stations.size() - 1) % stations.size()
+			menu_index = (menu_index + BAYS.size() - 1) % BAYS.size()
 		elif event.is_action_pressed("ui_accept") or event.is_action_pressed("interact"):
 			go_to(menu_index)
 			menu_open = false
@@ -630,16 +743,21 @@ func next_weapon() -> void:
 	_note(tool.to_upper() if not tool.is_empty() else str(arsenal.current().label))
 
 
-## Stand in front of plinth `index`, facing what it shows.
+## Stand in bay `index` (`BAYS`): in front of its plinth facing what it
+## shows, or, for the weapons bay, facing the sparring partner.
 func go_to(index: int) -> void:
-	var entry: Dictionary = stations[clampi(index, 0, stations.size() - 1)]
-	var plinth: Vector3 = entry.plinth
+	index = clampi(index, 0, BAYS.size() - 1)
+	var at: Vector3
+	if index < stations.size():
+		at = (stations[index].plinth as Vector3) + Vector3(0, 1.0, 1.9)
+	else:
+		at = SPARRING_AT + Vector3(0, 1.0, 4.0)
 	vehicles.leave()
-	player.global_position = plinth + Vector3(0, 1.0, 1.9)
+	player.global_position = at
 	player.velocity = Vector3.ZERO
 	yaw = 0.0
 	pitch = -0.12
-	_note("AT %s" % str(entry.title))
+	_note("AT %s" % str(BAYS[index].title))
 
 
 ## Presses the button on the plinth within reach, if there is one.
@@ -893,15 +1011,24 @@ func _land(collider: Object, at: Vector3, direction: Vector3, attack_data: Dicti
 func _build_hud() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
-	_hud = _label(layer, Vector2(24, 18), Color("e0442a"), 15)
-	_prompt = _label(layer, Vector2(24, 0), Color("ead4ad"), 18)
+	# One neutral line for where you are and what is in hand, a red one only
+	# while something is hurting you, and the readout behind SELECT.
+	_hud = _label(layer, Vector2(24, 18), INK, 18)
+	_danger = _label(layer, Vector2(24, 44), DANGER, 18)
+	_readout = _label(layer, Vector2(24, 76), INK, 14)
+	_readout.visible = false
+	_prompt = _label(layer, Vector2(24, 0), INK, 18)
 	_prompt.anchor_top = 1.0
 	_prompt.anchor_bottom = 1.0
 	_prompt.offset_top = -64
-	_menu = _label(layer, Vector2(0, 0), Color("ead4ad"), 22)
+	_hints = _label(layer, Vector2(24, 0), INK.darkened(0.2), 14)
+	_hints.anchor_top = 1.0
+	_hints.anchor_bottom = 1.0
+	_hints.offset_top = -32
+	_menu = _label(layer, Vector2(0, 0), INK, 22)
 	_menu.set_anchors_preset(Control.PRESET_CENTER)
 	_menu.offset_left = -220
-	_menu.offset_top = -120
+	_menu.offset_top = -140
 
 
 func _label(layer: CanvasLayer, at: Vector2, colour: Color, size: int) -> Label:
@@ -922,29 +1049,18 @@ func _note(text: String) -> void:
 
 func _update_hud() -> void:
 	var weapon: Dictionary = arsenal.current()
-	var lines := ["MECHANICS LAB", "%s   [%s] NEXT   [%s] FIRE/SWING   [%s] HEAVY" % [tool.to_upper() if not tool.is_empty() else str(weapon.label), InputProfile.glyph("inspect"), InputProfile.glyph("attack"), InputProfile.glyph("heavy")]]
-	for entry in stations:
-		if entry.node != null:
-			lines.append("%s  %s" % [str(entry.title), entry.node.status()])
-	# Acid rain is a lab demo, off by default (Greg): its line only while it falls.
-	if weather.state == "acid":
-		lines.append("ACID ON YOU %.1f  (x%.2f)" % [weather.player_acid_taken, weather.acid_player_scale])
-	var extra := ""
-	if arsenal.current_id == "cleaver":
-		extra = "   HEAT %d%%%s" % [roundi(melee.heat * 100.0), "  VENTING" if melee.vent_left > 0.0 else ""]
-	if disciplines.active == "duelist":
-		lines.append("DUELIST  R1 STRIKE  R2 HEAVY  L1 BLOCK  L2 PARRY -> RIPOSTE  R3 LOCK  CIRCLE ROLL")
-	elif disciplines.active == "shade":
-		lines.append("SHADE  R1 TAKEDOWN  R2 THROW  L1 DARKNESS  L2 STALK")
-	else:
-		lines.append("HP %d   STAMINA %d%s   [%s] BLOCK  [%s] PARRY/AIM  [%s] LOCK  [%s] ROLL" % [roundi(player_health), roundi(melee.stamina), extra, InputProfile.glyph("guard"), InputProfile.glyph("parry"), InputProfile.glyph("lock_on"), InputProfile.glyph("crouch" if InputProfile.device_family() == "keyboard" else "dodge")])
-	if player_body != null:
-		lines.append(_body_line())
+	var bay := bay_at(player.global_position)
+	var line := "%s   %s" % [str(BAYS[bay].title) if bay >= 0 else "MECHANICS LAB", tool.to_upper() if not tool.is_empty() else str(weapon.label)]
 	if _note_age < 3.0 and not last_note.is_empty():
-		lines.append("> " + last_note)
-	_hud.text = "\n".join(lines)
+		line += "   > " + last_note
+	_hud.text = line
+	_danger.text = "   ".join(danger_words())
+	_readout.visible = readouts
+	if readouts:
+		_readout.text = "\n".join(_readout_lines())
+	_hints.text = _hint_line()
 	var near := _nearest_plinth()
-	_prompt.text = "" if near.is_empty() else "[%s] %s" % [InputProfile.glyph("interact"), str(near.title)]
+	_prompt.text = "" if near.is_empty() else "[%s] %s" % [InputProfile.glyph("interact"), str(near.verb)]
 	var car_prompt: String = vehicles.prompt()
 	if not car_prompt.is_empty():
 		_prompt.text = "[%s] %s" % [InputProfile.glyph("interact"), car_prompt]
@@ -959,10 +1075,61 @@ func _update_hud() -> void:
 			_prompt.text = "[%s] %s" % [InputProfile.glyph("attack"), "TAKE THE HEART" if ExecutionBeat.style_for(downed, str(arsenal.current_id)) == "rip" else "EXECUTE"]
 	_menu.visible = menu_open
 	if menu_open:
-		var rows := ["STATIONS   [%s] GO" % InputProfile.glyph("ui_accept")]
-		for index in stations.size():
-			rows.append("%s %s" % [">" if index == menu_index else " ", str(stations[index].title)])
+		var rows := ["BAYS   [%s] GO" % InputProfile.glyph("ui_accept")]
+		for index in BAYS.size():
+			rows.append("%s %s" % [">" if index == menu_index else " ", str(BAYS[index].title)])
 		_menu.text = "\n".join(rows)
+
+
+## What is hurting you right now; empty when nothing is. The only red text.
+func danger_words() -> Array[String]:
+	var words: Array[String] = []
+	# Acid rain is a lab demo, off by default (Greg): only while it falls on you.
+	if weather.state == "acid" and weather.exposed(player.global_position + Vector3(0, 1.0, 0)):
+		words.append("ACID ON YOU")
+	if player_health < 50.0:
+		words.append("HP %d" % roundi(player_health))
+	if player_body != null:
+		var state := OrganSystem.failure(player_body.anatomy)
+		if bool(state.breathless):
+			words.append("BREATHLESS")
+		if bool(state.heart_failing):
+			words.append("HEART STOPPING %.1f" % maxf(0.0, OrganSystem.HEART_DEATH_SECONDS - float(player_body.anatomy.get_meta("heart_stopped_for", 0.0))))
+		if bool(state.slow_bleed):
+			words.append("BLEEDING INSIDE")
+		if player_body.anatomy.failed:
+			words.append("BODY FAILED")
+	return words
+
+
+## The long readout: every station's dials, then yours.
+func _readout_lines() -> Array[String]:
+	var lines: Array[String] = []
+	for entry in stations:
+		if entry.node != null:
+			lines.append("%s  %s" % [str(entry.title), entry.node.status()])
+	if weather.state == "acid" or weather.player_acid_taken > 0.0:
+		lines.append("ACID TAKEN %.1f  (x%.2f)" % [weather.player_acid_taken, weather.acid_player_scale])
+	var heat := ""
+	if arsenal.current_id == "cleaver":
+		heat = "   HEAT %d%%%s" % [roundi(melee.heat * 100.0), "  VENTING" if melee.vent_left > 0.0 else ""]
+	lines.append("HP %d   STAMINA %d%s" % [roundi(player_health), roundi(melee.stamina), heat])
+	if player_body != null:
+		lines.append(_body_line())
+	return lines
+
+
+## The pad hints for what your hands do now, then the lab's own two buttons.
+func _hint_line() -> String:
+	var hands: String
+	if disciplines.active == "duelist":
+		hands = "DUELIST  R1 STRIKE  R2 HEAVY  L1 BLOCK  L2 PARRY  R3 LOCK  CIRCLE ROLL"
+	elif disciplines.active == "shade":
+		hands = "SHADE  R1 TAKEDOWN  R2 THROW  L1 DARKNESS  L2 STALK"
+	else:
+		hands = "[%s] FIRE/SWING  [%s] HEAVY  [%s] BLOCK  [%s] PARRY/AIM  [%s] LOCK  [%s] ROLL  [%s] NEXT" % [InputProfile.glyph("attack"), InputProfile.glyph("heavy"), InputProfile.glyph("guard"), InputProfile.glyph("parry"), InputProfile.glyph("lock_on"), InputProfile.glyph("crouch" if InputProfile.device_family() == "keyboard" else "dodge"), InputProfile.glyph("inspect")]
+	var keyboard := InputProfile.device_family() == "keyboard"
+	return "%s     [%s] BAYS  [%s] READOUTS" % [hands, InputProfile.glyph("inventory" if keyboard else "pause"), InputProfile.glyph("device")]
 
 
 # --- lab-48: organs, cybernetics and the X-ray --------------------------------
