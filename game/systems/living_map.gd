@@ -95,6 +95,13 @@ var _holding_reveal: Dictionary = {}
 var _holding_polygons: Dictionary = {}
 var travel_hold := 0.0
 signal travel_requested(place: Dictionary)
+## v02-51. Underground there is no satellite and no Ashbloom survey. A host in
+## the facility hands the map its plan source (facility.gd: `plan_rooms()`,
+## `location_for()`, `objective_for()`) and the MAP page draws the floor the
+## carrier stands on as a plan, with them on it. Nothing here writes the
+## surface survey, so walking the facility cannot chart the Ashbloom.
+var plan_source: Node = null
+var plan_feet := Vector3.ZERO
 
 
 func _ready() -> void:
@@ -124,6 +131,21 @@ func bind(generator: Node, director: Node, contacts: Callable) -> void:
 	world_generator = generator
 	misfire_director = director
 	contacts_provider = contacts
+
+
+func set_plan_source(source: Node) -> void:
+	plan_source = source
+	queue_redraw()
+
+
+## Where the carrier is inside the facility. Deliberately not `observe()`:
+## that one charts the surface survey and the CellOutz holdings.
+func observe_interior(world_position: Vector3, yaw: float) -> void:
+	plan_feet = world_position
+	player_at = Vector2(world_position.x, world_position.z)
+	player_yaw = yaw
+	if visible:
+		queue_redraw()
 
 
 func _load_survey() -> void:
@@ -431,6 +453,9 @@ func _draw() -> void:
 	if chart_size.x <= 1.0 or chart_size.y <= 1.0:
 		return
 	_chart = Rect2(Vector2(margin, margin + 34.0), chart_size)
+	if plan_source != null and is_instance_valid(plan_source) and plan_source.has_method("plan_rooms"):
+		_draw_facility_plan()
+		return
 	if facility_sheet:
 		_draw_facility_sheet()
 		if not satellite_available:
@@ -1277,6 +1302,116 @@ func _draw_facility_sheet() -> void:
 	_draw_cracks()
 	var hint := "POINTER / ARROWS SELECT SECTOR   L SURFACE SATELLITE"
 	CellOutzType.draw_condensed(self, Vector2(28, size.y - 27), hint, 8.0, INK * Color(1, 1, 1, 0.5), 0.7)
+
+
+## The floor the carrier stands on, as a plan: every room, corridor and lift
+## whose height band holds their feet, fitted to the sheet with north up. The
+## room they are in lights; lifts carry the levels they join. The header says
+## where they are and what the route asks next, from the same facility calls
+## the body-cam stamp already uses.
+func _draw_facility_plan() -> void:
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.035, 0.026, 0.019, 0.96))
+	draw_rect(_chart, PLATE)
+	var feet := plan_feet.y
+	var level: Array = []
+	for entry: Dictionary in plan_source.call("plan_rooms"):
+		if feet >= float(entry.y) - 1.5 and feet <= float(entry.top):
+			level.append(entry)
+	if level.is_empty():
+		_draw_frame()
+		return
+	var bounds: Rect2 = level[0].rect
+	for entry: Dictionary in level:
+		bounds = bounds.merge(entry.rect)
+	bounds = bounds.grow(4.0)
+	var inner := _chart.grow(-24.0)
+	inner.position.y += 70.0
+	inner.size.y -= 70.0
+	var scale := minf(inner.size.x / bounds.size.x, inner.size.y / bounds.size.y)
+	var offset := inner.position + (inner.size - bounds.size * scale) * 0.5 - bounds.position * scale
+	var to_sheet := func(world: Vector2) -> Vector2: return offset + world * scale
+	# A faint 4 m grid, the facility module, under everything.
+	var grid_from: Vector2 = to_sheet.call(Vector2(floorf(bounds.position.x / 4.0) * 4.0, floorf(bounds.position.y / 4.0) * 4.0))
+	var step := 4.0 * scale
+	if step >= 6.0:
+		var x := grid_from.x
+		while x < inner.end.x:
+			if x > inner.position.x:
+				draw_line(Vector2(x, inner.position.y), Vector2(x, inner.end.y), INK * Color(1, 1, 1, 0.04), 1.0)
+			x += step
+		var y := grid_from.y
+		while y < inner.end.y:
+			if y > inner.position.y:
+				draw_line(Vector2(inner.position.x, y), Vector2(inner.end.x, y), INK * Color(1, 1, 1, 0.04), 1.0)
+			y += step
+	var here := -1
+	for index in level.size():
+		if (level[index].rect as Rect2).has_point(player_at) and str(level[index].kind) == "room":
+			here = index
+	for pass_kind: String in ["corridor", "room", "lift"]:
+		for index in level.size():
+			var entry: Dictionary = level[index]
+			if str(entry.kind) != pass_kind:
+				continue
+			var world: Rect2 = entry.rect
+			var rect := Rect2(to_sheet.call(world.position), world.size * scale)
+			var tone := BILE
+			var fill := 0.10
+			var line := 0.55
+			if pass_kind == "corridor":
+				tone = INK
+				fill = 0.07
+				line = 0.22
+			elif pass_kind == "lift":
+				tone = ACID
+				fill = 0.16
+				line = 0.85
+			if index == here:
+				tone = SPORE
+				fill = 0.20
+				line = 1.0
+			draw_rect(rect, tone * Color(1, 1, 1, fill))
+			draw_rect(rect, tone * Color(1, 1, 1, line), false, 2.0 if index == here else 1.2)
+			var title := str(entry.title)
+			if title != "":
+				var cap := 8.0 if pass_kind != "lift" else 7.0
+				var lines := CellOutzType.wrap_condensed(title, maxf(rect.size.x - 8.0, 30.0), cap, 0.66)
+				var ty := rect.get_center().y - float(lines.size()) * (cap + 3.0) * 0.5
+				for text: String in lines:
+					var width := CellOutzType.width_condensed(text, cap, 0.66)
+					CellOutzType.draw_condensed(self, Vector2(rect.get_center().x - width * 0.5, ty), text, cap, tone * Color(1, 1, 1, 0.95), 0.66)
+					ty += cap + 3.0
+			if pass_kind == "lift":
+				var mid := rect.get_center() + Vector2(0, rect.size.y * 0.5 + 9.0)
+				var going := "UP" if feet < float(entry.top) - 4.0 else ""
+				if feet > float(entry.y) + 1.0:
+					going = "DOWN" if going == "" else "UP / DOWN"
+				var gw := CellOutzType.width_condensed(going, 6.0, 0.5)
+				CellOutzType.draw_condensed(self, mid - Vector2(gw * 0.5, 0), going, 6.0, ACID, 0.5)
+	# The carrier: a copper arrow along the way they face, with a pulse ring.
+	var at: Vector2 = to_sheet.call(player_at)
+	var facing := Vector2(-sin(player_yaw), -cos(player_yaw))
+	var side := Vector2(-facing.y, facing.x)
+	var ring := 10.0 + 6.0 * fmod(clock * 1.2, 1.0)
+	draw_arc(at, ring, 0.0, TAU, 24, ACID * Color(1, 1, 1, 1.0 - fmod(clock * 1.2, 1.0)), 1.2)
+	draw_colored_polygon(PackedVector2Array([at + facing * 11.0, at - facing * 6.0 + side * 6.5, at - facing * 2.5, at - facing * 6.0 - side * 6.5]), BONE)
+	CellOutzType.draw_condensed(self, at + Vector2(12, -14), "YOU", 7.0, BONE, 0.6)
+	# Header: where, which level, what next.
+	var box := Rect2(_chart.position + Vector2(16, 14), Vector2(_chart.size.x - 32, 62))
+	draw_rect(box, VOID * Color(1, 1, 1, 0.9))
+	draw_rect(box, ACID * Color(1, 1, 1, 0.38), false, 1.0)
+	var where := str(plan_source.call("location_for", plan_feet)) if plan_source.has_method("location_for") else "CELLOUTZ FACILITY"
+	var next := str(plan_source.call("objective_for", plan_feet)) if plan_source.has_method("objective_for") else ""
+	CellOutzType.draw_condensed(self, box.position + Vector2(12, 10), where, 12.0, INK, 0.9)
+	if next != "":
+		CellOutzType.draw_condensed(self, box.position + Vector2(12, 34), "NEXT / " + next, 9.0, SPORE, 0.72)
+	var north := Vector2(_chart.end.x - 34, _chart.end.y - 34)
+	draw_line(north + Vector2(0, 12), north + Vector2(0, -12), INK * Color(1, 1, 1, 0.6), 1.2)
+	draw_colored_polygon(PackedVector2Array([north + Vector2(0, -16), north + Vector2(-5, -8), north + Vector2(5, -8)]), INK * Color(1, 1, 1, 0.6))
+	CellOutzType.draw_condensed(self, north + Vector2(-3, 16), "N", 7.0, INK * Color(1, 1, 1, 0.6), 0.6)
+	draw_rect(_chart, ACID * Color(1, 1, 1, 0.4), false, 1.4)
+	CellOutzType.draw_stamped(self, Vector2(26, 10), "LIVING MAP / FACILITY PLAN", 20.0, ACID, ARTERIAL * Color(1, 1, 1, 0.25), 3.4)
+	_draw_cracks()
 
 
 func _facility_row(rows: Array, id: String) -> Dictionary:

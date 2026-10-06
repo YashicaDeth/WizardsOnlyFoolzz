@@ -88,6 +88,11 @@ var embedded := false
 var bot_goal = null
 var _prop_materials := {}
 var identity = null
+## v02-51. Every room, corridor and lift footprint as it is built, so the Black
+## Mirror's MAP page can draw the floor you stand on as a plan: {title, y, top,
+## rect (x, z), kind}. Read through `plan_rooms()`.
+var plan: Array = []
+const TUNNEL_LAYOUT := preload("res://facility_tunnel_network.gd")
 
 
 func _ready() -> void:
@@ -171,7 +176,11 @@ static func _in_lift(at: Vector3) -> bool:
 # --- 0C: Growing Floor, Examination Room, service artery, Service Arcade -----
 
 func _build_level_0c() -> void:
-	# Growing Floor (vat_chamber.tscn), origin at the vat.
+	# Growing Floor (vat_chamber.tscn), origin at the vat. Embedded, the
+	# opening builds both rooms itself; the plan still needs their footprints.
+	if embedded:
+		_plan("GROWING FLOOR", 0.0, Vector2(-8, 8), Vector2(-26, 3.6), 4.4, "room")
+		_plan("EXAMINATION ROOM", 0.0, Vector2(-3.5, 4.5), Vector2(3.6, 10.5), 3.1, "room")
 	if not embedded:
 		_room("GROWING FLOOR", 0.0, Vector2(-8, 8), Vector2(-26, 3.6), 4.4,
 			{"e": [[-2.5, 3.0, 3.0]], "s": [[1.6, 1.2, 2.3]]})
@@ -205,6 +214,7 @@ func _build_level_0d() -> void:
 	add_child(lift_a)
 	lift_a.setup([-12.0, 0.0], ["0D LOWER WORKS", "0C SERVICE ARCADE"], [-1, 1], 1)
 	lifts["transit"] = lift_a
+	_plan("TRANSIT LIFT", -12.0, Vector2(26.5, 29.5), Vector2(-63.8, -60.2), 12.0 + 3.0, "lift")
 	_corridor_z(-12.0, 26.5, 29.5, -66.0, -63.8, 3.0)
 	# Lower Works (buried_city.tscn), origin (28, -12, -84).
 	var drain_hole := Rect2() if embedded and V01_DISABLED_ROUTES_AS_SEALED else Rect2(36, -120, 2, 2)
@@ -217,6 +227,7 @@ func _build_level_0d() -> void:
 	add_child(heat)
 	heat.setup([-12.0, SURFACE_Y], ["0D LOWER WORKS", "SURFACE"], [1, -1], 0)
 	lifts["heat"] = heat
+	_plan("HEAT ELEVATOR", -12.0, Vector2(26.2, 29.8), Vector2(-123.8, -120.2), SURFACE_Y + 12.0 + 3.0, "lift")
 	_sign("HEAT ELEVATOR", Vector3(28, -8.6, -119.9))
 	if not embedded:
 		_sign("DRAIN GRATE // OLD DRAINS", Vector3(37, -10.6, -119))
@@ -470,6 +481,23 @@ func _leave() -> void:
 	Interstitial.travel("res://bone_yard_hunt.tscn", "surface gate // out into the ashbloom expanse")
 
 
+# --- Plan (v02-51: the Black Mirror MAP page reads this) --------------------
+
+func _plan(title: String, y: float, xs: Vector2, zs: Vector2, height: float, kind: String) -> void:
+	plan.append({"title": title, "y": y, "top": y + height, "rect": Rect2(xs.x, zs.x, xs.y - xs.x, zs.y - zs.x), "kind": kind})
+
+
+## The built footprints plus the service artery's tunnel cells (4 m each,
+## `facility_tunnel_network.gd`), in facility coordinates.
+func plan_rooms() -> Array:
+	var rooms := plan.duplicate()
+	for cell: Vector2i in TUNNEL_LAYOUT.LAYOUT:
+		var centre: Vector3 = TUNNEL_LAYOUT.cell_centre(cell)
+		var title := "SERVICE ARTERY" if cell == Vector2i(1, 0) else ""
+		rooms.append({"title": title, "y": 0.0, "top": 3.4, "rect": Rect2(centre.x - 2.0, centre.z - 2.0, 4.0, 4.0), "kind": "corridor"})
+	return rooms
+
+
 # --- Geometry helpers (placeholder shells on the grid) ----------------------
 
 ## A room shell: floor, ceiling and four walls. `gaps` maps a face (n = -Z,
@@ -478,6 +506,7 @@ func _leave() -> void:
 ## floor (a grate) and the ceiling (a shaft passing up).
 func _room(title: String, y: float, xs: Vector2, zs: Vector2, height: float, gaps: Dictionary, skip: Array = [], floor_hole := Rect2(), ceiling_hole := Rect2()) -> void:
 	var rect := Rect2(xs.x, zs.x, xs.y - xs.x, zs.y - zs.x)
+	_plan(title, y, xs, zs, height, "room")
 	_plate(y - 0.2, rect, floor_hole, CONCRETE)
 	_plate(y + height + 0.2, rect, ceiling_hole, CEILING)
 	if not skip.has("n"):
@@ -514,6 +543,7 @@ func _room(title: String, y: float, xs: Vector2, zs: Vector2, height: float, gap
 ## A corridor along X at z, 4 m grid: floor, ceiling, two side walls.
 func _corridor_x(y: float, x0: float, x1: float, z: float, width: float, height: float) -> void:
 	var rect := Rect2(x0, z - width * 0.5, x1 - x0, width)
+	_plan("", y, Vector2(x0, x1), Vector2(z - width * 0.5, z + width * 0.5), height, "corridor")
 	_plate(y - 0.2, rect, Rect2(), CONCRETE)
 	_plate(y + height + 0.2, rect, Rect2(), CEILING)
 	for side: int in [-1, 1]:
@@ -523,6 +553,7 @@ func _corridor_x(y: float, x0: float, x1: float, z: float, width: float, height:
 
 func _corridor_z(y: float, x0: float, x1: float, z0: float, z1: float, height: float) -> void:
 	var rect := Rect2(x0, z0, x1 - x0, z1 - z0)
+	_plan("", y, Vector2(x0, x1), Vector2(z0, z1), height, "corridor")
 	_plate(y - 0.2, rect, Rect2(), CONCRETE)
 	_plate(y + height + 0.2, rect, Rect2(), CEILING)
 	for x: float in [x0 - 0.15, x1 + 0.15]:

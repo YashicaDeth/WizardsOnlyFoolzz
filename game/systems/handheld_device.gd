@@ -73,6 +73,18 @@ const PAGE_ROLES := {
 	"RITUAL": "EVIDENCE / RITE",
 	"FIELD": "RESONANCE / PRACTICE",
 }
+## v02-51 (Greg, 5 Oct: "remove or hide any page that is broken rather than
+## leaving it half-working"). The pages this device offers where it is being
+## carried. Every page stays in MODES, because saves, F-keys and tests address
+## pages by name; a host that cannot honestly supply one hides it here. The
+## facility route offers MAP and CARRY (BlackMirrorPhone adds the camera).
+var available_modes: Array = MODES.duplicate()
+## Pad-aware labels a host may set for the controls printed on the glass. Empty
+## keeps the keyboard wording this device has always printed.
+var control_hints := {}
+## A host that draws its own page rail across every page (camera included)
+## turns the chassis tabs off so the device never shows two rails.
+var show_tab_rail := true
 const PAGE_ACTIONS := {
 	"INDEX": "POINT / OPEN RECORD",
 	"MAP": "LEAN / SURVEY",
@@ -424,7 +436,7 @@ func load_device() -> void:
 		# The first useful fact this device knows is where its owner just escaped
 		# from. Start on MAP only for that real opening route; isolated UI tests
 		# and old worlds with no facility record retain the historic INDEX start.
-		if not WorldHistory.subject(FACILITY_TERRITORY.SUBJECT).is_empty():
+		if not WorldHistory.subject(FACILITY_TERRITORY.SUBJECT).is_empty() and available_modes.has("MAP"):
 			mode_index = MODES.find("MAP")
 			displayed_mode_index = mode_index
 		save_device()
@@ -442,6 +454,8 @@ func load_device() -> void:
 	# read of "nobody has ever lost this yet".
 	possessed = bool(record.get("possessed", true))
 	var remembered_mode := MODES.find(str(record.get("preferred_mode", current_mode())).to_upper())
+	if remembered_mode >= 0 and not available_modes.has(MODES[remembered_mode]):
+		remembered_mode = MODES.find(str(available_modes[0])) if not available_modes.is_empty() else -1
 	if remembered_mode >= 0:
 		mode_index = remembered_mode
 		displayed_mode_index = remembered_mode
@@ -594,7 +608,7 @@ func _gui_input(event: InputEvent) -> void:
 	if button.button_index == MOUSE_BUTTON_LEFT:
 		var tab := tab_index_at(button.position)
 		if button.pressed and tab >= 0:
-			jump_to_mode(tab)
+			jump_to_mode(MODES.find(str(available_modes[tab])))
 			accept_event()
 		elif _content_rect.has_point(button.position) and displayed_mode() == "RADIO":
 			radio_lock_held = button.pressed
@@ -706,16 +720,46 @@ func page_transition_contract() -> Dictionary:
 
 
 func cycle_mode(step: int) -> void:
-	if not is_open:
+	if not is_open or available_modes.is_empty():
 		return
-	set_mode(MODES[wrapi(mode_index + step, 0, MODES.size())])
+	var at := maxi(0, available_modes.find(current_mode()))
+	set_mode(str(available_modes[wrapi(at + step, 0, available_modes.size())]))
+
+
+## v02-51. Narrows the device to the pages its host can supply. Unknown names
+## are dropped; a list with nothing valid in it leaves every page offered.
+func set_available_modes(modes: Array) -> void:
+	var kept: Array = []
+	for mode in modes:
+		var id := str(mode).to_upper()
+		if MODES.has(id) and not kept.has(id):
+			kept.append(id)
+	available_modes = kept if not kept.is_empty() else MODES.duplicate()
+	if not available_modes.has(current_mode()):
+		mode_index = MODES.find(str(available_modes[0]))
+		displayed_mode_index = mode_index
+		pending_mode_index = -1
+
+
+## The head on the CARRY page is the way into the player's own Brain Index.
+## Clicking it already toggled this; a pad needs the same verb as a call.
+func toggle_brain_index() -> bool:
+	if not is_open or displayed_mode() != "CARRY":
+		return false
+	brain_index_open = not brain_index_open
+	queue_redraw()
+	return true
+
+
+func control_hint(id: String, fallback: String) -> String:
+	return str(control_hints.get(id, fallback))
 
 
 ## C2.6 `v2`. Cycling is how you learn the device; it is not how you use one you
 ## already know. A player who has had this thing in their hands for an hour
 ## should be able to reach the map without walking past the radio to get there.
 func jump_to_mode(index: int) -> bool:
-	if not is_open or index < 0 or index >= MODES.size():
+	if not is_open or index < 0 or index >= MODES.size() or not available_modes.has(MODES[index]):
 		return false
 	set_mode(MODES[index])
 	return true
@@ -745,7 +789,7 @@ func pin_selected_part() -> bool:
 
 func set_mode(mode: String) -> void:
 	var found := MODES.find(mode.to_upper())
-	if found < 0:
+	if found < 0 or not available_modes.has(MODES[found]):
 		return
 	mode_index = found
 	# Opening the page already physically present is reconciliation, not a page
@@ -828,8 +872,8 @@ func page_contract(mode: String) -> Dictionary:
 		"mode": id,
 		"role": str(PAGE_ROLES.get(id, "UNREGISTERED PAGE")),
 		"action": str(PAGE_ACTIONS.get(id, "OPERATE")),
-		"index": MODES.find(id) + 1,
-		"count": MODES.size(),
+		"index": available_modes.find(id) + 1,
+		"count": available_modes.size(),
 	}
 
 
@@ -1119,7 +1163,10 @@ func _draw_chassis(rect: Rect2, alpha: float) -> void:
 	# The jester, pressed small into the bezel. It is on the back of the case;
 	# this is the edge of it showing round the side.
 	BlackMirror.draw_jester(self, Vector2(rect.end.x - 40, rect.position.y + 34), 26.0, 0.5 * alpha, elapsed)
-	_draw_tabs(rect, alpha)
+	if show_tab_rail:
+		_draw_tabs(rect, alpha)
+	else:
+		_tab_rects = []
 	_draw_status(rect, alpha)
 	# C1.9 `v3`. Cracks used to end here, drawn across the whole chassis rect —
 	# which meant the case and bezel wore too, and "the device in your hand
@@ -1223,13 +1270,13 @@ func _draw_back(rect: Rect2, alpha: float) -> void:
 
 func _draw_tabs(rect: Rect2, alpha: float) -> void:
 	_tab_rects = tab_layout(rect)
-	for index in MODES.size():
-		var label: String = MODES[index]
+	for index in available_modes.size():
+		var label: String = available_modes[index]
 		var tab_rect := _tab_rects[index]
 		var x := tab_rect.position.x
 		var y := tab_rect.position.y
 		var width := tab_rect.size.x
-		var active := index == displayed_mode_index
+		var active := label == displayed_mode()
 		var tint: Color = AMBER if active else CASE_EDGE
 		var shape := PackedVector2Array([
 			Vector2(x, y), Vector2(x + width, y),
@@ -1246,7 +1293,7 @@ func _draw_tabs(rect: Rect2, alpha: float) -> void:
 		# discovers is a control nobody has. Printed on the tab it actually
 		# jumps to, the same register a real handheld prints a function key
 		# legend in.
-		CellOutzType.draw_condensed(self, Vector2(x + 6, y - 10), "F%d" % (index + 1), 8.0, tint * Color(1, 1, 1, 0.7 * alpha), 0.6)
+		CellOutzType.draw_condensed(self, Vector2(x + 6, y - 10), "F%d" % (MODES.find(label) + 1), 8.0, tint * Color(1, 1, 1, 0.7 * alpha), 0.6)
 
 
 ## Pure geometry companion to `_draw_tabs`, shared with hit-testing and tests.
@@ -1256,7 +1303,7 @@ func tab_layout(rect: Rect2) -> Array[Rect2]:
 	var result: Array[Rect2] = []
 	var x := rect.position.x + 26.0
 	var y := rect.position.y + rect.size.y - 34.0
-	for label: String in MODES:
+	for label: String in available_modes:
 		var width := CellOutzType.width(label, 11.0, 1.0) + 26.0
 		result.append(Rect2(Vector2(x, y), Vector2(width, 22.0)))
 		x += width + 8.0
@@ -1522,8 +1569,8 @@ func _draw_page_chrome(alpha: float) -> void:
 	CellOutzType.draw_condensed(_overlay, top.position + Vector2(118, 9), str(contract.role), 9.0, MOSS * Color(1, 1, 1, 0.82 * alpha), 0.72)
 	var code_width := CellOutzType.width_condensed(page_code, 9.0, 0.72)
 	CellOutzType.draw_condensed(_overlay, Vector2(top.end.x - code_width - 12, top.position.y + 9), page_code, 9.0, AMBER * Color(1, 1, 1, alpha), 0.72)
-	CellOutzType.draw_condensed(_overlay, bottom.position + Vector2(12, 6), "TAB / NEXT PAGE", 8.0, CASE_EDGE * Color(1, 1, 1, 0.86 * alpha), 0.66)
-	var action := str(contract.action)
+	CellOutzType.draw_condensed(_overlay, bottom.position + Vector2(12, 6), control_hint("next_page", "TAB / NEXT PAGE"), 8.0, CASE_EDGE * Color(1, 1, 1, 0.86 * alpha), 0.66)
+	var action := control_hint("action_" + str(contract.mode), str(contract.action))
 	var action_width := CellOutzType.width_condensed(action, 8.0, 0.66)
 	CellOutzType.draw_condensed(_overlay, Vector2(bottom.end.x - action_width - 12, bottom.position.y + 6), action, 8.0, AMBER * Color(1, 1, 1, 0.88 * alpha), 0.66)
 
@@ -1865,7 +1912,7 @@ func _draw_carry(rect: Rect2, alpha: float) -> void:
 	draw_rect(Rect2(track.position, Vector2(track.size.x * minf(burden, 1.0), track.size.y)), tone * Color(1, 1, 1, alpha))
 	if burden > 1.0:
 		draw_rect(Rect2(track.position + Vector2(0, -3), Vector2(track.size.x * clampf(burden - 1.0, 0.0, 1.0), 3)), ALERT * Color(1, 1, 1, alpha))
-	CellOutzType.draw_condensed(self, rect.position + Vector2(24, 86), "ARROWS / WHEEL: SELECT     P / ENTER: PIN TO BOARD", 8.0, CASE_EDGE * Color(1, 1, 1, 0.72 * alpha), 0.62)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(24, 86), control_hint("carry", "ARROWS / WHEEL: SELECT     P / ENTER: PIN TO BOARD"), 8.0, CASE_EDGE * Color(1, 1, 1, 0.72 * alpha), 0.62)
 
 	var content_top := rect.position.y + 104.0
 	var footer_y := rect.end.y - 42.0
@@ -1947,7 +1994,7 @@ func _draw_brain_index_overlay(rect: Rect2, alpha: float) -> void:
 		draw_rect(Rect2(line - Vector2(2, 2), Vector2(panel.size.x - 14, 13)), Color(0.12, 0.06, 0.04, 0.7 * alpha))
 		CellOutzType.draw_condensed(self, line, _fit(name, panel.size.x - 55, 7.0, 0.55), 7.0, INK * Color(1, 1, 1, alpha), 0.55)
 		CellOutzType.draw_condensed(self, Vector2(panel.end.x - 35, line.y), state, 7.0, MOSS * Color(1, 1, 1, alpha), 0.55)
-	CellOutzType.draw_condensed(self, panel.position + Vector2(8, panel.size.y - 15), "CLICK HEAD TO CLOSE", 7.0, CASE_EDGE * Color(1, 1, 1, 0.8 * alpha), 0.52)
+	CellOutzType.draw_condensed(self, panel.position + Vector2(8, panel.size.y - 15), control_hint("brain_close", "CLICK HEAD TO CLOSE"), 7.0, CASE_EDGE * Color(1, 1, 1, 0.8 * alpha), 0.52)
 
 
 func _draw_carry_grid(rect: Rect2, alpha: float) -> void:

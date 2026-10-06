@@ -56,6 +56,7 @@ const DOCTOR_ROUTE := preload("res://systems/doctor_route.gd")
 const IMPLANT_BOOT_HUD := preload("res://systems/implant_boot_hud.gd")
 const FIELD_INVENTORY := preload("res://systems/field_inventory.gd")
 const FACILITY_CHECKPOINTS := preload("res://systems/facility_checkpoints.gd")
+const BLACK_MIRROR_PHONE := preload("res://systems/black_mirror_phone.gd")
 
 const EYE_HEIGHT := 1.62
 const BODY_HALF_HEIGHT := 0.85
@@ -272,6 +273,8 @@ var doctor_route: Node3D
 var field_inventory: FieldInventory
 var route_carry: Carry
 var checkpoints: FacilityCheckpoints
+## v02-51. The Black Mirror, once taken from his desk (doctor_route.gd).
+var phone: BlackMirrorPhone
 ## Job 9: v0.1's guards, freed subject and sentinel on the one map.
 var encounters: V01Encounters
 var rebirth_site: RebirthSite
@@ -367,12 +370,21 @@ func _ready() -> void:
 	route_carry = CARRY.new()
 	field_inventory.close_requested.connect(_close_field_inventory)
 	field_inventory.activate_requested.connect(_activate_field_item)
+	phone = BLACK_MIRROR_PHONE.new()
+	phone.name = "BlackMirrorPhone"
+	$HUD.add_child(phone)
+	phone.setup(camera, $WorldEnvironment.environment, facility_map,
+		func() -> Array: return BLACK_MIRROR_PHONE.facility_targets(self),
+		func() -> Array: return [player.global_position, yaw])
 	opening_audio = OPENING_AUDIO.new()
 	add_child(opening_audio)
 	sight = SIGNAL_SIGHT.new()
 	sight.name = "SignalSight"
 	add_child(sight)
 	sight.call("setup", camera)
+	# The phone camera shows signals too (SignalSight), as it does in the Hunt.
+	phone.raised_changed.connect(func(up: bool, page: String) -> void:
+		sight.set("phone_lens", up and page == "CAMERA"))
 	# The failed subject in the jammed tank died here.
 	sight.set("spirits", [Vector3(-3.4, 0.0, 2.6)])
 	sight.set("hidden", [{"id": WEAK_WALL_ID, "at": WEAK_WALL_AT + Vector3(0.26, 0, 0), "size": WEAK_WALL_SIZE, "across": Vector3.BACK}])
@@ -1703,6 +1715,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		_open_field_inventory()
 		get_viewport().set_input_as_handled()
 		return
+	if can_move and phone != null and phone.handle_input(event):
+		get_viewport().set_input_as_handled()
+		return
 	# No fighting while a dressing goes on (hold 4).
 	if meds.busy() and event is InputEventMouseButton and event.pressed:
 		return
@@ -1821,6 +1836,8 @@ func _pad_input(event: InputEvent) -> bool:
 func _open_field_inventory() -> void:
 	if field_inventory == null:
 		return
+	if phone != null:
+		phone.lower()
 	route_carry = CARRY.new()
 	field_inventory.open_inventory(route_carry, null, null)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
