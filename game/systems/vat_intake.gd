@@ -1142,7 +1142,8 @@ func _chip_width(chip: Array, text_h: float) -> float:
 
 func _draw_form_header(rect: Rect2, ink: Color) -> void:
 	CellOutzType.draw_stamped(self, Vector2(26, 46), "NEURAL INTAKE", 20.0, ink, HOT * Color(1, 1, 1, 0.32), 1.6)
-	CellOutzType.draw_condensed(self, Vector2(26, 72), Branding.copy_for("intake", "header"), 9.0, ink * Color(1, 1, 1, 0.6), 0.7)
+	# The subhead ran into the first tab row at y 72-81 (bughunt-79).
+	CellOutzType.draw_condensed(self, Vector2(26, 68), Branding.copy_for("intake", "header"), 8.0, ink * Color(1, 1, 1, 0.6), 0.7)
 
 	# Page tabs along the top of the paper (intake-29: Greg on the pad, "the
 	# tiny tabs get bigger"): two rows of four equal cells, each a real target.
@@ -1312,9 +1313,23 @@ func _draw_races(_rect: Rect2, ink: Color, y: float) -> void:
 		# accurate and it is the institution's diagnosis that is distorted.
 		if sheet.race == str(keys[index]):
 			var filed := DoctorExamination.classify(sheet)
-			CellOutzType.draw_condensed(self, Vector2(300, y - 10), "FILED AS " + str(filed.label), 9.0, HOT * Color(1, 1, 1, 0.8), 0.7)
-			CellOutzType.draw_condensed(self, Vector2(300, y + 4), str(filed.note).to_upper(), 7.0, HOT * Color(1, 1, 1, 0.45), 0.6)
+			# Right of the name, inside the paper: at x 300 the note ran past
+			# the right edge and the label sat on the price line (bughunt-79).
+			var room_left := 50.0 + CellOutzType.width_condensed(str(data.name), 15.0, 0.9) + 18.0
+			_draw_fitted_right("FILED AS " + str(filed.label), y - 17, 9.0, 0.7, room_left, HOT * Color(1, 1, 1, 0.8))
+			_draw_fitted_right(str(filed.note).to_upper(), y - 6, 7.0, 0.6, room_left, HOT * Color(1, 1, 1, 0.45))
 		y += 42.0
+
+
+## One line ending at the paper's right margin, shrunk until it starts no
+## further left than `left`.
+func _draw_fitted_right(text: String, top: float, size: float, tracking: float, left: float, color: Color) -> void:
+	var right := _board_width - 30.0
+	var width := CellOutzType.width_condensed(text, size, tracking)
+	if width > right - left and width > 0.0:
+		size = maxf(5.0, size * (right - left) / width)
+		width = CellOutzType.width_condensed(text, size, tracking)
+	CellOutzType.draw_condensed(self, Vector2(right - width, top), text, size, color, tracking)
 
 
 func _draw_traits(rect: Rect2, ink: Color, y: float) -> void:
@@ -1373,7 +1388,7 @@ func _draw_body(_rect: Rect2, ink: Color, y: float) -> void:
 		# player's. INTERSEX files as "F / STANDARD" because the form has no
 		# second box -- the distortion is the paperwork's, never the body's.
 		if index == 0:
-			CellOutzType.draw_condensed(self, Vector2(340, y - 10), "FILED " + str(CharacterSheet.ANATOMY_SEX_FILED.get(sheet.anatomy_sex, "")), 8.0, HOT * Color(1, 1, 1, 0.72), 0.65)
+			_draw_fitted_right("FILED " + str(CharacterSheet.ANATOMY_SEX_FILED.get(sheet.anatomy_sex, "")), y - 10, 8.0, 0.65, 300.0, HOT * Color(1, 1, 1, 0.72))
 		y += 28.0
 	CellOutzType.draw_condensed(self, Vector2(30, y + 10), Branding.copy_for("intake", "body_notice"), 8.0, ink * Color(1, 1, 1, 0.42), 0.7)
 
@@ -1631,8 +1646,10 @@ func _draw_handler(_viewport: Vector2) -> void:
 	draw_multiline_string(font, Vector2(reply.position.x + 12, y + PROSE_SIZE), shown + cursor, HORIZONTAL_ALIGNMENT_LEFT, text_width, PROSE_SIZE, 4, voice_ink * Color(1, 1, 1, fade))
 	y += PROSE_SIZE * 1.3 * 4.0 + 8.0
 	if transcript_life > 0.0:
-		draw_string(font, Vector2(reply.position.x + 12, y), transcript, HORIZONTAL_ALIGNMENT_LEFT, text_width, 13, MOSS * Color(1, 1, 1, clampf(transcript_life, 0.0, 1.0)))
-		y += 22.0
+		# Wrapped, not clipped: one line cut "EXAMINER TERMINAL CO" (bughunt-79).
+		var transcript_lines := mini(3, roundi(font.get_multiline_string_size(transcript, HORIZONTAL_ALIGNMENT_LEFT, text_width, 13).y / font.get_height(13)))
+		draw_multiline_string(font, Vector2(reply.position.x + 12, y), transcript, HORIZONTAL_ALIGNMENT_LEFT, text_width, 13, 3, MOSS * Color(1, 1, 1, clampf(transcript_life, 0.0, 1.0)))
+		y += 22.0 + 16.0 * float(maxi(0, transcript_lines - 1))
 
 	# Answers, when he has asked something a body in a tank can answer.
 	_answer_hits.clear()
