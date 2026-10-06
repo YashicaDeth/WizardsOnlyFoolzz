@@ -16,7 +16,7 @@ hands_on_breakout_capture, examiner_exit_capture, facility_one_map_capture
 interstitial_capture.
 
 No blocker was found: every route suite reaches the surface and the ending,
-and START -> chooser -> vat now has its own test.
+and START -> chooser -> vat now has its own test. Also green and looked at: arcade_execution_test, execution_beat_test (+capture), hunt_execution_test, aim_down_sights_test (+capture), black_mirror_lens_test, vat_rebirth_test, rebirth_every_killer_test, opening_death_test, death_save_screen_test, service_arcade_route_test, lower_works_route_test, lower_works_gantry_test, examiner_fight_test, examiner_feed_test, v01_guard_duel_test, v01_creature_duel_test, vat_pad_chain_test, pad_bridge_test, hunt_pad_layout_test, menu_transition_test, menu_silence_test.
 
 ## Fixed
 
@@ -31,7 +31,7 @@ and START -> chooser -> vat now has its own test.
 
 ## Open
 
-- **Transit lift and heat elevator rides**: the floor readout is a big curved "DOWN 0C SERVICE ARCADE" / "UP 0D LOWER WORKS" floating in the black, the lintel "DOWN" overlaps the HUD objective box, the shaft strip is one flat green bar (REMASTER_LOG job5 "Still weak"; facility_one_map_capture 04, 07). Major (looks broken). OPEN: needs the readout as a flat panel on the car wall, below the HUD's objective band.
+- **Transit lift and heat elevator rides**: the floor readout is a big curved "DOWN 0C SERVICE ARCADE" / "UP 0D LOWER WORKS" floating in the black, the lintel "DOWN" overlaps the HUD objective box, the shaft strip is one flat green bar (REMASTER_LOG job5 "Still weak"; facility_one_map_capture 04, 07). Major (looks broken). OPEN, owned by the pending `remaster-job5-p2` job (lift readout and HUD overlap); not duplicated here.
 - **Service Arcade**: the "SERVICE ARCADE" sign label sits on top of the subtitle line (03a). Minor. OPEN: lower the sign or the subtitle band.
 - **Rebirth, old body in the arcade**: glowing orange ghost body with red discs and a ring, plus a floating "YOUR OLD BODY" label like debug text (REMASTER_LOG job7 "Still weak"; rebirth_old_body.png). Major (looks broken). OPEN: needs a real corpse/bloodstain read; Greg's art direction.
 - **Service Arcade, Hollis warning shot**: his spoken line is a Label3D too small to read at play distance (rebirth_warning_shot.png). Minor. OPEN.
@@ -42,6 +42,7 @@ and START -> chooser -> vat now has its own test.
 - **Examiner fight, bare-handed**: with no axe and no restraint he takes ~29 blows (260 health, 9 per fist) for a ~1 min fight. Minor (balance). OPEN: Greg's dial (Job 6).
 - **Main menu settings**: the Support / report-a-bug row Greg asked for (Y2, "email me in settings") has been dead code since the 16 Sep merge dcec1583 dropped its `_build_support_row()` call; the "settings > support" note it pointed at is gone too. Minor. OPEN: one call in `_ready` if the row is still wanted after the menu redesign.
 - **Mechanics lab, PRODSTAFF**: v01_weapons_test "and the shock staggers the dummy" fails: the charged shock lands (packet has shock) but no shock stagger is reported. Minor (lab, not route). OPEN.
+- **The Hunt, aiming down the sights**: sights are now centred, but in first person the low-poly hands and knuckle spheres fill the lower third of the frame while aimed (aim_down_sights_capture stage2 / third_person_aimed). Minor (after the route). OPEN.
 - **Exit-time noise**: baseline_human_test prints 12 "Lambda capture at index 0 was freed" at quit; one Jolt "job system exceeded the maximum number of jobs" warning in a route run. Minor. OPEN.
 
 ## Not verified by bughunt-79-a
