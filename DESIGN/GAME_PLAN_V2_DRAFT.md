@@ -8,7 +8,7 @@ Greg's north star (6 Oct night): "a really enjoyable gameplay shell" he can text
 
 - **Plays well:** the examiner fight (telegraphed, fair, keycard always drops); the one-map route with real lifts and no loading screens (map-84 lit Lower Works and gave the arcade real cover, min 174 fps); the vat wake through the flood; the ending; the pad-first intake; route suites green with no script errors (bughunt-79-a/b/c).
 - **Plays worst:** (1) the first-person melee still reads as a pose, not a swing (feel-86 queued); (2) encounters are flat: rooms are one long tile hall each with a guard in it (feel-87 queued); (3) lab systems (organs, X-ray, liquid, destruction) barely touch the route (route-88 queued); (4) lift rides are near-black; (5) the player model, which Greg hates (player-81 queued).
-- **Next refinement passes, in order:** bug list (DESIGN/BUGS.md) > player-81 > feel-86 > feel-87 > route-88 > imp-66 vat room > the Black Mirror in the route (v02-51 running now). Each pass ships a before/after render and keeps the route suites green.
+- **Next refinement passes, in order:** bug list (DESIGN/BUGS.md) > player-81 > feel-86 > feel-87 > route-88 > imp-66 vat room > the Black Mirror in the route (v02-51 landed 4a68600c; fix-93 proves it on trunk). Each pass ships a before/after render and keeps the route suites green.
 
 ## 1. What v0.1 "Escape" actually delivered (as of 22:10, 6 Oct)
 
@@ -67,7 +67,7 @@ These come from Greg's notes, in his order:
 
 ### v2-1 Black Mirror, one working device
 - **GOAL:** "one working device": raise and lower it; navigate its pages (MAP, camera with night vision, inventory link) on the pad; one consistent look; no broken pages. (Greg, 5 Oct midday)
-- **EXISTS:** the pending `v02-51-black-mirror-pickup` task, plus the phone pages already in the game.
+- **EXISTS:** v02-51 landed (4a68600c): phone on the examiner's desk, night and depth camera, MAP and CARRY underground; plus the phone pages already in the game.
 - **BUILD:** finish v02-51. Add the depth-map camera mode in Greg's TouchDesigner look: a LiDAR grey-to-white point look, block-tracked boxes, depth contours and sweeping scan lines, built as a Godot shader.
 - **PROOF:** a PNG of every page; a pad-only navigation test.
 
