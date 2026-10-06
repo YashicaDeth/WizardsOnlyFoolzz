@@ -223,6 +223,10 @@ func _station() -> void:
 	await _frames(4)
 	check(str(station.last_state.phase) == "peak" and station.rig._display.visible and station.rig.dial("kaleidoscope_segments") >= 2.0, "at its peak the psychedelic preset is on screen")
 	check(station.lab.bodies.reach_scale > 1.2, "and the X-ray reads further")
+	check(station.sight != null and station.sight.reach_scale > 1.2, "and the wizard eyes read further too")
+	await _press("wizard_eyes")
+	check(station.sight.mode == "wizard", "D-pad up opens the wizard eyes at the station")
+	await _press("wizard_eyes")
 	var lit := 0
 	for plane_id in station.plane_marks:
 		if station.plane_marks[plane_id].visible:

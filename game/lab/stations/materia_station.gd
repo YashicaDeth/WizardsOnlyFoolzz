@@ -10,6 +10,9 @@ extends Node3D
 ## - a smokeable in hand: hold block (`guard`, L1 / RMB) to draw, let go and
 ##   the breath leaves on its own; R1 / LMB flicks the ash, or, just after an
 ##   exhale, blows a ring; Y / R puts it away;
+## - D-pad up / K (`wizard_eyes`) opens the wizard eyes here: how far they
+##   read, and how long before they strain, follow the class you are on, as
+##   the X-ray's reach does;
 ## - the TRIP entry plays the 40-second sequence; USE again skips it.
 ##
 ## What each class does is `Materia` (systems/materia.gd); the picture is
@@ -53,6 +56,10 @@ var trip: MateriaTrip
 var bridge: OSCBridge
 var radio: AudioReactive
 var lungs: PulmonaryDiagnostic
+## The wizard eyes (SignalSight), with one hidden mark on the smoke wall that
+## only they show. Their reach follows `Materia.state().xray_reach`.
+var sight: SignalSight
+const HIDDEN_AT := Vector3(-1.78, 1.5, 0.6)
 var dummy: BaselineHuman
 var plane_marks: Dictionary = {}
 var entries: Array[Dictionary] = []
@@ -136,6 +143,19 @@ func build(owner_lab: Node3D) -> void:
 	lungs = PulmonaryDiagnostic.new()
 	lungs.name = "Lungs"
 	lung_layer.add_child(lungs)
+
+	if lab.get("camera") != null:
+		sight = SignalSight.new()
+		sight.name = "WizardEyes"
+		sight.handle_keys = false
+		add_child(sight)
+		sight.setup(lab.camera)
+		sight.enabled = true
+		sight.hidden = [{"id": "materia_wall_mark", "at": to_global(HIDDEN_AT),
+			"size": Vector2(0.6, 0.6), "across": global_basis.z}]
+		sight.hidden_seen.connect(func(_id: String) -> void:
+			if lab.has_method("_note"):
+				lab._note("WIZARD EYES // HIDDEN MARK ON THE WALL"))
 
 	for raw in SubstanceStationRef.MANIFEST:
 		var entry: Dictionary = raw
@@ -295,6 +315,9 @@ func handle_input(event: InputEvent) -> bool:
 		if event.is_action_pressed("reload"):
 			put_away()
 			return true
+	if sight != null and event.is_action_pressed("wizard_eyes"):
+		sight.toggle_wizard()
+		return true
 	if near_plinth():
 		if event.is_action_pressed("heal"):
 			lab._note(select(-1))
@@ -510,8 +533,11 @@ func _reveal_planes() -> void:
 			lit = clampf(perception * 1.4, 0.0, 1.0)
 		mark.visible = lit > 0.01
 		mark.modulate.a = lit
+	var reach := float(last_state.get("xray_reach", 1.0))
 	if lab.get("bodies") != null:
-		lab.bodies.reach_scale = float(last_state.get("xray_reach", 1.0))
+		lab.bodies.reach_scale = reach
+	if sight != null:
+		sight.reach_scale = reach
 
 
 ## The deliriant takes time. At its peak, every so often the screen goes and
