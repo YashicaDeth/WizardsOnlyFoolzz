@@ -27,6 +27,9 @@ uniform float lut_strength : hint_range(0.0, 1.0) = 0.0;
 // 2. Kaleidoscope UV fold. Segments below 2 leaves the frame unfolded.
 uniform float kaleidoscope_segments : hint_range(0.0, 24.0) = 0.0;
 uniform float kaleidoscope_spin = 0.0;
+// drug-70: inside this radius (of the half-screen) the frame is not folded,
+// with a soft band outside it. 0 folds everything, as before.
+uniform float kaleidoscope_clear : hint_range(0.0, 1.5) = 0.0;
 
 // 3. Feedback: the previous frame, zoomed and spun, blended back in. The
 // texture itself comes from `psychedelic_rig.gd`'s ping-ponged SubViewports —
@@ -116,7 +119,9 @@ void fragment() {
 		float radius = length(centered);
 		float wedge = TAU / kaleidoscope_segments;
 		angle = abs(mod(angle, wedge) - wedge * 0.5);
-		centered = vec2(cos(angle), sin(angle)) * radius;
+		vec2 folded = vec2(cos(angle), sin(angle)) * radius;
+		float fold = kaleidoscope_clear > 0.0 ? smoothstep(kaleidoscope_clear, kaleidoscope_clear + 0.3, radius) : 1.0;
+		centered = mix(centered, folded, fold);
 		uv = centered * 0.5 + 0.5;
 	}
 

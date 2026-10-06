@@ -94,7 +94,7 @@ const CLASSES := {
 	},
 	"psychedelic": {
 		"onset": 10.0, "peak": 40.0, "comedown": 45.0, "palette": "prism",
-		"dials": {"kaleidoscope_segments": 6.0, "kaleidoscope_spin": 0.25, "lut_strength": 0.55, "palette_cycle": 0.08,
+		"dials": {"kaleidoscope_segments": 6.0, "kaleidoscope_spin": 0.25, "kaleidoscope_clear": 0.42, "lut_strength": 0.55, "palette_cycle": 0.08,
 			"displacement_strength": 0.05, "feedback_strength": 0.45, "feedback_zoom": 1.015, "feedback_spin": 0.04,
 			"chromatic_offset": 0.012, "pulse_strength": 0.5, "saturation_shift": 0.45},
 		"feel": {"sway": 0.35, "aim": -0.35, "stamina": 0.0, "pain": 0.15, "perception": 0.85},
@@ -324,6 +324,9 @@ static func peak_dials(class_id: String, level: float) -> Dictionary:
 				out[dial_name] = 0.0 if level < 0.3 else maxf(2.0, roundf(target * level))
 			"cut_rate", "displacement_scroll":
 				out[dial_name] = target
+			"kaleidoscope_clear":
+				# Held, not grown: the middle stays clear from the first fold on.
+				out[dial_name] = target if level > 0.0 else neutral
 			_:
 				out[dial_name] = lerpf(neutral, target, clampf(level, 0.0, 1.5))
 	return out

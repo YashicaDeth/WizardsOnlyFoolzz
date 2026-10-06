@@ -8,7 +8,12 @@ render_mode blend_mix, depth_draw_never, cull_disabled, diffuse_lambert_wrap, sp
 uniform sampler2D depth_texture : hint_depth_texture, filter_linear_mipmap;
 uniform sampler2D noise_texture : hint_default_white, filter_linear_mipmap, repeat_enable;
 // Overall opacity, a dial for the owner.
-uniform float opacity = 0.32;
+uniform float opacity = 0.42;
+// How density reads as opacity. Below 1 is compressive: the simulation thins a
+// parcel as it mixes (density falls with its growing size), and a linear read
+// made a plume vanish within a second of leaving the mouth. At 0.6 thin smoke
+// lingers as a visible haze while a fresh breath is still the densest thing.
+uniform float density_gamma : hint_range(0.2, 1.0) = 0.6;
 // A floor of its own light, so smoke in the dark is grey and not black.
 uniform float ambient_floor = 0.06;
 // Metres over which a card fades into what is behind it.
@@ -48,5 +53,5 @@ void fragment() {
 	ROUGHNESS = 1.0;
 	BACKLIGHT = COLOR.rgb * 0.3;
 	EMISSION = COLOR.rgb * ambient_floor;
-	ALPHA = clamp(COLOR.a * shape * soft * opacity, 0.0, 1.0);
+	ALPHA = clamp(pow(max(COLOR.a, 0.0), density_gamma) * shape * soft * opacity, 0.0, 1.0);
 }

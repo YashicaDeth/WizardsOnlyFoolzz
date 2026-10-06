@@ -29,6 +29,7 @@ const REST := {
 	"lut_strength": 0.0,
 	"kaleidoscope_segments": 0.0,
 	"kaleidoscope_spin": 0.0,
+	"kaleidoscope_clear": 0.0,
 	"feedback_strength": 0.0,
 	"feedback_zoom": 1.0,
 	"feedback_spin": 0.0,

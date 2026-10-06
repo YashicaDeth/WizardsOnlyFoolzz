@@ -41,6 +41,9 @@ const NEUTRAL := {
 	"lut_strength": 0.0,
 	"kaleidoscope_segments": 0.0,
 	"kaleidoscope_spin": 0.0,
+	# drug-70: radius (0-1.4 of the half-screen) left unfolded in the middle,
+	# so the world you aim at stays the world while the fold blooms round it.
+	"kaleidoscope_clear": 0.0,
 	"feedback_strength": 0.0,
 	"feedback_zoom": 1.0,
 	"feedback_spin": 0.0,

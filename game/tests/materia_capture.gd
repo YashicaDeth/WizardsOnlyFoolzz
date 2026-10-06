@@ -140,13 +140,14 @@ func _ember() -> void:
 		ember.tick(get_process_delta_time(), 0.0)
 		await get_tree().process_frame
 	await _save("ember_rest")
-	ember.flick(Vector3(-0.3, -1, 0))
-	close.global_position = tip + Vector3(-0.1, -0.15, 0.55)
+	# One fixed side view framing the half metre under the tip, so the column
+	# can be followed as it falls (about 3, 12 and 28 cm at these stamps).
+	close.global_position = tip + Vector3(0.0, -0.22, 0.75)
 	close.fov = 40.0
+	close.look_at(tip + Vector3(0.0, -0.22, 0.0), Vector3.UP)
+	ember.flick(Vector3(-0.3, -1, 0))
 	for index in 3:
-		await _seconds(0.1)
-		close.look_at(tip + Vector3(-0.03, -0.12 - index * 0.25, 0), Vector3.UP)
-		await _frames(1)
+		await _seconds(0.08)
 		await _save("ember_flick_%d" % index)
 	lines.append("ash drops %d  reason %s" % [ember.drops, ember.last_drop_reason])
 	await _seconds(1.2)
