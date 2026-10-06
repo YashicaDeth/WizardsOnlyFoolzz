@@ -30,11 +30,37 @@ const SOULS_BASE := {
 	},
 }
 
+## Lab-only discipline layers. Physical shoulders stay put; the selected
+## discipline changes their verbs. Route scenes continue to use SOULS_BASE.
+const DUELIST := {
+	"melee": {
+		R1: "duelist_attack",
+		R2: "duelist_heavy",
+		L1: "duelist_block",
+		L2: "duelist_parry",
+	},
+}
+const SHADE := {
+	"melee": {
+		R1: "shade_takedown",
+		R2: "shade_throw",
+		L1: "shade_darkness",
+		L2: "shade_stalk",
+	},
+}
+
 const GLYPHS := {R1: "R1", R2: "R2", L1: "L1", L2: "L2"}
 
 
 static func souls_base() -> Dictionary:
 	return SOULS_BASE.duplicate(true)
+
+
+static func discipline(id: String) -> Dictionary:
+	match id:
+		"duelist": return with_overrides(DUELIST)
+		"shade": return with_overrides(SHADE)
+		_: return souls_base()
 
 
 ## A discipline layer is sparse: only meanings it changes are supplied.
