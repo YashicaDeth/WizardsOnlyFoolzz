@@ -103,6 +103,7 @@ func _ready() -> void:
 	# out loud about a game they are about to start.
 	$HUD/Play.text = "START GAME"
 	_build_gore_setting()
+	_build_support_row()
 	_build_run_doors()
 	_build_front_door()
 	_play_title_sequence()
@@ -818,7 +819,10 @@ func _dress_settings_panel() -> void:
 	settings_panel.add_theme_stylebox_override("panel", skin)
 	var rows: Array = []
 	for child in $HUD/SettingsPanel/VBox.get_children():
-		rows.append(child)
+		# The support line is wrapped prose with an "@" in it; CellOutzType has
+		# no wrapping and no "@", so it keeps its real font.
+		if child.name != "SupportResult":
+			rows.append(child)
 	settings_plate = MENU_PLATE.new()
 	settings_plate.name = "SettingsPlate"
 	settings_plate.compact = true

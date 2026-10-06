@@ -20,6 +20,8 @@ and START -> chooser -> vat now has its own test. Also green and looked at: arca
 
 bughunt-79-b (2026-10-06) re-ran the six route suites plus v01_ending, service_arcade_route, lower_works_route, examiner_fight, examiner_keycard, opening_death, death_save_screen, vat_rebirth, rebirth_every_killer, menu_input_chooser and menu_transition (all green; the only ERROR lines are quit-time leak reports), and opened hands_on_breakout_capture, intake_pad_capture, examiner_exit_capture, facility_one_map_capture (vat to daylight, 13 shots) and rebirth_capture.
 
+bughunt-79-c (2026-10-06, after the v0.1 sound pass merged) re-ran the six route suites plus the gate (baseline_human, body_cut, opening_handoff), all green, then menu_*, support_mail, facility_guard_post, support_unit, service_arcade_route, vat_rebirth, audio, chunk, impact_feel; opened menu_capture (settings before/after), hands_on_breakout_capture, rebirth_capture (before/after) and facility_one_map_capture (13 shots, vat to daylight; fps_min 3 on the first frame, average 205).
+
 ## Fixed
 
 - **Arcade -> both lifts -> surface gate**: the fight teacher's "RED GLINT // STEP OUT OR DODGE" (and any pickup or door line) was written into the vat subtitle and never cleared, so it rode the transit lift, the Lower Works and the heat elevator up to the surface gate. Major. FIXED bughunt-79-a: once on your feet a line clears 6 s after it last changed (`vat_chamber._expire_subtitle`, `route_subtitle_expiry_test`).
@@ -38,17 +40,25 @@ bughunt-79-b (2026-10-06) re-ran the six route suites plus v01_ending, service_a
 - **Examiner office door sign "doubled/ghosted"**: not a bug. examiner_exit_capture shoots during the departure, when the player is still in the tank and `tank_view` wobbles the screen through the fluid; one Label3D exists. Closed bughunt-79-b.
 - **Vat aisle, "floating red disc" (facility_one_map_capture 01)**: live smash debris (flesh drops and glass shards) still flying in the first frames after the breakout; it moves between runs. Not a bug. Closed bughunt-79-b.
 
+- **Exit-time "Lambda capture at index 0 was freed" (12 per baseline_human_test, any fight that ends in a free or reload)**: `GoreChunks.play_impact`'s delayed-layer lambda captured the struck body, which is often freed inside the few-ms delay. Minor. FIXED bughunt-79-c: captures the instance id (baseline_human_test now 0 lambda errors).
+- **Main menu settings, Support / report-a-bug row**: dead since merge dcec1583. FIXED bughunt-79-c: one call in `_ready`; the address line stays in a real font (CellOutzType has no "@" and no wrapping, it read "WIZARDSONLYFOOLZTHEGAME GMAIL.COM" and the failure line ran past the panel). menu_capture now opens settings through `_open_settings()` (it had photographed the undressed panel). menu_01/02 looked at.
+- **Service Arcade after rebirth, guard's spoken line**: depth-tested Label3D, so the growing tank cut "You again. They grew you back." off at "They grew you ba". Major (his line is the beat). FIXED bughunt-79-c: `no_depth_test` on his and the Support Unit's speech (rebirth_old_body before/after).
+- **impact_feel_test "a sever rings longer"**: failed on the base commit under load; awaited ~50 ms headless frames measured the shot's 54 ms ring as ~0.15 s. Not a game bug. FIXED bughunt-79-c in the test (fixed 60 Hz steps).
+
 ## Open
 
 - **Transit lift and heat elevator rides**: the floor readout is a big curved "DOWN 0C SERVICE ARCADE" / "UP 0D LOWER WORKS" floating in the black, the lintel "DOWN" overlaps the HUD objective box, the shaft strip is one flat green bar (REMASTER_LOG job5 "Still weak"; facility_one_map_capture 04, 07). Major (looks broken). OPEN, owned by the pending `remaster-job5-p2` job (lift readout and HUD overlap); not duplicated here.
 - **Rebirth, old body in the arcade**: glowing orange ghost body with red discs and a ring, plus a floating "YOUR OLD BODY" label like debug text (REMASTER_LOG job7 "Still weak"; rebirth_old_body.png). Major (looks broken). OPEN: needs a real corpse/bloodstain read; Greg's art direction.
 - **Vat, cord beat**: the subtitle "The cord is still down your throat." (sentence case) and the thought "IT'S DOWN MY THROAT. PULL." show at once, two lines saying the same thing (bo_1_cord.png). Minor. OPEN: Greg's opening text; a question, not a lane fix.
 - **Examiner fight, bare-handed**: with no axe and no restraint he takes ~29 blows (260 health, 9 per fist) for a ~1 min fight. Minor (balance). OPEN: Greg's dial (Job 6).
-- **Main menu settings**: the Support / report-a-bug row Greg asked for (Y2, "email me in settings") has been dead code since the 16 Sep merge dcec1583 dropped its `_build_support_row()` call; the "settings > support" note it pointed at is gone too. Minor. OPEN: one call in `_ready` if the row is still wanted after the menu redesign.
 - **The Hunt, aiming down the sights**: sights are now centred, but in first person the low-poly hands and knuckle spheres fill the lower third of the frame while aimed (aim_down_sights_capture stage2 / third_person_aimed). Minor (after the route). OPEN.
-- **Exit-time noise**: baseline_human_test prints 12 "Lambda capture at index 0 was freed" at quit, and route runs end with RID/ObjectDB leak lines; one Jolt "job system exceeded the maximum number of jobs" warning in a route run. bughunt-79-b: the lambdas are not BaselineHuman's 90 s gore-expiry timers (binding those left the count at 12). Source still unknown; needs a `--verbose` run or a lambda-by-lambda bisect in GoreChunks/BaselineHuman. Minor.
+- **Exit-time noise**: the 12 lambda errors are fixed (above). Left: route runs end with RID/ObjectDB leak lines (11868 ObjectDB in demo_route), one Jolt "maximum number of jobs" warning seen by 79-b. Quit-time only. Minor. OPEN.
 - **Legacy doctor chase**: doctor_chase_route_test failed 8 ("his door comes down (80 blows)" onward) at the base commit too: it drove the pre-hands-on breakout instead of the examiner's dropped-keycard path. Minor (stale test, not the route). FIXED fix-83: the suite now takes the dropped keycard and opens the staff door through the real interaction path, leaves the detailed card assertions to examiner_keycard_test, and retains the current Support Unit -> empty vehicle bay -> surface chase handoffs.
 - **First-person sleeves "purple checker" (REMASTER_LOG imp-64 Still weak)**: it is the jester leather pattern on `held_gear` sleeves, not a missing texture. Art call, not a lane fix. OPEN (look).
+
+- **Service Arcade, guard's "SEEN 100%" awareness tag**: BlockTracker's tag sits over his speech line at the old-body spot (rebirth_old_body). Minor. OPEN (presentation; move the tag or the line).
+- **Main menu settings**: the support address line sits ~12 px left of the plate's row inset. Minor. OPEN.
+- **Lower Works (05/05b) and arcade (02/03)**: still mostly black between light pools. Major for readability, already owned by the running map-84 "route readable and alive" job. OPEN, not duplicated.
 
 ## Not verified by bughunt-79-a
 
@@ -56,3 +66,4 @@ bughunt-79-b (2026-10-06) re-ran the six route suites plus v01_ending, service_a
 - Frame rate on Greg's RTX 2060 SUPER: the windowed map capture's first frame was 3 fps (shader warm-up), the rest 98-361 fps on this machine.
 - Audio.
 - bughunt-79-b: still no real pad, GPU or audio check. The examiner door sign was not seen on foot (no capture stands there after the breakout).
+- bughunt-79-c: no real pad, GPU or audio check either; the menu Support press was only seen in test mode (no mail client opened on purpose).
