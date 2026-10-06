@@ -46,6 +46,9 @@ func _ready() -> void:
 	vat.camera.current = true
 	vat.player.global_position = Vector3(4.4, 0.86, -2.5)
 	vat.player.velocity = Vector3.ZERO
+	# Let the opening's smash debris land first: a player reaches this door
+	# long after it settles (the "floating red slabs" were it mid-flight).
+	await get_tree().create_timer(3.0).timeout
 
 	await _pose_and_capture("01_staff_door_to_artery.png", Vector3(4.4, 0.86, -2.5), -PI * 0.5)
 	vat.thought_life = 0.0
