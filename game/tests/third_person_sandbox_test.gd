@@ -66,7 +66,7 @@ func _ready() -> void:
 	check(through.is_empty() or through.get("rig") != avatar.rig, "a trace from behind passes through your own body")
 
 	# --- Keys drive the third-person swing, one side each. ---
-	demo.arsenal.select_slot(HunterArsenal.SLOT_ORDER.find("sword"))
+	demo.arsenal.select_slot(HunterArsenal.SLOT_ORDER.find("cleaver"))
 	for side in [BladeRead.LEFT, BladeRead.RIGHT, BladeRead.HIGH, BladeRead.LOW]:
 		await _frames(40)
 		demo._tp_swing_side = side

@@ -388,6 +388,7 @@ func _film_rect(texture: Texture2D, frame: Rect2) -> void:
 		_film.material = material_value
 		screen.add_child(_film)
 	_film.texture = texture
+	(_film.material as ShaderMaterial).set_shader_parameter("film", texture)
 	_film.position = frame.position
 	_film.size = frame.size
 	_film.modulate = Color(1, 1, 1, alpha)

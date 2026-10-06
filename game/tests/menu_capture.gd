@@ -42,8 +42,12 @@ func _ready() -> void:
 
 	# And what pressing it says when no mail client answers, which on this
 	# machine is the honest case.
-	menu.get_node("HUD/SettingsPanel/VBox/Support").emit_signal("pressed")
-	await _shot(menu, "menu_02_support_pressed")
+	# The support row has since left settings; without this guard the capture
+	# errored here and sat open until render_one closed it.
+	var support := menu.get_node_or_null("HUD/SettingsPanel/VBox/Support")
+	if support != null:
+		support.emit_signal("pressed")
+		await _shot(menu, "menu_02_support_pressed")
 
 	print("MENU SHEET DONE")
 	get_tree().quit(0)

@@ -66,7 +66,7 @@ func _ready() -> void:
 	var demo = load("res://gore_demo.tscn").instantiate()
 	add_child(demo)
 	await get_tree().physics_frame
-	demo.arsenal.select_slot(HunterArsenal.SLOT_ORDER.find("sword"))
+	demo.arsenal.select_slot(HunterArsenal.SLOT_ORDER.find("cleaver"))
 	demo.arm.velocity = Vector3(0.0, -5.0, 0.0)
 	demo._melee_swing()
 	check(not demo.pending_melee.is_empty() and demo.melee_windup > 0.0,

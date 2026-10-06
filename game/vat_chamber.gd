@@ -1889,6 +1889,13 @@ const THOUGHTS := {
 var thought_label: Label
 var thought_phase := ""
 var thought_life := 0.0
+## Once the player is on their feet, the subtitle is written by pickups, doors
+## and the fight teacher and nothing ever cleared it: a "RED GLINT" prompt from
+## the arcade rode both lifts up to the surface gate (bughunt-79). A line now
+## holds for SUBTITLE_HOLD seconds after it last changed, then clears.
+const SUBTITLE_HOLD := 6.0
+var subtitle_seen := ""
+var subtitle_age := 0.0
 
 ## The music bed rises through the escape (Greg, 28 September).
 const VAT_TENSION := {"intake": 0.25, "departure": 0.4, "hacked": 0.9, "submerged": 0.6, "voiding": 0.55, "wired": 0.7, "cord": 0.8, "smash": 0.95, "rising": 0.6, "knees": 0.45, "floor": 0.45, "aisle": 0.35}
@@ -1902,6 +1909,19 @@ func in_fluid() -> bool:
 	if TANK_PANIC.has(phase):
 		return true
 	return hands_on_breakout and phase in ["wired", "cord", "smash"]
+
+
+func _expire_subtitle(delta: float) -> void:
+	if subtitle.text != subtitle_seen:
+		subtitle_seen = subtitle.text
+		subtitle_age = 0.0
+		return
+	if subtitle_seen.is_empty():
+		return
+	subtitle_age += delta
+	if subtitle_age >= SUBTITLE_HOLD:
+		subtitle.text = ""
+		subtitle_seen = ""
 
 
 func _physics_process(delta: float) -> void:
@@ -1972,6 +1992,8 @@ func _physics_process(delta: float) -> void:
 	clock += delta
 	_update_beats()
 	_update_sequence(delta)
+	if phase == "aisle":
+		_expire_subtitle(delta)
 	_update_shards(delta)
 	if vat_smash != null:
 		vat_smash.step(delta)
