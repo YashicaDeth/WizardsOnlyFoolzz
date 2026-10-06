@@ -621,7 +621,7 @@ func _build_gore_setting() -> void:
 	gore_index = maxi(0, gore_modes.find(str(WorldHistory.subject("settings").get("gore", "FULL"))))
 	var button := Button.new()
 	button.name = "Gore"
-	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	# Centred like every other settings row (bughunt-79: these two sat left).
 	button.text = "GORE: %s" % gore_modes[gore_index]
 	var box := $HUD/SettingsPanel/VBox
 	box.add_child(button)
@@ -632,7 +632,6 @@ func _build_gore_setting() -> void:
 	# default; this is where it turns off. `AnatomyPresentation` holds it.
 	var censor := Button.new()
 	censor.name = "Censor"
-	censor.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	censor.text = _censor_label()
 	box.add_child(censor)
 	box.move_child(censor, box.get_child_count() - 2)
