@@ -83,6 +83,11 @@ func offer(id: String, keycode: Key, key: String, verb: String) -> void:
 
 
 func _process(delta: float) -> void:
+	# A hint waits out a mission card: standing up offers E USE in the same
+	# frame GET REVENGE starts, and the box sat on the card's letters.
+	if MissionCard.any_playing(get_tree()):
+		_panel.visible = false
+		return
 	if current.is_empty():
 		if queue.is_empty():
 			return
@@ -93,7 +98,7 @@ func _process(delta: float) -> void:
 		_key.text = pad.hint(str(current.key), str(current.verb)) if pad != null else str(current.key)
 		_verb.text = str(current.verb).to_upper()
 		_layout()
-		_panel.visible = true
+	_panel.visible = true
 	age += delta
 	_panel.modulate.a = clampf(age / 0.25, 0.0, 1.0)
 	if age >= HOLD_SECONDS:

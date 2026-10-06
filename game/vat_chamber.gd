@@ -2258,6 +2258,10 @@ func _on_hack_finished(_skipped: bool) -> void:
 
 
 func _update_beats() -> void:
+	# The tank's own lines belong to the tank. Run on in the aisle, an unspent
+	# beat repainted "CYCLE ABORTED // VOIDING" under GET REVENGE (bughunt-79).
+	if not phase in ["submerged", "voiding"]:
+		return
 	for index in active_beats.size():
 		if clock >= float(active_beats[index].at) and index > line_index:
 			line_index = index

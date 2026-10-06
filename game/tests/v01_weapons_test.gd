@@ -83,6 +83,9 @@ func _staff() -> void:
 	check(_health(rig) < before, "and hurts it")
 	staggers.clear()
 	await _seconds(0.5)
+	# The thrust's stagger shoves the dummy back out of the charged reach
+	# (3.5 m); step back in as a player would (bughunt-79).
+	await _face(rig, 2.7)
 	await _trigger(JOY_AXIS_TRIGGER_RIGHT, 0.85)
 	await _seconds(1.4)
 	check(bool(lab.melee.last_packet.get("shock", false)), "R2 held and released is the charged shock (%s)" % str(lab.melee.last_packet.get("attack", "")))

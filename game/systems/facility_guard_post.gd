@@ -235,6 +235,11 @@ func _build_guard() -> void:
 	speech.modulate = Color("f2e2c4")
 	speech.outline_modulate = Color("120606")
 	speech.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	# Spoken lines read at any range: at the warning-shot distance a world-
+	# sized label was a few pixels tall (bughunt-79). Fixed screen size,
+	# about 20 px caps at 720p.
+	speech.fixed_size = true
+	speech.pixel_size = 0.0013
 	speech.position = GUARD_AT + Vector3(0, 2.25, 0)
 	add_child(speech)
 
