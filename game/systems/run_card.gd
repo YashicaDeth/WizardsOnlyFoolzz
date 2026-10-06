@@ -16,6 +16,9 @@ const HOLD_SECONDS := 9.0
 const FADE_SECONDS := 1.2
 
 var summary: Dictionary = {}
+## The v0.1 ending holds it under TO BE CONTINUED, centred, for its own beat.
+var hold_seconds := HOLD_SECONDS
+var centred := false
 var age := 0.0
 var sheet: Control
 
@@ -34,18 +37,20 @@ func _process(delta: float) -> void:
 	if sheet == null:
 		return
 	age += delta
-	if age > HOLD_SECONDS + FADE_SECONDS:
+	if age > hold_seconds + FADE_SECONDS:
 		queue_free()
 		return
 	sheet.queue_redraw()
 
 
 func _draw_sheet() -> void:
-	var alpha := clampf(age / 0.4, 0.0, 1.0) * clampf((HOLD_SECONDS + FADE_SECONDS - age) / FADE_SECONDS, 0.0, 1.0)
+	var alpha := clampf(age / 0.4, 0.0, 1.0) * clampf((hold_seconds + FADE_SECONDS - age) / FADE_SECONDS, 0.0, 1.0)
 	var rows: Array = summary.get("rows", [])
 	var plate := Vector2(520.0, 132.0 + 26.0 * rows.size())
 	# Greg's playtest: top-left under the status, not over the middle of the view.
 	var origin := Vector2(24.0, 128.0)
+	if centred:
+		origin = Vector2((sheet.size.x - plate.x) * 0.5, sheet.size.y * 0.42)
 	sheet.draw_rect(Rect2(origin, plate), Color(0.02, 0.01, 0.012, 0.9 * alpha))
 	sheet.draw_rect(Rect2(origin, plate), Color(COPPER, 0.8 * alpha), false, 1.5)
 	CellOutzType.draw_stamped(sheet, origin + Vector2(28.0, 40.0), "SURFACED", 22.0, Color(COPPER, alpha), Color(BLOOD, 0.5 * alpha))
