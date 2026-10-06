@@ -31,6 +31,7 @@ extends Node3D
 const MOVESET := preload("res://systems/sword_moveset.gd")
 const VAT_REBIRTH := preload("res://systems/vat_rebirth.gd")
 const CARRY := preload("res://systems/carry.gd")
+const FACILITY := preload("res://facility.gd")
 
 ## DIALS (DESIGN/REMASTER_LOG.md, job9). Defaults are the assistant's, not Greg's.
 const GUARD_COUNT := 3
@@ -155,7 +156,9 @@ func _build_guards() -> void:
 	var posts := [
 		["47", "staff", Vector3(27.0, 0.0, -15.5), PI],
 		["48", "staff", Vector3(30.6, 0.0, -29.0), PI],
-		["49", "pistol", Vector3(28.0, 0.0, -44.5), PI],
+		# map-84: behind the mid-hall barrier, where you meet him, not a
+		# speck at the far end of the hall.
+		["49", "pistol", Vector3(30.6, 0.0, -43.4), PI],
 	]
 	for index in mini(GUARD_COUNT, posts.size()):
 		var post: Array = posts[index]
@@ -164,6 +167,8 @@ func _build_guards() -> void:
 		add_child(guard)
 		guard.setup(self, "v01_guard_%s" % post[0], post[2], ARCADE_AREA, 0.0)
 		guard.died.connect(_on_foe_died)
+		# The arcade's stalls, booth and barriers are solid: walk round them.
+		guard.avoid = FACILITY.ARCADE_COVER
 		guards.append(guard)
 		foes.append(guard)
 		if guard.state == "dead":
