@@ -94,6 +94,7 @@ var post_message_timer := 0.0
 var card_on_pedestal := true
 var weapon_on_floor := true
 var remains_nodes: Dictionary = {}
+var rebirth_site: RebirthSite
 var died := false
 var rebirth_request: Dictionary = {}
 
@@ -377,25 +378,13 @@ func _restore_from_history() -> void:
 
 ## Each body the player left here lies where they fell, holding what they held.
 func _build_remains() -> void:
-	for remains in VAT_REBIRTH.remains_at(LOCATION):
-		var body := BaselineHuman.new()
-		body.name = str(remains.id)
-		add_child(body)
-		body.build(str(remains.id), {"flesh": Color("6b5842"), "variation": int(remains.get("body_number", 1))})
-		body.position = VAT_REBIRTH.remains_position(remains)
-		# A corpse, not a sleeper: a living rig eases itself back upright every
-		# frame (seen on the first capture, where the old body stood up).
-		body.anatomy.dead = true
-		body.rotation.x = -PI * 0.46
-		var tag := Label3D.new()
-		tag.text = "YOUR OLD BODY"
-		tag.font_size = 30
-		tag.outline_size = 8
-		tag.modulate = Color("d9c3a4")
-		tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		tag.position = body.position + Vector3(0, 0.9, 0)
-		add_child(tag)
-		remains_nodes[str(remains.id)] = [body, tag]
+	rebirth_site = RebirthSite.new()
+	add_child(rebirth_site)
+	rebirth_site.recovered.connect(_on_remains_recovered)
+	rebirth_site.setup(LOCATION, player)
+	# Preserve the route's existing objective and test seam while the shared
+	# site owns the corpse, audible sigil and recovery transaction.
+	remains_nodes = rebirth_site._bodies
 
 
 func _nearest_remains() -> String:
@@ -407,18 +396,21 @@ func _nearest_remains() -> String:
 
 
 func _recover_remains(remains_id: String) -> bool:
-	var result := VAT_REBIRTH.recover(remains_id)
+	var result := rebirth_site.recover(remains_id)
 	if not bool(result.get("ok", false)):
 		return false
+	return true
+
+
+func _on_remains_recovered(remains_id: String, _result: Dictionary, message: String) -> void:
 	card_taken = VAT_REBIRTH.carries(CARD_LABEL)
 	if VAT_REBIRTH.carries(TOOL_LABEL) and not weapon_taken:
 		weapon_taken = true
 		_hold_ram()
 	var tag: Label3D = remains_nodes[remains_id][1]
 	tag.text = "STRIPPED"
-	post_message = "TAKEN BACK OFF YOUR OLD BODY // %d THINGS" % int(result.get("items", 0))
+	post_message = message
 	post_message_timer = 2.4
-	return true
 
 
 ## Job 3: the HOTLINE CLEAVER taken off the Growing Floor's wall is in your
@@ -445,9 +437,15 @@ func _arm_cleaver() -> void:
 	melee.setup(arsenal, camera, [player.get_rid()])
 	melee.struck.connect(_on_cleaver_struck)
 	melee.kicked.connect(func(amount: float) -> void: BODY_CAM.hit(camera, amount))
-	cleaver_held = DoctorRoute.cleaver_model()
-	LabSurface.hold_in_view(camera, cleaver_held)
-	melee.set_model(cleaver_held)
+	# imp-64: the cleaver is carried by the hunter's animated arms.
+	var arms := FirstPersonArms.new()
+	arms.body = player
+	camera.add_child(arms)
+	arms.drive(melee)
+	arms.take("cleaver")
+	cleaver_held = arms
+	if weapon_taken:
+		arms.left_hand.visible = false
 
 
 ## The ram in view; beside the cleaver it moves to the off hand.
@@ -456,6 +454,8 @@ func _hold_ram() -> void:
 	LabSurface.hold_in_view(camera, weapon_visual)
 	if melee != null:
 		weapon_visual.position.x = -weapon_visual.position.x
+		# The ram takes the arms' free left hand.
+		(cleaver_held as FirstPersonArms).left_hand.visible = false
 
 
 ## A cleaver blow met something: the guard takes it through his post (same

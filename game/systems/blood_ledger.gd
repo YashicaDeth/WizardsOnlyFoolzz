@@ -310,7 +310,7 @@ func consume(event: Dictionary, live: bool) -> void:
 		"melee_body_hit":
 			# The swing comes through the player action ledger (it carries an
 			# action id); the torque-arm surge writes the same event directly.
-			var weapon := _held_weapon(live, "sword") if details.has("action_id") else "surge"
+			var weapon := _held_weapon(live, "cleaver") if details.has("action_id") else "surge"
 			_hit(weapon, str(details.get("target", "")), float(details.get("damage", 0.0)), unseen)
 		"facility_guard_rammed":
 			_hit("breach_tool", GUARD_ID, FacilityGuardPost.RAM_DAMAGE, false)

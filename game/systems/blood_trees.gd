@@ -68,12 +68,12 @@ const NODES := {
 	"first_cut": {
 		"style": "melee", "label": "FIRST CUT", "cost": 20, "requires": [], "auto": true,
 		"effect": "CLEAVER BITES DEEPER  +10% DAMAGE",
-		"weapons": ["sword"], "scales": {"damage_scale": 1.10},
+		"weapons": ["sword", "cleaver"], "scales": {"damage_scale": 1.10},
 	},
 	"light_hand": {
 		"style": "melee", "label": "LIGHT HAND", "cost": 40, "requires": ["first_cut"],
 		"effect": "CLEAVER RECOVERS FASTER  -10% COOLDOWN",
-		"weapons": ["sword"], "scales": {"cooldown_scale": 0.90},
+		"weapons": ["sword", "cleaver"], "scales": {"cooldown_scale": 0.90},
 	},
 	"clean_killer": {
 		"style": "melee", "label": "CLEAN KILLER", "cost": 70, "requires": ["first_cut"],
@@ -83,7 +83,7 @@ const NODES := {
 	"bone_reader": {
 		"style": "melee", "label": "BONE READER", "cost": 110, "requires": ["light_hand"],
 		"effect": "CLEAVER +10% DAMAGE AGAIN",
-		"weapons": ["sword"], "scales": {"damage_scale": 1.10},
+		"weapons": ["sword", "cleaver"], "scales": {"damage_scale": 1.10},
 	},
 	# Greg, 24 September: the moves. Each is read by the Hunt's fight code.
 	"feint": {
@@ -193,11 +193,11 @@ static func first_node(style_id: String) -> String:
 
 
 ## What you walk into the Hunt holding for the style you told the examiner.
-## Iron starts on the sidearm; everyone else keeps the sword, because the
+## Iron starts on the sidearm; everyone else keeps the cleaver (imp-64), because the
 ## Hunt's arsenal has no slot yet for meat's hands or hush's unseen kill.
 ## Assistant proposal, open to Greg.
 static func starting_weapon(style_id: String) -> String:
-	return {"firearm": "sidearm"}.get(style_id, "sword")
+	return {"firearm": "sidearm"}.get(style_id, "cleaver")
 
 
 ## Greg, 25 September: the fighting style you give him opens that style's first

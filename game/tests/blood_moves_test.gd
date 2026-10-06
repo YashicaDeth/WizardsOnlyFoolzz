@@ -87,7 +87,7 @@ func _ready() -> void:
 	hunt._after_parry(elite, hunt.encounter_actors.find(elite))
 	check(int(hunt.arsenal.ammo.sidearm.loaded) == loaded - 1, "the counter spends a round")
 	check(elite.anatomy.wounds.size() > wounds and int(hunt.fight_stats.get("hip_counter", 0)) == 1, "and it lands point blank")
-	hunt.arsenal.select_weapon("sword")
+	hunt.arsenal.select_weapon("cleaver")
 	check(not hunt.hip_counter(elite, hunt.encounter_actors.find(elite)), "no counter with a blade in hand")
 
 	# BACKSTAB: an unaware fighter, facing away, is taken down.

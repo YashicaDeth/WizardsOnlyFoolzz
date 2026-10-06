@@ -32,6 +32,9 @@ func _ready() -> void:
 	await get_tree().process_frame
 	var sight = vat.sight
 	check(sight != null, "the Growing Floor has the vision modes")
+	check(sight.BONE == Color("e6d4ac") and sight.COPPER == Color("b0552a") and sight.BLOOD == Color("a8281a"), "wizard eyes use the house bone, copper and deep-red palette")
+	check(sight.SICKLY.s < 0.25, "the remaining sickly-green accent is desaturated (%.2f)" % sight.SICKLY.s)
+	check(sight._material.get_shader_parameter("wizard_bone") == sight.BONE and sight._material.get_shader_parameter("wizard_copper") == sight.COPPER, "the world shader receives the same restrained palette as its marks")
 	key(sight, KEY_K)
 	check(sight.mode == "", "K does nothing before the brain hack")
 	vat._on_hack_finished(false)

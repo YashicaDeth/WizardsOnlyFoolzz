@@ -1,5 +1,7 @@
 extends Node3D
 const LOOK := preload("res://systems/look_settings.gd")
+const FACILITY_MAP_SCENE := preload("res://facility.tscn")
+const FACILITY_MAP_SCRIPT := preload("res://facility.gd")
 
 ## THE GROWING FLOOR — the opening.
 ##
@@ -52,6 +54,8 @@ const VAT_REBIRTH := preload("res://systems/vat_rebirth.gd")
 const WOUND_CATALOG := preload("res://systems/wound_catalog.gd")
 const DOCTOR_ROUTE := preload("res://systems/doctor_route.gd")
 const IMPLANT_BOOT_HUD := preload("res://systems/implant_boot_hud.gd")
+const FIELD_INVENTORY := preload("res://systems/field_inventory.gd")
+const FACILITY_CHECKPOINTS := preload("res://systems/facility_checkpoints.gd")
 
 const EYE_HEIGHT := 1.62
 const BODY_HALF_HEIGHT := 0.85
@@ -182,6 +186,8 @@ var staff_door_panel: Node3D
 ## his staff cupboard (two dressings and rounds).
 var staff_door_open := false
 var staff_cupboard: Node3D
+## The reader by the one-map staff door: red while sealed, green-white open.
+var staff_card_reader: StandardMaterial3D
 const STAFF_KEYCARD := "STAFF KEYCARD"
 ## Where the examiner stands at his terminal, and whether his door has been
 ## heard shutting behind him.
@@ -212,6 +218,12 @@ var breach_shake := 0.0
 ## way staff leave rather than walking the player's escape route. It is not the
 ## pit door at the far end and it is never openable by the player.
 const STAFF_DOOR_AT := Vector3(6.95, 0.0, -2.49)
+## One map (jobs 5/6): the wall opening the staff door seals, centre and size
+## (the split slabs in `_build_chamber` leave z -4.5..-1.5, up to 3.0 m).
+const STAFF_OPENING_CENTRE := Vector3(7.6, 1.5, -3.0)
+const STAFF_OPENING_SIZE := Vector3(0.3, 3.0, 3.0)
+## His cupboard against the south wall of the artery's first cell.
+const STAFF_CUPBOARD_ONE_MAP_AT := Vector3(9.9, 0.0, -0.95)
 ## Greg, 24 September: the examiner and his PC stood in the middle of the vat
 ## aisle. The workstation is a monitoring post now, off the aisle to the
 ## right-front of the tank and turned to face it: the screen is the
@@ -239,6 +251,7 @@ var stuck_tank_culture: MeshInstance3D
 var failed_subject_visual: Node3D
 var stuck_tank_opened := false
 var inspect_held := false
+var facility_map: Node3D
 ## Death is rebirth in a vat (Greg, 24 September). A regrown body wakes here
 ## with no examination: the record, the preset and the memories are kept.
 var rebirth := false
@@ -256,6 +269,12 @@ var revenge_at := -1.0
 var jolt := 0.0
 ## His door behind the vat, his room and the lift down (DoctorRoute).
 var doctor_route: Node3D
+var field_inventory: FieldInventory
+var route_carry: Carry
+var checkpoints: FacilityCheckpoints
+## Job 9: v0.1's guards, freed subject and sentinel on the one map.
+var encounters: V01Encounters
+var rebirth_site: RebirthSite
 
 # 0 submerged, 1 voiding, 2 breach, 3 floor, 4 aisle
 const BEATS := [
@@ -322,6 +341,15 @@ func _ready() -> void:
 	watchers.call("build", VAT_POSITION + Vector3(0, 1.55, 0))
 	_build_first_objects()
 	_build_player()
+	if FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+		facility_map = FACILITY_MAP_SCENE.instantiate()
+		facility_map.set("embedded", true)
+		add_child(facility_map)
+		facility_map.call("attach_player", player, camera)
+		rebirth_site = RebirthSite.new()
+		add_child(rebirth_site)
+		rebirth_site.recovered.connect(_on_remains_recovered)
+		rebirth_site.setup("growing_floor", player)
 	doctor_route = DOCTOR_ROUTE.new()
 	add_child(doctor_route)
 	doctor_route.build(self)
@@ -333,6 +361,12 @@ func _ready() -> void:
 	osd.adopt(vitals, $HUD/Objective, prompt, "SUBLEVEL 0C  //  GROWING FLOOR")
 	osd.camera = camera
 	osd.visible = intake == null
+	field_inventory = FIELD_INVENTORY.new()
+	field_inventory.name = "FieldInventory"
+	$HUD.add_child(field_inventory)
+	route_carry = CARRY.new()
+	field_inventory.close_requested.connect(_close_field_inventory)
+	field_inventory.activate_requested.connect(_activate_field_item)
 	opening_audio = OPENING_AUDIO.new()
 	add_child(opening_audio)
 	sight = SIGNAL_SIGHT.new()
@@ -356,12 +390,20 @@ func _ready() -> void:
 	# Greg, 28 September: pools of light in the black, red only on danger.
 	room_lights = RoomLights.new().setup("vat", strip_lights)
 	add_child(room_lights)
-	# A stash in the left wall between the second and third bays.
-	caches.append(HIDDEN_CACHE.place_stash(self, sight, "growing_floor_stash", Vector3(-7.35, 1.0, -5.75), Vector3.RIGHT))
-	_build_den()
+	# The optional stash/den route stays available outside the cut-down build.
+	if not FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+		caches.append(HIDDEN_CACHE.place_stash(self, sight, "growing_floor_stash", Vector3(-7.35, 1.0, -5.75), Vector3.RIGHT))
+		_build_den()
 	_wire_guidance()
 	key_hints = KeyHints.new()
 	add_child(key_hints)
+	if FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+		checkpoints = FACILITY_CHECKPOINTS.new()
+		add_child(checkpoints)
+		checkpoints.setup(self, player, facility_map)
+		encounters = V01Encounters.new()
+		add_child(encounters)
+		encounters.setup(self)
 	tank_view = TankView.new()
 	add_child(tank_view)
 	if VatHorror.wanted():
@@ -781,7 +823,15 @@ func _build_chamber() -> void:
 	_slab(Vector3(16.0, 0.4, AISLE_LENGTH + 8.0), Vector3(0, -0.2, -AISLE_LENGTH * 0.4), "dirt", Color("15120f"))
 	_slab(Vector3(16.0, 0.35, AISLE_LENGTH + 8.0), Vector3(0, 4.3, -AISLE_LENGTH * 0.4), "rust", Color("100d0b"))
 	_build_left_wall()
-	_slab(Vector3(0.5, 4.4, AISLE_LENGTH + 8.0), Vector3(7.6, 2.2, -AISLE_LENGTH * 0.4), "rust", Color("1c1712"))
+	if FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+		# The authored staff door is the west port of the 4 m service artery.
+		# Split the old solid wall around it so opening the panel reveals a real
+		# corridor, not another scene transition.
+		_slab(Vector3(0.5, 4.4, 4.9), Vector3(7.6, 2.2, 0.95), "rust", Color("1c1712"))
+		_slab(Vector3(0.5, 4.4, 22.1), Vector3(7.6, 2.2, -15.55), "rust", Color("1c1712"))
+		_slab(Vector3(0.5, 1.4, 3.0), Vector3(7.6, 3.7, STAFF_DOOR_AT.z), "rust", Color("1c1712"))
+	else:
+		_slab(Vector3(0.5, 4.4, AISLE_LENGTH + 8.0), Vector3(7.6, 2.2, -AISLE_LENGTH * 0.4), "rust", Color("1c1712"))
 	# The near wall is DoctorRoute's: the same wall in pieces, around his door
 	# and the observation glass.
 	# Greg, playing the build: "you walk to the end of this room and then
@@ -1038,6 +1088,20 @@ func _build_staff_door() -> void:
 	frame.mesh = frame_mesh
 	frame.position = STAFF_DOOR_AT + Vector3(0.42, 1.28, 0)
 	add_child(frame)
+	if FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+		# The render showed this 1.55 m frame as a solid, walk-through slab
+		# standing in the middle of the 3 m opening once the door slid away:
+		# here it becomes two jambs and a head at the opening's real edges.
+		frame_mesh.size = Vector3(0.36, 0.14, STAFF_OPENING_SIZE.z + 0.2)
+		frame.position = Vector3(STAFF_OPENING_CENTRE.x - 0.1, STAFF_OPENING_SIZE.y + 0.07, STAFF_OPENING_CENTRE.z)
+		for side in [-1.0, 1.0]:
+			var jamb := MeshInstance3D.new()
+			var jamb_mesh := BoxMesh.new()
+			jamb_mesh.size = Vector3(0.36, STAFF_OPENING_SIZE.y, 0.1)
+			jamb_mesh.material = frame_mesh.material
+			jamb.mesh = jamb_mesh
+			jamb.position = Vector3(STAFF_OPENING_CENTRE.x - 0.1, STAFF_OPENING_SIZE.y * 0.5, STAFF_OPENING_CENTRE.z + side * (STAFF_OPENING_SIZE.z * 0.5 + 0.05))
+			add_child(jamb)
 
 	var jamb_light := OmniLight3D.new()
 	jamb_light.position = STAFF_DOOR_AT + Vector3(-0.15, 2.25, 0)
@@ -1059,6 +1123,10 @@ func _build_staff_door() -> void:
 	lintel_mesh.material = lintel_material
 	lintel.mesh = lintel_mesh
 	lintel.position = STAFF_DOOR_AT + Vector3(0.30, 2.46, 0)
+	if FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+		# Under the head of the full-width opening, not floating mid-doorway.
+		lintel_mesh.size = Vector3(0.06, 0.07, STAFF_OPENING_SIZE.z - 0.1)
+		lintel.position = Vector3(STAFF_OPENING_CENTRE.x - 0.3, STAFF_OPENING_SIZE.y - 0.06, STAFF_OPENING_CENTRE.z)
 	add_child(lintel)
 
 	staff_door_panel = Node3D.new()
@@ -1075,25 +1143,89 @@ func _build_staff_door() -> void:
 	panel.mesh = panel_mesh
 	panel.position = Vector3(0, 1.18, 0)
 	staff_door_panel.add_child(panel)
+	if FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+		_seal_staff_opening(panel, panel_mesh)
 	if WorldHistory.event_count("staff_door_opened") > 0:
 		_open_staff_door(false)
+
+
+## One map: the door is the way on, so it fills the opening and stops you
+## rather than standing in the middle of it as a 1.4 m plate you can walk
+## round. A red reader beside it says it wants a card.
+func _seal_staff_opening(panel: MeshInstance3D, panel_mesh: BoxMesh) -> void:
+	panel_mesh.size = Vector3(0.12, STAFF_OPENING_SIZE.y, STAFF_OPENING_SIZE.z)
+	panel.position = Vector3(0, STAFF_OPENING_SIZE.y * 0.5, STAFF_OPENING_CENTRE.z - STAFF_DOOR_AT.z)
+	var seal := StaticBody3D.new()
+	seal.name = "Seal"
+	seal.position = panel.position
+	staff_door_panel.add_child(seal)
+	var shape := CollisionShape3D.new()
+	shape.name = "Shape"
+	var box := BoxShape3D.new()
+	box.size = Vector3(0.3, STAFF_OPENING_SIZE.y, STAFF_OPENING_SIZE.z)
+	shape.shape = box
+	seal.add_child(shape)
+	var reader := MeshInstance3D.new()
+	reader.name = "StaffCardReader"
+	var reader_mesh := BoxMesh.new()
+	reader_mesh.size = Vector3(0.05, 0.16, 0.1)
+	staff_card_reader = StandardMaterial3D.new()
+	staff_card_reader.albedo_color = Color("2a1510")
+	staff_card_reader.emission_enabled = true
+	staff_card_reader.emission = Color("a52d20")
+	staff_card_reader.emission_energy_multiplier = 1.6
+	reader_mesh.material = staff_card_reader
+	reader.mesh = reader_mesh
+	reader.position = Vector3(STAFF_OPENING_CENTRE.x - 0.29, 1.25, STAFF_OPENING_CENTRE.z - STAFF_OPENING_SIZE.z * 0.5 - 0.2)
+	add_child(reader)
 
 
 ## E at the staff door: the keycard opens it; open, E takes what his cupboard
 ## holds (once).
 func _try_staff_door() -> bool:
+	if staff_door_open:
+		return _try_staff_cupboard()
 	var to_staff := STAFF_DOOR_AT - player.global_position
 	to_staff.y = 0.0
 	if to_staff.length() > 2.4:
 		return false
-	if not staff_door_open:
-		if not VAT_REBIRTH.carries(STAFF_KEYCARD):
-			return false
-		_open_staff_door(true)
-		WorldHistory.record_event("staff_door_opened", {"location": "growing_floor", "with": STAFF_KEYCARD})
-		subtitle.text = "HIS KEYCARD OPENS IT  //  HIS CUPBOARD"
+	if not _has_staff_keycard():
+		subtitle.text = _staff_door_needs()
 		return true
-	if _cupboard_taken():
+	_open_staff_door(true)
+	WorldHistory.record_event("staff_door_opened", {"location": "growing_floor", "with": STAFF_KEYCARD})
+	subtitle.text = "HIS KEYCARD OPENS IT  //  HIS CUPBOARD IS INSIDE"
+	return true
+
+
+## Job 6: the door and the examiner's drop read one thing, the shared
+## inventory item (ExaminerFight.has_keycard).
+func _has_staff_keycard() -> bool:
+	return ExaminerFight.has_keycard()
+
+
+## What the sealed staff door needs, and where it is right now.
+func _staff_door_needs() -> String:
+	var fight: ExaminerFight = doctor_route.fight if doctor_route != null else null
+	var where := "THE EXAMINER CARRIES IT  //  HIS OFFICE, BEHIND YOUR VAT"
+	if fight != null and fight.keycard_on_floor():
+		where = "HIS KEYCARD IS ON HIS OFFICE FLOOR, BY HIS BODY"
+	return "STAFF DOOR  //  SEALED  //  NEEDS HIS STAFF KEYCARD\n" + where
+
+
+## Where his cupboard stands: behind the panel in the older cut; on the wall of
+## the artery's first cell once the door is the way on (one map), so it never
+## stands in the doorway.
+func _staff_cupboard_at() -> Vector3:
+	if FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+		return STAFF_CUPBOARD_ONE_MAP_AT
+	return STAFF_DOOR_AT + Vector3(0.28, 0.0, 0.0)
+
+
+func _try_staff_cupboard() -> bool:
+	var to_cupboard := _staff_cupboard_at() - player.global_position
+	to_cupboard.y = 0.0
+	if to_cupboard.length() > 2.0 or _cupboard_taken():
 		return false
 	HIDDEN_CACHE.give_stash()
 	HIDDEN_CACHE.give_stash()
@@ -1114,17 +1246,28 @@ func _cupboard_taken() -> bool:
 func _open_staff_door(animated: bool) -> void:
 	staff_door_open = true
 	var open_at := STAFF_DOOR_AT + Vector3(0.30, 0.0, 1.5)
+	if FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+		# The full-width leaf slides clear of the whole 3 m opening.
+		open_at = STAFF_DOOR_AT + Vector3(0.30, 0.0, 3.2)
+		var seal := staff_door_panel.get_node_or_null("Seal/Shape") as CollisionShape3D
+		if seal != null:
+			seal.set_deferred("disabled", true)
 	if animated and is_inside_tree():
 		create_tween().tween_property(staff_door_panel, "position", open_at, 0.9).set_trans(Tween.TRANS_SINE)
 		if opening_audio != null:
 			opening_audio.cue("door")
 	else:
 		staff_door_panel.position = open_at
+	if staff_card_reader != null:
+		staff_card_reader.emission = Color("d2ecc0")
 	if staff_cupboard != null:
 		return
 	staff_cupboard = Node3D.new()
 	staff_cupboard.name = "StaffCupboard"
-	staff_cupboard.position = STAFF_DOOR_AT + Vector3(0.28, 0.0, 0.0)
+	staff_cupboard.position = _staff_cupboard_at()
+	if FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+		# Its front (local -X) faces into the artery (-Z), back to the wall.
+		staff_cupboard.rotation.y = -PI * 0.5
 	add_child(staff_cupboard)
 	var back := WorldLook.surface(Color("1d1914"), "paint", 932)
 	var shelf := WorldLook.surface(Color("4a3f33"), "rust", 933)
@@ -1501,12 +1644,15 @@ func _first_run() -> bool:
 
 
 func _pit_door_open() -> bool:
-	return not _first_run() or VAT_REBIRTH.carries(STAFF_KEYCARD)
+	return not _first_run() or _has_staff_keycard()
 
 
 func _first_run_objective() -> String:
 	# The step on top; the escape purpose always under it (opening tests).
-	if VAT_REBIRTH.carries(STAFF_KEYCARD):
+	if _has_staff_keycard():
+		# One map: the pit route is sealed; the staff door is the way on.
+		if FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+			return "THROUGH THE STAFF DOOR\nESCAPE THE FACILITY" if staff_door_open else "HIS CARD OPENS THE STAFF DOOR\nESCAPE THE FACILITY"
 		return "HIS CARD OPENS THE PIT DOOR\nESCAPE THE FACILITY"
 	if doctor_route != null and doctor_route.door != null and doctor_route.door.broken:
 		return "GET REVENGE  //  BEAT HIM, TAKE HIS CARD\nTHEN ESCAPE THE FACILITY"
@@ -1549,6 +1695,14 @@ func _slab(dimensions: Vector3, at: Vector3, _kind: String, _color: Color) -> vo
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if field_inventory != null and field_inventory.visible:
+		if field_inventory.handle_input(event):
+			get_viewport().set_input_as_handled()
+		return
+	if can_move and event.is_action_pressed("inventory"):
+		_open_field_inventory()
+		get_viewport().set_input_as_handled()
+		return
 	# No fighting while a dressing goes on (hold 4).
 	if meds.busy() and event is InputEventMouseButton and event.pressed:
 		return
@@ -1664,6 +1818,46 @@ func _pad_input(event: InputEvent) -> bool:
 	return false
 
 
+func _open_field_inventory() -> void:
+	if field_inventory == null:
+		return
+	route_carry = CARRY.new()
+	field_inventory.open_inventory(route_carry, null, null)
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+
+func _close_field_inventory() -> void:
+	if field_inventory != null:
+		field_inventory.close_inventory()
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func _activate_field_item(_index: int) -> void:
+	# The v0.1 route shows the honest carried object list. Item-specific use
+	# remains in the physical hands/interact verbs; inventory never invents a
+	# second activation path.
+	_close_field_inventory()
+
+
+func _on_remains_recovered(_remains_id: String, _result: Dictionary, message: String) -> void:
+	subtitle.text = message
+
+
+func _resume_from_checkpoint() -> void:
+	breakout_complete = true
+	first_acquisition_complete = true
+	phase = "aisle"
+	can_move = true
+	if intake != null and is_instance_valid(intake):
+		intake.queue_free()
+		intake = null
+	if load_in != null and is_instance_valid(load_in):
+		load_in.queue_free()
+		load_in = null
+	if osd != null:
+		osd.visible = true
+
+
 ## A stick is coarser than a mouse: the wire nearest the middle of the view
 ## within this wider cone is the one Square takes.
 const PAD_WIRE_CONE := 0.8
@@ -1711,6 +1905,10 @@ func in_fluid() -> bool:
 
 
 func _physics_process(delta: float) -> void:
+	if field_inventory != null and field_inventory.visible:
+		return
+	if key_hints != null and not KeyHints.seen("inventory") and not WorldHistory.subject("inventory").get("items", []).is_empty():
+		key_hints.offer("inventory", KEY_TAB, "TAB", "open inventory")
 	if phase != thought_phase:
 		thought_phase = phase
 		if THOUGHTS.has(phase):
@@ -2727,19 +2925,33 @@ func _update_movement(delta: float) -> void:
 func _interact() -> void:
 	if not can_move:
 		return
-	if _try_pry_stuck_tank():
+	if rebirth_site != null:
+		var recovered := rebirth_site.try_recover()
+		if not recovered.is_empty():
+			subtitle.text = recovered
+			return
+	if facility_map != null and facility_map.call("interact"):
 		return
-	if _try_take_garment():
+	if encounters != null and encounters.use():
 		return
+	# Square on the pad lands here, not in DoctorRoute.handle_input: the axe
+	# and the examiner's dropped keycard are taken through the same use.
+	if doctor_route != null and doctor_route._use():
+		return
+	if not FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+		if _try_pry_stuck_tank():
+			return
+		if _try_take_garment():
+			return
 	if _try_staff_door():
 		return
 	if break_weak_wall() or _try_den():
 		return
-	if HIDDEN_CACHE.open_near(caches, player.global_position, sight) == "stash":
+	if not FACILITY_MAP_SCRIPT.V01_ONE_MAP and HIDDEN_CACHE.open_near(caches, player.global_position, sight) == "stash":
 		key_hints.offer("field_dressing", KEY_4, "HOLD 4", "dress a wound")
 		subtitle.text = "A FIELD DRESSING AND FOUR ROUNDS  //  SOMEBODY HID THESE"
 		return
-	if sight != null and sight.call("cut_wire_near", player.global_position) != "":
+	if not FACILITY_MAP_SCRIPT.V01_ONE_MAP and sight != null and sight.call("cut_wire_near", player.global_position) != "":
 		subtitle.text = "THE LINE SPITS AND DIES  //  THAT BAY GOES DARK"
 		if bool(sight.get("last_cut_shocked")):
 			anatomy.call("apply_hit", "right_arm", sight.SHOCK_BLOOD, 0.0, "blunt")
@@ -2752,6 +2964,9 @@ func _interact() -> void:
 		return
 	if not _pit_door_open():
 		subtitle.text = "THE PIT DOOR  //  A CARD READER, RED  //  HE CARRIES THE CARD"
+		return
+	if FACILITY_MAP_SCRIPT.V01_ONE_MAP:
+		subtitle.text = "THE OLD PIT ROUTE IS SEALED  //  USE THE EAST STAFF DOOR"
 		return
 	# Filing the stage can legitimately refuse -- it is write-once and a resumed
 	# world may already have it -- but that is not a reason to refuse the door.
@@ -2875,10 +3090,17 @@ func _update_hud() -> void:
 		prompt.text = ""
 		$HUD/Objective.text = ""
 		return
-	$HUD/Objective.text = "OBJECTIVE\n" + (_first_run_objective() if _first_run() else objective_text)
+	if facility_map != null and (player.global_position.x > 8.0 or player.global_position.y < -1.0):
+		$HUD/Objective.text = "OBJECTIVE\n" + str(facility_map.call("objective_for", player.global_position))
+		if osd != null:
+			osd.location = str(facility_map.call("location_for", player.global_position))
+	else:
+		$HUD/Objective.text = "OBJECTIVE\n" + (_first_run_objective() if _first_run() else objective_text)
+		if osd != null:
+			osd.location = "SUBLEVEL 0C  //  GROWING FLOOR"
 	# AX3.1/AX3.6. INSPECT is a held state, not a menu, so it wins the prompt
 	# line for as long as it is held rather than opening anything separate.
-	if inspect_held:
+	if inspect_held and not FACILITY_MAP_SCRIPT.V01_ONE_MAP:
 		prompt.text = _inspect_text()
 		return
 	if not stuck_tank_opened and (_carries_restraint() or not grant_restraint) and _near_first_objects():
@@ -2912,6 +3134,10 @@ func _update_hud() -> void:
 	if sight != null and sight.call("wire_in_reach", player.global_position):
 		prompt.text = "[E] CUT THE POWER LINE"
 		return
+	var fight_prompt: String = encounters.prompt_text() if encounters != null else ""
+	if fight_prompt != "":
+		prompt.text = fight_prompt
+		return
 	var smash_prompt: String = vat_smash.prompt_for(camera, doctor_route.held_weapon() if doctor_route != null else "") if vat_smash != null and breakout_complete else ""
 	if smash_prompt != "":
 		prompt.text = smash_prompt
@@ -2924,13 +3150,16 @@ func _update_hud() -> void:
 	# be able to interact with it). Staff access is found further on.
 	var to_staff := STAFF_DOOR_AT - player.global_position
 	to_staff.y = 0.0
-	if to_staff.length() <= 2.4:
-		if staff_door_open:
-			prompt.text = "HIS CUPBOARD // EMPTY" if _cupboard_taken() else "[E] HIS CUPBOARD"
-		elif VAT_REBIRTH.carries(STAFF_KEYCARD):
-			prompt.text = "[E] STAFF KEYCARD // OPEN THE STAFF DOOR"
+	var to_cupboard := _staff_cupboard_at() - player.global_position
+	to_cupboard.y = 0.0
+	if staff_door_open and to_cupboard.length() <= 2.0:
+		prompt.text = "HIS CUPBOARD // EMPTY" if _cupboard_taken() else "%s HIS CUPBOARD" % _key("interact")
+		return
+	if not staff_door_open and to_staff.length() <= 2.4:
+		if _has_staff_keycard():
+			prompt.text = "%s STAFF KEYCARD // OPEN THE STAFF DOOR" % _key("interact")
 		else:
-			prompt.text = "STAFF DOOR // SEALED // STAFF ACCESS REQUIRED"
+			prompt.text = _staff_door_needs()
 		return
 	var to_door := door_marker.global_position - player.global_position
 	to_door.y = 0.0

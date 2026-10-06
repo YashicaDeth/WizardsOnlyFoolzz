@@ -129,18 +129,14 @@ func handle_input(event: InputEvent) -> bool:
 		return false
 	if not _can_act():
 		return false
+	# In his office, a blow is for him first, from the mouse or the pad (job 6:
+	# R1 / click hits, L2 / X parries, R2 / right click fires the gun).
+	if fight != null and fight.is_active() and _in_room() and _fight_input(event):
+		return true
 	if event is InputEventMouseButton:
 		var button := event as InputEventMouseButton
 		if not button.pressed:
 			return false
-		# In his office, a click is for him first.
-		if fight != null and fight.is_active() and _in_room():
-			if button.button_index == MOUSE_BUTTON_LEFT and fight.player_strike(held_weapon()):
-				_swing_held()
-				return true
-			if button.button_index == MOUSE_BUTTON_RIGHT and _gun_rounds() > 0 and fight.player_strike("gun"):
-				_spend_round()
-				return true
 		if button.button_index == MOUSE_BUTTON_LEFT:
 			return strike(held_weapon())
 		if button.button_index == MOUSE_BUTTON_RIGHT and _gun_rounds() > 0:
@@ -157,10 +153,35 @@ func handle_input(event: InputEvent) -> bool:
 	return false
 
 
+## The examiner fight's share of the input. True when it was used on him.
+func _fight_input(event: InputEvent) -> bool:
+	if event.is_action_pressed("parry"):
+		return fight.player_parry()
+	var gun := event.is_action_pressed("heavy") or (event is InputEventMouseButton and (event as InputEventMouseButton).pressed and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_RIGHT)
+	var swing := event.is_action_pressed("attack")
+	if not gun and not swing:
+		return false
+	# Greg's playtest, "hit him twice... he's dead": blows at him keep the
+	# weapon's own rhythm, the same cooldown as blows at his door.
+	if cooldown > 0.0:
+		return true
+	if gun and _gun_rounds() > 0 and fight.player_strike("gun"):
+		_spend_round()
+		cooldown = float(COOLDOWN["gun"])
+		return true
+	if swing and fight.player_strike(held_weapon()):
+		_swing_held()
+		cooldown = float(COOLDOWN.get(held_weapon(), COOLDOWN["body"]))
+		return true
+	return false
+
+
 ## What the prompt line should say here, or "" to leave it to the chamber.
 func prompt_text() -> String:
 	if not _can_act():
 		return ""
+	if fight != null and fight.keycard_in_reach():
+		return "%s TAKE HIS STAFF KEYCARD" % _use_glyph()
 	if lift_state == "riding" or lift_state == "returning":
 		return "GOING DOWN" if lift_state == "riding" else "GOING UP"
 	if lift_state == "arrived":
@@ -233,7 +254,13 @@ func strike(weapon: String) -> bool:
 	return true
 
 
+func _use_glyph() -> String:
+	return str(chamber.call("_key", "interact")) if chamber != null and chamber.has_method("_key") else "[E]"
+
+
 func _use() -> bool:
+	if fight != null and fight.take_keycard():
+		return true
 	if lift_state == "arrived" and placeholder_shown:
 		lift_state = "returning"
 		ride_clock = 0.0
@@ -483,14 +510,19 @@ func _take_axe() -> void:
 	carry.items.append({"label": AXE_LABEL, "kind": "tool", "mass": 2.6, "perishes": false, "age": 0.0, "from": "growing_floor"})
 	carry.save_to_history()
 	WorldHistory.record_event("doctor_route_axe_taken", {"location": "growing_floor"})
-	held_axe = _axe_mesh()
-	LabSurface.hold_in_view(chamber.camera, held_axe)
-	held_axe.rotation_degrees = AXE_REST
-	held_axe.position += Vector3(0.04, -0.04, 0.04)
+	# imp-64: carried by the hunter's animated arms, not hung in view.
+	var arms := FirstPersonArms.new()
+	arms.body = chamber.get("player") as CharacterBody3D
+	chamber.camera.add_child(arms)
+	arms.take("cleaver")
+	held_axe = arms
 	chamber.subtitle.text = "HOTLINE CLEAVER  //  TAKEN OFF THE WALL"
 
 
 func _swing_held() -> void:
+	if held_axe is FirstPersonArms:
+		(held_axe as FirstPersonArms).strike()
+		return
 	var held := held_axe if held_axe != null else held_restraint
 	if held == null:
 		return

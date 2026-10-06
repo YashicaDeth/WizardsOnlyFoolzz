@@ -32,6 +32,38 @@ extends Node3D
 ## Living knockdown keeps BaselineHuman's authored tip-over (Greg, round 13).
 
 const MODEL := "res://art/characters/ual_mannequin.glb"
+## imp-60 (Greg, 5 Oct ~19:00: "improve the bodies further (checker skin,
+## helmet heads, hunched idle, ankle gaps)"). The mannequin keeps the skeleton
+## and the clips; the skin it shows is a real low-poly human on the same
+## skeleton (Quaternius' Universal Base Characters, CC0, see CREDITS.md): one
+## continuous body with a face, eyes and brows, re-bound to the mannequin's
+## rest so every clip and the ragdoll drive it unchanged. Dial: false puts the
+## jointed mannequin back.
+const HUMAN_SKIN := true
+const HUMAN_MODELS := {
+	"male": "res://art/characters/ubc/Superhero_Male_FullBody.gltf",
+	"female": "res://art/characters/ubc/Superhero_Female_FullBody.gltf",
+}
+## Below this BaselineHuman `frame_factor` the body wears the female base.
+const FEMALE_FRAME_BELOW := 0.35
+const FLESH_SHADER := "res://systems/flesh_skin.gdshader"
+const CLOTH_SHADER := "res://systems/cloth_skin.gdshader"
+## The procedural face and hand pieces HunterAppearance dresses onto the
+## zones. The human skin has its own face and hands, so on a skinned zone
+## these hide; they come back with the rig's own body when the zone is hurt.
+## The coat's front, collar and strap slabs and the boot boxes go too: on the
+## skin the zone's garment colour is the coat, and the cloth paints the boots.
+const HUMAN_FACE_PIECES := ["Eye_", "Pupil_", "Brow_Ridge", "Cheek_", "Nose_", "Mouth_", "Tooth_", "Jaw_Line", "left_arm_Hand", "right_arm_Hand", "left_arm_Finger_", "right_arm_Finger_", "Coat_Front", "Collar_L", "Collar_R", "Torque_Strap", "left_leg_Boot", "right_leg_Boot", "left_leg_Toecap", "right_leg_Toecap"]
+## The pack's brows are a grey card its own shader tints; here they are dark.
+const BROW_COLOUR := Color("2b211b")
+## The library's idle and walk carry the chest about 16 degrees forward and
+## the head 14 (measured at the bones): the hunched zombie crouch. Baked out of
+## those clips once, at load, as a lift about the body's side-to-side axis at
+## each bone (degrees; negative straightens). Dial: POSTURE_LIFT 0 = the clips
+## as they came, 1 = upright.
+const POSTURE_LIFT := 1.0
+const POSTURE := {"spine_02": -3.0, "spine_03": -8.0, "neck_01": 8.0, "Head": -9.0}
+const POSTURE_CLIPS := ["Idle", "Idle_Talking", "Idle_Torch", "Walk", "Walk_Formal", "Pistol_Idle"]
 const ZONES := ["head", "torso", "left_arm", "right_arm", "left_leg", "right_leg"]
 ## The mannequin faces +Z in its own space; the rig faces -Z.
 const MODEL_BACK := Vector3(0, 0, -1)
@@ -199,6 +231,15 @@ var max_launch_speed := 0.0
 ## False while the arms are someone else's (first-person arms).
 var arms_driven := true
 var model_scale := 1.0
+## "male"/"female" when the human skin shows, "" on the mannequin.
+var human := ""
+
+static var _flesh_materials: Dictionary = {}
+var _pristine_tint: Dictionary = {}
+## See `wear_kit`.
+var kit: Dictionary = {}
+var _look_cache: Dictionary = {}
+var _last_waist: Array = []
 
 var _back_local: Dictionary = {}
 var _hidden: Dictionary = {}
@@ -269,12 +310,27 @@ func build(host: BaselineHuman) -> bool:
 	if skeleton == null or player == null or source == null:
 		return false
 	model.rotation.y = PI
-	model_scale = _rig_height() / maxf(source.mesh.get_aabb().end.y, 0.5)
+	for zone: String in ZONES:
+		zone_meshes[zone] = []
+		triangles_by_zone[zone] = 0
+		modes[zone] = ""
+		_hidden[zone] = {}
+	var sources: Array[MeshInstance3D] = []
+	if HUMAN_SKIN:
+		sources = _human_sources(source)
+	if sources.is_empty():
+		sources.append(source)
+	else:
+		source.get_parent().remove_child(source)
+		source.queue_free()
+	model_scale = _rig_height() / maxf(sources[0].mesh.get_aabb().end.y, 0.5)
 	model.scale = Vector3.ONE * model_scale
-	if not _split(source):
-		return false
+	for index in sources.size():
+		if not _split(sources[index], index > 0):
+			return false
 	_measure_fit()
 	player.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
+	_stand_up(player, skeleton)
 	for clip_name in ["Idle", "Walk", "Jog_Fwd", "Sprint", "Crouch_Idle", "Crouch_Fwd", "Jump", "Sword_Idle", "Pistol_Idle", "Spell_Simple_Idle"]:
 		if player.has_animation(clip_name):
 			player.get_animation(clip_name).loop_mode = Animation.LOOP_LINEAR
@@ -310,6 +366,32 @@ func build(host: BaselineHuman) -> bool:
 	_drive_zones()
 	_zones()
 	return true
+
+
+## Straightens the clips in POSTURE_CLIPS in place, once per library: every
+## body shares the imported clips, so this costs nothing per frame. The lift
+## is a turn about the skeleton's X axis at the bone, taken into the bone's
+## parent's rest frame, so it composes with whatever the clip does there.
+static func _stand_up(clips: AnimationPlayer, rig: Skeleton3D) -> void:
+	if is_zero_approx(POSTURE_LIFT):
+		return
+	for clip_name: String in POSTURE_CLIPS:
+		if not clips.has_animation(clip_name):
+			continue
+		var clip := clips.get_animation(clip_name)
+		if clip.has_meta("posture_lift"):
+			continue
+		clip.set_meta("posture_lift", POSTURE_LIFT)
+		for bone_name: String in POSTURE:
+			var bone := rig.find_bone(bone_name)
+			var track := clip.find_track(NodePath("Armature/Skeleton3D:" + bone_name), Animation.TYPE_ROTATION_3D)
+			if bone < 0 or track < 0 or clip.track_is_compressed(track):
+				continue
+			var parent := rig.get_bone_parent(bone)
+			var frame := rig.get_bone_global_rest(parent).basis.get_rotation_quaternion() if parent >= 0 else Quaternion.IDENTITY
+			var lift := frame.inverse() * Quaternion(Vector3.RIGHT, deg_to_rad(float(POSTURE[bone_name]) * POSTURE_LIFT)) * frame
+			for key in clip.track_get_key_count(track):
+				clip.track_set_key_value(track, key, (lift * (clip.track_get_key_value(track, key) as Quaternion)).normalized())
 
 
 ## Everything dressed onto a zone (face, implant hardware, outfit extras,
@@ -425,9 +507,60 @@ func _rest_distance(from_bone: String, to_bone: String) -> float:
 	return skeleton.get_bone_global_rest(a).origin.distance_to(skeleton.get_bone_global_rest(b).origin)
 
 
+## The human base's skinned meshes (body first, then eyes and brows), hung on
+## the mannequin's skeleton. Each bind is re-made against the mannequin's rest,
+## so at rest the human stands exactly as modelled and every bone then carries
+## it by its own motion from rest: the two rigs' few degrees of rest
+## difference (neck, clavicles) never bend the body.
+func _human_sources(mannequin_source: MeshInstance3D) -> Array[MeshInstance3D]:
+	var frame := float(body.get("frame_factor")) if body.get("frame_factor") != null else 0.5
+	var kind := "female" if frame < FEMALE_FRAME_BELOW else "male"
+	var path: String = HUMAN_MODELS[kind]
+	var found: Array[MeshInstance3D] = []
+	if not ResourceLoader.exists(path):
+		return found
+	var scene := load(path) as PackedScene
+	if scene == null:
+		return found
+	var human_root := scene.instantiate() as Node3D
+	var human_skeleton := human_root.find_child("Skeleton3D", true, false) as Skeleton3D
+	if human_skeleton == null:
+		human_root.free()
+		return found
+	var meshes: Array[MeshInstance3D] = []
+	for node in human_root.find_children("*", "MeshInstance3D", true, false):
+		var instance := node as MeshInstance3D
+		if instance.skin != null and instance.mesh != null:
+			meshes.append(instance)
+	# The body is the big one; eyes and brows follow.
+	meshes.sort_custom(func(a: MeshInstance3D, b: MeshInstance3D) -> bool: return a.mesh.get_aabb().size.y > b.mesh.get_aabb().size.y)
+	var parent := mannequin_source.get_parent()
+	for instance in meshes:
+		var rebound := Skin.new()
+		var skin := instance.skin
+		for bind in skin.get_bind_count():
+			var bone_name := skin.get_bind_name(bind)
+			var ours := skeleton.find_bone(bone_name)
+			var theirs := human_skeleton.find_bone(bone_name)
+			var pose := skin.get_bind_pose(bind)
+			if ours >= 0 and theirs >= 0:
+				pose = skeleton.get_bone_global_rest(ours).affine_inverse() * human_skeleton.get_bone_global_rest(theirs) * pose
+			rebound.add_named_bind(bone_name, pose)
+		instance.get_parent().remove_child(instance)
+		instance.owner = null
+		instance.skin = rebound
+		instance.transform = Transform3D.IDENTITY
+		parent.add_child(instance)
+		found.append(instance)
+	human_root.free()
+	human = kind
+	return found
+
+
 ## The skin mesh becomes one mesh per zone per surface, all on the same skeleton
-## and skin, so each zone shows or hides on its own.
-func _split(source: MeshInstance3D) -> bool:
+## and skin, so each zone shows or hides on its own. `own_material` sources
+## (the human's eyes and brows) keep their own material and go to the head.
+func _split(source: MeshInstance3D, own_material := false) -> bool:
 	var mesh := source.mesh as ArrayMesh
 	if mesh == null or mesh.get_surface_count() < 1:
 		return false
@@ -437,10 +570,6 @@ func _split(source: MeshInstance3D) -> bool:
 		var bone_name := skin.get_bind_name(bind)
 		var bone := skeleton.find_bone(bone_name) if not bone_name.is_empty() else skin.get_bind_bone(bind)
 		bind_zone.append(ZONES.find(_zone_of_bone(bone)))
-	var zone_lists: Dictionary = {}
-	for zone: String in ZONES:
-		zone_lists[zone] = []
-		triangles_by_zone[zone] = 0
 	for surface in mesh.get_surface_count():
 		var arrays := mesh.surface_get_arrays(surface)
 		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
@@ -466,6 +595,9 @@ func _split(source: MeshInstance3D) -> bool:
 		for zone_index in ZONES.size():
 			per_zone.append(PackedInt32Array())
 		for triangle in indices.size() / 3:
+			if own_material:
+				per_zone[ZONES.find("head")].append_array([indices[triangle * 3], indices[triangle * 3 + 1], indices[triangle * 3 + 2]])
+				continue
 			var best_zone := 0
 			var best_weight := -1.0
 			for zone_index in ZONES.size():
@@ -476,13 +608,30 @@ func _split(source: MeshInstance3D) -> bool:
 					best_weight = total
 					best_zone = zone_index
 			per_zone[best_zone].append_array([indices[triangle * 3], indices[triangle * 3 + 1], indices[triangle * 3 + 2]])
-		var flags := int(mesh.surface_get_format(surface)) & Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS
+		var format := int(mesh.surface_get_format(surface))
+		var flags := format & Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS
+		# Any custom channels the source carries keep their own formats.
+		for channel in 4:
+			flags |= format & (Mesh.ARRAY_FORMAT_CUSTOM_MASK << (Mesh.ARRAY_FORMAT_CUSTOM_BASE + channel * Mesh.ARRAY_FORMAT_CUSTOM_BITS))
+		# Where each vertex sits at rest, for the flesh shader's grime, sweat
+		# and scars: they ride the limb rather than swim as it moves.
+		var rest := PackedFloat32Array()
+		if not human.is_empty() and not own_material:
+			rest.resize(vertices.size() * 3)
+			for vertex in vertices.size():
+				rest[vertex * 3] = vertices[vertex].x
+				rest[vertex * 3 + 1] = vertices[vertex].y
+				rest[vertex * 3 + 2] = vertices[vertex].z
+			flags &= ~(Mesh.ARRAY_FORMAT_CUSTOM_MASK << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT)
+			flags |= Mesh.ARRAY_CUSTOM_RGB_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT
 		for zone_index in ZONES.size():
 			var list := per_zone[zone_index]
 			if list.is_empty():
 				continue
 			var zone_arrays := arrays.duplicate()
 			zone_arrays[Mesh.ARRAY_INDEX] = list
+			if not rest.is_empty():
+				zone_arrays[Mesh.ARRAY_CUSTOM0] = rest
 			var zone_mesh := ArrayMesh.new()
 			zone_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, zone_arrays, [], {}, flags)
 			var zone: String = ZONES[zone_index]
@@ -497,16 +646,27 @@ func _split(source: MeshInstance3D) -> bool:
 			instance.skin = skin
 			instance.skeleton = NodePath("..")
 			instance.extra_cull_margin = 2.0
+			if own_material:
+				instance.set_meta("own_material", true)
+				zone_mesh.surface_set_material(0, _own_material(mesh.surface_get_material(surface)))
 			source.get_parent().add_child(instance)
-			(zone_lists[zone] as Array).append(instance)
-	for zone: String in ZONES:
-		zone_meshes[zone] = zone_lists[zone]
-		modes[zone] = ""
-		_hidden[zone] = {}
+			(zone_meshes[zone] as Array).append(instance)
 	source.visible = false
 	source.get_parent().remove_child(source)
 	source.queue_free()
 	return true
+
+
+static func _own_material(material: Material) -> Material:
+	var brows := material as BaseMaterial3D
+	if brows == null or not brows.resource_name.begins_with("MI_Hair"):
+		return material
+	if _flesh_materials.has(brows):
+		return _flesh_materials[brows]
+	var dark := brows.duplicate() as BaseMaterial3D
+	dark.albedo_color = BROW_COLOUR
+	_flesh_materials[brows] = dark
+	return dark
 
 
 func _zone_of_bone(bone: int) -> String:
@@ -783,17 +943,28 @@ func in_skin_mode(zone: String) -> bool:
 
 
 func _zones() -> void:
+	var waist_changed := false
+	if not human.is_empty():
+		var waist := _waist()
+		waist_changed = waist != _last_waist
+		_last_waist = waist
 	for zone: String in ZONES:
 		var skin_mode := in_skin_mode(zone)
 		var part := body.parts.get(zone) as MeshInstance3D
 		var shown := skin_mode and part != null and is_instance_valid(part) and part.visible
 		_shown[zone] = skin_mode
-		var material: Material = _skin_material(zone, part) if shown else null
+		var look: Array = _zone_look(zone, part) if shown else [null, null, null, Color.WHITE]
+		var material: Material = look[2]
+		var tone: Color = look[3]
 		for instance: MeshInstance3D in zone_meshes[zone]:
 			if instance.visible != shown:
 				instance.visible = shown
-			if shown and instance.material_override != material:
+			if not shown or instance.has_meta("own_material"):
+				continue
+			if instance.material_override != material:
 				instance.material_override = material
+			if material is ShaderMaterial and (waist_changed or instance.get_meta("skin_tone", Color.BLACK) != tone):
+				_tone(instance, tone)
 		if part != null and is_instance_valid(part):
 			if skin_mode:
 				# BaselineHuman rewrites transparency on every zone refresh, so
@@ -836,10 +1007,156 @@ func _mirror_visibility() -> void:
 ## the zone's own flesh material - the world's grain and colour, bruising
 ## included, because BaselineHuman retints it on every blow.
 func _skin_material(zone: String, part: MeshInstance3D) -> Material:
-	var garment := part.get_node_or_null("Garment") as GeometryInstance3D
-	if garment != null and garment.material_override != null:
-		return garment.material_override
+	var garment := _garment_plain(part)
+	if garment != null:
+		if not human.is_empty() and garment is StandardMaterial3D and (garment as StandardMaterial3D).albedo_texture == null:
+			return cloth_material(human)
+		return garment
+	if not human.is_empty():
+		return flesh_material(human)
 	return part.material_override
+
+
+func _garment_plain(part: MeshInstance3D) -> Material:
+	var garment := part.get_node_or_null("Garment") as GeometryInstance3D
+	return garment.material_override if garment != null else null
+
+
+## [flesh material, garment material, skin material, tone] for a zone, worked
+## out again only when BaselineHuman has swapped either material in (every
+## blow, stain or re-dress makes new ones): this runs every few frames for
+## every body on screen.
+func _zone_look(zone: String, part: MeshInstance3D) -> Array:
+	var garment := _garment_plain(part)
+	var cached: Array = _look_cache.get(zone, [])
+	if not cached.is_empty() and cached[0] == part.material_override and cached[1] == garment:
+		return cached
+	var material := _skin_material(zone, part)
+	var look := [part.material_override, garment, material, _tone_for(material, zone, part)]
+	_look_cache[zone] = look
+	return look
+
+
+## The per-instance colour a human skin material wears: the flesh tone under
+## flesh; under cloth the garment's clean colour with its blood soak in alpha.
+func _tone_for(material: Material, zone: String, part: MeshInstance3D) -> Color:
+	if material == null or not (material is ShaderMaterial):
+		return Color.WHITE
+	if material == _flesh_materials.get("male") or material == _flesh_materials.get("female"):
+		return _skin_tone(part)
+	return _clean_garment(zone)
+
+
+## ClothingShell mixes blood into the whole garment colour, which turned a
+## stained white coat flesh pink on the skin. Taken apart again here so the
+## cloth shader can draw the soak as stains: rgb clean colour, alpha soak.
+## Transparent black when the zone wears no plain garment.
+func _clean_garment(zone: String) -> Color:
+	var part := body.parts.get(zone) as MeshInstance3D
+	var garment := _garment_plain(part) as BaseMaterial3D if part != null and is_instance_valid(part) else null
+	if garment == null:
+		return Color(0, 0, 0, 0)
+	var soak := clampf(ClothingShell.soak_of(body, zone), 0.0, 1.0) * 0.7
+	var blood := Color("3d0907")
+	var worn := garment.albedo_color
+	if soak >= 0.99:
+		return Color(worn.r, worn.g, worn.b, soak)
+	return Color(
+		clampf((worn.r - blood.r * soak) / (1.0 - soak), 0.0, 1.0),
+		clampf((worn.g - blood.g * soak) / (1.0 - soak), 0.0, 1.0),
+		clampf((worn.b - blood.b * soak) / (1.0 - soak), 0.0, 1.0),
+		soak)
+
+
+## Above and below the waist, so coat and trousers meet on a level line rather
+## than along the zigzag where the torso's triangles meet the legs'.
+func _waist() -> Array:
+	for zone: String in ["torso", "left_leg"]:
+		var part := body.parts.get(zone) as MeshInstance3D
+		if part == null or not is_instance_valid(part) or _garment_plain(part) == null:
+			return [Color(0, 0, 0, 0), Color(0, 0, 0, 0)]
+	var upper := _clean_garment("torso")
+	var lower := _clean_garment("left_leg")
+	return [Color(upper.r, upper.g, upper.b, 1.0), Color(lower.r, lower.g, lower.b, 1.0)]
+
+
+## Cloth over the human skin, one material per base, colour per instance.
+static func cloth_material(kind: String) -> ShaderMaterial:
+	var key := "cloth_" + kind
+	if _flesh_materials.has(key):
+		return _flesh_materials[key]
+	var material := ShaderMaterial.new()
+	material.shader = load(CLOTH_SHADER) as Shader
+	material.set_shader_parameter("normal_texture", load("res://art/characters/ubc/T_Superhero_%s_Normal.png" % ("Female" if kind == "female" else "Male")))
+	_flesh_materials[key] = material
+	return material
+
+
+## The human skin's flesh, one material per base shared by every body; each
+## skin instance carries its own tone and seed.
+static func flesh_material(kind: String) -> ShaderMaterial:
+	if _flesh_materials.has(kind):
+		return _flesh_materials[kind]
+	var material := ShaderMaterial.new()
+	material.shader = load(FLESH_SHADER) as Shader
+	var root := "res://art/characters/ubc/"
+	if kind == "female":
+		material.set_shader_parameter("base_texture", load(root + "T_Superhero_Female_Dark_BaseColor.png"))
+		material.set_shader_parameter("normal_texture", load(root + "T_Superhero_Female_Normal.png"))
+		material.set_shader_parameter("roughness_texture", load(root + "T_Superhero_Female_Roughness.png"))
+		material.set_shader_parameter("texture_skin", Vector3(0.381, 0.177, 0.083))
+	else:
+		material.set_shader_parameter("base_texture", load(root + "T_Superhero_Male_Dark.png"))
+		material.set_shader_parameter("normal_texture", load(root + "T_Superhero_Male_Normal.png"))
+		material.set_shader_parameter("roughness_texture", load(root + "T_Superhero_Male_Roughness.png"))
+		material.set_shader_parameter("texture_skin", Vector3(0.355, 0.163, 0.078))
+	_flesh_materials[kind] = material
+	return material
+
+
+## The zone's flesh colour as BaselineHuman last tinted it (bruising
+## included). Its material keeps the colour in a grain texture and only the
+## damage as a tint over it, so the tint is read against the first one seen.
+func _skin_tone(part: MeshInstance3D) -> Color:
+	var flesh: Color = body.get("_flesh") if body.get("_flesh") is Color else Color("6b5842")
+	var material := part.material_override as BaseMaterial3D if part != null else null
+	if material == null:
+		return flesh
+	var now := material.albedo_color
+	if not _pristine_tint.has(part):
+		_pristine_tint[part] = now
+	var first: Color = _pristine_tint[part]
+	return Color(
+		flesh.r * clampf(now.r / maxf(first.r, 0.01), 0.0, 3.0),
+		flesh.g * clampf(now.g / maxf(first.g, 0.01), 0.0, 3.0),
+		flesh.b * clampf(now.b / maxf(first.b, 0.01), 0.0, 3.0))
+
+
+func _tone(instance: GeometryInstance3D, tone: Color) -> void:
+	instance.set_meta("skin_tone", tone)
+	instance.set_instance_shader_parameter("seed", float(absi(hash(body.subject_id)) % 997) * 0.37)
+	if instance.material_override == _flesh_materials.get("cloth_" + human):
+		instance.set_instance_shader_parameter("cloth_colour", tone)
+		var waist := _last_waist if not _last_waist.is_empty() else _waist()
+		instance.set_instance_shader_parameter("upper_colour", waist[0])
+		instance.set_instance_shader_parameter("lower_colour", waist[1])
+		for key: String in ["vest_colour", "plate_colour", "belt_colour"]:
+			instance.set_instance_shader_parameter(key, kit.get(key, Color(0, 0, 0, 0)))
+	else:
+		instance.set_instance_shader_parameter("skin_tone", tone)
+
+
+## Kit painted onto the cloth of a human skin rather than boxed over it
+## (FacilityGuardPost.dress_security's flak vest): colours keyed vest_colour,
+## plate_colour, belt_colour. False on the mannequin, which keeps the boxes.
+func wear_kit(colours: Dictionary) -> bool:
+	if human.is_empty():
+		return false
+	kit = colours.duplicate()
+	for zone: String in ZONES:
+		for instance: MeshInstance3D in zone_meshes[zone]:
+			instance.set_meta("skin_tone", Color.BLACK)
+	return true
 
 
 func _hide_rig_pieces(zone: String, part: Node3D) -> void:
@@ -847,6 +1164,8 @@ func _hide_rig_pieces(zone: String, part: Node3D) -> void:
 	for child in part.get_children():
 		var piece := child as Node3D
 		if piece == null or not piece.visible or hidden.has(piece):
+			continue
+		if piece.has_meta("mutation"):
 			continue
 		if _is_body_piece(str(piece.name)) or piece.has_meta("body_mod"):
 			piece.visible = false
@@ -861,6 +1180,10 @@ func _is_body_piece(piece_name: String) -> bool:
 	for prefix: String in BODY_PIECE_PREFIXES:
 		if piece_name.begins_with(prefix):
 			return true
+	if not human.is_empty():
+		for prefix: String in HUMAN_FACE_PIECES:
+			if piece_name.begins_with(prefix):
+				return true
 	return false
 
 
@@ -893,8 +1216,11 @@ func skin_severed_limb(zone: String, limb: Node3D, visual: GeometryInstance3D) -
 		var copy := MeshInstance3D.new()
 		copy.name = "SeveredSkin"
 		copy.mesh = baked
-		copy.material_override = material
+		if not instance.has_meta("own_material"):
+			copy.material_override = material
 		limb.add_child(copy)
+		if material is ShaderMaterial and not instance.has_meta("own_material"):
+			_tone(copy, _tone_for(material, zone, part))
 		copy.global_transform = skeleton.global_transform
 		baked_any = true
 	# The rig's thrown copy never carried the zone's wound decals (those stay on
@@ -941,6 +1267,8 @@ func _bake_pose(instance: MeshInstance3D) -> ArrayMesh:
 	var out_normals := PackedVector3Array()
 	var out_uvs := PackedVector2Array()
 	var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV] if arrays[Mesh.ARRAY_TEX_UV] != null else PackedVector2Array()
+	var rest: PackedFloat32Array = arrays[Mesh.ARRAY_CUSTOM0] if arrays[Mesh.ARRAY_CUSTOM0] != null else PackedFloat32Array()
+	var out_rest := PackedFloat32Array()
 	var out_indices := PackedInt32Array()
 	for index in indices:
 		if not remap.has(index):
@@ -959,6 +1287,8 @@ func _bake_pose(instance: MeshInstance3D) -> ArrayMesh:
 			out_normals.append(normal.normalized() if normal.length_squared() > 0.0 else Vector3.UP)
 			if not uvs.is_empty():
 				out_uvs.append(uvs[index])
+			if not rest.is_empty():
+				out_rest.append_array([rest[index * 3], rest[index * 3 + 1], rest[index * 3 + 2]])
 		out_indices.append(int(remap[index]))
 	var baked_arrays := []
 	baked_arrays.resize(Mesh.ARRAY_MAX)
@@ -967,8 +1297,13 @@ func _bake_pose(instance: MeshInstance3D) -> ArrayMesh:
 	if not out_uvs.is_empty():
 		baked_arrays[Mesh.ARRAY_TEX_UV] = out_uvs
 	baked_arrays[Mesh.ARRAY_INDEX] = out_indices
+	var flags := 0
+	if not out_rest.is_empty():
+		baked_arrays[Mesh.ARRAY_CUSTOM0] = out_rest
+		flags = Mesh.ARRAY_CUSTOM_RGB_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT
 	var baked := ArrayMesh.new()
-	baked.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, baked_arrays)
+	baked.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, baked_arrays, [], {}, flags)
+	baked.surface_set_material(0, mesh.surface_get_material(0))
 	return baked
 
 

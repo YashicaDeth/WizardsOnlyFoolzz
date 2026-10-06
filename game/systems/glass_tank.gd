@@ -20,6 +20,11 @@ extends Node3D
 ## the break line can be shared with the standing stub exactly (the shader
 ## discards above the same line), and a thin curved wall gains nothing from
 ## Voronoi interiors. All tanks share one shard budget; the oldest goes.
+##
+## imp-61 sound (Greg, 5 Oct ~19:00: "... and add sound"): a crack per stage
+## (sharper and longer each blow), the burst with the gush of fluid, and a
+## looping pour whose loudness follows the Torricelli flow. Through
+## FluidSound; FluidSound.volume = 0 silences all of it.
 
 signal cracked(stage: int)
 signal burst(direction: Vector3)
@@ -64,6 +69,8 @@ var _head0 := 1.0
 var _owed := 0.0
 var _hit_dir := Vector3.FORWARD
 var _float_rest := Vector3.ZERO
+var _pour_sound: AudioStreamPlayer3D
+var _flow_peak := 0.0
 
 
 func _ready() -> void:
@@ -167,6 +174,7 @@ func strike(at: Vector3, direction: Vector3, weight := 1) -> Dictionary:
 		_burst(direction)
 		return {"hit": true, "broken": true, "stage": hits}
 	cracked.emit(hits)
+	FluidSound.play(self, "glass_crack_%d" % clampi(hits, 1, 3), at, 0.7 + 0.1 * hits)
 	_apply()
 	return {"hit": true, "broken": false, "stage": hits}
 
@@ -202,6 +210,15 @@ func _burst(direction: Vector3) -> void:
 	(_shape.shape as CylinderShape3D).height = leak
 	_shape.position.y = -height * 0.5 + leak * 0.5
 	burst.emit(_hit_dir)
+	var face := to_global(Vector3(-_hit_dir.x, 0, -_hit_dir.z).normalized() * radius + Vector3(0, leak + 0.3, 0))
+	FluidSound.play(self, "glass_burst", face, 1.0)
+	FluidSound.play(self, "fluid_gush", face, clampf(_head0 / height, 0.4, 1.0))
+	if _pour_sound == null:
+		_pour_sound = FluidSound.loop(self, "fluid_pour_loop")
+	_pour_sound.position = Vector3(0, leak, 0)
+	_flow_peak = 0.0
+	if _pour_sound.is_inside_tree() and _pour_sound.stream != null and FluidSound.volume > 0.0:
+		_pour_sound.play()
 	_apply()
 
 
@@ -210,6 +227,8 @@ func refill() -> void:
 	hits = 0
 	level = 1.0
 	_impacts = [Vector4.ZERO, Vector4.ZERO, Vector4.ZERO, Vector4.ZERO]
+	if _pour_sound != null:
+		_pour_sound.stop()
 	(_shape.shape as CylinderShape3D).height = height
 	_shape.position.y = 0.0
 	for shard in shards:
@@ -256,9 +275,18 @@ func _drain(delta: float) -> void:
 	var leak := _leak_floor()
 	var head := _top() - leak
 	if head <= 0.002:
+		if _pour_sound != null and _pour_sound.playing:
+			_pour_sound.stop()
 		return
 	var k := 2.0 * sqrt(_head0) / maxf(pour_seconds, 0.1)
 	var drop := minf(k * sqrt(head) * delta, head)
+	if _pour_sound != null:
+		# Loud while it gushes, a trickle as the head falls.
+		var flow := k * sqrt(head)
+		_flow_peak = maxf(_flow_peak, flow)
+		var share := flow / maxf(_flow_peak, 0.0001)
+		_pour_sound.volume_db = linear_to_db(clampf(share * share * FluidSound.volume, 0.001, 1.0))
+		_pour_sound.pitch_scale = lerpf(0.8, 1.05, share)
 	level = maxf((_top() - drop) / (height * fill), 0.0)
 	if fluid == null:
 		return
@@ -268,9 +296,10 @@ func _drain(delta: float) -> void:
 	while _owed >= share and budget > 0:
 		budget -= 1
 		var around: float
-		if randf() < 0.6:
-			# Mostly out of the struck face, which faces whoever struck it.
-			around = atan2(-_hit_dir.z, -_hit_dir.x) + randf_range(-1.0, 1.0)
+		if randf() < 0.75:
+			# Mostly out of the struck face, which faces whoever struck it
+			# (imp-61: narrowed so the pour reads as one stream, not a ring).
+			around = atan2(-_hit_dir.z, -_hit_dir.x) + randf_range(-0.7, 0.7)
 		else:
 			around = randf() * TAU
 		var out := Vector3(cos(around), 0, sin(around))

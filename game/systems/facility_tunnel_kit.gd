@@ -32,13 +32,39 @@ const TILE_METRES := 2.0
 const SIDES := {"n": Vector3(0, 0, -1), "e": Vector3(1, 0, 0), "s": Vector3(0, 0, 1), "w": Vector3(-1, 0, 0)}
 const KINDS := ["straight", "corner", "t", "cross", "dead_end", "door", "pipe_run", "vent"]
 
+## The authored tunnel models remain, but the large repeating surfaces use the
+## existing ambientCG CC0 sets from the mechanics lab: real grime at corridor
+## scale instead of a stretched flat box or newly generated imagery.
 const TEXTURES := {
-	"wall": "res://art/generated/textures/tunnel_wall_512.png",
-	"floor": "res://art/generated/textures/tunnel_floor_512.png",
-	"ceiling": "res://art/generated/textures/tunnel_ceiling_512.png",
-	"door": "res://art/generated/textures/tunnel_door_512.png",
+	"wall": {
+		"albedo": "res://art/textures/lab/Rust004_Color.jpg",
+		"normal": "res://art/textures/lab/Rust004_NormalGL.jpg",
+		"roughness": "res://art/textures/lab/Rust004_Roughness.jpg",
+		"metallic": "res://art/textures/lab/Rust004_Metalness.jpg",
+	},
+	"floor": {
+		"albedo": "res://art/textures/lab/Concrete034_Color.jpg",
+		"normal": "res://art/textures/lab/Concrete034_NormalGL.jpg",
+		"roughness": "res://art/textures/lab/Concrete034_Roughness.jpg",
+	},
+	"ceiling": {
+		"albedo": "res://art/textures/lab/MetalPlates006_Color.jpg",
+		"normal": "res://art/textures/lab/MetalPlates006_NormalGL.jpg",
+		"roughness": "res://art/textures/lab/MetalPlates006_Roughness.jpg",
+		"metallic": "res://art/textures/lab/MetalPlates006_Metalness.jpg",
+	},
+	"door": {
+		"albedo": "res://art/textures/lab/PaintedMetal009_Color.jpg",
+		"normal": "res://art/textures/lab/PaintedMetal009_NormalGL.jpg",
+		"roughness": "res://art/textures/lab/PaintedMetal009_Roughness.jpg",
+		"metallic": "res://art/textures/lab/PaintedMetal009_Metalness.jpg",
+	},
 }
 const FALLBACK := {"wall": Color("231a14"), "floor": Color("1d1915"), "ceiling": Color("100d0b"), "door": Color("2a1510")}
+const LAMP_GAIN := 2.2
+## Dial: false restores the generated tunnel_lift_cab cage inside each car.
+const V01_PLAIN_CAB := true
+const TINT := {"wall": Color("806d60"), "floor": Color("706a63"), "ceiling": Color("605c56"), "door": Color("806b5a")}
 
 static var _materials := {}
 
@@ -70,9 +96,18 @@ static func material(surface: String, moving := false) -> StandardMaterial3D:
 	var made := StandardMaterial3D.new()
 	made.roughness = 0.88
 	made.metallic = 0.15 if surface != "floor" else 0.05
-	var path: String = TEXTURES[surface]
+	var set: Dictionary = TEXTURES[surface]
+	var path: String = set["albedo"]
 	if ResourceLoader.exists(path):
+		made.albedo_color = TINT[surface]
 		made.albedo_texture = load(path)
+		if set.has("normal") and ResourceLoader.exists(set["normal"]):
+			made.normal_enabled = true
+			made.normal_texture = load(set["normal"])
+		if set.has("roughness") and ResourceLoader.exists(set["roughness"]):
+			made.roughness_texture = load(set["roughness"])
+		if set.has("metallic") and ResourceLoader.exists(set["metallic"]):
+			made.metallic_texture = load(set["metallic"])
 		made.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
 		made.uv1_triplanar = true
 		made.uv1_world_triplanar = not moving
@@ -164,11 +199,21 @@ static func dress_lift(lift: Node3D) -> void:
 			for part in child.get_children():
 				if part is MeshInstance3D:
 					(part as MeshInstance3D).material_override = material("door", true)
+	# The generated cab cage read as torn foil and blocked the side slots the
+	# shaft is meant to pass by in; the car wears the kit's steel instead.
 	var cab := lift.get("cab") as Node3D
 	if cab != null:
-		var cage := GENERATED_MODEL.make("tunnel_lift_cab")
-		if cage != null:
-			cab.add_child(cage)
+		for part in cab.get_children():
+			if part is MeshInstance3D:
+				(part as MeshInstance3D).material_override = material("wall", true)
+			elif part is AnimatableBody3D:
+				for leaf in part.get_children():
+					if leaf is MeshInstance3D:
+						(leaf as MeshInstance3D).material_override = material("door", true)
+		if not V01_PLAIN_CAB:
+			var cage := GENERATED_MODEL.make("tunnel_lift_cab")
+			if cage != null:
+				cab.add_child(cage)
 
 
 ## A world-facing basis: local +Z looks along `forward`, +Y stays up.
@@ -189,12 +234,14 @@ static func _lamp(piece: Node3D, energy: float) -> void:
 	_model(piece, "tunnel_lamp", Vector3(0, HEIGHT, 0), Basis.IDENTITY)
 	var lamp := OmniLight3D.new()
 	lamp.name = "Lamp"
-	lamp.light_color = Color("ffb27a")
-	lamp.light_energy = energy
+	lamp.light_color = Color("d2ecc0")
+	# Layout energies were set for a steep falloff that left the artery black
+	# in render; the low-falloff pool needs about twice the energy.
+	lamp.light_energy = energy * LAMP_GAIN
 	# Short reach and a steep falloff: pools of light with dark between them
 	# (the Shade's light/dark visibility reads these).
 	lamp.omni_range = 5.0
-	lamp.omni_attenuation = 1.6
+	lamp.omni_attenuation = 0.9
 	lamp.shadow_enabled = true
 	lamp.position = Vector3(0, HEIGHT - 0.7, 0)
 	piece.add_child(lamp)

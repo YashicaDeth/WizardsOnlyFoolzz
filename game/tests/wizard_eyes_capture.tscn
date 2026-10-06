@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://tests/wizard_eyes_capture.gd" id="1"]
+
+[node name="WizardEyesCapture" type="Node"]
+script = ExtResource("1")

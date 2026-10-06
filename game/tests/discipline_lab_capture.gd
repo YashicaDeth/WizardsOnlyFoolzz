@@ -21,9 +21,9 @@ func _ready() -> void:
 	lab = load("res://lab/mechanics_lab.tscn").instantiate()
 	add_child(lab)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	eye = Camera3D.new()
-	eye.fov = 68.0
-	add_child(eye)
+	# Photograph the actual player camera. An external proof camera sees the
+	# first-person arms from the side and makes them look disconnected.
+	eye = lab.camera
 	await get_tree().create_timer(0.6).timeout
 	eye.current = true
 
@@ -34,19 +34,25 @@ func _ready() -> void:
 	lab.toggle_lock()
 	lab.sparring._enter("windup")
 	lab.disciplines.open_riposte(lab.sparring.rig)
-	await get_tree().create_timer(0.22).timeout
-	await _shot("duelist", lab.sparring.holder.global_position + Vector3(2.8, 1.65, 3.0), lab.sparring.rig.global_position + Vector3.UP)
+	lab.melee.press_parry()
+	await get_tree().create_timer(0.06).timeout
+	await _shot("duelist")
 
 	lab.disciplines.activate("shade")
+	lab.player.global_position = lab.disciplines.to_global(Vector3(0, 1.0, -0.35))
+	lab.player.velocity = Vector3.ZERO
+	lab.lock_target = null
+	lab.yaw = 0.0
+	lab.pitch = -0.05
+	lab.mover.crouched = true
 	lab.disciplines.toggle_darkness()
-	await _shot("shade_darkness", lab.disciplines.to_global(Vector3(3.7, 1.8, 1.3)), lab.disciplines.target.global_position + Vector3.UP)
+	await get_tree().create_timer(0.24).timeout
+	await _shot("shade_darkness")
 	print("DISCIPLINE_LAB_CAPTURE wrote %s" % shots)
 	get_tree().quit(0)
 
 
-func _shot(label: String, from: Vector3, at: Vector3) -> void:
-	eye.global_position = from
-	eye.look_at(at)
+func _shot(label: String) -> void:
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw
 	var image := get_viewport().get_texture().get_image()

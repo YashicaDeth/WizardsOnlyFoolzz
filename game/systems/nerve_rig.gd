@@ -38,6 +38,11 @@ const MARROW := Color("5a1210")
 const CHROME_SEGMENTS := [0, 1, 18, 19]
 const FIBRES := 5
 const POCKETS := 3
+## imp-68. How the three pockets show. "spine" (default): what each pocket
+## holds hangs off the sacrum as a specimen tag, and an empty pocket is only a
+## bare hook. "rack": the old row of three bottles by the weapon well, which
+## Greg singled out (5 Oct ~19:00).
+const POCKET_STYLES := ["spine", "rack"]
 const IDLE_PRESENCE := 0.18
 ## Seconds a change keeps the rig fully lit before it may start to recede.
 const ACTIVITY_HOLD := 2.5
@@ -52,6 +57,7 @@ var magick := 0.0
 var head_damage := 0.0
 var pockets: Array = []
 var mood := "STEADY"
+var pocket_style := "spine"
 var elapsed := 0.0
 var _drips: Array[Vector2] = []
 var _drip_clock := 0.0
@@ -525,6 +531,90 @@ func _draw_monitor(anchor: Vector2, phase: float, heart: bool) -> void:
 # --- the pocket rack -------------------------------------------------------------
 
 func _draw_pockets() -> void:
+	if pocket_style == "rack":
+		_draw_pocket_rack()
+	else:
+		_draw_pocket_tags()
+
+
+## What a pocket holds, as the mark on its tag: meat, a pill, bone, hardware,
+## or anything else.
+static func pocket_glyph(item: Dictionary) -> String:
+	var kind := str(item.get("kind", ""))
+	if kind in ["substance", "smokeable", "drug"]:
+		return "pill"
+	if kind in ["organ", "limb", "chunk", "meat", "skin", "fat", "muscle"]:
+		return "meat"
+	if kind == "bone":
+		return "bone"
+	if kind == "cybernetic":
+		return "chip"
+	return "thing"
+
+
+## The name on the tag: the first word of the item's own label, so a strain
+## or a zone in brackets does not run off the tag.
+static func pocket_name(item: Dictionary) -> String:
+	var label := str(item.get("label", item.get("item_id", "?"))).to_upper()
+	for cut in [" — ", " (", " "]:
+		var at := label.find(cut)
+		if at > 0:
+			label = label.left(at)
+	return label.left(8)
+
+
+func _pocket_hook(index: int) -> Vector2:
+	var sacrum := _spine_point(26)
+	return sacrum + Vector2(-16.0 - float(index) * 6.0, -4.0 + float(index) * 9.0)
+
+
+## Hung off the sacrum on wire, each tag swinging a little: a filled pocket is
+## a dark tag with a mark for what it is and its name; an empty one is a hook.
+func _draw_pocket_tags() -> void:
+	for i in POCKETS:
+		var hook := _pocket_hook(i)
+		var item: Dictionary = pockets[i] if i < pockets.size() and pockets[i] is Dictionary else {}
+		draw_arc(hook + Vector2(0, 2), 2.5, 0.0, PI * 1.4, 6, COPPER * Color(1, 1, 1, 0.75 if not item.is_empty() else 0.35), 1.2)
+		if item.is_empty():
+			continue
+		var sway := sin(elapsed * 1.1 + float(i) * 1.9) * 3.0
+		var tag_at := hook + Vector2(-52.0 - float(i) * 12.0 + sway, 22.0 + float(i) * 15.0)
+		var wire := PackedVector2Array([hook + Vector2(0, 4), hook.lerp(tag_at, 0.5) + Vector2(0, 6), tag_at + Vector2(47, 0)])
+		draw_polyline(wire, Color("121416"), 1.6)
+		draw_polyline(wire, COPPER * Color(1, 1, 1, 0.4), 0.6)
+		var plate := PackedVector2Array([
+			tag_at + Vector2(0, -6), tag_at + Vector2(44, -6), tag_at + Vector2(50, 0),
+			tag_at + Vector2(44, 6), tag_at + Vector2(0, 6),
+		])
+		draw_colored_polygon(plate, Color(0.06, 0.05, 0.045, 0.92))
+		_close(plate, BONE * Color(1, 1, 1, 0.5))
+		draw_circle(tag_at + Vector2(46, 0), 1.3, Color(0.01, 0.01, 0.01))
+		_draw_pocket_glyph(tag_at + Vector2(7, 0), pocket_glyph(item))
+		CellOutzType.draw_condensed(self, tag_at + Vector2(14, -4), pocket_name(item), 7.0, BONE * Color(1, 1, 1, 0.85), 0.45)
+
+
+func _draw_pocket_glyph(at: Vector2, glyph: String) -> void:
+	match glyph:
+		"pill":
+			draw_line(at + Vector2(-4, 2), at + Vector2(4, -2), VIOLET, 4.0)
+			draw_line(at + Vector2(0, 0), at + Vector2(4, -2), VIOLET.lightened(0.35), 4.0)
+		"meat":
+			draw_circle(at + Vector2(-1.5, 0), 3.4, BLOOD)
+			draw_circle(at + Vector2(1.8, -0.8), 2.6, BLOOD.lightened(0.15))
+		"bone":
+			draw_line(at + Vector2(-3, 2), at + Vector2(3, -2), BONE, 1.6)
+			for end in [Vector2(-3, 2), Vector2(3, -2)]:
+				draw_circle(at + end + Vector2(-1, 0), 1.3, BONE)
+				draw_circle(at + end + Vector2(1, 0), 1.3, BONE)
+		"chip":
+			draw_rect(Rect2(at - Vector2(3, 3), Vector2(6, 6)), CHROME)
+			for pin in 3:
+				draw_line(at + Vector2(-4.5, -2 + pin * 2), at + Vector2(4.5, -2 + pin * 2), GUNMETAL, 0.6)
+		_:
+			draw_rect(Rect2(at - Vector2(3, 3), Vector2(6, 6)), BONE.darkened(0.3), false, 1.2)
+
+
+func _draw_pocket_rack() -> void:
 	# Left of the held-object reliquary (bottom-right) and above the control
 	# strip: the first in-scene capture put the rack on top of the reliquary.
 	var origin := Vector2(size.x - 400.0, size.y - 172.0)

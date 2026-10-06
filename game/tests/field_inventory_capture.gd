@@ -9,6 +9,7 @@ func _ready() -> void:
 			out_path = argument.trim_prefix("--out=")
 	get_window().size = Vector2i(1280, 720)
 	WorldHistory.clear_history()
+	InputProfile.using_pad = true
 	var hunt = load("res://bone_yard_hunt.tscn").instantiate()
 	add_child(hunt)
 	await get_tree().physics_frame

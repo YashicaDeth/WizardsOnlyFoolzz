@@ -108,7 +108,11 @@ func _walk_it() -> void:
 	var scene_at_start := get_tree().current_scene
 	check(facility.tunnels != null and facility.tunnels.pieces.size() == NETWORK_SCRIPT.LAYOUT.size(), "facility.tscn builds the tunnel network in place of the old artery box")
 	for lift: Node3D in facility.lifts.values():
-		check(lift.cab.find_child("generated_tunnel_lift_cab", true, false) != null, "lift %s rides with the generated cage in its car" % lift.name)
+		var caged: bool = lift.cab.find_child("generated_tunnel_lift_cab", true, false) != null
+		if KIT.V01_PLAIN_CAB:
+			check(not caged and (lift.cab.get_child(0) as MeshInstance3D).material_override == KIT.material("wall", true), "lift %s car wears the kit steel, no generated cage (V01_PLAIN_CAB)" % lift.name)
+		else:
+			check(caged, "lift %s rides with the generated cage in its car" % lift.name)
 	var door: Node3D = null
 	for piece: Node3D in facility.tunnels.pieces.values():
 		if piece.get_node_or_null("Door") != null:

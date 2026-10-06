@@ -115,10 +115,12 @@ func toggle_darkness() -> bool:
 	return darkness_left > 0.0
 
 
-func throw_from(origin: Vector3, direction: Vector3) -> ShadeThrowable:
+func throw_from(origin: Vector3, direction: Vector3):
 	if active != "shade":
 		return null
-	var thrown := THROWABLE.new() as ShadeThrowable
+	# Keep this preload-local so a fresh worktree does not need the generated
+	# global class cache before the station can parse.
+	var thrown = THROWABLE.new()
 	thrown.name = "ShadeThrowable%d" % throws
 	lab.add_child(thrown)
 	thrown.launch(origin, direction, float(DIALS.throw_speed))
@@ -129,7 +131,7 @@ func throw_from(origin: Vector3, direction: Vector3) -> ShadeThrowable:
 	return thrown
 
 
-func throw_from_camera() -> ShadeThrowable:
+func throw_from_camera():
 	return throw_from(lab.camera.global_position - lab.camera.global_basis.z * 0.35, -lab.camera.global_basis.z)
 
 

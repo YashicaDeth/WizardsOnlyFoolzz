@@ -67,7 +67,9 @@ func _ready() -> void:
 	lab.camera.look_at(station.target.global_position + Vector3.UP)
 	_pad_trigger(JOY_AXIS_TRIGGER_RIGHT, true)
 	_pad_trigger(JOY_AXIS_TRIGGER_RIGHT, false)
-	var thrown := lab.get_node_or_null("ShadeThrowable0") as ShadeThrowable
+	# Do not depend on a warm global class cache: this suite must parse in a
+	# fresh isolated APPDATA before ShadeThrowable has ever been registered.
+	var thrown := lab.get_node_or_null("ShadeThrowable0") as CharacterBody3D
 	check(thrown != null and thrown.velocity.length() > 10.0 and station.throws == 1, "R2 Shade throw launches a physical projectile")
 	await _frames(30)
 	check(station.throwable_hits == 1, "the throwable crosses the booth and physically hits its target")

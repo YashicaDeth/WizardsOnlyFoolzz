@@ -147,11 +147,16 @@ built rooms, so only it is placed.
 
 ## Not done yet (honest boundary)
 
-- The placeholders are boxes on the grid. The real rooms (`vat_chamber.tscn`
-  and the rest) are still separate scenes with their own player and HUD;
-  the cutscenes and the intro live in `vat_chamber.tscn` and are untouched.
-  Moving each room's content into its cell (one shared player) is the next
-  step, room by room, and is where `tunnels-06-seamless-facility` overlaps.
+- Job 5's `V01_ONE_MAP` path now embeds the grid, service artery, Service
+  Arcade shell, Lower Works shell, transit lift, heat lift and surface
+  head-house directly inside `vat_chamber.tscn`. The opening's player, camera
+  and HUD persist through the whole underground walk; only the Surface Gate
+  calls `Interstitial`. The authored east staff door is the physical seam.
+- Service Arcade and Lower Works are still their connected room shells, not
+  their older standalone scene contents. Those standalone scenes remain for
+  returning-route regression coverage, but their pressure-gate, breach-tool
+  and fuse chain is not on the v0.1 one-map path. Authored room dressing must
+  move into these cells without adding another player or HUD.
 - The tunnel kit now builds the service artery and dresses all three lift
   shafts. The other corridors (Lift A and heat-elevator vestibules) and the
   room shells are still placeholder boxes on the grid; the kit can replace
