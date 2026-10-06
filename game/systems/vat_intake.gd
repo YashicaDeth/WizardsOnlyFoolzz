@@ -27,6 +27,7 @@ const SHEET := preload("res://systems/character_sheet.gd")
 const VAT_BODY_PREVIEW := preload("res://systems/vat_body_preview.gd")
 const Branding := preload("res://systems/celloutz_branding.gd")
 const IntakePageMotion := preload("res://systems/intake_page_motion.gd")
+const EXAMINER_VOICE := preload("res://systems/examiner_voice.gd")
 
 signal filed(state: Dictionary)
 ## A beat in his lines the room answers ("watched": the cameras close in).
@@ -141,6 +142,7 @@ const PROSE_SIZE := 20
 const REVEAL_RATE := 22.0
 const READ_RATE := 18.0
 var examiner_feed: Control
+var examiner_voice: ExaminerVoice
 var revealed := 0.0
 var _shown_text := ""
 ## His earlier lines, newest last, kept above the current one and fading.
@@ -191,6 +193,8 @@ func _ready() -> void:
 	examiner_feed = EXAMINER_FEED.new()
 	examiner_feed.name = "ExaminerFeed"
 	add_child(examiner_feed)
+	examiner_voice = EXAMINER_VOICE.new()
+	add_child(examiner_voice)
 	thought_edit = LineEdit.new()
 	thought_edit.name = "ThinkOutLoud"
 	thought_edit.placeholder_text = "think out loud, then Enter"
@@ -323,6 +327,8 @@ func _process(delta: float) -> void:
 				said_history.pop_front()
 		_shown_text = line
 		revealed = 0.0
+		if examiner_voice != null:
+			examiner_voice.speak(line, maxf(handler_life, doctor_life), true)
 	if page != _printed_page:
 		_printed_page = page
 		page_print = 0.0

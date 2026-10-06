@@ -1,21 +1,20 @@
 extends Node
 
-## Route 3, the doctor chase, played through the real scenes in one world:
-## the vat -> his door -> his room -> the lift -> the Support Unit -> Hollis's
-## gate -> the vehicle bay -> the hologram -> the ramp -> the surface handoff.
-## Each scene has its own suite; this one proves they hand over to each other
-## with what a player would actually be carrying.
+## Route 3 after the v0.1 examiner fight, played through the real scenes in one
+## world: take his dropped keycard, open the staff door, then preserve the
+## chase handoffs through the Support Unit, Hollis's gate, the now-empty
+## vehicle bay, the ramp and the surface. ExaminerKeycardTest owns the detailed
+## fight/card/door assertions; this suite does not duplicate them.
 
 const VAT := preload("res://vat_chamber.tscn")
 const UNIT := preload("res://support_unit.tscn")
 const BAY := preload("res://doctor_vehicle_bay.tscn")
 
 var failures: Array[String] = []
-var travelled := ""
 var checks_run := 0
 ## Every check below must actually run: a runtime error inside a scene step
 ## would otherwise skip the rest of that step and still report zero failures.
-const EXPECTED_CHECKS := 14
+const EXPECTED_CHECKS := 9
 
 
 func check(condition: bool, label: String) -> void:
@@ -30,7 +29,7 @@ func _ready() -> void:
 		get_tree().quit(2)
 		return
 	WorldHistory.clear_history()
-	await _vat_to_lift()
+	await _keycard_to_chase()
 	await _support_unit()
 	await _vehicle_bay()
 	check(checks_run == EXPECTED_CHECKS, "every step ran to the end (%d of %d checks)" % [checks_run, EXPECTED_CHECKS])
@@ -38,7 +37,25 @@ func _ready() -> void:
 	get_tree().quit(1 if failures.size() > 0 else 0)
 
 
-func _vat_to_lift() -> void:
+func _place(vat, at: Vector3, look_at_point: Vector3) -> void:
+	vat.player.global_position = Vector3(at.x, vat.BODY_HALF_HEIGHT + 0.02, at.z)
+	vat.player.velocity = Vector3.ZERO
+	var to := look_at_point - at
+	vat.yaw = atan2(-to.x, -to.z)
+	vat.pitch = 0.0
+	vat.player.rotation.y = vat.yaw
+	vat.camera.rotation = Vector3.ZERO
+
+
+func _press(vat, action: String) -> void:
+	var event := InputEventKey.new()
+	event.keycode = KEY_E if action == "interact" else KEY_NONE
+	event.physical_keycode = event.keycode
+	event.pressed = true
+	vat._unhandled_input(event)
+
+
+func _keycard_to_chase() -> void:
 	var vat = VAT.instantiate()
 	add_child(vat)
 	await get_tree().process_frame
@@ -61,48 +78,25 @@ func _vat_to_lift() -> void:
 			break
 		vat._physics_process(0.1)
 	await get_tree().physics_frame
-	check(vat.can_move, "out of the vat and standing")
 	var route: DoctorRoute = vat.doctor_route
-	# Break his door with what the breakout gave you.
-	var blows := 0
-	while not route.door.broken and blows < 80:
-		vat._unhandled_input(InputEventMouseMotion.new())
-		vat.player.global_position = Vector3(route.DOOR_AT.x, vat.BODY_HALF_HEIGHT + 0.02, route.WALL_Z - 1.3)
-		vat.yaw = PI
-		vat.pitch = -0.15
-		vat.player.rotation.y = vat.yaw
-		vat.camera.rotation = Vector3(vat.pitch, 0, 0)
-		route.cooldown = 0.0
-		var click := InputEventMouseButton.new()
-		click.button_index = MOUSE_BUTTON_LEFT
-		click.pressed = true
-		vat._unhandled_input(click)
-		blows += 1
-		await get_tree().physics_frame
-	check(route.door.broken, "his door comes down (%d blows)" % blows)
-	check(str(FacilityRoutes.ensure().get("active_route", "")) == FacilityRoutes.ROUTE_DOCTOR, "breaking it begins the doctor pursuit")
-	# Walk in, then the lift.
-	Input.action_press("move_forward")
-	for _frame in int(3.0 * Engine.physics_ticks_per_second):
-		await get_tree().physics_frame
-	Input.action_release("move_forward")
-	check(route.room_entered, "into his room")
-	vat.player.global_position = Vector3(route.CAR_AT.x, vat.BODY_HALF_HEIGHT + 0.02, route.ROOM_Z.y - 1.0)
+	var fight: ExaminerFight = route.fight
+	# The examiner suite owns the fight and the individual card/door assertions.
+	# This route suite uses the same real interaction path as its _place/_press
+	# helpers, then concentrates on the chase handoffs that follow.
+	fight._win()
+	var card_at: Vector3 = fight.keycard_pickup.global_position if fight.keycard_on_floor() else vat.player.global_position
+	_place(vat, card_at + Vector3(0, 0, 0.8), card_at)
 	await get_tree().physics_frame
-	var e := InputEventKey.new()
-	e.keycode = KEY_E
-	e.pressed = true
-	vat._unhandled_input(e)
-	for _frame in int((route.DOOR_SECONDS + 0.2) * Engine.physics_ticks_per_second):
-		await get_tree().physics_frame
-	vat.player.global_position = route.CAR_AT + Vector3(0, vat.BODY_HALF_HEIGHT + 0.02, 0.2)
-	await get_tree().physics_frame
-	route.travel_hook = func(path: String) -> void: travelled = path
-	vat._unhandled_input(e)
-	for _frame in int((route.DOOR_SECONDS + route.RIDE_SECONDS + 0.5) * Engine.physics_ticks_per_second):
-		await get_tree().physics_frame
-	check(travelled == "res://support_unit.tscn", "the lift carries you down to the Support Unit")
-	check((FacilityRoutes.ensure().get("route_steps", []) as Array) == ["examination_room"], "his room is filed on the route")
+	_press(vat, "interact")
+	_place(vat, vat.STAFF_DOOR_AT + Vector3(-1.2, 0, 0), vat.STAFF_DOOR_AT)
+	_press(vat, "interact")
+
+	# The detailed room/lift mechanics remain covered by doctor_route_test.
+	# Seed only the route boundary needed to exercise the still-current chase.
+	route._take_axe()
+	var began := FacilityRoutes.begin(FacilityRoutes.ROUTE_DOCTOR)
+	var filed_room := FacilityRoutes.traverse("examination_room")
+	check(began and filed_room and (FacilityRoutes.ensure().get("route_steps", []) as Array) == ["examination_room"], "the doctor pursuit is filed through his examination room")
 	vat.queue_free()
 	await get_tree().process_frame
 
@@ -135,12 +129,8 @@ func _vehicle_bay() -> void:
 	var bay = BAY.instantiate()
 	add_child(bay)
 	await get_tree().physics_frame
-	bay.player.global_position = bay.DOCTOR_AT + Vector3(0, 0.9, 1.5)
-	bay.attack()
-	check(bay.state == "reveal", "he is a hologram")
-	bay.step(bay.REVEAL_SECONDS + 0.05)
-	bay.holo_call.skip()
-	check(bay.ramp_open, "after his call the ramp opens")
+	check(bay.empty_bay and bay.state == "after", "after the examiner's defeat his vehicle bay is empty")
+	check(bay.ramp_open, "the empty bay's ramp is open")
 	bay.player.global_position = Vector3(0, bay.RAMP_RISE + 0.9, bay.RAMP_TOP_Z + 0.5)
 	bay.step(0.05)
 	var handoff := FacilityRoutes.pending_surface_handoff()

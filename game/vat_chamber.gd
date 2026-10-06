@@ -2937,6 +2937,8 @@ func _update_movement(delta: float) -> void:
 		player.velocity.z = move_toward(player.velocity.z, direction.z * speed, 26.0 * delta)
 	JUMP_CLIMB.fall(player, delta)
 	player.move_and_slide()
+	if facility_map != null:
+		facility_map.call("update_soundscape", player.global_position)
 	var fall_hurt := JUMP_CLIMB.landing_damage(player)
 	if fall_hurt > 0.0:
 		anatomy.call("apply_hit", "left_leg", fall_hurt * 0.5, 0.0, "blunt")
