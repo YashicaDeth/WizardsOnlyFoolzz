@@ -598,6 +598,15 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 - Dial for Greg (defaults mine): Pause > DISPLAY / HUD > PLAYER LOOK = PATIENT SMOCK (default) / VAT BODYSUIT / BANDAGE WRAPS. The jester set (Greg's design, worn in the Hunt) still covers the look where it is worn.
 - Still weak: FP hands are the old procedural low-poly hands (skin-toned now, not the human mesh); garment is painted on, so no loose cloth silhouette; the face sliders do not visibly move the human face in the intake preview (procedural face pieces hide on the skin; cust-91's shape keys); a wounded zone still hands back to the boxed rig body (existing behaviour); the Hunt over-the-shoulder view of the player was not captured (the existing capture frames an NPC).
 
+## 2026-10-07, dec-89 Greg's 6 Oct night answers (Claude, Opus)
+- Brain screen: all four disciplines on the chip, pick 2 (`BrainScreen.OFFER_LAB_DISCIPLINES` true). Cards narrower; a long kit line shrinks to its card. The pair lights its lobe on every HUD brain and the Hunt arms it (first slot in hand). Duelist/Shade *verbs* in the route are route-88's, not done here. Renders: `P:/GameDev/Temp/dec89/brain_screen_four_{empty,duelist_shade}.png`.
+- Death on the route: 3 s regrowth in the tank, then out at the last checkpoint filed (arcade west door, Lower Works floor, each lift, examiner door, vat). No checkpoint on file = the old tank escape. The bloodstain stays where you died (`RebirthSite`), old bodies now lie in every v0.1 place.
+- Ragdoll on every death and execution: dials `RAGDOLL_DEATHS` (V01Encounters, FacilityGuardPost, BoneYardHunt).
+- HUD face default BODYCAM (`FaceMonitor.DEFAULT_STYLE`); XRAY and MASK stay in Pause.
+- Kept as Greg said: guards drop their weapons (sidearm = first gun), the freed subject breaks its own glass.
+- Fixed in passing: keyboard hints for Godot's own ui_* keys read "(UNSET)" on the brain screen (`InputProfile.glyph`).
+- Weak: the regrowth to a checkpoint was not looked at windowed (no capture; headless test only). `arcade_execution_test` exits 139 on quit in about 2 runs of 7 with ragdoll on, after every check passes. The WIP commit carries imp-66's `DisciplineLobes` (hub/imp-66-vat-room is unmerged): merge one, not both.
+
 ## Manager notes, 2026-10-07 02:10
 - Merged since 00:10, gate green: fix-85 old-body label (6b27f6b2/f16f24c3, Codex): the "YOUR OLD BODY" billboard is gone; corpse, blood sigil and the gear prompt stay. Serves Job 7 death/rebirth; no clutter added.
 - Looked at (render_one rebirth_capture on trunk, opened): `P:/GameDev/Temp/rebirth_old_body.png`. Label gone, guard line readable in full. Weak: (1) the old body is still a glowing orange ghost on a red ring (BUGS.md open, Greg's art call); (2) the guard's BlockTracker "SEEN 100%" tag draws over and under his speech line; (3) "E USE / OPEN / TEAR" hint is generic at the gear spot when the objective says recover gear.

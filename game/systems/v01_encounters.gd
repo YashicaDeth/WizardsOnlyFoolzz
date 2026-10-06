@@ -33,13 +33,19 @@ const VAT_REBIRTH := preload("res://systems/vat_rebirth.gd")
 const CARRY := preload("res://systems/carry.gd")
 const FACILITY := preload("res://facility.gd")
 
-## DIALS (DESIGN/REMASTER_LOG.md, job9). Defaults are the assistant's, not Greg's.
+## DIALS (DESIGN/REMASTER_LOG.md, job9). GUARD_COUNT and the blow numbers are
+## the assistant's defaults; the three below it Greg settled on 6 Oct night.
 const GUARD_COUNT := 3
 ## The near tank's living subject breaks out as you pass if you have not
-## freed it yourself, so the Growing Floor always has its fight.
+## freed it yourself, so the Growing Floor always has its fight (Greg: keep).
 const SUBJECT_BREAKS_OUT := true
 const SUBJECT_TRIGGER := 3.0
+## Guards drop their weapons; the pistol guard's sidearm is the first gun
+## (Greg: keep).
 const GUARD_DROPS_WEAPON := true
+## Every foe on the route goes limp on its ragdoll when it dies or is executed
+## (Greg, 6 Oct night; was execution-58-01).
+const RAGDOLL_DEATHS := true
 ## Player blows on foes, per weapon (light). Heavy x1.6, charged x2.2,
 ## riposte (after your parry) x1.75.
 const PLAYER_DAMAGE := {"cleaver": 30.0, "staff": 22.0, "restraint": 16.0, "fists": 9.0, "gun": 45.0}
@@ -811,7 +817,8 @@ func _lose() -> void:
 		cause = "crushed by the Lower Works sentinel"
 		location = "lower_works"
 	WorldHistory.record_event("v01_player_killed", {"by": killer.foe_id if killer != null else "", "location": location})
-	var at: Vector3 = _player_at()
+	# The old body and its stain lie on the floor, not at the capsule's middle.
+	var at: Vector3 = _player_at() - Vector3(0, float(chamber.BODY_HALF_HEIGHT), 0)
 	var request := VAT_REBIRTH.die(location, cause, killer.foe_id if killer != null else "facility", at)
 	if OS.get_environment("ATG_V01_NO_DEATH_BEAT") == "1":
 		return

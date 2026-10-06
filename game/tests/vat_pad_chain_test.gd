@@ -121,7 +121,7 @@ func _ready() -> void:
 	button(JOY_BUTTON_A)
 	check(await wait_for(func() -> bool: return vat.phase == "brain_screen", 8.0), "Cross hurries him out and the brain screen opens")
 	var screen = vat.brain_screen
-	check(screen != null and screen.DISCIPLINES.size() == 2, "the chip offers the two v0.1 disciplines")
+	check(screen != null and BrainScreen.offered().size() == 4, "the chip offers all four disciplines (dec-89)")
 	button(JOY_BUTTON_A)
 	button(JOY_BUTTON_A)
 	check(screen != null and is_instance_valid(screen) and screen.ready_to_lock(), "Cross, Cross slots both")

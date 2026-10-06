@@ -256,6 +256,11 @@ var facility_map: Node3D
 ## Death is rebirth in a vat (Greg, 24 September). A regrown body wakes here
 ## with no examination: the record, the preset and the memories are kept.
 var rebirth := false
+## dec-89 (Greg, 6 Oct night): a death past the vat is a short regrowth beat in
+## the tank, then you go on from the checkpoint you last filed, not the whole
+## route again. False while there is no checkpoint (died before the vat filed).
+var regrow_to_checkpoint := false
+const REGROW_SECONDS := 3.0
 var active_beats: Array = BEATS
 var title: Label
 ## The HUD as body-cam footage (Greg, 24 September).
@@ -352,7 +357,8 @@ func _ready() -> void:
 		rebirth_site = RebirthSite.new()
 		add_child(rebirth_site)
 		rebirth_site.recovered.connect(_on_remains_recovered)
-		rebirth_site.setup("growing_floor", player)
+		# The one map holds every v0.1 place you can die (V01Encounters._lose).
+		rebirth_site.setup("growing_floor", player, ["service_arcade", "lower_works", "facility"])
 	doctor_route = DOCTOR_ROUTE.new()
 	add_child(doctor_route)
 	doctor_route.build(self)
@@ -499,8 +505,10 @@ func _begin_rebirth() -> void:
 	active_beats = [
 		{"at": 0.4, "text": "REGROWTH COMPLETE  //  BODY %d" % int(player_state.get("body_number", 2))},
 		{"at": 1.8, "text": "%s  //  YOUR OLD BODY IS WHERE YOU LEFT IT" % str(vat.label)},
-		{"at": 3.2, "text": "TANK 0C-7  //  CYCLE ABORTED  //  VOIDING"},
 	]
+	regrow_to_checkpoint = FACILITY_CHECKPOINTS.filed()
+	if not regrow_to_checkpoint:
+		active_beats.append({"at": 3.2, "text": "TANK 0C-7  //  CYCLE ABORTED  //  VOIDING"})
 	if WorldHistory.event_count("opening_first_object_used") > 0 and stuck_tank_shell != null:
 		stuck_tank_opened = true
 		stuck_tank_shell.visible = false
@@ -1863,11 +1871,27 @@ func _on_remains_recovered(_remains_id: String, _result: Dictionary, message: St
 	subtitle.text = message
 
 
+## dec-89: the regrowth beat is over; out of the tank at the last checkpoint.
+func _regrown_to_checkpoint() -> void:
+	regrow_to_checkpoint = false
+	VAT_REBIRTH.complete()
+	if checkpoints == null or not checkpoints.restore():
+		return
+	subtitle.text = ""
+	WorldHistory.record_event("regrown_to_checkpoint", {"checkpoint": str(WorldHistory.subject(FACILITY_CHECKPOINTS.SUBJECT).get("id", ""))})
+
+
 func _resume_from_checkpoint() -> void:
 	breakout_complete = true
 	first_acquisition_complete = true
 	phase = "aisle"
 	can_move = true
+	fade.color.a = 0.0
+	submerge_tint.color.a = 0.0
+	camera.fov = 74.0
+	camera.rotation = Vector3.ZERO
+	yaw = 0.0
+	pitch = 0.0
 	if intake != null and is_instance_valid(intake):
 		intake.queue_free()
 		intake = null
@@ -2304,6 +2328,9 @@ func _update_sequence(_delta: float) -> void:
 			camera.fov = 92.0 + sin(clock * 1.6) * 3.5
 			player.position.y = 1.35 + sin(clock * 0.8) * 0.06
 			opening_audio.set_phase("submerged", t)
+			if regrow_to_checkpoint and clock >= REGROW_SECONDS:
+				_regrown_to_checkpoint()
+				return
 			if clock >= 3.2:
 				# Greg, 4 Oct: the fluid floods the floor when the glass goes and
 				# you fall with it, so in the game the tank stays full while you

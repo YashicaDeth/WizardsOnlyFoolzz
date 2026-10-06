@@ -23,6 +23,9 @@ func setup(route_host: Node, body: CharacterBody3D, connected_facility: Node3D) 
 	for lift_id: String in facility.lifts:
 		var lift: FacilityElevator = facility.lifts[lift_id]
 		lift.arrived.connect(_on_lift_arrived.bind(lift_id, lift))
+	# A route already past the vat (Continue, or a regrowth to a checkpoint)
+	# must not have its checkpoint renamed "vat" when breakout is set on resume.
+	_vat_filed = filed()
 	restore()
 
 
@@ -50,6 +53,12 @@ func file(checkpoint_id: String, at: Vector3) -> void:
 	WorldHistory.update_subject(SUBJECT, data, "facility_checkpoint_reached")
 	WorldHistory.record_event("facility_checkpoint_reached", {"checkpoint": checkpoint_id, "location": checkpoint_id})
 	WorldHistory.commit_ledger_batch()
+
+
+## A checkpoint is on file for the route (dec-89: a regrowth resumes there).
+static func filed() -> bool:
+	var saved := WorldHistory.subject(SUBJECT)
+	return str(saved.get("scene", "")) == SCENE and (saved.get("position", []) as Array).size() == 3
 
 
 func restore() -> bool:

@@ -31,6 +31,7 @@ var _anchor_frames := 0
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	disciplines = DisciplineLobes.slotted()
 
 
 ## Takes over a scene's plain HUD labels. They keep receiving text; they just
@@ -77,6 +78,9 @@ var _redraw_clock := 0.0
 ## Which pieces are on screen. All of them normally; the implant boot
 ## (`ImplantBootHud`) brings them up one at a time after the tank.
 var pieces := {"frame": true, "rec": true, "vitals": true, "objective": true, "prompt": true}
+## imp-66: the slotted discipline pair, shown as the chip's brain with its
+## lobes lit beside the vitals. Empty (nothing drawn) until the brain screen.
+var disciplines: Array = []
 
 
 func show_piece(piece: String, on: bool) -> void:
@@ -195,6 +199,8 @@ func _draw_vitals(view: Vector2) -> void:
 		draw_rect(Rect2(bar.position, Vector2(bar.size.x * clampf(float(blood) / 100.0, 0.0, 1.0), bar.size.y)), REC)
 	if pain >= 0:
 		CellOutzType.draw_condensed(self, at + Vector2(188, 0), "PN %02d" % pain, 12.0, INK if pain < 70 else REC, 0.8)
+	if not disciplines.is_empty():
+		DisciplineLobes.draw_brain(self, at + Vector2(266, 6), 14.0, disciplines, footage)
 	# Greg's playtest: under BLD this ran into the centred key hints. Above it,
 	# the left column stays clear of the hint band.
 	if not rest.is_empty():

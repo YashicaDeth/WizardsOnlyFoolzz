@@ -21,7 +21,9 @@ const CellOutzType := preload("res://systems/celloutz_type.gd")
 ## The dial (`GothicFieldHud.face_style`, Pause > DISPLAY / HUD > HUD FACE).
 ## "mask" is the old jester mask, drawn by the HUD itself.
 const STYLES := ["xray", "bodycam", "mask"]
-const DEFAULT_STYLE := "xray"
+## dec-89 (Greg, 6 Oct night): BODYCAM is the default; XRAY and MASK stay
+## selectable in Pause.
+const DEFAULT_STYLE := "bodycam"
 const BONE := Color("ead4ad")
 const BLOOD := Color("a81716")
 const COPPER := Color("dc5827")
@@ -43,7 +45,7 @@ const FEED_FOV := 38.0
 ## The render layer the head sits on while the eye is inside it.
 const HEAD_LAYER := 20
 
-var style := "xray"
+var style := DEFAULT_STYLE
 var health := 100.0
 var blood := 1.0
 var stamina := 100.0

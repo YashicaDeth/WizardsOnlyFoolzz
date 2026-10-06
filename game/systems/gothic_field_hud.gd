@@ -68,8 +68,8 @@ var pulmonary_diagnostic: Control
 var nerve_rig: NerveRig
 ## imp-68. Greg, 5 Oct ~19:00: the round frowning face "looks dumb" and the
 ## three vials at the bottom need rework. The dial picks the face; the pockets
-## follow it. "xray" (default): a bolted CRT with your own skull, and pockets
-## hung off the sacrum as tags. "bodycam": a live feed of your own rigged head
+## follow it. "xray": a bolted CRT with your own skull, and pockets
+## hung off the sacrum as tags. "bodycam" (default, Greg 6 Oct night): a live feed of your own rigged head
 ## (the skull plate where there is no body), pockets as tags. "mask": the old
 ## jester mask and bottle rack. Pause > DISPLAY / HUD > HUD FACE flips it.
 const FACE_STYLES := FaceMonitor.STYLES

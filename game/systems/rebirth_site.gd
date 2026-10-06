@@ -24,11 +24,17 @@ var _sigils: Dictionary = {}
 var _pulse := 0.0
 
 
-func setup(location_id: String, player_node: Node3D) -> void:
+## `more_locations`: other places the same scene holds (the v0.1 one map).
+func setup(location_id: String, player_node: Node3D, more_locations: Array = []) -> void:
 	location = location_id
 	player = player_node
 	name = "RebirthSite"
-	for remains in VAT_REBIRTH.remains_at(location):
+	var places := [location_id] + more_locations
+	_stain(places)
+	var lying: Array = []
+	for place in places:
+		lying.append_array(VAT_REBIRTH.remains_at(str(place)))
+	for remains in lying:
 		var body := BaselineHuman.new()
 		body.name = str(remains.id)
 		add_child(body)
@@ -39,6 +45,18 @@ func setup(location_id: String, player_node: Node3D) -> void:
 		_bodies[str(remains.id)] = [body, null]
 		if int(remains.get("blood_fragments", 0)) > 0 and not bool(remains.get("sigil_lost", false)):
 			_build_sigil(str(remains.id), body.position + Vector3(0, 0.07, 0))
+
+
+## dec-89 (Greg, 6 Oct night): the bloodstain stays where you died, after the
+## body is stripped and the sigil spent.
+func _stain(places: Array) -> void:
+	for index in range(1, VAT_REBIRTH.deaths() + 1):
+		var remains := WorldHistory.subject("remains_%d" % index)
+		if remains.is_empty() or not places.has(str(remains.get("location", ""))):
+			continue
+		var stain := BloodPool.build_pool_node({"radius": 0.8, "pos": VAT_REBIRTH.remains_position(remains), "age": 0.7}, index)
+		stain.name = "Bloodstain_remains_%d" % index
+		add_child(stain)
 
 
 func _build_sigil(remains_id: String, at: Vector3) -> void:

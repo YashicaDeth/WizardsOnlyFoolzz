@@ -221,7 +221,10 @@ func glyph(action: String, family := "") -> String:
 	for event: InputEvent in InputMap.action_get_events(action):
 		if wanted == "keyboard":
 			if event is InputEventKey:
-				return (event as InputEventKey).as_text_physical_keycode().to_upper()
+				# Godot's own ui_* keys carry only a logical keycode; their
+				# physical one reads "(Unset)" (the brain screen showed it).
+				var key := event as InputEventKey
+				return (key.as_text_physical_keycode() if key.physical_keycode != KEY_NONE else key.as_text_keycode()).to_upper()
 			if event is InputEventMouseButton:
 				return _mouse_name((event as InputEventMouseButton).button_index)
 		elif event is InputEventJoypadButton:

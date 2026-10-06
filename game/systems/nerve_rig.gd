@@ -58,6 +58,9 @@ var head_damage := 0.0
 var pockets: Array = []
 var mood := "STEADY"
 var pocket_style := "spine"
+## imp-66: the slotted discipline pair, whose lobes glow on the brain
+## (`DisciplineLobes`). Read from the record; `set_state` may override it.
+var disciplines: Array = []
 var elapsed := 0.0
 var _drips: Array[Vector2] = []
 var _drip_clock := 0.0
@@ -68,6 +71,7 @@ var _last_reading := []
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	disciplines = DisciplineLobes.slotted()
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 
@@ -83,6 +87,7 @@ func set_state(values: Dictionary) -> void:
 	head_damage = clampf(float(regions.get("head", head_damage)), 0.0, 1.0)
 	pockets = values.get("pockets", pockets)
 	mood = str(values.get("mood", mood))
+	disciplines = values.get("disciplines", disciplines)
 	visible = not bool(values.get("menu_open", false))
 	var reading := [health, blood, stamina, pain, consciousness, magick, filled_pockets()]
 	if not _last_reading.is_empty():
@@ -469,6 +474,8 @@ func _draw_brain() -> void:
 		outline.append(centre + Vector2(cos(a) * r * 1.18, sin(a) * r * 0.86))
 	draw_colored_polygon(outline, tint * Color(1, 1, 1, awake))
 	draw_polyline(outline, BONE * Color(1, 1, 1, 0.55 * awake), 1.4)
+	if not disciplines.is_empty():
+		DisciplineLobes.draw_lobes(self, centre, 31.0, disciplines, elapsed, "", awake)
 	# Gyri: short curling folds, fixed per fold so they do not shimmer.
 	for fold in 11:
 		var seed_a := float(fold) * 2.39996

@@ -99,6 +99,8 @@ func _cleaver_staff_guard() -> void:
 	check(g47.tree_choices > 0, "his choices came from the LimboAI tree (%d)" % g47.tree_choices)
 	check(blood() > enc.LOSE_AT, "a careful player is standing at the end")
 	check(g47.body is BaselineHuman and (g47.body as BaselineHuman).anatomy.dead, "his body is dead through its own anatomy (gore-capable corpse)")
+	var corpse := g47.body as BaselineHuman
+	check(corpse != null and ((corpse.rigged != null and corpse.rigged.ragdolled) or corpse.ragdoll_body != null), "and he goes limp on his ragdoll (dec-89)")
 	check(str(WorldHistory.subject(g47.foe_id).get("status", "")) == "dead", "his death is filed in WorldHistory")
 	restore(all)
 	heal()
