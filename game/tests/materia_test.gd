@@ -22,6 +22,7 @@ func _ready() -> void:
 	_tolerance()
 	_deliriant()
 	_presets()
+	_bakes()
 	await _smoke()
 	await _station()
 	print("MATERIA_TEST_RESULT failures=%d" % failures.size())
@@ -306,6 +307,41 @@ func _station() -> void:
 	check(lab.melee.stamina >= 0.0 and stamina_before >= 0.0, "stamina stays in range under a dose")
 	lab.queue_free()
 	await _frames(2)
+
+
+## TouchDesigner bakes dropped into the bake folder are picked up, and the
+## deliriant guard reads a baked LUT too. Written to user://, removed after.
+func _bakes() -> void:
+	var real_dir := MateriaBakes.bake_dir
+	var dir := "user://materia_bake_test"
+	DirAccess.make_dir_recursive_absolute(dir)
+	MateriaBakes.bake_dir = dir
+	var bright := Image.create(16, 1, false, Image.FORMAT_RGB8)
+	bright.fill(Color(1.0, 0.95, 0.4))
+	bright.save_png(dir.path_join("lut_ash.png"))
+	check(Materia.palette_texture("ash").get_width() == 16, "a baked LUT replaces the generated palette")
+	check(Materia.palette_peak_luminance("ash") > 0.35, "a bright baked LUT on the deliriant's palette is caught by the guard")
+	var atlas := Image.create(64, 32, false, Image.FORMAT_RGB8)
+	atlas.save_png(dir.path_join("trip_flipbook.png"))
+	var sidecar := FileAccess.open(dir.path_join("trip_flipbook.json"), FileAccess.WRITE)
+	sidecar.store_string(JSON.stringify({"columns": 4, "rows": 2, "frames": 7, "fps": 10, "loop": true}))
+	sidecar.close()
+	var layer := CanvasLayer.new()
+	add_child(layer)
+	var rig := PsychedelicRig.new()
+	layer.add_child(rig)
+	var trip := MateriaTrip.new()
+	add_child(trip)
+	trip.setup(rig, layer)
+	check(trip.plate.texture is AtlasTexture and int(trip.flipbook.frames) == 7, "a baked flipbook becomes the trip's ground")
+	check(trip.flipbook_frame(0.25) == 2 and trip.flipbook_frame(0.75) == 0, "the flipbook steps at its own fps and loops")
+	check(MateriaBakes.flipbook_region(trip.flipbook, 5) == Rect2(16, 16, 16, 16), "frame 5 is the second row, second cell")
+	trip.queue_free()
+	layer.queue_free()
+	for file_name in ["lut_ash.png", "trip_flipbook.png", "trip_flipbook.json"]:
+		DirAccess.remove_absolute(dir.path_join(file_name))
+	MateriaBakes.bake_dir = real_dir
+	check(Materia.palette_peak_luminance("ash") < 0.35, "with the bake gone the deliriant's palette is dark again")
 
 
 func _press(action: String) -> void:

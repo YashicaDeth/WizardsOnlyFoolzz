@@ -8,7 +8,7 @@ extends Node
 ## It is FINAL_V's Path B in miniature: a baked ground layer with the live
 ## shader composited over it. The ground here is one of Greg's own plates
 ## (`art/derived/plate/`); when a TouchDesigner flipbook exists it replaces the
-## plate (DESIGN/TOUCHDESIGNER_PIPELINE.md, "a baked sequence as a trip"),
+## plate (DESIGN/TOUCHDESIGNER_PIPELINE.md, "A baked sequence as a trip"),
 ## and the dial track below stays the live layer on top.
 ##
 ## Six movements, keyed by time. Between keys each dial eases; mirror counts
@@ -41,6 +41,10 @@ signal finished(skipped: bool)
 
 var rig: PsychedelicRig
 var plate: TextureRect
+## A TouchDesigner flipbook (`art/materia/trip_flipbook.png` + `.json`), when
+## one has been baked; empty means Greg's plate is the ground.
+var flipbook: Dictionary = {}
+var _frame_view: AtlasTexture
 var playing := false
 var elapsed := 0.0
 var _skip_left := -1.0
@@ -58,7 +62,14 @@ func setup(target_rig: PsychedelicRig, layer: CanvasLayer) -> void:
 	plate.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	plate.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	plate.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	plate.texture = load(PLATE) as Texture2D
+	flipbook = MateriaBakes.flipbook("trip_flipbook")
+	if flipbook.is_empty():
+		plate.texture = load(PLATE) as Texture2D
+	else:
+		_frame_view = AtlasTexture.new()
+		_frame_view.atlas = flipbook.texture
+		_frame_view.region = MateriaBakes.flipbook_region(flipbook, 0)
+		plate.texture = _frame_view
 	plate.modulate.a = 0.0
 	plate.visible = false
 	layer.add_child(plate)
@@ -103,6 +114,17 @@ func _process(delta: float) -> void:
 	for dial_name: String in dials:
 		rig.set_dial(dial_name, float(dials[dial_name]))
 	plate.modulate.a = plate_at(elapsed)
+	if _frame_view != null:
+		_frame_view.region = MateriaBakes.flipbook_region(flipbook, flipbook_frame(elapsed))
+
+
+## Which atlas frame shows at `t` seconds: looped, or held on the last.
+func flipbook_frame(t: float) -> int:
+	if flipbook.is_empty():
+		return 0
+	var index := int(t * float(flipbook.fps))
+	var frames := int(flipbook.frames)
+	return index % frames if bool(flipbook.loop) else mini(index, frames - 1)
 
 
 func _end(skipped: bool) -> void:

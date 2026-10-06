@@ -94,7 +94,9 @@ func _ready() -> void:
 	_material = ShaderMaterial.new()
 	_material.shader = PSYCHEDELIC_SHADER
 	_material.set_shader_parameter("lut_texture", _build_placeholder_lut())
-	_material.set_shader_parameter("noise_texture", _build_placeholder_noise())
+	# drug-70: a flow field baked out of TouchDesigner wins when one is there.
+	var baked_flow := MateriaBakes.texture("flow.png")
+	_material.set_shader_parameter("noise_texture", baked_flow if baked_flow != null else _build_placeholder_noise())
 	_display.material = _material
 	add_child(_display)
 	_apply_all_dials()

@@ -342,8 +342,12 @@ static func planes_seen(altitude: float) -> Array:
 	return out
 
 
-## The palette as a 256 x 1 LUT texture for the shader.
-static func palette_texture(palette_name: String) -> ImageTexture:
+## The palette as a 256 x 1 LUT texture for the shader. A LUT baked out of
+## TouchDesigner (`art/materia/lut_<name>.png`, MateriaBakes) replaces it.
+static func palette_texture(palette_name: String) -> Texture2D:
+	var baked := MateriaBakes.texture("lut_%s.png" % palette_name)
+	if baked != null:
+		return baked
 	var stops: Array = PALETTES.get(palette_name, PALETTES["wire"])
 	var image := Image.create(256, 1, false, Image.FORMAT_RGB8)
 	for x in 256:
@@ -354,8 +358,16 @@ static func palette_texture(palette_name: String) -> ImageTexture:
 
 
 ## Brightest stop of a palette, by luminance. The deliriant's must stay dark.
+## A baked LUT counts: if one replaces the palette, its middle row is read,
+## so a bright bake cannot slip a fun palette onto the deliriant unnoticed.
 static func palette_peak_luminance(palette_name: String) -> float:
 	var best := 0.0
+	var baked := MateriaBakes.image_of("lut_%s.png" % palette_name)
+	if baked != null:
+		var row := baked.get_height() / 2
+		for x in baked.get_width():
+			best = maxf(best, baked.get_pixel(x, row).get_luminance())
+		return best
 	for stop in PALETTES.get(palette_name, []) as Array:
 		best = maxf(best, Color(str(stop)).get_luminance())
 	return best
