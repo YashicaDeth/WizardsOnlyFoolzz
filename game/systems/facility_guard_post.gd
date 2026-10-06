@@ -343,7 +343,9 @@ func _torso_position() -> Vector3:
 func watcher_entries() -> Array:
 	if not warned or not guard_active():
 		return []
-	return [{"at": _torso_position(), "certainty": 1.0}]
+	# Keep the acquisition box while he speaks, but remove its tag so the fixed-
+	# size spoken line is the only text over him. The tag returns with the line.
+	return [{"at": _torso_position(), "certainty": 1.0, "hide_tag": speech != null and not speech.text.is_empty()}]
 
 
 ## LMB with the ram in hand. Returns true when the swing was his to take, so
