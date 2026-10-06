@@ -11,6 +11,10 @@ uniform float seed = 0.0;
 uniform vec2 rect_size = vec2(760.0, 760.0);
 // For captures: pin the cycle to one point instead of the clock.
 uniform float phase_override = -1.0;
+// The same picture as TEXTURE, set by interstitial.gd. A canvas shader cannot
+// pass the TEXTURE builtin into a function (the compiler errors on every
+// loading plate), so the blur reads this instead.
+uniform sampler2D film : filter_linear, repeat_disable;
 
 float hash21(vec2 p) {
 	p = fract(p * vec2(123.34, 456.21) + seed);
@@ -24,13 +28,13 @@ float bayer4(vec2 px) {
 	return m[i] / 16.0 - 0.5;
 }
 
-vec3 blurred(sampler2D tex, vec2 uv, float radius) {
+vec3 blurred(vec2 uv, float radius) {
 	vec3 sum = vec3(0.0);
 	float total = 0.0;
 	for (int x = -2; x <= 2; x++) {
 		for (int y = -2; y <= 2; y++) {
 			float w = 1.0 / (1.0 + float(x * x + y * y));
-			sum += texture(tex, uv + vec2(float(x), float(y)) * radius).rgb * w;
+			sum += texture(film, uv + vec2(float(x), float(y)) * radius).rgb * w;
 			total += w;
 		}
 	}
@@ -60,9 +64,9 @@ void fragment() {
 	vec3 c;
 	if (focus_loss > 0.02) {
 		float radius = focus_loss * 0.016;
-		c = vec3(blurred(TEXTURE, uv + vec2(split, 0.0), radius).r,
-				blurred(TEXTURE, uv, radius).g,
-				blurred(TEXTURE, uv - vec2(split, 0.0), radius).b);
+		c = vec3(blurred(uv + vec2(split, 0.0), radius).r,
+				blurred(uv, radius).g,
+				blurred(uv - vec2(split, 0.0), radius).b);
 	} else {
 		c = vec3(texture(TEXTURE, uv + vec2(split, 0.0)).r, texture(TEXTURE, uv).g, texture(TEXTURE, uv - vec2(split, 0.0)).b);
 	}
