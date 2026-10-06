@@ -23,6 +23,8 @@ design decision, it is listed under OPEN; stop and report instead of choosing.
 
 ## Rules for every job
 
+0. **Goal and scope (Greg, 6 Oct).** Build "a really enjoyable gameplay shell", pad first: a genre-bending soulslike with interesting combat disciplines, cyberpunk-ish post-apocalyptic biopunk occult horror. Greg will do the art and textures himself, so spend effort on how it plays and reads, not on world surface textures. `DESIGN/FEATURE_CHECKLIST.md` is the scope: work only on its lines, wire every feature into the demo route or one labelled lab bay (no orphan systems, no text walls), and tick lines as they land.
+
 1. **Wire before you build.** The repo has about 236 systems and many are
    finished but called by nothing. Before writing a new file, search for the
    one that already does it (`systems/`, scene scripts, `tests/`). Rebuilding
