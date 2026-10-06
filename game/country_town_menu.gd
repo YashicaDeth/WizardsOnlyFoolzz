@@ -569,6 +569,9 @@ func _build_support_row() -> void:
 	result.text = SupportMail.ADDRESS
 	result.modulate = Color(1, 1, 1, 0.45)
 	result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var result_inset := StyleBoxEmpty.new()
+	result_inset.content_margin_left = 14.0
+	result.add_theme_stylebox_override("normal", result_inset)
 	box.add_child(result)
 	box.move_child(result, back.get_index())
 
