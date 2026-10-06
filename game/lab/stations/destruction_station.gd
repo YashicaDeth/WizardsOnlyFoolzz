@@ -62,6 +62,9 @@ func build(owner_lab: Node3D) -> void:
 	for x in [1.0, 3.0, 5.0, 7.0]:
 		_trestle(Vector3(x, 0, 1.8))
 	_raise()
+	# Smoke, sparks and marks made now, so the first blast's frame is not
+	# also the frame they are built on.
+	(func() -> void: BlastFx.of(self)).call_deferred()
 
 
 func press() -> String:
@@ -72,8 +75,16 @@ func press() -> String:
 ## Props that broke, and voxel walls, crates and bunker parts that lost a real
 ## share of themselves (`VoxelStructure.broken`) or are gone.
 func broken_count() -> int:
-	var count := props.filter(func(prop: BreakableProp) -> bool: return is_instance_valid(prop) and prop.broken).size()
-	return count + voxels.filter(func(structure: VoxelStructure) -> bool: return not is_instance_valid(structure) or structure.broken()).size()
+	# A plain loop: a typed lambda argument errors on a freed wall (one a blast
+	# took whole), which made the whole count read 0.
+	var count := 0
+	for prop in props:
+		if is_instance_valid(prop) and prop.broken:
+			count += 1
+	for structure in voxels:
+		if not is_instance_valid(structure) or structure.broken():
+			count += 1
+	return count
 
 
 func breakables() -> int:
@@ -247,11 +258,13 @@ func _fuse(thing: Node3D, seconds: float, spec: Dictionary) -> void:
 ## Sets `thing` off now. A charge blows into what it is stuck to.
 func detonate(thing: Node3D, spec := CHARGE) -> Dictionary:
 	var at := thing.global_position
+	var normal := Vector3.UP
 	if thing.has_meta("normal"):
-		at -= (thing.get_meta("normal") as Vector3) * 0.2
+		normal = thing.get_meta("normal") as Vector3
+		at -= normal * 0.2
 	charges.erase(thing)
 	thing.queue_free()
-	return Blast.explode(self, at, float(spec.radius), float(spec.damage), str(spec.source))
+	return Blast.explode(self, at, float(spec.radius), float(spec.damage), str(spec.source), normal)
 
 
 ## One physics frame of the thermal drill held against whatever is in front.
