@@ -1933,6 +1933,10 @@ const THOUGHTS := {
 var thought_label: Label
 var thought_phase := ""
 var thought_life := 0.0
+const THOUGHT_DEFAULT_TOP := 196.0
+const THOUGHT_DEFAULT_BOTTOM := 226.0
+const THOUGHT_CARD_GAP := 8.0
+const THOUGHT_SCREEN_MARGIN := 8.0
 ## Once the player is on their feet, the subtitle is written by pickups, doors
 ## and the fight teacher and nothing ever cleared it: a "RED GLINT" prompt from
 ## the arcade rode both lifts up to the surface gate (bughunt-79). A line now
@@ -1980,6 +1984,7 @@ func _physics_process(delta: float) -> void:
 	if thought_label != null:
 		thought_life = maxf(0.0, thought_life - delta)
 		thought_label.modulate.a = clampf(thought_life / 0.8, 0.0, 1.0)
+		_layout_thought_label(MissionCard.playing_title_rect(get_tree()))
 	# Greg, 28 September: the tank you are in (TankView) until it drains.
 	_pin_tank_body()
 	if tank_view != null:
@@ -2270,8 +2275,8 @@ func _think_aloud(line: String) -> void:
 		thought_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 		thought_label.offset_left = -480.0
 		thought_label.offset_right = 480.0
-		thought_label.offset_top = 196.0
-		thought_label.offset_bottom = 226.0
+		thought_label.offset_top = THOUGHT_DEFAULT_TOP
+		thought_label.offset_bottom = THOUGHT_DEFAULT_BOTTOM
 		thought_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		thought_label.add_theme_font_size_override("font_size", 22)
 		thought_label.add_theme_color_override("font_color", Color("ead4ad"))
@@ -2282,6 +2287,28 @@ func _think_aloud(line: String) -> void:
 	thought_label.text = line
 	thought_life = 4.5
 	thought_label.modulate.a = 1.0
+
+
+## Keep a first-person thought clear of the live mission-card title. Resetting
+## first makes the authored strip return as soon as the card has gone.
+func _layout_thought_label(title: Rect2 = Rect2()) -> void:
+	thought_label.offset_top = THOUGHT_DEFAULT_TOP
+	thought_label.offset_bottom = THOUGHT_DEFAULT_BOTTOM
+	if not title.has_area():
+		return
+	var thought_rect := thought_label.get_global_rect()
+	if not thought_rect.intersects(title):
+		return
+	var height := thought_rect.size.y
+	var desired_top := title.position.y - height - THOUGHT_CARD_GAP
+	if desired_top < THOUGHT_SCREEN_MARGIN:
+		desired_top = title.end.y + THOUGHT_CARD_GAP
+		if key_hints != null and key_hints._panel != null and key_hints._panel.visible:
+			var hint_top := key_hints._panel.get_global_rect().position.y
+			desired_top = minf(desired_top, hint_top - height - THOUGHT_CARD_GAP)
+	var shift := desired_top - thought_rect.position.y
+	thought_label.offset_top += shift
+	thought_label.offset_bottom += shift
 
 
 func _offer_standing_hints() -> void:

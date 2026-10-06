@@ -56,6 +56,19 @@ func _ready() -> void:
 	add_child(vat)
 	for _frame in 4:
 		await get_tree().physics_frame
+	vat._think_aloud("HE WENT THROUGH THAT DOOR.")
+	vat.mission_card.play("get_revenge", "GET REVENGE", 10.0)
+	for _frame in 3:
+		await get_tree().physics_frame
+	var revenge_title := MissionCard.playing_title_rect(get_tree())
+	var thought_rect: Rect2 = vat.thought_label.get_global_rect()
+	check(revenge_title.has_area() and not thought_rect.intersects(revenge_title), "the thought is clear of GET REVENGE (%s vs %s)" % [thought_rect, revenge_title])
+	check(thought_rect.position.y >= 8.0, "the raised thought stays at least 8 px from the screen top")
+	vat.mission_card.skip()
+	for _frame in 3:
+		await get_tree().physics_frame
+	check(not vat.mission_card.playing, "the vat mission card has finished")
+	check(is_equal_approx(vat.thought_label.offset_top, 196.0) and is_equal_approx(vat.thought_label.offset_bottom, 226.0), "the thought returns to its authored 196-226 position")
 	vat.phase = "aisle"
 	vat.line_index = -1
 	vat.clock = 10.0
