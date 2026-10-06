@@ -101,6 +101,9 @@ var ride_clock := 0.0
 var car_y := 0.0
 
 var feed_viewport: SubViewport
+## v02-51. The Black Mirror lies on his desk: the v0.1 route's pickup.
+var mirror_model: Node3D
+const MIRROR_REACH := 1.5
 var _was_moving := false
 var _look_left := 0.0
 var _look_from := Vector2.ZERO
@@ -182,6 +185,8 @@ func prompt_text() -> String:
 		return ""
 	if fight != null and fight.keycard_in_reach():
 		return "%s TAKE HIS STAFF KEYCARD" % _use_glyph()
+	if _mirror_in_reach():
+		return "%s TAKE THE BLACK MIRROR" % _use_glyph()
 	if lift_state == "riding" or lift_state == "returning":
 		return "GOING DOWN" if lift_state == "riding" else "GOING UP"
 	if lift_state == "arrived":
@@ -260,6 +265,9 @@ func _use_glyph() -> String:
 
 func _use() -> bool:
 	if fight != null and fight.take_keycard():
+		return true
+	if _mirror_in_reach():
+		_take_mirror()
 		return true
 	if lift_state == "arrived" and placeholder_shown:
 		lift_state = "returning"
@@ -731,6 +739,7 @@ func _build_room() -> void:
 	desk_box.size = Vector3(2.0, 0.9, 0.8)
 	desk_shape.shape = desk_box
 	desk_body.add_child(desk_shape)
+	_build_black_mirror(desk_at)
 	# The monitor, turned to his chair, showing the tank you were in.
 	var monitor_at := desk_at + Vector3(0.45, 1.2, 0.12)
 	_block(Vector3(0.9, 0.58, 0.08), monitor_at, LabSurface.material("plate"), false)
@@ -787,6 +796,58 @@ func _build_room() -> void:
 	fight = ExaminerFight.new()
 	add_child(fight)
 	fight.setup(self, Vector3(ROOM_X.x + 0.42, 0.0, 7.4), ROOM_X, ROOM_Z)
+
+
+## v02-51 (Greg, 6 Oct: "put it in the v0.1 route, picked up in the examiner
+## office"). The generated phone, screen up on his desk beside the keyboard,
+## with a faint glow off the glass so it reads in the dark room. Once taken it
+## is the handheld's own possessed record, so a rebirth does not lay it out
+## again.
+func _build_black_mirror(desk_at: Vector3) -> void:
+	if BlackMirrorPhone.is_held():
+		return
+	var model: Node3D = GENERATED_MODEL.make("black_mirror")
+	if model == null:
+		var drawn := MeshInstance3D.new()
+		var slab := BoxMesh.new()
+		slab.size = Vector3(0.075, 0.012, 0.155)
+		var glass := StandardMaterial3D.new()
+		glass.albedo_color = Color("0b0c0e")
+		glass.metallic = 0.8
+		glass.roughness = 0.15
+		glass.emission_enabled = true
+		glass.emission = Color(0.25, 0.55, 0.5)
+		glass.emission_energy_multiplier = 0.35
+		slab.material = glass
+		drawn.mesh = slab
+		model = drawn
+	model.name = "DeskBlackMirror"
+	model.position = desk_at + Vector3(-0.55, 0.885, 0.12)
+	model.rotation.y = 0.4
+	add_child(model)
+	var glow := OmniLight3D.new()
+	glow.name = "MirrorGlow"
+	glow.light_color = Color("9bd4b0")
+	glow.light_energy = 0.35
+	glow.omni_range = 0.9
+	glow.shadow_enabled = false
+	glow.position = Vector3(0, 0.08, 0)
+	model.add_child(glow)
+	mirror_model = model
+
+
+func _mirror_in_reach() -> bool:
+	return mirror_model != null and is_instance_valid(mirror_model) and mirror_model.visible and _in_room() and _flat_distance(mirror_model.global_position) <= MIRROR_REACH
+
+
+func _take_mirror() -> void:
+	mirror_model.visible = false
+	BlackMirrorPhone.take(ROOM_DISTRICT)
+	var profile := get_node_or_null("/root/InputProfile")
+	var raise := str(profile.call("glyph", "device")) if profile != null else "G"
+	chamber.subtitle.text = "BLACK MIRROR TAKEN  //  [%s] RAISE IT" % raise
+	if chamber.opening_audio != null:
+		chamber.opening_audio.cue("tug")
 
 
 ## What Greg's office concept (26 September) has in it, built from the game's
