@@ -629,3 +629,11 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 
 ## 2026-10-07, fix-92 thought clear of mission card
 - The vat thought now reads the live mission-card title bounds each frame, moves above GET REVENGE when their rectangles meet, and returns to its authored 196-226 strip when the card clears. If a title leaves no room above, the thought uses the gap below it and above the visible key hint. Card timing, wording, type and key hints are unchanged.
+
+## Manager notes, 2026-10-07 09:10
+- Merged: fix-92 (c3be708b, vat thought clear of mission card), fix-94 (b2274035, guard speech clear of awareness tag). Looked at P:/GameDev/Temp/rebirth_old_body.png: the guard's line now reads in full with no tag text over it.
+- Weak (same shot): the old body is still a pale glowing figure on a red disc, not a corpse with a bloodstain (BUGS.md "Rebirth, old body", OPEN); the floor is a bright checker that pulls the eye away from it.
+- Accounts: both main Claude accounts and claude-alt2 are parked until 10-10/10-11; three Codex accounts are parked; codex-allusions-plus was ready but idle for 4 ticks (every pending task said agent claude).
+- Recommendations: 1) old-body read (corpse plus bloodstain, no glow); already in remaster-job7-p1's scope, so no duplicate queued. 2) fix-95 ragdoll quit crash stays first among the fixes when a Claude account frees up. 3) Give Codex small, mechanical BUGS.md items so it does not sit idle.
+- Queued for Codex: fix-82 narrowed to the one thing left (the support address line's ~12 px inset in country_town_menu.gd `_build_support_row`); bughunt-79-c already restored the row.
+- Failures: none new (job2, job2b, lane-exit-routes are old).
