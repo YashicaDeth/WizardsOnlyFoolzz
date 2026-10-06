@@ -745,9 +745,24 @@ func near_miss(_foe: V01Foe) -> void:
 
 func _teach_colour(spec: Dictionary) -> void:
 	if bool(spec.get("parryable", false)):
-		_teach("copper", "COPPER GLINT  //  PARRY IT (L2 / X) OR BLOCK (L1 / RMB)")
+		_teach("copper", "COPPER GLINT  //  PARRY IT (%s) OR BLOCK (%s)" % [_key("parry"), _key("guard")])
 	elif not bool(spec.get("blockable", true)):
-		_teach("red", "RED GLINT  //  STEP OUT OR DODGE (B / SPACE)")
+		_teach("red", "RED GLINT  //  STEP OUT OR DODGE (%s)" % _key("dodge"))
+
+
+## The button for an action on the device last used (CIRCLE on a pad, SPACE on
+## the keyboard), not a fixed mix of an Xbox letter and a key (bughunt-79-c).
+## On the keyboard a mouse button wins: "guard" also carries the old X key from
+## project.godot, which is parry here, and "BLOCK (X)" would read as parry.
+func _key(action: String) -> String:
+	if InputProfile.device_family() == "keyboard":
+		for event: InputEvent in InputMap.action_get_events(action):
+			if event is InputEventMouseButton:
+				return str(InputProfile._mouse_name((event as InputEventMouseButton).button_index))
+	var glyph := str(InputProfile.glyph(action))
+	for prefix in ["PS5 ", "PS4 ", "PAD "]:
+		glyph = glyph.trim_prefix(prefix)
+	return glyph
 
 
 func _teach(key: String, line: String) -> void:
@@ -929,7 +944,7 @@ func _take_pickup() -> bool:
 		carry.save_to_history()
 		staff_in_hand = true
 		_hold_staff()
-		_say("PRODSTAFF  //  HOLD R2 TO CHARGE A SHOCK  //  Y / R SWAPS WEAPON")
+		_say("PRODSTAFF  //  HOLD %s TO CHARGE A SHOCK  //  %s SWAPS WEAPON" % [_key("heavy"), _key("reload")])
 	else:
 		# His sidearm, loading any loose rounds you carry (as the guard post's
 		# loadout did).
@@ -947,7 +962,7 @@ func _take_pickup() -> bool:
 		if not merged:
 			carry.items.append({"label": GUN_LABEL, "kind": "weapon", "weapon": "facility_sidearm", "rounds": rounds, "mass": 1.1, "perishes": false, "age": 0.0, "from": str(pickup.guard)})
 		carry.save_to_history()
-		_say("%s  //  %d ROUNDS  //  R2 / MMB FIRES" % [GUN_LABEL, _gun_rounds()])
+		_say("%s  //  %d ROUNDS  //  %s FIRES" % [GUN_LABEL, _gun_rounds(), _key("heavy")])
 	(pickup.node as Node3D).queue_free()
 	pickups.erase(pickup)
 	WorldHistory.record_event("v01_pickup_%s" % str(pickup.guard), {"label": label})
