@@ -1140,6 +1140,7 @@ func _build_organ_kit() -> void:
 	player_body.name = "PlayerBody"
 	add_child(player_body)
 	player_body.position = Vector3(0, -40, 0)
+	PlayerLook.mark(player_body)
 	player_body.build("lab_player", {"gore": false, "blood": 4800.0, "rigged": true})
 	player_body.visible = false
 	player_body.anatomy.undying = true
