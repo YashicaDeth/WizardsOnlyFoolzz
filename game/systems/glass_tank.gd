@@ -411,9 +411,11 @@ func _shard(tri: Array, material: Material, head: float) -> void:
 	shard.linear_velocity = global_basis * throw
 	shard.angular_velocity = Vector3(randf_range(-8, 8), randf_range(-8, 8), randf_range(-8, 8))
 	shards.append(shard)
+	_prune_shards()
 	_all_shards.append(shard)
 	while _all_shards.size() > max_shards:
-		var oldest: RigidBody3D = _all_shards.pop_front()
+		# Untyped: a shard swept with its scene is already freed here.
+		var oldest: Variant = _all_shards.pop_front()
 		if is_instance_valid(oldest):
 			oldest.queue_free()
 
@@ -424,6 +426,7 @@ static func kick(feet: Vector3, velocity: Vector3) -> int:
 	if flat.length() < 0.5:
 		return 0
 	var moved := 0
+	_prune_shards()
 	for shard in _all_shards:
 		if not is_instance_valid(shard):
 			continue
@@ -435,5 +438,11 @@ static func kick(feet: Vector3, velocity: Vector3) -> int:
 
 
 static func shard_count() -> int:
-	_all_shards = _all_shards.filter(func(shard: RigidBody3D) -> bool: return is_instance_valid(shard))
+	_prune_shards()
 	return _all_shards.size()
+
+
+## The list is static and outlives the scene that owned the shards, so drop the
+## freed ones before anything reads it through a typed variable.
+static func _prune_shards() -> void:
+	_all_shards = _all_shards.filter(func(shard: Variant) -> bool: return is_instance_valid(shard))

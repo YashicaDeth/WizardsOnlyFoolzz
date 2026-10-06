@@ -188,8 +188,12 @@ static func keep(root: Node, at: Vector3, volume: float) -> int:
 	var nodes: Array = _pool_nodes.get(key, [])
 	while nodes.size() <= index:
 		nodes.append(null)
-	var node := nodes[index] as MeshInstance3D
-	if node == null or not is_instance_valid(node):
+	# The cache is static and outlives the scene (a vat rebirth reloads it), so
+	# the slot can hold a freed node; casting one is a SCRIPT ERROR on every
+	# feed (bughunt-79: ~2000 a fight in examiner_fight_test).
+	var held: Variant = nodes[index]
+	var node: MeshInstance3D = held as MeshInstance3D if is_instance_valid(held) else null
+	if node == null:
 		node = build_pool_node(pools[index], index + 1)
 		root.add_child(node)
 		nodes[index] = node
