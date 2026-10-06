@@ -367,6 +367,14 @@ func _start_demo() -> void:
 	box.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	box.grow_vertical = Control.GROW_DIRECTION_BOTH
 	box.z_index = 30
+	# bughunt-79: the default panel was see-through, so the menu column read
+	# through the choices; an opaque plate in the menu's copper.
+	var plate := StyleBoxFlat.new()
+	plate.bg_color = Color(0.03, 0.012, 0.012, 0.97)
+	plate.border_color = Color("a85b43")
+	plate.set_border_width_all(1)
+	plate.set_content_margin_all(18.0)
+	box.add_theme_stylebox_override("panel", plate)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 10)
 	box.add_child(col)
@@ -386,6 +394,9 @@ func _start_demo() -> void:
 	hint.text = "controller: L-stick move  R-stick look  R1 light  R2 heavy/fire  L1 block  L2 parry/aim  L2+R2 X-ray  CROSS jump  SQUARE use"
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.modulate = Color(1, 1, 1, 0.6)
+	# It ran past the plate's edge on one line.
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.custom_minimum_size = Vector2(360, 0)
 	col.add_child(hint)
 	$HUD.add_child(box)
 	pad.pressed.connect(func() -> void: _choose_input(true))
@@ -393,6 +404,13 @@ func _start_demo() -> void:
 	back.pressed.connect(func() -> void:
 		box.queue_free()
 		$HUD/Play.grab_focus())
+	# Keep the pad inside the three choices: down from BACK used to walk onto
+	# the menu column behind the plate.
+	pad.focus_neighbor_top = pad.get_path_to(back)
+	back.focus_neighbor_bottom = back.get_path_to(pad)
+	for b in [pad, kb, back]:
+		b.focus_neighbor_left = b.get_path()
+		b.focus_neighbor_right = b.get_path()
 	(pad if not Input.get_connected_joypads().is_empty() else kb).grab_focus()
 
 
@@ -824,6 +842,12 @@ func _close_settings() -> void:
 
 ## B / Escape backs out of settings.
 func _unhandled_input(event: InputEvent) -> void:
+	var chooser := $HUD.get_node_or_null("InputChooser")
+	if chooser != null and not chooser.is_queued_for_deletion() and event.is_action_pressed("ui_cancel") and not menu_departing:
+		get_viewport().set_input_as_handled()
+		chooser.queue_free()
+		$HUD/Play.grab_focus()
+		return
 	if settings_panel.visible and event.is_action_pressed("ui_cancel"):
 		get_viewport().set_input_as_handled()
 		_close_settings()
