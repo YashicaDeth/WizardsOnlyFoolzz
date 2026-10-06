@@ -52,7 +52,8 @@ func play(id: String, words: String, seconds := 5.2) -> void:
 	duration = seconds
 	clock = 0.0
 	playing = true
-	# KeyHints holds its hint while a card plays (both claim screen centre).
+	# KeyHints moves its hint under the title while a card plays (both
+	# claim screen centre).
 	add_to_group(GROUP)
 	_seed = hash(id)
 	visible = true
@@ -110,13 +111,7 @@ func _inverted() -> bool:
 
 func _draw_title(view: Vector2, inverted: bool) -> void:
 	var words := text.split(" ")
-	var cap := minf(view.y * 0.2, view.x / maxf(6.0, float(_longest(words)) * 0.9))
-	# Letter count undersizes wide words (OVERTAKEN ran off the left edge):
-	# fit the widest word's real drawn width, tracking included, to 88%.
-	for word in words:
-		var drawn := CellOutzType.width(word, cap, cap * 0.08) + cap * 0.3
-		if drawn > view.x * 0.88:
-			cap *= view.x * 0.88 / drawn
+	var cap := _title_cap(view, words)
 	var line_gap := cap * 1.25
 	var total := line_gap * float(words.size())
 	var top := view.y * 0.5 - total * 0.5 + cap * 0.1
@@ -155,6 +150,40 @@ func _draw_title(view: Vector2, inverted: bool) -> void:
 		var art_size := custom_art.get_size() * minf(view.x * 0.8 / custom_art.get_size().x, view.y * 0.6 / custom_art.get_size().y)
 		var wobble := Vector2(sin(clock * 3.0), cos(clock * 2.3)) * 8.0
 		draw_texture_rect(custom_art, Rect2(view * 0.5 - art_size * 0.5 + wobble, art_size), false, Color(1, 1, 1, slam))
+
+
+func _title_cap(view: Vector2, words: PackedStringArray) -> float:
+	var cap := minf(view.y * 0.2, view.x / maxf(6.0, float(_longest(words)) * 0.9))
+	# Letter count undersizes wide words (OVERTAKEN ran off the left edge):
+	# fit the widest word's real drawn width, tracking included, to 88%.
+	for word in words:
+		var drawn := CellOutzType.width(word, cap, cap * 0.08) + cap * 0.3
+		if drawn > view.x * 0.88:
+			cap *= view.x * 0.88 / drawn
+	return cap
+
+
+## Where the title letters can reach, in this card's own coordinates: the
+## lines with their shear, lift and jitter, and the drips under the last line.
+## KeyHints keeps its box out of this while the card plays.
+func title_rect() -> Rect2:
+	var view := size
+	var words := text.split(" ")
+	var cap := _title_cap(view, words)
+	var total := cap * 1.25 * float(words.size())
+	var top := view.y * 0.5 - total * 0.5 + cap * 0.1
+	var widest := 0.0
+	for word in words:
+		widest = maxf(widest, CellOutzType.width(word, cap, cap * 0.08))
+	var reach := cap * 0.25
+	# The last line's letters plus the darker two thirds of its drips (the
+	# rest has faded to almost nothing by then).
+	var bottom := top + cap * 1.25 * float(words.size() - 1) + cap * 1.4
+	var rect := Rect2(view.x * 0.5 - widest * 0.5 - reach, top - reach, widest + reach * 2.0, bottom - top + reach)
+	if custom_art != null:
+		var art_size := custom_art.get_size() * minf(view.x * 0.8 / custom_art.get_size().x, view.y * 0.6 / custom_art.get_size().y)
+		rect = rect.merge(Rect2(view * 0.5 - art_size * 0.5 - Vector2(8, 8), art_size + Vector2(16, 16)))
+	return rect
 
 
 func _draw_code(view: Vector2, inverted: bool) -> void:
@@ -232,6 +261,18 @@ class CelloutzEase:
 		if t >= 1.0:
 			return 1.0
 		return (1.0 - pow(1.0 - t, 3.0)) + 0.3 * sin(t * PI)
+
+
+## The title area of every card on screen, in viewport coordinates (empty
+## when none plays).
+static func playing_title_rect(tree: SceneTree) -> Rect2:
+	var area := Rect2()
+	for card in tree.get_nodes_in_group(GROUP):
+		if card is MissionCard and (card as MissionCard).playing and (card as MissionCard).is_visible_in_tree():
+			var rect := (card as MissionCard).title_rect()
+			rect.position += (card as MissionCard).get_global_rect().position
+			area = area.merge(rect) if area.has_area() else rect
+	return area
 
 
 ## True while any card in the tree is on screen.
