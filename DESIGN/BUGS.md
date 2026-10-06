@@ -63,7 +63,7 @@ bughunt-79-c (2026-10-06, after the v0.1 sound pass merged) re-ran the six route
 - **First-person sleeves "purple checker" (REMASTER_LOG imp-64 Still weak)**: it is the jester leather pattern on `held_gear` sleeves, not a missing texture. Art call, not a lane fix. OPEN (look).
 
 - **Service Arcade, guard's "SEEN 100%" awareness tag**: BlockTracker's tag sits over his speech line at the old-body spot (rebirth_old_body). Minor. FIXED fix-94: awareness box stays, tag text yields for the guard's spoken line and returns when it ends (`P:/GameDev/Temp/rebirth_old_body.png`).
-- **Main menu settings**: the support address line sits ~12 px left of the plate's row inset. Minor. OPEN.
+- **Main menu settings**: the support address line sits ~12 px left of the plate's row inset. Minor. FIXED fix-82: the real-font address now uses the compact plate's 14 px row inset (`P:/GameDev/Temp/menu_01_settings_support.png`).
 
 ## Not verified by bughunt-79-a
 
