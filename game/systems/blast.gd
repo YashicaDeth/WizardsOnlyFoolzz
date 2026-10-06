@@ -16,8 +16,11 @@ const SHOCK := 0.1
 
 ## `source` is a `MaterialToughness.SOURCES` key ("explosive", "charge").
 ## Returns a tally: cells removed, soil cut, bodies hit, things pushed.
-static func explode(host: Node3D, at: Vector3, radius: float, damage: float, source := "explosive") -> Dictionary:
+## `normal` is the face a charge sat on (UP for a grenade on the ground); the
+## fireball, smoke and scorch (`BlastFx`) are thrown out of it.
+static func explode(host: Node3D, at: Vector3, radius: float, damage: float, source := "explosive", normal := Vector3.UP) -> Dictionary:
 	var tally := {"removed": 0, "blocked": 0, "dug": 0, "bodies": 0, "pushed": 0, "props": 0}
+	var material := ""
 	var tree := host.get_tree()
 	for node in tree.get_nodes_in_group(VoxelStructure.GROUP):
 		var structure := node as VoxelStructure
@@ -26,8 +29,13 @@ static func explode(host: Node3D, at: Vector3, radius: float, damage: float, sou
 		var result := structure.damage_sphere(at, radius, source, damage, Vector3.UP, {}, SHOCK)
 		tally.removed += int(result.removed)
 		tally.blocked += int(result.blocked)
+		if material.is_empty() and not str(result.material).is_empty():
+			material = str(result.material)
 	for node in tree.get_nodes_in_group(DigTerrain.GROUP):
-		tally.dug += (node as DigTerrain).carve_sphere(at, radius * 0.85, source)
+		var soil := (node as DigTerrain).carve_sphere(at, radius * 0.85, source)
+		tally.dug += soil
+		if soil > 0 and material.is_empty():
+			material = (node as DigTerrain).layer_at(at)
 	# Bodies, props and loose things inside twice the radius.
 	var query := PhysicsShapeQueryParameters3D.new()
 	var ball := SphereShape3D.new()
@@ -63,7 +71,10 @@ static func explode(host: Node3D, at: Vector3, radius: float, damage: float, sou
 			var broke: Dictionary = WORLD_BREAK.hit(collider, damage, "explosion", at, ((collider as Node3D).global_position - at).normalized() if collider is Node3D else Vector3.UP, source, "explosive")
 			if not broke.is_empty():
 				tally.props += 1
-	_flash(host, at, radius)
+	var fx := BlastFx.of(host)
+	if fx != null:
+		fx.blast(at, radius, damage, normal, material)
+	MaterialToughness.play_break(host, at, "concrete")
 	return tally
 
 
@@ -76,17 +87,3 @@ static func _rig_of(collider: Object) -> BaselineHuman:
 			return node
 		node = node.get_parent()
 	return null
-
-
-static func _flash(host: Node3D, at: Vector3, radius: float) -> void:
-	var light := OmniLight3D.new()
-	light.light_color = Color("ffb36a")
-	light.light_energy = 8.0
-	light.omni_range = radius * 5.0
-	var scene := host.get_tree().current_scene
-	(scene if scene != null else host).add_child(light)
-	light.global_position = at + Vector3.UP * 0.3
-	var fade := light.create_tween()
-	fade.tween_property(light, "light_energy", 0.0, 0.35)
-	fade.tween_callback(light.queue_free)
-	MaterialToughness.play_break(host, at, "concrete")

@@ -25,6 +25,12 @@ const CHUNK := 8
 const GRIME := preload("res://shaders/grimy_dirt.gdshader")
 
 @export var material := "dirt"
+## imp-63: the ground is layered. Greg: "ground texture"; the brief: topsoil,
+## clay, rock exposed as you dig deeper. Metres below the untouched surface
+## where clay starts and where rock starts (dials; the shader wobbles the
+## seams). Looks and spoil only: the soil's tier stays `material`'s.
+@export var topsoil_depth := 0.4
+@export var clay_depth := 1.6
 var density := PackedFloat32Array()
 var cuts: Array = []
 var _chunks: Dictionary = {}
@@ -42,6 +48,9 @@ func _ready() -> void:
 				density[_s(x, y, z)] = depth - float(y) * cell
 	_look = ShaderMaterial.new()
 	_look.shader = GRIME
+	_look.set_shader_parameter("surface_y", surface_y())
+	_look.set_shader_parameter("topsoil_depth", topsoil_depth)
+	_look.set_shader_parameter("clay_depth", clay_depth)
 	for cz in ceili(float(cells.z) / CHUNK):
 		for cy in ceili(float(cells.y) / CHUNK):
 			for cx in ceili(float(cells.x) / CHUNK):
@@ -69,6 +78,14 @@ func surface_y() -> float:
 	return global_position.y + depth
 
 
+## Which layer a world point sits in: "topsoil", "clay" or "rock".
+func layer_at(world_point: Vector3) -> String:
+	var below := surface_y() - world_point.y
+	if below >= clay_depth:
+		return "rock"
+	return "clay" if below >= topsoil_depth else "topsoil"
+
+
 ## A crater or scoop: soil within `radius` of `world_point` is gone, if
 ## `source` beats the soil's tier. Returns the number of samples cut.
 func carve_sphere(world_point: Vector3, radius: float, source := "dig", params := {}) -> int:
@@ -80,6 +97,9 @@ func carve_sphere(world_point: Vector3, radius: float, source := "dig", params :
 		cuts.append({"shape": "sphere", "at": centre, "r": radius})
 		_spoil(world_point, radius)
 		MaterialToughness.play_break(self, world_point, material)
+		var fx := BlastFx.of(self)
+		if fx != null:
+			fx.break_dust(world_point + Vector3.UP * radius * 0.5, layer_at(world_point - Vector3.UP * radius * 0.5), cut, Vector3.UP)
 	return cut
 
 
@@ -129,9 +149,11 @@ func _cut(low: Vector3, high: Vector3, inside: Callable) -> int:
 	return count
 
 
+## Clods thrown up by a cut, coloured by the deepest layer it reached.
 func _spoil(at: Vector3, radius: float) -> void:
+	var dug := layer_at(at - Vector3.UP * radius * 0.5)
 	for n in mini(int(radius * 8.0), 6):
-		VoxelStructure.spawn_cube(get_parent(), at + Vector3(randf_range(-0.3, 0.3), 0.2, randf_range(-0.3, 0.3)), 0.12, material, Vector3(randf_range(-2, 2), randf_range(2, 5), randf_range(-2, 2)))
+		VoxelStructure.spawn_cube(get_parent(), at + Vector3(randf_range(-0.3, 0.3), 0.2, randf_range(-0.3, 0.3)), 0.12, dug, Vector3(randf_range(-2, 2), randf_range(2, 5), randf_range(-2, 2)))
 
 
 func _flush() -> void:
@@ -180,10 +202,9 @@ func _mesh_chunk(key: Vector3i) -> void:
 				var at := Vector3(x, y, z) + sum / float(crossings)
 				vertex_of[Vector3i(x, y, z)] = verts.size()
 				verts.append(at * cell)
-				# Deeper soil is darker and redder.
-				var below := clampf((depth - at.y * cell) / depth, 0.0, 1.0)
+				# The layers (topsoil, clay, rock) are the shader's, by depth.
 				var grain := 0.9 + 0.1 * float(hash(Vector3i(x, y, z)) % 100) / 100.0
-				var tint := base.lerp(Color("2a1a12"), below * 0.7) * grain
+				var tint := base * grain
 				tint.a = 1.0
 				colours.append(tint)
 	var indices := PackedInt32Array()

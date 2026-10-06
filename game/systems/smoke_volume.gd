@@ -220,6 +220,13 @@ func sidestream(at: Vector3, tint := Color(0.62, 0.66, 0.74)) -> void:
 		float(SIDESTREAM.life), float(SIDESTREAM.grow), float(SIDESTREAM.thin), tint, 0.0)
 
 
+## One free parcel with the caller's own numbers (imp-63: a blast's smoke
+## column and a break's material dust, which are not breaths).
+func billow(at: Vector3, velocity: Vector3, radius: float, density: float, heat: float, life: float,
+		grow: float, thin: float, tint: Color) -> int:
+	return _spawn(at, velocity, radius, density, heat, life, grow, thin, tint, 0.0)
+
+
 func _spawn(at: Vector3, velocity: Vector3, radius: float, density: float, heat: float, life: float,
 		grow: float, thin: float, tint: Color, ring_flag: float) -> int:
 	if _pos.size() >= cap():
