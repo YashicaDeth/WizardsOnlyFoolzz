@@ -17,7 +17,7 @@ cyberpunk-ish post-apocalyptic biopunk occult horror; pad first.
 - [x] Enemies: numbered guards, freed vat subject, sentinel (shoot the eye, hit the core)
 - [x] Death: short vat regrowth, then the nearest checkpoint; the bloodstain stays where you died (Greg 6 Oct, dec-89)
 - [~] The recovery sigil should be a dark pulsing organ-sigil, not the orange ghost
-- [x] Ending: daylight, silence then wind, title drop, TO BE CONTINUED card (fix-78 landed 722f3f37)
+- [x] Ending: daylight, silence then wind, title drop, TO BE CONTINUED card (fix-78 landed 722f3f37; fix-96 horizon tilt 7a760832)
 - [ ] A real pad playtest by Greg start to finish, the five worst problems fixed, tag v0.1-escape
 
 ## Combat (soulslike core)
