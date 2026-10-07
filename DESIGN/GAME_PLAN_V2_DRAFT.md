@@ -2,13 +2,14 @@
 
 Started by the hourly build manager, 2026-10-05 15:10. This is a draft. It does not change GAME_PLAN.html or BUILD_PLAN.html, and no v0.2 job has been queued from it. Anything not taken from Greg's recorded decisions is marked **proposal, needs Greg**.
 
-## 0. v2: refining v0.1 into a really good demo (refreshed 6 Oct 22:10)
+## 0. v2: refining v0.1 into a really good demo (refreshed 7 Oct 21:10)
 
 Greg's north star (6 Oct night): "a really enjoyable gameplay shell" he can texture himself. So v2 is not new content; it is making the START-to-daylight route play well.
 
-- **Plays well:** the examiner fight (telegraphed, fair, keycard always drops); the one-map route with real lifts and no loading screens (map-84 lit Lower Works and gave the arcade real cover, min 174 fps); the vat wake through the flood; the ending; the pad-first intake; route suites green with no script errors (bughunt-79-a/b/c).
-- **Plays worst:** (1) the first-person melee still reads as a pose, not a swing (feel-86 queued); (2) encounters are flat: rooms are one long tile hall each with a guard in it (feel-87 queued); (3) lab systems (organs, X-ray, liquid, destruction) barely touch the route (route-88 queued); (4) lift rides are near-black; (5) the player model, which Greg hates (player-81 queued).
-- **Next refinement passes, in order:** bug list (DESIGN/BUGS.md) > player-81 > feel-86 > feel-87 > route-88 > imp-66 vat room > the Black Mirror in the route (v02-51 landed 4a68600c; fix-93 proves it on trunk). Each pass ships a before/after render and keeps the route suites green.
+- **Plays well:** the examiner fight (telegraphed, fair, keycard always drops); the one-map route with real lifts and no loading screens (min 174 fps); the vat wake through the flood; the ending (7 Oct: hands hidden through the whiteout, bigger TO BE CONTINUED card, camera tilts 8 degrees to the horizon at the title drop, dial `TITLE_LOOK_UP_DEG`); the brain screen with all 4 disciplines (dec-89); route death = 3 s vat regrowth then last checkpoint; the decluttered lab (tidy-80); the new player body (player-81); the combat test suites all green (fix-76, fix-98).
+- **Plays worst:** (1) the first-person melee still reads as a pose, not a swing (feel-86 queued); (2) encounters are flat: one long tile hall per room with a guard in it (feel-87 queued); (3) lab systems (organs, X-ray, liquid, destruction) barely touch the route (route-88 queued); (4) the Black Mirror on trunk stays stuck behind the brain screen (fix-93 queued); (5) ragdoll bodies can crash the game on quit (fix-95 queued); (6) lift rides are near-black and the arcade and Lower Works look alike.
+- **Capacity, 7 Oct:** every Claude account is parked until 10 Oct 19:04 (alt2 until 11 Oct), so today only Codex built: 8 small fixes landed (fix-82, 92, 94, 78, 76, 96, 98, plus fix-85 overnight). Codex frees up around 01:40 on 8 Oct with fix-97 and fix-99 waiting.
+- **Next refinement passes, in order:** fix-95 ragdoll quit crash > fix-93 Black Mirror on trunk > feel-86 combat feel > feel-87 encounters > route-88 lab systems into the route > remaster-player-81-p1 > imp-66 vat room. Each pass ships a before/after render and keeps the route suites green.
 
 ## 1. What v0.1 "Escape" actually delivered (as of 22:10, 6 Oct)
 
@@ -33,7 +34,9 @@ Greg's north star (6 Oct night): "a really enjoyable gameplay shell" he can text
 | intake-29 pad-first intake | landed (42fdbd02, 6 Oct) | NEURAL INTAKE is fully playable on a PS4/PS5 pad: L1/R1 tabs, D-pad rows, face-button actions, device-aware hints, push-to-talk on R3 with a text fallback, on-screen rename. | Header overlaps the tabs, labels run off the edge, the subject preview is still the checker body (fix-77 queued). Not tried on a real pad. |
 | v01-75 ending | landed (9cf16860, merge 8d4089fd, 6 Oct) | At the Surface Gate: whiteout, eyes adjust, hum to silence then wind, WIZARDS ONLY FOOLS burns in over the first view, TO BE CONTINUED with the per-area run card, back to the title. Skippable after first view. | The held weapon stays on screen over the title drop; the first view is bare pillars on flat ground; the card text is small at 720p; gamepad Start not tested (fix-78 queued). |
 
-Fixes that also landed: fix-hidden-cache-test, fix-58 (an execution on a downed body is one beat and ends with them dead), and fix-55 (the examiner no longer uses the Higgsfield skin).
+Fixes that landed 7 Oct (Codex, all gate green): fix-85 old-body label, fix-92 thought line, fix-94 guard tag, fix-82 menu support row, fix-78 ending first view, fix-76 combat tests, fix-96 horizon tilt, fix-98 test quit leaks. Also landed 7 Oct: player-81 player model redo (e98c9457) and dec-89 Greg's 6 Oct answers (23c53034).
+
+Earlier fixes: fix-hidden-cache-test, fix-58 (an execution on a downed body is one beat and ends with them dead), and fix-55 (the examiner no longer uses the Higgsfield skin).
 
 ## 2. What v0.1 still needs before v0.2 starts
 

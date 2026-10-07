@@ -683,3 +683,8 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 - fix-97 (ADS hands lower) did not run: both Codex tries hit limits/out of credits; still pending.
 - Accounts: all parked (Codex team/allusions-plus free ~01:40 8 Oct; Claude 10-10/10-11).
 - Recommendations: 1) Queued fix-99-boneyard-quit-leaks (Codex, 66): free BoneYardHunt runtime RIDs/streams on exit so sparring/exit_reveal logs go quiet. 2) fix-97 stays next for Codex. 3) fix-95 ragdoll quit crash stays the first Claude fix when an account frees up.
+
+## Manager notes, 2026-10-07 21:10
+- Merged since 20:10: nothing. Every account is parked (Codex until about 01:40 on 8 Oct, Claude until 10 Oct 19:04). No new tasks are queued, because fix-97 and fix-99 are already waiting for Codex.
+- The daily refresh is done: GAME_PLAN_V2_DRAFT.md section 0 is updated for 7 Oct, and MORNING_REPORT.md has today's summary.
+- Top three, all already queued: fix-95 (ragdoll quit crash), fix-93 (Black Mirror on trunk), feel-86 (combat feel).
