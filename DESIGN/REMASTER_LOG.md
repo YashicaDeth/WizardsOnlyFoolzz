@@ -666,3 +666,7 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 - Weak: combat_stance_test and sparring_test still print quit-time leak lines (exit 0; same family as BUGS.md "Exit-time noise").
 - Accounts: all Claude accounts parked to 10-10/10-11; only codex-allusions-plus ready and no Codex work was pending.
 - Recommendations: 1) Keep Codex busy: queued fix-96-ending-horizon-tilt (Codex, priority 70): one dial `TITLE_LOOK_UP_DEG` (default 8, 0 = old) eases the camera up at the title drop so the first outside view is horizon, not black floor. 2) fix-95 ragdoll quit crash stays the first Claude fix when an account frees up. 3) Next Codex candidate: lower the first-person hands while aiming down the sights (BUGS.md "The Hunt, aiming down the sights"), behind a dial.
+
+## 7 October 2026 — fix-96 ending horizon tilt
+
+- The v0.1 ending now eases the active camera 8 degrees upward while the white adjusts, putting more sky and horizon behind the title without moving the player or changing the ending timings. `TITLE_LOOK_UP_DEG` is the presentation dial; 0 restores the old composition.

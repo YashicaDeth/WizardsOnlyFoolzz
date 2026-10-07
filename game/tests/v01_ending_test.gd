@@ -77,6 +77,7 @@ func _ready() -> void:
 	var saw_card := false
 	var saw_eyes_adjust := false
 	var view_model_hidden := false
+	var camera_pitch_rise_deg := 0.0
 	var deadline := Time.get_ticks_msec() + 90000
 	while is_instance_valid(ending) and not ending.menu_reached and Time.get_ticks_msec() < deadline:
 		await get_tree().process_frame
@@ -88,7 +89,11 @@ func _ready() -> void:
 			var hunter_body := get_tree().current_scene.find_child("HunterBody", true, false) as Node3D
 			view_model_hidden = view_model_hidden or (hunter_body != null and not hunter_body.visible)
 			saw_eyes_adjust = saw_eyes_adjust or ending.white_alpha() < 0.2
-			saw_title_over_world = saw_title_over_world or ending.title_alpha() > 0.9
+			if ending.title_alpha() > 0.9:
+				saw_title_over_world = true
+				var active_camera := get_viewport().get_camera_3d()
+				if active_camera != null and ending._ending_camera == active_camera:
+					camera_pitch_rise_deg = rad_to_deg(active_camera.rotation.x - ending._camera_pitch_start)
 		saw_wind = saw_wind or ending._wind.playing
 		if ending.card_alpha() >= 1.0 and ending._card != null:
 			if not saw_card:
@@ -108,6 +113,7 @@ func _ready() -> void:
 	check(saw_eyes_adjust, "the eyes adjust out of the white onto the world")
 	check(saw_wind, "open air and wind come in")
 	check(saw_title_over_world, "the WIZARDS ONLY FOOLS logo drops over the first view")
+	check(absf(camera_pitch_rise_deg - ENDING.TITLE_LOOK_UP_DEG) < 0.5, "the title view pitches up by about %.1f degrees (%.2f)" % [ENDING.TITLE_LOOK_UP_DEG, camera_pitch_rise_deg])
 	check(view_model_hidden, "the first-person body and held view model stay out of the ending")
 	check(saw_card, "then the TO BE CONTINUED card with the run times")
 	for _frame in 6:
