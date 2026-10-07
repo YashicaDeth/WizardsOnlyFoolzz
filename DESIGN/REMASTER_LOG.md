@@ -677,3 +677,9 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 - Accounts: Claude accounts parked to 10-10/10-11; two Codex accounts ready (allusions-plus, sircuteskingdom-team), no Codex work was pending.
 - Recommendations: 1) Queued fix-97-ads-hands-lower (Codex, priority 70): dial `ADS_HAND_DROP` (0.035 m, 0 = old) lowers the grip hands while aimed, sights untouched. 2) Queued fix-98-test-quit-leaks (Codex, 65): free test scenes before quit in combat_stance/sparring tests. 3) fix-95 ragdoll quit crash stays the first Claude fix when an account frees up.
 2026-10-07 — fix-98: combat stance and sparring tests release spawned nodes before quit; stance leak noise is gone, while sparring still exposes BoneYardHunt's system-owned shutdown leaks.
+
+## Manager notes, 2026-10-07 20:10
+- Merged: fix-98 (c32d60e9, merge e334ce63, gate green). Test-only: combat_stance_test leak lines 1 -> 0; sparring_test still 5 (BoneYardHunt shutdown leaks, system-owned). No render needed.
+- fix-97 (ADS hands lower) did not run: both Codex tries hit limits/out of credits; still pending.
+- Accounts: all parked (Codex team/allusions-plus free ~01:40 8 Oct; Claude 10-10/10-11).
+- Recommendations: 1) Queued fix-99-boneyard-quit-leaks (Codex, 66): free BoneYardHunt runtime RIDs/streams on exit so sparring/exit_reveal logs go quiet. 2) fix-97 stays next for Codex. 3) fix-95 ragdoll quit crash stays the first Claude fix when an account frees up.
