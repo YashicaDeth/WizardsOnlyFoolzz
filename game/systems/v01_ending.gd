@@ -35,6 +35,7 @@ const MENU_SCENE := "res://country_town_menu.tscn"
 const WORLD_AT := 0.2
 const WHITE_HOLD := 0.9
 const WHITE_ADJUST := 2.0
+const TITLE_LOOK_UP_DEG := 8.0
 ## The facility hum cuts dead at the gate; silence, then open air and wind.
 const SILENCE := 1.6
 const WIND_AT := 1.4
@@ -76,6 +77,8 @@ var _hidden_hud: CanvasLayer
 var _hud_was_visible := false
 var _hidden_view_model: Node3D
 var _view_model_was_visible := false
+var _ending_camera: Camera3D
+var _camera_pitch_start := 0.0
 
 
 ## `world_scene` empty keeps the current scene as the view (gallery use).
@@ -84,6 +87,9 @@ func begin(world_scene: String = WORLD_SCENE) -> void:
 	layer = 90
 	name = "V01Ending"
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# The Hunt composes its ordinary camera earlier in the frame; the ending's
+	# temporary authored view is the final camera operation while it owns it.
+	process_priority = 100
 	get_tree().root.set_meta(ACTIVE_META, true)
 	skippable = WorldHistory.event_count(SEEN_EVENT) > 0
 	WorldHistory.record_event(SEEN_EVENT, {"location": "surface_gate"})
@@ -150,6 +156,7 @@ func _process(delta: float) -> void:
 	if _recorded_surface:
 		# Every frame: the Hunt's own systems turn its HUD back on.
 		_hide_world_presentation()
+		_tilt_world_camera()
 	if clock >= WIND_AT:
 		if not _wind.playing:
 			_wind.play()
@@ -253,6 +260,23 @@ func _hide_world_presentation() -> void:
 		_hidden_view_model = body
 		_view_model_was_visible = body.visible
 	body.visible = false
+
+
+## Lift the active view with the same eye-adjustment beat that reveals the
+## world. The body stays put; only the camera's local pitch changes. Zero keeps
+## the pre-fix composition exactly.
+func _tilt_world_camera() -> void:
+	var active := get_viewport().get_camera_3d()
+	if active == null:
+		return
+	if _ending_camera == null:
+		_ending_camera = active
+		_camera_pitch_start = active.rotation.x
+	if active != _ending_camera:
+		return
+	var progress := clampf((clock - WHITE_HOLD) / WHITE_ADJUST, 0.0, 1.0)
+	var eased := smoothstep(0.0, 1.0, progress)
+	_ending_camera.rotation.x = _camera_pitch_start + deg_to_rad(TITLE_LOOK_UP_DEG) * eased
 
 
 func _restore_world_presentation() -> void:
