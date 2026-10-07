@@ -676,3 +676,4 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 - Weak: ADS grip hands still cover the lower third (BUGS.md, OPEN); combat_stance/sparring tests print quit-time leak lines.
 - Accounts: Claude accounts parked to 10-10/10-11; two Codex accounts ready (allusions-plus, sircuteskingdom-team), no Codex work was pending.
 - Recommendations: 1) Queued fix-97-ads-hands-lower (Codex, priority 70): dial `ADS_HAND_DROP` (0.035 m, 0 = old) lowers the grip hands while aimed, sights untouched. 2) Queued fix-98-test-quit-leaks (Codex, 65): free test scenes before quit in combat_stance/sparring tests. 3) fix-95 ragdoll quit crash stays the first Claude fix when an account frees up.
+2026-10-07 — fix-98: combat stance and sparring tests release spawned nodes before quit; stance leak noise is gone, while sparring still exposes BoneYardHunt's system-owned shutdown leaks.
