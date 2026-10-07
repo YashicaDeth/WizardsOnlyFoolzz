@@ -2797,6 +2797,7 @@ func _pose_weapon_on_sight() -> void:
 		var rest: Vector3 = model.get_meta("rest_position")
 		sway = (model.get_parent() as Node3D).global_transform.basis * (model.position - rest)
 	ads.pose(model, camera.global_transform, str(arsenal.current_id), firearm_aim_blend, sway)
+	FirstPersonArms.drop_ads_hands(model, null, camera, firearm_aim_blend)
 	_update_first_person_forearms()
 
 

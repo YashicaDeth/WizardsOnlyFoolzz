@@ -62,6 +62,9 @@ const INSPECT := {"swing": Vector3(0.18, 0.25, 0.0), "wrist": Vector3(-0.60, 1.3
 const INSPECT_SECONDS := 2.4
 const RELOAD := {"swing": Vector3(-0.20, -0.20, 0.0), "wrist": Vector3(0.55, 0.35, 0.75), "reach": Vector3(-0.05, -0.04, 0.06)}
 const MAGAZINE_DROP := Vector3(0, -0.145, 0.012)
+## Presentation-only clearance below the sight line. Zero restores the old
+## shouldered hand placement without moving the gun or either sight marker.
+const ADS_HAND_DROP := 0.035
 
 var weapon_id := "-"
 ## player-81: true keeps the jester gloves (the forced humiliation set, worn
@@ -301,11 +304,39 @@ func pose(delta: float) -> void:
 	# The pistol comes up onto its sights through the owner's ADS.
 	if ads != null and aim_blend > 0.0 and is_inside_tree() and camera != null:
 		ads.pose(held, camera.global_transform, weapon_id, aim_blend)
+	drop_ads_hands(held, left_hand, camera as Camera3D, aim_blend)
 	_jolt = _jolt.lerp(Vector3.ZERO, clampf(delta * 12.0, 0.0, 1.0))
 	_jolt_turn = _jolt_turn.lerp(Vector3.ZERO, clampf(delta * 12.0, 0.0, 1.0))
 	if is_inside_tree() and camera is Camera3D:
 		for hand in [held.get_node_or_null("RightGripHand"), held.get_node_or_null("LeftGripHand"), left_hand]:
 			stretch_forearm(hand as Node3D, camera as Camera3D)
+
+
+## Lower only the hands after ADS has placed the gun. The Hunt and the
+## mechanics/facility arm mount share this seam; caching each local rest once
+## prevents the per-frame offset from accumulating.
+static func drop_ads_hands(mount: Node3D, free_left_hand: Node3D, camera: Camera3D, blend: float) -> void:
+	if mount == null or camera == null:
+		return
+	var amount := clampf(blend, 0.0, 1.0)
+	for hand in [mount.get_node_or_null("RightGripHand"), mount.get_node_or_null("LeftGripHand"), free_left_hand]:
+		var grip := hand as Node3D
+		if grip == null or not is_instance_valid(grip):
+			continue
+		if is_zero_approx(amount) or is_zero_approx(ADS_HAND_DROP):
+			# A hand that has never aimed may belong to a melee pose composed just
+			# above. Do not create a rest cache or overwrite that live animation.
+			if grip.has_meta("ads_hand_rest_position"):
+				grip.position = grip.get_meta("ads_hand_rest_position")
+			continue
+		if not grip.has_meta("ads_hand_rest_position"):
+			grip.set_meta("ads_hand_rest_position", grip.get_meta("grip_rest_position", grip.position))
+		var rest: Vector3 = grip.get_meta("ads_hand_rest_position")
+		var parent := grip.get_parent() as Node3D
+		if parent == null:
+			continue
+		var camera_drop := -camera.global_basis.y.normalized() * ADS_HAND_DROP * amount
+		grip.position = rest + parent.global_basis.inverse() * camera_drop
 
 
 ## Hand transform: the arm turns about `shoulder`, the wrist turns the weapon.
