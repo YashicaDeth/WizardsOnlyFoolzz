@@ -650,3 +650,9 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 - The centred SURFACED run card uses a 1.55 presentation scale in the ending; its existing text, colours and sequence are unchanged. Ordinary in-world run cards remain at their original scale.
 - `v01_ending_test` now drives a real `JOY_BUTTON_START` press on the card and verifies the enlarged card and hidden view model.
 - Failures: none new (job2, job2b, lane-exit-routes are old).
+
+## Manager notes, 2026-10-07 17:10
+- Merged: fix-78 (9ca8c869, merge 722f3f37, gate green). Looked at P:/GameDev/Temp/v01_ending/5_title.png and 7_to_be_continued.png (16:21 renders): no weapon or hands over the title drop; the TO BE CONTINUED card now fills the middle of the screen and reads at 720p; the prompt already switches ENTER/CROSS with the pad.
+- Weak: (1) on the title shot the bottom half of the frame is flat black ground, so the "first view of the world" is mostly a dark floor under the logo; the camera could look a little higher at the horizon. (2) The card's area times read 0:00/0:00/0:05 in the capture (a capture shortcut, not a bug to chase). (3) A faint ghost of other text shows behind the logo letters.
+- Accounts: only codex-allusions-plus is ready; nothing pending was for Codex, so it sat idle since 16:22.
+- Recommendations: 1) Keep Codex busy: fix-76 is now narrowed to `souls_pad_test` only (v01_weapons_test was fixed by bughunt-79-b) and moved to agent codex. 2) fix-95 ragdoll quit crash stays the first Claude fix when an account frees up (10-10 19:04). 3) Ending camera: tilt up toward the horizon for the title drop (a later Codex job, behind a dial).
