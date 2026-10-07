@@ -692,3 +692,10 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 ## 7 October 2026 - fix-97 ADS grip-hand clearance
 
 - The Hunt and the facility/lab arm mount now share a non-accumulating 0.035 m camera-local grip-hand drop after ADS poses the gun. `P:/GameDev/Temp/ads01/ads_sidearm_stage2.png` keeps the sights centred while the hands occupy roughly the lower 24% of the 720p frame instead of the lower third; zero aim restores their cached rest.
+
+## Manager notes, 2026-10-08 02:10
+- Merged since 21:10: fix-97 ADS hands lower (2e4b900f, merge 96c3dc0d, gate green). Checked the builder's render P:/GameDev/Temp/ads01/ads_sidearm_stage2.png: the sights are centred and clear, and the hands now sit in the bottom of the frame. Dial: `ADS_HAND_DROP` = 0.035 m.
+- Weak: the grip hands still look like checker-textured balls rather than hands (remaster-imp-64-p1 already covers this). While aiming, the three hanging monitors (HRT/EEG/CAM) stay fully opaque and crowd the top right, which adds clutter.
+- Failures: fix-99 (Bone Yard quit leaks) did not run; both Codex tries hit "workspace out of credits". It is still pending.
+- Accounts: all parked (Codex team ~08:07 and allusions-plus ~07:59 on 8 Oct; Claude 10 Oct 19:04, alt2 11 Oct).
+- Recommendations: 1) Queued fix-100-ads-quiet-monitors (Codex, 70): fade the hanging monitors to 25% while aiming (dial `ADS_MONITOR_ALPHA`), Job 3. 2) remaster-imp-64-p1: make the grip hands read as hands. 3) fix-99 stays next for Codex after fix-100.
