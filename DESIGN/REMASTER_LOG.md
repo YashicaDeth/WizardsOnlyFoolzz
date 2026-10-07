@@ -699,3 +699,4 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 - Failures: fix-99 (Bone Yard quit leaks) did not run; both Codex tries hit "workspace out of credits". It is still pending.
 - Accounts: all parked (Codex team ~08:07 and allusions-plus ~07:59 on 8 Oct; Claude 10 Oct 19:04, alt2 11 Oct).
 - Recommendations: 1) Queued fix-100-ads-quiet-monitors (Codex, 70): fade the hanging monitors to 25% while aiming (dial `ADS_MONITOR_ALPHA`), Job 3. 2) remaster-imp-64-p1: make the grip hands read as hands. 3) fix-99 stays next for Codex after fix-100.
+- fix-100: MERCY NINE ADS now fades only the HRT, EEG and CAM hanging monitors to 25%, restoring them exactly at zero aim.
