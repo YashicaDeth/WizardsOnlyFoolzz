@@ -167,8 +167,12 @@ func _ready() -> void:
 	motion.update(0.016, Vector3.ZERO, true, false, false, false)
 	var torso := rig.parts.get("torso") as Node3D
 	check(absf(torso.rotation.z) > 0.01, "and a stagger folds the torso on a live body")
+	motion.step_voice.stop()
+	motion.step_voice.stream = null
 	rig.queue_free()
 	motion.queue_free()
+	await get_tree().process_frame
+	await get_tree().process_frame
 
 	print("COMBAT_STANCE_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

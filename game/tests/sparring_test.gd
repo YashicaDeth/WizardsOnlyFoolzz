@@ -54,5 +54,8 @@ func _ready() -> void:
 	check(hunt.spar_bout.is_empty() and hunt.health == health_before, "five touches lose the bout, and nobody bleeds")
 	check(hunt.prompt.text.contains("YOU LOSE") and hunt.prompt.text.contains("LOW"), "losing says what beat you: %s" % hunt.prompt.text)
 	check(hunt.spar_tier() == "hunter", "losing keeps your tier")
+	hunt.queue_free()
+	await get_tree().process_frame
+	await get_tree().process_frame
 	print("SPARRING_TEST_RESULT failures=%d" % failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
