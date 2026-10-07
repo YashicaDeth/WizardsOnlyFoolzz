@@ -700,3 +700,10 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 - Accounts: all parked (Codex team ~08:07 and allusions-plus ~07:59 on 8 Oct; Claude 10 Oct 19:04, alt2 11 Oct).
 - Recommendations: 1) Queued fix-100-ads-quiet-monitors (Codex, 70): fade the hanging monitors to 25% while aiming (dial `ADS_MONITOR_ALPHA`), Job 3. 2) remaster-imp-64-p1: make the grip hands read as hands. 3) fix-99 stays next for Codex after fix-100.
 - fix-100: MERCY NINE ADS now fades only the HRT, EEG and CAM hanging monitors to 25%, restoring them exactly at zero aim.
+
+## Manager notes, 2026-10-08 09:10
+- Merged since 02:10: fix-100 ADS quiet monitors (11c3389f, merge 7ed7f5d0, gate green). Checked the builder's renders P:/GameDev/Temp/ads100-final/ads_sidearm_hip.png vs ads_sidearm_stage2.png: HRT and EEG recede to 25% while aiming, as asked. Dial: `ADS_MONITOR_ALPHA` = 0.25.
+- Weak: the CAM monitor's inner face feed stays fully bright while aiming (its frame fades, the image does not), so the top right is still busy. At hip the MERCY NINE arm reads as a dark checker cylinder and the hand as a checker ball (remaster-imp-64-p1 covers it). The capture target's name plate sits right over the sight line; capture-only, not a game bug.
+- Failures: none new. fix-99 still pending (Codex was out of credits).
+- Accounts: all parked (Codex team 14:19 and allusions-plus 14:29 today; others 10-11 Oct). 29 pending, no idle account.
+- Recommendations: 1) Queued fix-101-cam-feed-fade (Codex, 70): make the CAM feed follow the monitor alpha, Job 3. 2) remaster-imp-64-p1: hands and forearm that read as hands. 3) fix-99 quit leaks next for Codex.
