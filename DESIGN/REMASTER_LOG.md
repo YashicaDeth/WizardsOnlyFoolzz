@@ -688,3 +688,7 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 - Merged since 20:10: nothing. Every account is parked (Codex until about 01:40 on 8 Oct, Claude until 10 Oct 19:04). No new tasks are queued, because fix-97 and fix-99 are already waiting for Codex.
 - The daily refresh is done: GAME_PLAN_V2_DRAFT.md section 0 is updated for 7 Oct, and MORNING_REPORT.md has today's summary.
 - Top three, all already queued: fix-95 (ragdoll quit crash), fix-93 (Black Mirror on trunk), feel-86 (combat feel).
+
+## 7 October 2026 - fix-97 ADS grip-hand clearance
+
+- The Hunt and the facility/lab arm mount now share a non-accumulating 0.035 m camera-local grip-hand drop after ADS poses the gun. `P:/GameDev/Temp/ads01/ads_sidearm_stage2.png` keeps the sights centred while the hands occupy roughly the lower 24% of the 720p frame instead of the lower third; zero aim restores their cached rest.

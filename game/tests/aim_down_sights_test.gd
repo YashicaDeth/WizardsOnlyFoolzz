@@ -144,6 +144,15 @@ func _ready() -> void:
 	check(hunt.ads.stage == 2, "SHIFT while aimed steps further down the sight")
 	_settle(hunt)
 	var stage_two_depth := _check_sight_line(hunt, "stage 2")
+	var grip_hand := mount.get_node("RightGripHand") as Node3D
+	var grip_rest: Vector3 = grip_hand.get_meta("ads_hand_rest_position")
+	var undropped_hand := camera.to_local(mount.global_transform * grip_rest)
+	var dropped_hand := camera.to_local(grip_hand.global_position)
+	var stage_two_sights := _sights(hunt)
+	check(absf((dropped_hand.y - undropped_hand.y) + FirstPersonArms.ADS_HAND_DROP) < 0.001
+		and _off_axis(camera, stage_two_sights[0]) < 0.004
+		and _off_axis(camera, stage_two_sights[1]) < 0.004,
+		"full aim drops the grip hand %.3f m in camera space without moving the sight line" % FirstPersonArms.ADS_HAND_DROP)
 	check(camera.fov < stage_one_fov - 8.0, "stage 2 narrows again (%.1f -> %.1f)" % [stage_one_fov, camera.fov])
 	check(stage_two_depth < stage_one_depth - 0.05, "stage 2 brings the eye closer to the rear sight")
 	hunt._unhandled_input(_key(KEY_SHIFT, true))
@@ -193,6 +202,8 @@ func _ready() -> void:
 	hunt.perspective_blend = 0.0
 	_settle(hunt)
 	check(absf(camera.fov - hip_fov) < 0.5, "the field returns to the hip view")
+	check(grip_hand.position.distance_to(grip_rest) < 0.0001,
+		"zero aim restores the grip hand exactly to rest")
 	hunt._pose_weapon()
 	check(mount.transform.origin.distance_to(hip_mount.origin) < 0.02 and mount.transform.basis.get_euler().distance_to(hip_mount.basis.get_euler()) < 0.05,
 		"the gun goes back to the hand")
