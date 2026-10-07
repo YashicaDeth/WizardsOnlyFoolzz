@@ -38,6 +38,9 @@ const MARROW := Color("5a1210")
 const CHROME_SEGMENTS := [0, 1, 18, 19]
 const FIBRES := 5
 const POCKETS := 3
+## How present the three hanging monitors remain while the weapon is on its
+## sight line. The anatomy, pockets and other field instruments do not fade.
+const ADS_MONITOR_ALPHA := 0.25
 ## imp-68. How the three pockets show. "spine" (default): what each pocket
 ## holds hangs off the sacrum as a specimen tag, and an empty pocket is only a
 ## bare hook. "rack": the old row of three bottles by the weapon well, which
@@ -67,6 +70,7 @@ var _drip_clock := 0.0
 var presence := 1.0
 var _activity := ACTIVITY_HOLD
 var _last_reading := []
+var monitor_alpha := 1.0
 
 
 func _ready() -> void:
@@ -98,6 +102,21 @@ func set_state(values: Dictionary) -> void:
 	_last_reading = reading
 
 
+func set_aim_blend(blend: float) -> void:
+	monitor_alpha = lerpf(1.0, ADS_MONITOR_ALPHA, clampf(blend, 0.0, 1.0))
+	_apply_face_monitor_alpha()
+	queue_redraw()
+
+
+func _apply_face_monitor_alpha() -> void:
+	# CAM is authored as the adjacent live-feed control, while HRT and EEG are
+	# drawn below. The parent HUD refreshes its ordinary presence each frame, so
+	# this child reapplies the aim dial afterward.
+	var face_monitor := get_parent().get_node_or_null("FaceMonitor") if get_parent() != null else null
+	if face_monitor is CanvasItem:
+		(face_monitor as CanvasItem).modulate.a = monitor_alpha
+
+
 ## How much the body is asking to be seen: any shortfall, scaled so a body at
 ## 60% of anything is already fully lit.
 func need() -> float:
@@ -124,6 +143,7 @@ func filled_pockets() -> int:
 func _process(delta: float) -> void:
 	elapsed += delta
 	step_presence(delta)
+	_apply_face_monitor_alpha()
 	# Blood loss drips from the lowest seated vertebra; the rate is the loss.
 	var loss := 1.0 - blood
 	_drip_clock += delta * loss * 3.0
@@ -496,18 +516,19 @@ func _draw_brain() -> void:
 # --- hanging CRTs ---------------------------------------------------------------
 
 func _draw_monitor(anchor: Vector2, phase: float, heart: bool) -> void:
+	var aim_modulate := Color(1.0, 1.0, 1.0, monitor_alpha)
 	var cable := 58.0 + phase * 14.0
 	var swing := sin(elapsed * 1.25 + phase) * (0.045 + head_damage * 0.12)
 	var hang := anchor + Vector2(0, cable).rotated(swing)
-	draw_line(anchor, hang, Color(0.08, 0.06, 0.06, 0.95), 2.0)
-	draw_line(anchor + Vector2(3, 0), hang + Vector2(3, 0), COPPER * Color(1, 1, 1, 0.3), 1.0)
+	draw_line(anchor, hang, Color(0.08, 0.06, 0.06, 0.95) * aim_modulate, 2.0)
+	draw_line(anchor + Vector2(3, 0), hang + Vector2(3, 0), COPPER * Color(1, 1, 1, 0.3) * aim_modulate, 1.0)
 	draw_set_transform(hang, swing, Vector2.ONE)
 	var box := Rect2(Vector2(-38, 0), Vector2(76, 58))
-	draw_rect(box, Color("2a2626"))
-	draw_rect(box, BONE * Color(1, 1, 1, 0.35), false, 1.2)
-	draw_rect(Rect2(box.position + Vector2(20, -5), Vector2(36, 6)), Color("1a1717"))
+	draw_rect(box, Color("2a2626") * aim_modulate)
+	draw_rect(box, BONE * Color(1, 1, 1, 0.35) * aim_modulate, false, 1.2)
+	draw_rect(Rect2(box.position + Vector2(20, -5), Vector2(36, 6)), Color("1a1717") * aim_modulate)
 	var screen := Rect2(Vector2(-31, 7), Vector2(62, 42))
-	draw_rect(screen, Color(0.01, 0.05, 0.045))
+	draw_rect(screen, Color(0.01, 0.05, 0.045) * aim_modulate)
 	var trace := PackedVector2Array()
 	var steps := 40
 	for s in steps + 1:
@@ -524,14 +545,14 @@ func _draw_monitor(anchor: Vector2, phase: float, heart: bool) -> void:
 			y += (fposmod(sin(x * 91.7 + floor(elapsed * 20.0)) * 43758.5, 1.0) - 0.5) * 0.5 * (1.0 - calm)
 		trace.append(screen.position + Vector2(x * screen.size.x, screen.size.y * 0.5 + y * screen.size.y * 0.42))
 	var colour := PHOSPHOR if not (heart and health < 35.0) else Color("ff5a4a")
-	draw_polyline(trace, colour * Color(1, 1, 1, 0.35), 3.5)
-	draw_polyline(trace, colour, 1.3)
+	draw_polyline(trace, colour * Color(1, 1, 1, 0.35) * aim_modulate, 3.5)
+	draw_polyline(trace, colour * aim_modulate, 1.3)
 	for line in range(0, int(screen.size.y), 3):
-		draw_line(screen.position + Vector2(0, line), screen.position + Vector2(screen.size.x, line), Color(0, 0, 0, 0.18), 1.0)
+		draw_line(screen.position + Vector2(0, line), screen.position + Vector2(screen.size.x, line), Color(0, 0, 0, 0.18) * aim_modulate, 1.0)
 	if head_damage > 0.08:
 		var tear := screen.position.y + fposmod(elapsed * 40.0 + phase * 13.0, screen.size.y)
-		draw_rect(Rect2(screen.position.x, tear, screen.size.x, 2.0 + head_damage * 5.0), Color(0.8, 0.9, 0.9, 0.35 * head_damage))
-	CellOutzType.draw_condensed(self, Vector2(-31, 50), "HRT" if heart else "EEG", 6.0, BONE * Color(1, 1, 1, 0.6), 0.4)
+		draw_rect(Rect2(screen.position.x, tear, screen.size.x, 2.0 + head_damage * 5.0), Color(0.8, 0.9, 0.9, 0.35 * head_damage) * aim_modulate)
+	CellOutzType.draw_condensed(self, Vector2(-31, 50), "HRT" if heart else "EEG", 6.0, BONE * Color(1, 1, 1, 0.6) * aim_modulate, 0.4)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 

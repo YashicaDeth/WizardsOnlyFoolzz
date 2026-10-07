@@ -2780,6 +2780,9 @@ func _pose_weapon() -> void:
 ## After the camera has its final pose (kick included), the shouldered gun is
 ## carried from the hand onto the eye line, and the forearms re-follow it.
 func _pose_weapon_on_sight() -> void:
+	var nerve_rig: NerveRig = field_interface.get("nerve_rig") if field_interface != null else null
+	if nerve_rig != null:
+		nerve_rig.set_aim_blend(firearm_aim_blend)
 	if arsenal == null or firearm_aim_blend <= 0.0:
 		ads.has_line = false
 		return
