@@ -55,6 +55,10 @@ const DAY_WHITE := Color(1.0, 0.98, 0.93)
 
 var clock := 0.0
 var run_summary: Dictionary = {}
+## Presentation dial: the title drop is a clean first view of the world, not
+## ordinary play with the player's hands and current object still in frame.
+## Kept as a dial so a later ending can deliberately retain the body if needed.
+var hide_view_model_in_ending := true
 ## True when this save has already seen the ending once.
 var skippable := false
 var world_shown := false
@@ -68,6 +72,10 @@ var _master_db := 0.0
 var _sound_back := false
 var _recorded_surface := false
 var _world_scene := WORLD_SCENE
+var _hidden_hud: CanvasLayer
+var _hud_was_visible := false
+var _hidden_view_model: Node3D
+var _view_model_was_visible := false
 
 
 ## `world_scene` empty keeps the current scene as the view (gallery use).
@@ -141,7 +149,7 @@ func _process(delta: float) -> void:
 			WorldHistory.record_event("title_drop_seen", {"location": "surface_gate"})
 	if _recorded_surface:
 		# Every frame: the Hunt's own systems turn its HUD back on.
-		_hide_world_hud()
+		_hide_world_presentation()
 	if clock >= WIND_AT:
 		if not _wind.playing:
 			_wind.play()
@@ -160,6 +168,7 @@ func _process(delta: float) -> void:
 		_card = RUN_CARD.new()
 		_card.hold_seconds = CARD_HOLD
 		_card.centred = true
+		_card.presentation_scale = 1.55
 		add_child(_card)
 		_card.show_summary(run_summary)
 		# show_summary sets its own layer; this card sits over the black.
@@ -210,6 +219,7 @@ func go_to_menu() -> void:
 	if menu_reached:
 		return
 	menu_reached = true
+	_restore_world_presentation()
 	_restore_sound()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	get_tree().root.remove_meta(ACTIVE_META)
@@ -218,14 +228,40 @@ func go_to_menu() -> void:
 	queue_free()
 
 
-## The Hunt's HUD (objective, vials, prompts) is not part of the first view.
-func _hide_world_hud() -> void:
+## The Hunt's HUD (objective, vials, prompts, held-item reliquary) and physical
+## first-person body are not part of the first view. `HunterBody` owns every
+## production object that can be held in view: arsenal models, smokeables,
+## carried limbs and their hands/forearms. Remember its previous state so a
+## skipped/removed ending can hand control back without leaving the player
+## invisible.
+func _hide_world_presentation() -> void:
 	var scene := get_tree().current_scene
 	if scene == null:
 		return
 	var hud := scene.get_node_or_null("HUD")
 	if hud is CanvasLayer:
+		if _hidden_hud == null:
+			_hidden_hud = hud
+			_hud_was_visible = hud.visible
 		hud.visible = false
+	if not hide_view_model_in_ending:
+		return
+	var body := scene.find_child("HunterBody", true, false) as Node3D
+	if body == null:
+		return
+	if _hidden_view_model == null:
+		_hidden_view_model = body
+		_view_model_was_visible = body.visible
+	body.visible = false
+
+
+func _restore_world_presentation() -> void:
+	if _hidden_hud != null and is_instance_valid(_hidden_hud):
+		_hidden_hud.visible = _hud_was_visible
+	_hidden_hud = null
+	if _hidden_view_model != null and is_instance_valid(_hidden_view_model):
+		_hidden_view_model.visible = _view_model_was_visible
+	_hidden_view_model = null
 
 
 func _draw_sheet() -> void:
@@ -260,6 +296,7 @@ func _restore_sound() -> void:
 
 ## Never leave the game silent or the Hunt stood down if this goes away.
 func _exit_tree() -> void:
+	_restore_world_presentation()
 	_restore_sound()
 	if get_tree() != null and get_tree().root.has_meta(ACTIVE_META) and not menu_reached:
 		get_tree().root.remove_meta(ACTIVE_META)

@@ -26,6 +26,13 @@ func _press_accept(ending: Node) -> void:
 	ending._unhandled_input(press)
 
 
+func _press_gamepad_start(ending: Node) -> void:
+	var press := InputEventJoypadButton.new()
+	press.button_index = JOY_BUTTON_START
+	press.pressed = true
+	ending._unhandled_input(press)
+
+
 func _ready() -> void:
 	if OS.get_environment("ATG_TEST_MODE") != "1":
 		get_tree().quit(2)
@@ -69,6 +76,7 @@ func _ready() -> void:
 	var saw_wind := false
 	var saw_card := false
 	var saw_eyes_adjust := false
+	var view_model_hidden := false
 	var deadline := Time.get_ticks_msec() + 90000
 	while is_instance_valid(ending) and not ending.menu_reached and Time.get_ticks_msec() < deadline:
 		await get_tree().process_frame
@@ -77,6 +85,8 @@ func _ready() -> void:
 		if _scene_path() == ENDING.WORLD_SCENE:
 			saw_world = true
 			hunt_surfacing = hunt_surfacing or get_tree().current_scene.get_node_or_null("Surfacing") != null
+			var hunter_body := get_tree().current_scene.find_child("HunterBody", true, false) as Node3D
+			view_model_hidden = view_model_hidden or (hunter_body != null and not hunter_body.visible)
 			saw_eyes_adjust = saw_eyes_adjust or ending.white_alpha() < 0.2
 			saw_title_over_world = saw_title_over_world or ending.title_alpha() > 0.9
 		saw_wind = saw_wind or ending._wind.playing
@@ -84,13 +94,21 @@ func _ready() -> void:
 			if not saw_card:
 				check(ending.can_skip(), "once TO BE CONTINUED is up, it can be skipped")
 				check(ending.return_key() in ["CROSS", "ENTER"], "and the card names the button that skips it (%s)" % ending.return_key())
+				check(is_equal_approx(float(ending._card.presentation_scale), 1.55), "the ending run card uses its couch-readable scale")
 			saw_card = true
+			var hidden_body := ending._hidden_view_model as Node3D
+			var hidden_hud := ending._hidden_hud as CanvasLayer
+			_press_gamepad_start(ending)
+			check(ending.menu_reached, "gamepad Start returns from the card")
+			check(hidden_body != null and hidden_body.visible, "return restores the view model before leaving play")
+			check(hidden_hud != null and hidden_hud.visible, "return restores the held-item HUD before leaving play")
 	Engine.time_scale = 1.0
 	check(saw_world, "the world loads under the white")
 	check(not hunt_surfacing, "the Hunt's own surfacing stands down for the ending")
 	check(saw_eyes_adjust, "the eyes adjust out of the white onto the world")
 	check(saw_wind, "open air and wind come in")
 	check(saw_title_over_world, "the WIZARDS ONLY FOOLS logo drops over the first view")
+	check(view_model_hidden, "the first-person body and held view model stay out of the ending")
 	check(saw_card, "then the TO BE CONTINUED card with the run times")
 	for _frame in 6:
 		await get_tree().process_frame

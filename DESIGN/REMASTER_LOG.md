@@ -643,4 +643,10 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 - Weak (same shot): the address is grey sans-serif among copper pixel-font rows. That is on purpose (the pixel font has no "@"), so it stays.
 - Accounts: Claude main/alt are parked until 10-10 19:04, claude-alt2 until 10-11, three Codex accounts parked; codex-allusions-plus is the only builder ready.
 - Recommendations: 1) Keep Codex fed. fix-78 (ending: hide the view model during the whiteout/title drop, scale up the TO BE CONTINUED card, Start-on-pad test) is specific enough, so it moves to agent codex at priority 72. 2) fix-95 ragdoll quit crash is still the first Claude fix when an account frees up. 3) remaster-job7-p1 (old body reads as a ghost) after that.
+
+## 7 October 2026 — fix-78 ending first view
+
+- The v0.1 ending now hides the Hunt's physical first-person body (including every weapon, smokeable, carried limb, hand and forearm) together with the held-item HUD from whiteout through the card. The `hide_view_model_in_ending` dial defaults true; teardown restores the body's prior visibility before returning to play or changing to the title.
+- The centred SURFACED run card uses a 1.55 presentation scale in the ending; its existing text, colours and sequence are unchanged. Ordinary in-world run cards remain at their original scale.
+- `v01_ending_test` now drives a real `JOY_BUTTON_START` press on the card and verifies the enlarged card and hidden view model.
 - Failures: none new (job2, job2b, lane-exit-routes are old).
