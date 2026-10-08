@@ -727,3 +727,4 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 - Merged: fix-102 examiner fist dial (e4d9d9d5, merged 0ba5b005, gate green). It only changes a number, so there was nothing to render.
 - fix-99 boneyard quit leaks: codex-allusions-plus ran out of workspace credits partway through (out of credits, not the usual usage limit). The hub put it back in pending, and it resumes when an account returns (Codex accounts from 09 Oct 03:25).
 - Every account is parked. 28 tasks are pending, so nothing new is queued, and the top three from 21:10 still hold.
+- fix-99: Hunt teardown now frees its unparented dialogue brain, clears generated scene audio, and breaks the nested native-voice script cycle; `sparring_test` and `exit_reveal_test` keep exit 0 with RID/ObjectDB leak summaries 5 -> 0, while the four-Hunt `first_thirty_route_test` stays green.
