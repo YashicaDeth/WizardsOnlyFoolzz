@@ -736,3 +736,9 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 - Failures: none new. The Claude accounts return 10 Oct 19:04 and alt2 returns 11 Oct.
 - Top three: 1) fix-103/104 quit-time stability (queued). 2) remaster-imp-64-p1: hands that read as hands. 3) fix-95 ragdoll quit crash.
 - fix-103: a fresh verbose `demo_route` run after fix-99 has 0 RID, 0 ObjectDB and 0 resource leak summaries (reported before: 11868 ObjectDB); the Hunt owner teardown and native-voice cycle fix already closed the route leak, so no shared cache or gameplay code changed. Separate opening handoff / first-run walk shutdown summaries remain at 25 ObjectDB, 15 renderer RIDs and 6 resources each.
+
+## Manager notes, 2026-10-09 05:10
+- Merged since 04:10: fix-103 demo-route quit leaks (4e2c230d, merged fae225ad, gate green). It only touched docs, because demo_route already quit at 0 leaks after fix-99. Nothing to render.
+- Weak: opening_handoff/first_run_walk still leak 25 ObjectDB, 15 RID and 6 resources each at quit. fix-104 (Jolt max-jobs warning) hit a limit twice and is still pending.
+- Accounts: all parked (Codex team 10:27, allusions-plus 10:36, Claude 10 Oct 19:04, alt2 11 Oct). 30 pending.
+- Top three: 1) Queued fix-105-opening-quit-leaks (Codex, 68, Job 7). 2) remaster-imp-64-p1: hands that read as hands. 3) fix-95 ragdoll quit crash.
