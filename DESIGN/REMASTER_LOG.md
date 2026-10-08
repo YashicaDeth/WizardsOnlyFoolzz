@@ -707,3 +707,4 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 - Failures: none new. fix-99 still pending (Codex was out of credits).
 - Accounts: all parked (Codex team 14:19 and allusions-plus 14:29 today; others 10-11 Oct). 29 pending, no idle account.
 - Recommendations: 1) Queued fix-101-cam-feed-fade (Codex, 70): make the CAM feed follow the monitor alpha, Job 3. 2) remaster-imp-64-p1: hands and forearm that read as hands. 3) fix-99 quit leaks next for Codex.
+- fix-101: the CAM monitor's inner live face feed now preserves its inherited alpha, fading with the frame during MERCY NINE ADS and restoring exactly at zero aim.
