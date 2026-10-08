@@ -735,3 +735,4 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 - Idle: codex-sircuteskingdom-team and codex-allusions-plus were ready with no Codex work. I queued fix-103-demo-route-quit-leaks (Codex, 70) and fix-104-jolt-max-jobs-warning (Codex, 69), both Job 7 stability.
 - Failures: none new. The Claude accounts return 10 Oct 19:04 and alt2 returns 11 Oct.
 - Top three: 1) fix-103/104 quit-time stability (queued). 2) remaster-imp-64-p1: hands that read as hands. 3) fix-95 ragdoll quit crash.
+- fix-103: a fresh verbose `demo_route` run after fix-99 has 0 RID, 0 ObjectDB and 0 resource leak summaries (reported before: 11868 ObjectDB); the Hunt owner teardown and native-voice cycle fix already closed the route leak, so no shared cache or gameplay code changed. Separate opening handoff / first-run walk shutdown summaries remain at 25 ObjectDB, 15 renderer RIDs and 6 resources each.
