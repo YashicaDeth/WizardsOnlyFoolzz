@@ -708,3 +708,10 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 - Accounts: all parked (Codex team 14:19 and allusions-plus 14:29 today; others 10-11 Oct). 29 pending, no idle account.
 - Recommendations: 1) Queued fix-101-cam-feed-fade (Codex, 70): make the CAM feed follow the monitor alpha, Job 3. 2) remaster-imp-64-p1: hands and forearm that read as hands. 3) fix-99 quit leaks next for Codex.
 - fix-101: the CAM monitor's inner live face feed now preserves its inherited alpha, fading with the frame during MERCY NINE ADS and restoring exactly at zero aim.
+
+## Manager notes, 2026-10-08 15:10
+- Merged since 09:10: fix-101 CAM feed fade (2e14056b, merge f4afeeaf, gate green). Checked the builder's render P:/GameDev/Temp/ads101-final/ads_sidearm_stage2.png: the teal face feed now recedes with its CAM frame while aiming; the sight line is clear.
+- Weak: the grip hands are still two orange checker spheres filling the bottom centre of the ADS frame, which is the biggest thing wrong in this shot. The capture's "SIGHT PROBE" plate is capture-only.
+- Failures: fix-99 (Bone Yard quit leaks) failed 3 more times at 14:32-14:57, each time "workspace out of credits" on both Codex workspaces. It is not a code fault, so it stays pending as is.
+- Accounts: all parked (Codex team 20:52 and allusions-plus 21:08 today; Claude 10 Oct 19:04, alt2 11 Oct). 29 pending, no idle account, so no new task was queued.
+- Recommendations: 1) remaster-imp-64-p1 (claude, 70, already queued): make the hands and forearm read as hands, Job 3. 2) fix-99 next for Codex at 20:52. 3) fix-95 ragdoll quit crash is the first Claude fix after imp-64.
