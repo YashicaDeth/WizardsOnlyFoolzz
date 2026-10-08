@@ -42,7 +42,8 @@ const COAT := "examiner_coat"
 ## nine clean cleaver blows, fewer with parry ripostes, for a ~30 s fight.
 const HEALTH := 260.0
 ## What each thing you can hit him with takes off him.
-const DAMAGE := {"axe": 30.0, "restraint": 16.0, "": 9.0, "gun": 45.0}
+## Bare-fist damage is a dial (was 9.0), pending Greg's confirmation.
+const DAMAGE := {"axe": 30.0, "restraint": 16.0, "": 15.0, "gun": 45.0}
 const PLAYER_REACH := 2.3
 const REACH := 1.45
 const SPEED := 2.3

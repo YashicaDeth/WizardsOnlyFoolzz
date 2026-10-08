@@ -183,7 +183,7 @@ func _run(run: int, seed_value: int) -> void:
 	var frames := 0
 	var side := 1.0
 	# Job 6 raised him to ~nine cleaver blows; bare-handed (the 30% of seeds
-	# that skip the axe) that is ~29 blows, which never fit in 3000 frames.
+	# that skip the axe) is now ~18 blows, which may not fit in 3000 frames.
 	var budget := 3000 if str(route.call("held_weapon")) == "axe" else 9000
 	while fight.state == "fighting" and frames < budget:
 		frames += 1

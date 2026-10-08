@@ -719,5 +719,6 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 ## Manager notes, 2026-10-08 21:10
 - Merged since 15:10: nothing. fix-99 (Bone Yard quit leaks) is running on codex-sircuteskingdom-team since 20:57. No render needed.
 - Idle: codex-allusions-plus was ready with no Codex work, so I queued fix-102-examiner-fist-dial (Codex, 70, Job 6): bare-fist damage on the examiner goes from 9 to 15 (~29 -> ~18 blows) behind the `DAMAGE` dial. This answers the BUGS.md Open "bare-handed" line with a default; Greg to confirm.
+- fix-102: examiner bare-fist damage is now 15 instead of 9 (~18 blows), behind the `DAMAGE` dial pending Greg's confirmation.
 - The daily refresh is done: GAME_PLAN_V2_DRAFT.md section 0 is updated for 8 Oct, and MORNING_REPORT.md has the daily summary.
 - Top three: 1) remaster-imp-64-p1: make the hands read as hands (the biggest flaw in the ADS frame). 2) fix-95 ragdoll quit crash. 3) fix-93 Black Mirror on trunk. All are queued for Claude accounts, which return 10 Oct 19:04.
