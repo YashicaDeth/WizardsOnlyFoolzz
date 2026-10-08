@@ -715,3 +715,9 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 - Failures: fix-99 (Bone Yard quit leaks) failed 3 more times at 14:32-14:57, each time "workspace out of credits" on both Codex workspaces. It is not a code fault, so it stays pending as is.
 - Accounts: all parked (Codex team 20:52 and allusions-plus 21:08 today; Claude 10 Oct 19:04, alt2 11 Oct). 29 pending, no idle account, so no new task was queued.
 - Recommendations: 1) remaster-imp-64-p1 (claude, 70, already queued): make the hands and forearm read as hands, Job 3. 2) fix-99 next for Codex at 20:52. 3) fix-95 ragdoll quit crash is the first Claude fix after imp-64.
+
+## Manager notes, 2026-10-08 21:10
+- Merged since 15:10: nothing. fix-99 (Bone Yard quit leaks) is running on codex-sircuteskingdom-team since 20:57. No render needed.
+- Idle: codex-allusions-plus was ready with no Codex work, so I queued fix-102-examiner-fist-dial (Codex, 70, Job 6): bare-fist damage on the examiner goes from 9 to 15 (~29 -> ~18 blows) behind the `DAMAGE` dial. This answers the BUGS.md Open "bare-handed" line with a default; Greg to confirm.
+- The daily refresh is done: GAME_PLAN_V2_DRAFT.md section 0 is updated for 8 Oct, and MORNING_REPORT.md has the daily summary.
+- Top three: 1) remaster-imp-64-p1: make the hands read as hands (the biggest flaw in the ADS frame). 2) fix-95 ragdoll quit crash. 3) fix-93 Black Mirror on trunk. All are queued for Claude accounts, which return 10 Oct 19:04.
