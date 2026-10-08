@@ -82,8 +82,8 @@ class NativeVoice extends Voice:
 	var pitch := 0.88
 	var volume := 62
 
-	func _init(preferred_language := "en_AU") -> void:
-		voice_id = NPCSpeechOutput.best_voice(preferred_language, true)
+	func _init(selected_voice_id: String) -> void:
+		voice_id = selected_voice_id
 
 	func speak(text: String, interrupt: bool = true) -> void:
 		if voice_id.is_empty() or text.strip_edges().is_empty():
@@ -229,5 +229,8 @@ static func make(preferred_language := "en_AU", host: Node = null) -> Voice:
 	if host != null and PipedVoice.installed():
 		return PipedVoice.new(host)
 	if available():
-		return NativeVoice.new(preferred_language)
+		# Resolve the voice in the owning script before constructing the nested
+		# class. Having NativeVoice name its owner creates a script-resource
+		# reference cycle that otherwise retains the Hunt's loaded resource graph.
+		return NativeVoice.new(best_voice(preferred_language, true))
 	return SilentVoice.new()

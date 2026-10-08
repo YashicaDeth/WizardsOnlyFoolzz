@@ -8730,6 +8730,24 @@ func _exit_tree() -> void:
 		bridge.clear_combat_receiver(self)
 	if vats.is_active():
 		Engine.time_scale = 1.0
+	# The shared conversation brain is deliberately created before anybody is
+	# close enough to speak. Until `configure()` parents it under DownedTalk it
+	# is an orphan, so the Hunt must release that pre-conversation instance.
+	if downed_brain != null and is_instance_valid(downed_brain) and downed_brain.get_parent() == null:
+		downed_brain.free()
+	downed_brain = null
+	# These streams are generated at runtime. Stop every scene-owned player and
+	# drop its stream reference before the audio server shuts down.
+	for node in find_children("*", "AudioStreamPlayer", true, false):
+		var player_2d := node as AudioStreamPlayer
+		player_2d.stop()
+		player_2d.stream = null
+	for node in find_children("*", "AudioStreamPlayer3D", true, false):
+		var player_3d := node as AudioStreamPlayer3D
+		player_3d.stop()
+		player_3d.stream = null
+	smoke_bong_audio = null
+	smoke_lighter_audio = null
 
 
 ## R2 has just come down. True if it is the second half of the L2+R2 chord
