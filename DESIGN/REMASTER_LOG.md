@@ -728,3 +728,10 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 - fix-99 boneyard quit leaks: codex-allusions-plus ran out of workspace credits partway through (out of credits, not the usual usage limit). The hub put it back in pending, and it resumes when an account returns (Codex accounts from 09 Oct 03:25).
 - Every account is parked. 28 tasks are pending, so nothing new is queued, and the top three from 21:10 still hold.
 - fix-99: Hunt teardown now frees its unparented dialogue brain, clears generated scene audio, and breaks the nested native-voice script cycle; `sparring_test` and `exit_reveal_test` keep exit 0 with RID/ObjectDB leak summaries 5 -> 0, while the four-Hunt `first_thirty_route_test` stays green.
+
+## Manager notes, 2026-10-09 04:10
+- Merged since 22:10: fix-99 Bone Yard quit leaks (53ef3c63, merged a9328b05, gate green): sparring/exit_reveal leak summaries 5 -> 0. It only changes teardown, so there was nothing to render.
+- Weak: full route runs still leak at quit (~11868 ObjectDB in demo_route), and a Jolt "maximum number of jobs" warning is still open (BUGS.md "Exit-time noise").
+- Idle: codex-sircuteskingdom-team and codex-allusions-plus were ready with no Codex work. I queued fix-103-demo-route-quit-leaks (Codex, 70) and fix-104-jolt-max-jobs-warning (Codex, 69), both Job 7 stability.
+- Failures: none new. The Claude accounts return 10 Oct 19:04 and alt2 returns 11 Oct.
+- Top three: 1) fix-103/104 quit-time stability (queued). 2) remaster-imp-64-p1: hands that read as hands. 3) fix-95 ragdoll quit crash.
