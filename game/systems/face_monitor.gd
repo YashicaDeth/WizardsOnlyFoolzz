@@ -88,7 +88,10 @@ void fragment() {
 	float n = fract(sin(dot(UV * vec2(91.7, 37.3) + vec2(time * 3.1, time * 1.7), vec2(12.9898, 78.233))) * 43758.5453);
 	c += (n - 0.5) * (0.08 + 0.18 * (1.0 - wake));
 	c *= mix(0.3, 1.0, smoothstep(0.72, 0.3, distance(UV, vec2(0.5))));
-	COLOR = vec4(c, 1.0);
+	// Preserve the CanvasItem alpha inherited from FaceMonitor. The live feed
+	// samples its viewport manually, so replacing COLOR with an opaque value
+	// would otherwise ignore the ADS fade applied to the monitor.
+	COLOR = vec4(c, COLOR.a);
 }
 """
 

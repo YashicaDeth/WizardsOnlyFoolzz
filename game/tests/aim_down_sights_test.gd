@@ -53,6 +53,15 @@ func _off_axis(camera: Camera3D, point: Vector3) -> float:
 	return (rel - forward * rel.dot(forward)).length()
 
 
+func _effective_alpha(item: CanvasItem) -> float:
+	var alpha := item.self_modulate.a
+	var branch: CanvasItem = item
+	while branch != null:
+		alpha *= branch.modulate.a
+		branch = branch.get_parent() as CanvasItem
+	return alpha
+
+
 func _check_sight_line(hunt: Node, label: String) -> float:
 	var camera: Camera3D = hunt.camera
 	var points := _sights(hunt)
@@ -111,10 +120,14 @@ func _ready() -> void:
 	hunt._unhandled_input(_mouse(MOUSE_BUTTON_RIGHT, true))
 	check(hunt.firearm_aiming, "RMB / L2 shoulders the firearm")
 	_settle(hunt)
+	var face_feed := hunt.field_interface.face_monitor.get_node_or_null("FeedView") as TextureRect
+	check(face_feed != null and face_feed.visible, "CAM live face feed is the active inner monitor image")
 	check(hunt.firearm_aim_blend > 0.99 and hunt.ads.has_line, "the sight comes up")
 	check(absf(hunt.field_interface.nerve_rig.monitor_alpha - NERVE_RIG.ADS_MONITOR_ALPHA) < 0.001
-		and absf(hunt.field_interface.face_monitor.modulate.a - NERVE_RIG.ADS_MONITOR_ALPHA) < 0.001,
-		"full aim fades HRT, EEG and CAM to the ADS monitor alpha")
+		and absf(hunt.field_interface.face_monitor.modulate.a - NERVE_RIG.ADS_MONITOR_ALPHA) < 0.001
+		and face_feed != null
+		and absf(_effective_alpha(face_feed) - NERVE_RIG.ADS_MONITOR_ALPHA) < 0.001,
+		"full aim fades HRT, EEG, CAM frame and the drawn face feed to the ADS monitor alpha")
 	var stage_one_depth := _check_sight_line(hunt, "stage 1")
 	var stage_one_fov: float = camera.fov
 	check(stage_one_fov < hip_fov - 15.0, "aiming narrows the field (%.1f -> %.1f)" % [hip_fov, stage_one_fov])
@@ -201,8 +214,10 @@ func _ready() -> void:
 	_settle(hunt)
 	check(hunt.firearm_aim_blend < 0.01 and hunt.ads.stage == 1 and not hunt.ads.has_line, "the sight blends back down and the stage resets")
 	check(hunt.field_interface.nerve_rig.monitor_alpha == 1.0
-		and hunt.field_interface.face_monitor.modulate.a == 1.0,
-		"zero aim restores HRT, EEG and CAM alpha exactly")
+		and hunt.field_interface.face_monitor.modulate.a == 1.0
+		and face_feed != null
+		and _effective_alpha(face_feed) == 1.0,
+		"zero aim restores HRT, EEG, CAM frame and the drawn face feed alpha exactly")
 	print("  released third person: camera %.3f m from the eye" % camera.global_position.distance_to(first_eye))
 	check(absf(camera.global_position.distance_to(first_eye) - shoulder_gap) < 0.1, "released in third person, the camera returns to the shoulder")
 	hunt.third_person = false
