@@ -742,3 +742,4 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 - Weak: opening_handoff/first_run_walk still leak 25 ObjectDB, 15 RID and 6 resources each at quit. fix-104 (Jolt max-jobs warning) hit a limit twice and is still pending.
 - Accounts: all parked (Codex team 10:27, allusions-plus 10:36, Claude 10 Oct 19:04, alt2 11 Oct). 30 pending.
 - Top three: 1) Queued fix-105-opening-quit-leaks (Codex, 68, Job 7). 2) remaster-imp-64-p1: hands that read as hands. 3) fix-95 ragdoll quit crash.
+- fix-104: route-test teardown now gives Jolt a physics step to reclaim completed jobs between whole-map frees; the historical max-jobs warning count is 1 -> 0, and both route suites exit 0 without disabling any physics content.

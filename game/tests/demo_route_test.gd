@@ -9,6 +9,14 @@ func check(condition: bool, label: String) -> void:
 		failures.append(label)
 
 
+## Replacing an entire Hunt in consecutive idle frames can leave Jolt's
+## completed jobs queued for reclamation. Cross a physics step between maps.
+func _free_hunt(hunt: Node) -> void:
+	hunt.queue_free()
+	await get_tree().process_frame
+	await get_tree().physics_frame
+
+
 func _ready() -> void:
 	if OS.get_environment("ATG_TEST_MODE") != "1":
 		get_tree().quit(2)
@@ -26,14 +34,13 @@ func _ready() -> void:
 	check(hunt.demo_wall.visible, "the Hunt displays its authored wall after victory")
 	check(get_tree().paused, "the live Hunt is stopped under the wall")
 	get_tree().paused = false
-	hunt.queue_free()
-	await get_tree().process_frame
+	await _free_hunt(hunt)
 	WorldHistory.begin_demo()
 	var fresh_hunt := (load("res://bone_yard_hunt.tscn") as PackedScene).instantiate()
 	add_child(fresh_hunt)
 	await get_tree().create_timer(0.05, true).timeout
 	check(not fresh_hunt.demo_wall.visible, "a new START DEMO does not restore the previous run's wall")
 	check(not get_tree().paused, "a fresh demo can enter the Hunt instead of remaining stopped")
-	fresh_hunt.queue_free()
+	await _free_hunt(fresh_hunt)
 	print("DEMO_ROUTE_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

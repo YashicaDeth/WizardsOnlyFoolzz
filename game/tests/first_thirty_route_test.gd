@@ -42,6 +42,15 @@ func _click() -> InputEventMouseButton:
 	return event
 
 
+## A route test replaces whole physics-heavy maps much faster than a player
+## can. Give Jolt one physics step after the deferred free so its completed
+## jobs are reclaimed before the next map creates another full batch.
+func _free_route_scene(scene: Node) -> void:
+	scene.queue_free()
+	await get_tree().process_frame
+	await get_tree().physics_frame
+
+
 ## The demo's first real player sequence. This deliberately uses the same
 ## inputs as the hands-on breakout instead of relying on the test-mode legacy
 ## auto-breach, because a route that only works after a private helper call is
@@ -114,8 +123,7 @@ func _through_the_facility(route_name: String) -> Node:
 	check(Clothing.worn("player") == "bare" and WorldHistory.event_count("opening_first_object_used") == 0,
 		"%s: the rejected tank-pry and undressing beat is switched off" % route_name)
 	vat._record_service_arcade_entry()
-	vat.queue_free()
-	await get_tree().process_frame
+	await _free_route_scene(vat)
 
 	print("--- %s: the Service Arcade ---" % route_name)
 	var arcade = load("res://service_arcade.tscn").instantiate()
@@ -134,8 +142,7 @@ func _through_the_facility(route_name: String) -> Node:
 	arcade._interact()
 	arcade._interact()
 	check(arcade.gate_open and arcade.lower_works_requested, "%s: the card opens the pressure gate onward" % route_name)
-	arcade.queue_free()
-	await get_tree().process_frame
+	await _free_route_scene(arcade)
 
 	print("--- %s: the Lower Works ---" % route_name)
 	var city = load("res://buried_city.tscn").instantiate()
@@ -160,8 +167,7 @@ func _into_the_hunt(route_name: String, expected_route: String) -> void:
 		"%s: the Hunt opens where this route surfaces (at %s, expected %s)" % [route_name, str(hunt.player), str(arrival)])
 	check(FacilityRoutes.pending_surface_handoff().is_empty(), "%s: and the handoff is consumed, once" % route_name)
 	check(OpeningDirector.reached("left_facility"), "%s: the opening run is out of the facility" % route_name)
-	hunt.queue_free()
-	await get_tree().process_frame
+	await _free_route_scene(hunt)
 
 
 func _ready() -> void:
@@ -175,8 +181,7 @@ func _ready() -> void:
 	city.player.global_position = city.LIFT_AT + Vector3(0, 0.9, 3.2)
 	city._interact()
 	check(city.lift_requested, "heat elevator: the fuse powers the lift and it carries you up")
-	city.queue_free()
-	await get_tree().process_frame
+	await _free_route_scene(city)
 	await _into_the_hunt("heat elevator", FacilityRoutes.ROUTE_HEAT_ELEVATOR)
 	var lift_arrival: Vector3 = FacilityRoutes.route(FacilityRoutes.ROUTE_HEAT_ELEVATOR).surface_position
 
@@ -184,8 +189,7 @@ func _ready() -> void:
 	city.player.global_position = city.DRAIN_AT + Vector3(0, 0.9, 1.0)
 	city._interact()
 	check(city.drains_requested, "old drains: the hatch drops you into the drains")
-	city.queue_free()
-	await get_tree().process_frame
+	await _free_route_scene(city)
 	var drains = load("res://old_drains.tscn").instantiate()
 	add_child(drains)
 	await get_tree().process_frame
@@ -194,8 +198,7 @@ func _ready() -> void:
 		drains._physics_process(0.016)
 	drains._interact()
 	check(drains.surfaced, "old drains: gallery, cistern, and out through the storm outfall")
-	drains.queue_free()
-	await get_tree().process_frame
+	await _free_route_scene(drains)
 	await _into_the_hunt("old drains", FacilityRoutes.ROUTE_STEALTH)
 	var drain_arrival: Vector3 = FacilityRoutes.route(FacilityRoutes.ROUTE_STEALTH).surface_position
 	check(drain_arrival.distance_to(lift_arrival) > 20.0, "the two routes out surface in different parts of the map")
@@ -216,8 +219,7 @@ func _ready() -> void:
 	bay.player.global_position = Vector3(0, bay.RAMP_RISE + 0.9, bay.RAMP_TOP_Z + 0.5)
 	bay.step(0.05)
 	check(bay.surface_requested, "doctor's route: his bay, the call, and up the ramp")
-	bay.queue_free()
-	await get_tree().process_frame
+	await _free_route_scene(bay)
 	await _into_the_hunt("doctor's route", FacilityRoutes.ROUTE_DOCTOR)
 
 	# The derby's secret route: the tunnels come out at the dry falls, and the
@@ -229,8 +231,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	falls._complete("driving")
 	check(falls.travel_requested, "derby tunnels: out of the gorge past the dry falls")
-	falls.queue_free()
-	await get_tree().process_frame
+	await _free_route_scene(falls)
 	await _into_the_hunt("derby tunnels", "derby_tunnels")
 
 	print("FIRST_THIRTY_ROUTE_TEST_RESULT failures=", failures.size())
