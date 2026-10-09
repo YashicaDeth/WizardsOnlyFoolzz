@@ -743,3 +743,9 @@ Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs 
 - Accounts: all parked (Codex team 10:27, allusions-plus 10:36, Claude 10 Oct 19:04, alt2 11 Oct). 30 pending.
 - Top three: 1) Queued fix-105-opening-quit-leaks (Codex, 68, Job 7). 2) remaster-imp-64-p1: hands that read as hands. 3) fix-95 ragdoll quit crash.
 - fix-104: route-test teardown now gives Jolt a physics step to reclaim completed jobs between whole-map frees; the historical max-jobs warning count is 1 -> 0, and both route suites exit 0 without disabling any physics content.
+
+## Manager notes, 2026-10-09 11:10
+- Merged since 05:10: fix-104 Jolt max-jobs warning (5f745ac9, merged 0b0a608d, gate green). Route teardown now gives Jolt a physics step between map frees; max-jobs warnings 1 -> 0, no physics content disabled. Headless-only change, nothing to render.
+- Weak: fix-105 (opening quit leaks) ran out of Codex workspace credits on both codex-allusions-plus and codex-sircuteskingdom-team and is back in pending. first_thirty_route_test still reports 41 ObjectDB at exit (folds into fix-105).
+- Accounts: all parked (Codex 16:42 / 16:55 today, Claude 10 Oct 19:04, alt2 11 Oct 17:04). 28 pending, none idle, so no new task.
+- Top three: 1) fix-105 stays first for Codex at 16:42. 2) remaster-imp-64-p1: hands that read as hands. 3) fix-95 ragdoll quit crash.
