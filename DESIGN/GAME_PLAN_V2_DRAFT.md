@@ -2,13 +2,13 @@
 
 Started by the hourly build manager, 2026-10-05 15:10. This is a draft. It does not change GAME_PLAN.html or BUILD_PLAN.html, and no v0.2 job has been queued from it. Anything not taken from Greg's recorded decisions is marked **proposal, needs Greg**.
 
-## 0. v2: refining v0.1 into a really good demo (refreshed 8 Oct 21:10)
+## 0. v2: refining v0.1 into a really good demo (refreshed 9 Oct 21:10)
 
 Greg's north star (6 Oct night): "a really enjoyable gameplay shell" he can texture himself. So v2 is not new content; it is making the START-to-daylight route play well.
 
 - **Plays well:** the examiner fight (telegraphed, fair, keycard always drops); the one-map route with real lifts and no loading screens (min 174 fps); the vat wake through the flood; the ending (7 Oct: hands hidden through the whiteout, bigger TO BE CONTINUED card, camera tilts 8 degrees to the horizon at the title drop, dial `TITLE_LOOK_UP_DEG`); the brain screen with all 4 disciplines (dec-89); route death = 3 s vat regrowth then last checkpoint; the decluttered lab (tidy-80); the new player body (player-81); the combat test suites all green (fix-76, fix-98).
 - **Plays worst:** (1) the first-person melee still reads as a pose, not a swing (feel-86 queued); (2) encounters are flat: one long tile hall per room with a guard in it (feel-87 queued); (3) lab systems (organs, X-ray, liquid, destruction) barely touch the route (route-88 queued); (4) the Black Mirror on trunk stays stuck behind the brain screen (fix-93 queued); (5) ragdoll bodies can crash the game on quit (fix-95 queued); (6) lift rides are near-black and the arcade and Lower Works look alike.
-- **Capacity, 8 Oct:** Claude accounts are still parked (until 10 Oct 19:04, alt2 until 11 Oct). Codex landed 3 small aiming fixes today: fix-97 (hands drop below the sight line), fix-100 and fix-101 (HRT/EEG/CAM monitors and the face feed fade to 25% while aiming). The MERCY NINE sight line is now clear. The grip hands still read as checker balls (remaster-imp-64-p1). fix-99 (Bone Yard quit leaks) is running; fix-102 (bare-fist examiner dial 9 -> 15) is queued.
+- **Capacity, 9 Oct:** no gameplay change landed today; every account was parked (Claude until 10 Oct 19:04, alt2 until 11 Oct 17:04, Codex until 22:47 tonight or 11 Oct). Codex landed three quit/teardown fixes: fix-99 (Bone Yard quit leaks), fix-103 (the full route now quits with 0 leaks, was about 11868) and fix-104 (Jolt "max jobs" warning between maps gone). fix-105 (opening-test quit leaks) waits for Codex credits. Earlier (8 Oct): fix-97/100/101 cleared the MERCY NINE sight line; fix-102 examiner fist 9 -> 15 behind the DAMAGE dial.
 - **Next refinement passes, in order:** fix-95 ragdoll quit crash > fix-93 Black Mirror on trunk > feel-86 combat feel > feel-87 encounters > route-88 lab systems into the route > remaster-player-81-p1 > imp-66 vat room. Each pass ships a before/after render and keeps the route suites green.
 
 ## 1. What v0.1 "Escape" actually delivered (as of 22:10, 6 Oct)
