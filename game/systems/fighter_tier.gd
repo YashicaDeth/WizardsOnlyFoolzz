@@ -28,6 +28,25 @@ const TIERS := {
 }
 const ORDER := ["scavenger", "hunter", "captain", "elite"]
 const SIDES := ["high", "low", "left", "right"]
+## Where a blow raised on each side actually lands. The side was already chosen
+## at the wind-up and already decided what a guard could turn — but the wound
+## went wherever the aim point happened to fall, so `LOW` still opened a chest
+## and `LEFT` opened nothing in particular. One table, read by both the warning
+## and the blow, so the promise and the wound cannot disagree.
+const SIDE_ZONES := {
+	"high": "head",
+	# A low blow takes the leading leg; the body only has two and either is a
+	# real wound, so this is a choice rather than a rule.
+	"low": "left_leg",
+	"left": "left_arm",
+	"right": "right_arm",
+}
+
+
+## The zone a side lands on. Anything unrecognised is the torso, which is where
+## an unaimed blow already went.
+static func zone_for(side: String) -> String:
+	return str(SIDE_ZONES.get(side, "torso"))
 ## When a feint switches side, as a fraction of the wind-up.
 const FEINT_AT := 0.82
 
