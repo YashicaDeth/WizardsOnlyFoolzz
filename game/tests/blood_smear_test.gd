@@ -178,6 +178,30 @@ func _ready() -> void:
 	check(fell_heading.dot(fell.normalized() if fell.length_squared() > 0.0001 else Vector3.ZERO) > 0.9,
 		"oriented along the fall (%s)" % str(fell_heading.snapped(Vector3(0.01, 0.01, 0.01))))
 
+	# --- a motion whose tween delivers a single step still marks --------------
+	# The deterministic version of the batch failure: a tween this short is over
+	# by its first update, so `follow()` sees one sample. If that sample is also
+	# the sample that creates the trail, a whole fall leaves nothing — which is
+	# what a stuttered frame in the game would do to a knockdown.
+	var starved_holder := Node3D.new()
+	starved_holder.name = "Starved"
+	add_child(starved_holder)
+	starved_holder.position = Vector3(-1.0, 1.0, -2.0)
+	var starved := BaselineHuman.new()
+	starved_holder.add_child(starved)
+	starved.position = Vector3(0, -1.0, 0)
+	starved.build("starved", {"gore": true})
+	await get_tree().physics_frame
+	starved._record_wound("left_leg", starved.global_position + Vector3(0.12, 0.3, 0), Vector3(0, 0, 1), 45.0, "ballistic", 0.6)
+	starved.anatomy.bleed_rate = 3.0
+	starved.anatomy.blood_remaining = starved.anatomy.blood_capacity * 0.8
+	BloodSmear.follow_while(self, starved, starved, 0.001)
+	starved.position.x += 0.45
+	await get_tree().process_frame
+	await get_tree().create_timer(0.1).timeout
+	check(BloodSmear.segment_count(self, starved) >= 2,
+		"a tweened motion with no intermediate steps still leaves its trail (%d segments)" % BloodSmear.segment_count(self, starved))
+
 	# --- heavy damage throws a mist it can account for ----------------------
 	var mist_at := Vector3(-1.0, 0.3, 0.3)
 	var mist := BloodSmear.throw_mist(self, mist_at, Vector3(1, 0, 0), 1.0)
