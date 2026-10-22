@@ -412,10 +412,16 @@ func _layout_context_controls() -> void:
 
 
 ## A pulse trace driven by the real body: rate follows how fast they are losing
-## blood, amplitude follows how conscious they still are. It flatlines toward
-## nothing as the snapshot worsens, without any separate animation state.
+## blood, amplitude follows how conscious they still are and how much oxygen is
+## left in them. It flatlines toward nothing as the snapshot worsens, without
+## any separate animation state. A body with no reserve left is one whose pulse
+## you cannot feel, which is the anatomy's own `Perfusion` speaking here rather
+## than a second idea of what a dying body does.
 func _advance_trace(delta: float) -> void:
 	var consciousness := clampf(float(anatomy.get("consciousness", 60)) / 100.0, 0.0, 1.0)
+	# Saves and snapshots written before the reserve existed have no key; a body
+	# nobody has recorded as short of oxygen reads as a whole one.
+	var oxygen := clampf(float(anatomy.get("oxygen", 100.0)) / 100.0, 0.0, 1.0)
 	var rate := 1.6 + clampf(float(anatomy.get("bleed_rate", 0.0)) / 6.0, 0.0, 2.2)
 	var phase := fmod(clock * rate, 1.0)
 	var beat := 0.0
@@ -427,7 +433,7 @@ func _advance_trace(delta: float) -> void:
 		beat = -0.55
 	elif phase < 0.34:
 		beat = 0.18
-	var sample := beat * (0.25 + consciousness * 0.75)
+	var sample := beat * (0.25 + consciousness * 0.75) * (0.15 + oxygen * 0.85)
 	var steps := maxi(1, int(delta * 90.0))
 	for _step in steps:
 		for index in range(_trace.size() - 1):
