@@ -19,6 +19,7 @@ extends RefCounted
 ## screen can carry it without owning a node.
 
 const CellOutzType := preload("res://systems/celloutz_type.gd")
+const OrganSystem := preload("res://systems/organ_system.gd")
 
 const RING := 26.0
 const BUTTON_ARC := 0.92
@@ -28,6 +29,21 @@ const BRASS := Color("b0552a")
 const BONE := Color("e6d4ac")
 const HOT := Color("a8281a")
 const SOOT := Color(0.05, 0.036, 0.028, 0.88)
+
+## How far the reticle reads into a body, in metres. The same short reach the
+## lab's rip prompt uses: the X-ray reaches 22 m, but naming what is under the
+## crosshair is about the body in front of you.
+const READOUT_REACH := OrganSystem.RIP_REACH
+## Bones the ray can name, for the zones whose skeleton is a single piece. The
+## chest carries named ribs and numbered vertebrae of its own, so it is not in
+## this table.
+const BONE_LABELS := {
+	"head": "SKULL", "left_arm": "LEFT ARM BONE", "right_arm": "RIGHT ARM BONE",
+	"left_leg": "LEFT LEG BONE", "right_leg": "RIGHT LEG BONE",
+}
+## One tone per kind of line, so a tissue and a landmark are told apart at a
+## glance rather than by reading three words at cursor speed.
+const TONES := {"tissue": BONE, "hardware": HOT, "bone": BONE * Color(1, 1, 1, 0.78), "landmark": BRASS}
 
 
 ## Is this click on the X-ray segment? Callers ask before their own hit tests,
@@ -89,3 +105,148 @@ static func draw(canvas: CanvasItem, at: Vector2, active: bool, elapsed: float) 
 			var from := TAU * float(index) / float(ticks) + elapsed * 0.6
 			canvas.draw_arc(at, RING + 7.0, from, from + 0.1, 3, HOT * Color(1, 1, 1, 0.5), 1.6)
 		CellOutzType.draw_text(canvas, at + Vector2(RING + 14.0, -6.0), "XRAY", 9.0, HOT, 1.0)
+
+
+# --- three structures under the reticle --------------------------------------
+#
+# Carl 0.8.71 names three structures at once -- `RIGHT LUNG / RIGHT RIB 3 /
+# T5 VERTEBRA` -- while ours named the one organ the aim was on. The readout is
+# the same instrument, so it is built here rather than as a second widget.
+#
+# The tissue comes from `OrganSystem.aimed_part()`, the resolution the lab's rip
+# prompt and the scan overlay already share, so there is no parallel anatomy
+# table: a body that cannot answer yields fewer lines instead of a guessed name.
+# The bone is the skeleton the X-ray itself draws, so the name is where the ray
+# actually goes rather than a label attached to a zone.
+
+## Up to three named structures along an aim ray, in the order it meets them:
+## the tissue it lands in (an organ, or installed hardware), the bone behind
+## that tissue, and the deepest distinct skeletal landmark it reaches. Each line
+## is `{"kind", "label", "at", "depth"}`. An aim that reaches no body, or a body
+## with nothing at that point, gives an empty list; a ray that crosses only bone
+## gives bone lines with no tissue line.
+static func structures(rig: Node, from: Vector3, along: Vector3, reach := READOUT_REACH) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if rig == null or not is_instance_valid(rig) or not rig.is_inside_tree():
+		return out
+	if along.length_squared() < 0.000001:
+		return out
+	var ray := along.normalized()
+	var body := rig as BaselineHuman
+	if body == null:
+		return out
+	var seen := {}
+	var tissue_depth := 0.0
+	var tissue := OrganSystem.aimed_part([body], from, ray, reach)
+	if not tissue.is_empty():
+		tissue_depth = float(tissue.get("distance", 0.0))
+		var label := OrganSystem.label_of(body, str(tissue.get("id", "")))
+		if not label.is_empty():
+			seen[label] = true
+			out.append({
+				"kind": "hardware" if str(tissue.get("id", "")).begins_with("implant:") else "tissue",
+				"label": label, "at": tissue.get("at", from), "depth": snappedf(tissue_depth, 0.001),
+			})
+	# Entry and exit of every bone the ray crosses, so the far wall of the skull
+	# counts as the bone behind the brain rather than being missed as "in front".
+	var slots := 0
+	for cross: Dictionary in _bone_crossings(body, from, ray, reach):
+		if slots >= 2:
+			break
+		var label := str(cross.get("label", ""))
+		if label.is_empty() or seen.has(label):
+			continue
+		# "Behind it" is a position, not a guess: a bone the ray meets before the
+		# tissue is in front of it and does not answer this line.
+		if tissue_depth > 0.0 and float(cross.get("depth", 0.0)) <= tissue_depth:
+			continue
+		seen[label] = true
+		out.append({
+			"kind": "bone" if slots == 0 else "landmark",
+			"label": label, "at": cross.get("at", from), "depth": snappedf(float(cross.get("depth", 0.0)), 0.001),
+		})
+		slots += 1
+	return out
+
+
+## Draws the lines beside the cursor, one per named structure. Nothing is drawn
+## for an empty list, which is what keeps the reticle quiet over empty air.
+static func draw_structures(canvas: CanvasItem, at: Vector2, lines: Array, alpha := 1.0) -> void:
+	if lines.is_empty():
+		return
+	var width := 0.0
+	for line: Dictionary in lines:
+		width = maxf(width, CellOutzType.width(str(line.get("label", "")), 10.0, 1.0))
+	var box := Rect2(at + Vector2(10.0, -8.0), Vector2(width + 16.0, 8.0 + lines.size() * 13.0))
+	canvas.draw_rect(box, SOOT * Color(1, 1, 1, alpha))
+	canvas.draw_rect(box, BRASS * Color(1, 1, 1, 0.65 * alpha), false, 1.0)
+	var y := box.position.y + 4.0
+	for line: Dictionary in lines:
+		var tone: Color = TONES.get(str(line.get("kind", "")), BONE)
+		canvas.draw_rect(Rect2(Vector2(box.position.x + 5.0, y + 3.0), Vector2(3.0, 3.0)), tone * Color(1, 1, 1, alpha))
+		CellOutzType.draw_text(canvas, Vector2(box.position.x + 12.0, y), str(line.get("label", "")), 10.0, tone * Color(1, 1, 1, alpha), 1.0)
+		y += 13.0
+
+
+
+## Every bone the ray crosses, sorted by how far along the ray it is. Bones of a
+## zone that has been taken off the body are not the body's any more.
+static func _bone_crossings(body: BaselineHuman, from: Vector3, ray: Vector3, reach: float) -> Array:
+	var hits: Array = []
+	for zone_id in body.bones:
+		var zone := str(zone_id)
+		if body.severed.has(zone):
+			continue
+		var frame := body.bones[zone_id] as Node3D
+		if frame == null or not is_instance_valid(frame) or not frame.is_inside_tree():
+			continue
+		for child in frame.get_children():
+			var piece := child as MeshInstance3D
+			if piece == null or piece.mesh == null or not piece.is_inside_tree():
+				continue
+			var span := _ray_box_span(piece.global_transform * piece.get_aabb(), from, ray)
+			if span.x < 0.0:
+				continue
+			var label := _bone_label(piece, zone)
+			for depth in [span.x, span.y]:
+				var at_depth := float(depth)
+				if at_depth < 0.0 or at_depth > reach:
+					continue
+				hits.append({"label": label, "at": from + ray * at_depth, "depth": at_depth})
+	hits.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.depth) < float(b.depth))
+	return hits
+
+
+## The name the skeleton itself carries: the 33 vertebrae are numbered, the ribs
+## are numbered, and the single-bone zones are named by the zone they belong to.
+static func _bone_label(piece: MeshInstance3D, zone: String) -> String:
+	if piece.has_meta("vertebra"):
+		return "VERTEBRA %d" % int(piece.get_meta("vertebra"))
+	if piece.has_meta("rib"):
+		return "RIB %d" % int(piece.get_meta("rib"))
+	return str(BONE_LABELS.get(zone, "BONE"))
+
+
+## Entry and exit depths of a ray through an axis-aligned box, as `Vector2(entry,
+## exit)`; `x < 0` when the ray misses entirely.
+static func _ray_box_span(box: AABB, from: Vector3, ray: Vector3) -> Vector2:
+	var enter := -INF
+	var exit := INF
+	for axis in 3:
+		var origin := from[axis]
+		var direction := ray[axis]
+		if absf(direction) < 0.000001:
+			if origin < box.position[axis] or origin > box.position[axis] + box.size[axis]:
+				return Vector2(-1.0, -1.0)
+			continue
+		var near := (box.position[axis] - origin) / direction
+		var far := (box.position[axis] + box.size[axis] - origin) / direction
+		if near > far:
+			var swap := near
+			near = far
+			far = swap
+		enter = maxf(enter, near)
+		exit = minf(exit, far)
+	if enter > exit:
+		return Vector2(-1.0, -1.0)
+	return Vector2(enter, exit)

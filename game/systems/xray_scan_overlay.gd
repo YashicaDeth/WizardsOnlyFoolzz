@@ -13,6 +13,7 @@ extends Control
 ## `VatsOverlay`, so the aimed X-ray and the scan read as one instrument.
 
 const CellOutzType := preload("res://systems/celloutz_type.gd")
+const XrayCursor := preload("res://systems/xray_cursor.gd")
 const BONE := Color("e6d4ac")
 const HOT := Color("a8281a")
 const BRASS := Color("b0552a")
@@ -140,6 +141,14 @@ func _draw() -> void:
 		var at := camera.unproject_position(node.global_position)
 		var tone: Color = STATE_TONES.get(str(organ.state), HOT)
 		draw_arc(at, 9.0 + sin(_clock * 5.0) * 1.5, 0.0, TAU, 16, tone, 1.6)
+	# Under the reticle: the tissue the aim lands in, the bone behind it, and the
+	# landmark the ray reaches. Resolved by `XrayCursor` from the same anatomy
+	# and the body's own skeleton, so this panel and the cursor agree.
+	if rig is BaselineHuman:
+		var lines := XrayCursor.structures(rig, camera.global_position, -camera.global_basis.z)
+		# Off the crosshair and clear of the chest, so the names read as a label
+		# beside the aim rather than as text printed on the body.
+		XrayCursor.draw_structures(self, size * 0.5 + Vector2(28.0, 32.0), lines)
 
 
 func _draw_column() -> void:

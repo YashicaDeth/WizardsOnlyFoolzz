@@ -570,6 +570,9 @@ func _build_bones(layout: Dictionary) -> void:
 					# The arc bulges toward -Z, the chest, and opens at the spine.
 					var rib := _bone_piece(frame, BodyMesh.arc_tube(0.148, 0.098, 0.011, PI * 0.12, PI * 0.88), Vector3(0, length * 0.30 - index * 0.052, 0.012))
 					rib.rotation = Vector3(0.14, PI, 0.0)
+					# Numbered like the vertebrae, so the X-ray reticle can name the
+					# rib the aim line actually crosses rather than "a rib".
+					rib.set_meta("rib", index + 1)
 			_:
 				_bone_piece(frame, BodyMesh.long_bone(length * 0.92, 0.019), Vector3.ZERO)
 
