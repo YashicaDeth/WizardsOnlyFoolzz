@@ -195,10 +195,14 @@ func _ready() -> void:
 	starved._record_wound("left_leg", starved.global_position + Vector3(0.12, 0.3, 0), Vector3(0, 0, 1), 45.0, "ballistic", 0.6)
 	starved.anatomy.bleed_rate = 3.0
 	starved.anatomy.blood_remaining = starved.anatomy.blood_capacity * 0.8
-	BloodSmear.follow_while(self, starved, starved, 0.001)
+	var starved_sampler := BloodSmear.follow_while(self, starved, starved, 0.001)
 	starved.position.x += 0.45
+	# Wait on the sampler itself, not a guessed sleep: on a cold first frame the
+	# tween can complete in the same frame a timer expires, and which resumes
+	# first is not something a test should be betting on.
+	if starved_sampler != null:
+		await starved_sampler.finished
 	await get_tree().process_frame
-	await get_tree().create_timer(0.1).timeout
 	check(BloodSmear.segment_count(self, starved) >= 2,
 		"a tweened motion with no intermediate steps still leaves its trail (%d segments)" % BloodSmear.segment_count(self, starved))
 
