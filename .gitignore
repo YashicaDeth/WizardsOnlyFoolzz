@@ -29,3 +29,7 @@ tools/vosk-model-*/
 # tracked stay tracked; add a new one deliberately with `git add -f`.
 *.import
 *.uid
+
+# Reference builds and captures from other people's projects. Binaries, not
+# source: never commit them (see carl_reference/_NOTES.md).
+carl_reference/

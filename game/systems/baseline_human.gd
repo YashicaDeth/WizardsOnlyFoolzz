@@ -595,6 +595,10 @@ func reveal_organs(revealed: bool) -> void:
 		var part := parts[zone_id] as MeshInstance3D
 		if part != null and is_instance_valid(part) and not severed.has(zone_id):
 			part.transparency = 0.62 if revealed else 0.0
+			# AN6.7. What has already been done to this body, drawn where it was
+			# done. An empty list is what takes it away, so letting go of the sweep
+			# leaves no debug drawing on a corpse.
+			RoundTrails.refresh(part, wound_marks.get(zone_id, []) as Array if revealed else [])
 
 
 ## B3.4. Seeing into a body is not worth much if the shed in front of it still
@@ -1770,6 +1774,10 @@ func _record_wound(zone_id: String, global_point: Vector3, travel: Vector3, dama
 	var wound: Dictionary = WoundMarks.make(surface["at"], surface["normal"], damage, damage_type, layer, local_travel)
 	wound["depth"] = shot["fraction"]
 	wound["through"] = shot["through"]
+	# AN6.7. How much body the round crossed, so the X-ray trail can be the length
+	# of the path later without asking `Penetration` a second time from a point
+	# on a limb that may by then be somewhere else entirely.
+	wound["thickness"] = float(shot["thickness"])
 	# Keep the identity of what lay behind this exact opening. The wound can then
 	# show the body's real organ mesh while it is present, and the same window
 	# empties when that organ ruptures and becomes a loose physics body.
