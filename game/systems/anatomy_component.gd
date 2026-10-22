@@ -893,9 +893,17 @@ func _process(delta: float) -> void:
 	var simulating := _needs_simulation()
 	# Healthy bodies are the common case in the larger sandbox. Dose, blood loss
 	# and an oxygen reserve still repaying a debt are the autonomous anatomy; an
-	# intact bystander is one float compare and out, so a body nobody has hurt
-	# pays nothing per frame for this model existing.
-	if not simulating and vitals.oxygen >= 100.0:
+	# intact bystander is three compare-and-out, so a body nobody has hurt pays
+	# nothing per frame for this model existing. Measured: 0.6us a frame against
+	# 0.2us for a script whose `_process` does nothing, in `vitals_cost_test`.
+	#
+	# The volume clause is not redundant with the reserve. Blood can be written
+	# from outside these methods (`v01_foe` restores a body that way), and a
+	# reserve of 100% on a body holding less than its full volume is a body the
+	# model would never wake to correct. At any volume below capacity
+	# `oxygen_target()` carries less oxygen, so the test is exact rather than
+	# conservative: it never keeps awake a body that had nowhere to go.
+	if vitals.oxygen >= 100.0 and blood_remaining >= blood_capacity and not simulating:
 		return
 	vitals.advance(self, _open_vessels(), delta)
 	if not simulating:
