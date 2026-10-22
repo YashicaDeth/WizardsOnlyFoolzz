@@ -133,8 +133,13 @@ func _ready() -> void:
 	shoved_rig.anatomy.blood_remaining = shoved_rig.anatomy.blood_capacity * 0.8
 	var start_at := shoved_rig.global_position.x
 	MeleeDriver.reel(shoved_rig, {"shove": Vector3(1.6, 0, 0), "knockdown": false, "shock": false})
-	for frame in 40:
-		await get_tree().process_frame
+	# A frame count is not a duration. `reel()` lays its streak from a real-time
+	# tween (`BloodSmear.follow_while`), and headless runs at whatever rate the
+	# machine manages, so forty frames is somewhere between 40 ms and 300 ms.
+	# That is why this block used to pass alone and fail as the eighth test in a
+	# batch: the machine was warm, the frames were fast, and the tween had not
+	# moved the body far enough to lay a mark before the trail was read.
+	await get_tree().create_timer(MeleeDriver.REEL_SECONDS + 0.25).timeout
 	var shoved_trail := BloodSmear.trail_for(self, shoved_rig)
 	check(not shoved_trail.is_empty(), "a bleeding body shoved by a landed blow marks the floor")
 	check(int(shoved_trail.get("segments", 0)) >= 2, "with a trail, not a single coin (%d segments)" % int(shoved_trail.get("segments", 0)))
@@ -160,8 +165,9 @@ func _ready() -> void:
 	felled.anatomy.blood_remaining = felled.anatomy.blood_capacity * 0.8
 	var felled_from := felled.global_position
 	felled.anatomy.go_down()
-	for frame in 40:
-		await get_tree().process_frame
+	# The fall's own duration, not a frame count, for the same reason as the shove
+	# above: the sampler is a tween in real seconds.
+	await get_tree().create_timer(BaselineHuman.KNOCKDOWN_SECONDS + 0.3).timeout
 	var fell := felled.global_position - felled_from
 	fell.y = 0.0
 	check(fell.length() > 0.2, "a knockdown carries the body off its feet (%.2f m)" % fell.length())
