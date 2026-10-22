@@ -94,12 +94,13 @@ t+3 minutes.
 
 The queue's line is one big job. These are the pieces I would cut it into.
 
-**C1. A telegraph that names the zone.** Every enemy wind-up already drives
-`ThreatCompass`. Make it say *which limb, which side* — `FighterTier.SIDES`
-already has high / low / left / right — so raising a guard is a decision instead
-of a coin flip.
-*Proof:* a test asserting the telegraph's zone equals the zone the blow lands
-in, for every tier and side; a capture.
+**C1. A telegraph that names the zone.** — *Built 2026-10-23:* the side a
+fighter raises now decides the part that opens (`FighterTier.zone_for`), the
+Hunt's `_wound_player` takes that zone instead of re-deriving one from an aim
+point at chest height, and the warning prints `▼ HIGH // HEAD`. Before this a
+`LOW` warning opened a rib, which punished the player for believing it.
+`enemy_zone_test` walks all four sides plus a nonsense one, through the Hunt's
+own wound path.
 
 **C2. Omnidirectional swinging, both sides.** The queue's own next line.
 `_swing_mirror` and `swing_hint` are the seeds; each direction needs its own

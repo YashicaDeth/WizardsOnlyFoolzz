@@ -1513,7 +1513,13 @@ func _grown_cybernetics(sheet_anatomy: Dictionary) -> Dictionary:
 
 ## Damage to the player, routed through the body so it lands on a real zone,
 ## bleeds from a real organ, and is still there next time.
-func _wound_player(from: Vector3, damage: float, damage_type := "cut") -> void:
+##
+## `zone` is the part the blow was promised on. An enemy's wind-up already
+## commits to a side and shows it; the wound used to be resolved from the aim
+## point at chest height regardless, so a `LOW` warning opened a rib. A caller
+## that has nothing to promise leaves it at the torso, which is where the aim
+## point landed anyway.
+func _wound_player(from: Vector3, damage: float, damage_type := "cut", zone := "torso") -> void:
 	if player_rig == null:
 		return
 	# One incoming blow may crack the held mirror, change anatomy, sever a limb
@@ -1525,10 +1531,8 @@ func _wound_player(from: Vector3, damage: float, damage_type := "cut") -> void:
 	# cosmetic random point.
 	if handheld != null and is_instance_valid(handheld) and handheld.possessed and handheld.raised > 0.5:
 		handheld.take_wear(clampf(damage / 400.0, 0.008, 0.08), "%s impact while raised" % damage_type, _handheld_impact_point(from))
-	var toward := (from - player)
-	toward.y = 0.0
-	var aim := player_rig.global_position + Vector3(0, 1.1, 0) + toward.normalized() * 0.3
-	var result := player_rig.hit_at(aim, damage, damage * 0.8, damage_type)
+	var landed := zone if not str(zone).is_empty() else "torso"
+	var result := player_rig.hit(landed, damage, damage * 0.8, damage_type)
 	hunter_appearance.sync_from_anatomy()
 	WorldHistory.update_subject("player", {"anatomy_state": player_rig.snapshot()}, "anatomy_changed")
 	WorldHistory.record_event("player_wounded", {
@@ -6592,7 +6596,9 @@ func _update_encounter_actors(delta: float) -> void:
 						_spar_struck(actor, guarded)
 						continue
 					var health_after := health - roundi(float(guarded.get("damage", incoming)))
-					_wound_player(node.global_position, maxf(5.0, 15.0 * _actor_combat_ratio(actor)), "cut")
+					# The side the fighter raised is the part that opens. The warning
+					# and the wound are one decision, not two.
+					_wound_player(node.global_position, maxf(5.0, 15.0 * _actor_combat_ratio(actor)), "cut", FighterTier.zone_for(str(actor.get("attack_side", ""))))
 					if hit_flash != null and third_person:
 						# `player` is already about eye height (body + 0.6 m); the chest is just below.
 						hit_flash.burst(player + Vector3(0, -0.3, 0), player - node.global_position, incoming / 30.0)
@@ -6782,6 +6788,11 @@ func _show_telegraph(actor: Dictionary, node: Node3D, on: bool) -> void:
 		_:
 			at += right * 0.55
 			mark.text = "◀ RIGHT"
+	# Name the part it will open, not only the direction: a warning a player
+	# cannot turn into a decision is decoration.
+	var promised := FighterTier.zone_for(side)
+	if promised != "torso":
+		mark.text += " // " + promised.replace("_", " ").to_upper()
 	var view := get_viewport().get_camera_3d()
 	if view == null or view.is_position_behind(at):
 		mark.visible = false
