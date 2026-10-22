@@ -757,6 +757,13 @@ func oxygen_pct() -> int:
 	return vitals.percent()
 
 
+## The beat the monitor prints. Derived on every read like the other two, so
+## there is no stored rate here to drift from the heart that sets it, and a
+## replaced heart beats on the next call without a reset.
+func pulse_bpm() -> int:
+	return vitals.pulse(self, _open_vessels())
+
+
 ## The stumps, read from the rig that owns this anatomy rather than counted
 ## again here: `BaselineHuman.severed` is the one record of what has come off,
 ## and a copy on the anatomy would be a second answer to the same question.

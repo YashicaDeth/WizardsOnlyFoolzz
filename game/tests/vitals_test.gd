@@ -9,6 +9,9 @@ extends Node3D
 ## - perfusion is computed on every read from blood volume, open vessels, the
 ##   spine, the heart and the loss still running out of the body, and a field
 ##   written directly changes it at once because nothing is cached;
+## - the pulse is derived the same way — resting on a whole body, faster while
+##   it compensates, faltering when the reserve runs out, and none at all once
+##   the pump has stopped;
 ## - oxygen is the one value `Perfusion` remembers, and it falls behind
 ##   perfusion because delivery is flow times the carriers blood still has;
 ## - an arrest is a real state the monitor can print, entered through the
@@ -96,6 +99,9 @@ func _ready() -> void:
 	print("WHOLE ", lines)
 	check(line_starting(lines, "O2 ") == "O2 100%  PERF 100%", "a whole body reads full oxygen and full flow (%s)" % line_starting(lines, "O2 "))
 	check(anatomy.perfusion_pct() == 100 and anatomy.oxygen_pct() == 100, "and the anatomy's own numbers agree")
+	check(line_starting(lines, "PULSE ") == "PULSE 62 BPM", "a whole body beats at rest (%s)" % line_starting(lines, "PULSE "))
+	var resting_pulse := anatomy.pulse_bpm()
+	check(resting_pulse == 62, "and the anatomy's own rate is the same number (%d BPM)" % resting_pulse)
 	check(not str(lines[0]).contains("DOWN"), "with nothing downed about it (%s)" % lines[0])
 	# The common case has to be free: a body nobody has hurt must not enter the
 	# model at all.
@@ -135,6 +141,11 @@ func _ready() -> void:
 	print("BLEEDING ", lines)
 	check(line_starting(lines, "O2 ") == "O2 %d%%  PERF %d%%" % [bleeding_oxygen, bleeding_perf],
 		"the screen prints the body's own two numbers (%s)" % line_starting(lines, "O2 "))
+	var bleeding_pulse := anatomy.pulse_bpm()
+	check(bleeding_pulse > resting_pulse,
+		"and the heart is working harder for what is left (%d > %d BPM)" % [bleeding_pulse, resting_pulse])
+	check(line_starting(lines, "PULSE ") == "PULSE %d BPM" % bleeding_pulse,
+		"which the screen prints (%s)" % line_starting(lines, "PULSE "))
 
 	# --- 3. arrested: the pump stops, the reserve spends itself ---------------
 	anatomy.damage_organ("heart", 999.0)
@@ -149,6 +160,8 @@ func _ready() -> void:
 	check(str(lines[0]).ends_with("DOWN"), "the monitor says so in its header (%s)" % lines[0])
 	check(line_starting(lines, "O2 ") == "O2 %d%%  PERF %d%%" % [arrested_oxygen, arrested_perf],
 		"and prints the arrest rather than hiding it (%s)" % line_starting(lines, "O2 "))
+	check(anatomy.pulse_bpm() == 0 and line_starting(lines, "PULSE ") == "PULSE NONE",
+		"a stopped heart has no beat to find (%s)" % line_starting(lines, "PULSE "))
 
 	# The reserve reaches the downed resolution's own trace, which is the other
 	# existing reader of a failing body — no new UI, no second number.
@@ -186,6 +199,19 @@ func _ready() -> void:
 	check(not anatomy.downed and not str(lines[0]).contains("DOWN"), "sparing brings the body up (%s)" % lines[0])
 	check(line_starting(lines, "O2 ") == "O2 %d%%  PERF %d%%" % [stopped_oxygen, stopped_perf],
 		"with the recovered numbers still the body's own (%s)" % line_starting(lines, "O2 "))
+	check(anatomy.pulse_bpm() > 0 and line_starting(lines, "PULSE ").ends_with("BPM"),
+		"and a replaced heart beats again (%s)" % line_starting(lines, "PULSE "))
+	# The falter: same body, same flow, only the reserve moved. A body nearly out
+	# of oxygen beats slower than one that is merely short of it, which is the
+	# reading that says stop fighting and start treating.
+	var kept_oxygen := anatomy.vitals.oxygen
+	anatomy.vitals.oxygen = 60.0
+	var short_of_breath := anatomy.pulse_bpm()
+	anatomy.vitals.oxygen = 8.0
+	var faltering := anatomy.pulse_bpm()
+	anatomy.vitals.oxygen = kept_oxygen
+	check(faltering < short_of_breath,
+		"a body nearly out of oxygen goes slow before it goes quiet (%d < %d BPM)" % [faltering, short_of_breath])
 	# And the reserve travels with the body the way dose does.
 	check(is_equal_approx(float(body.snapshot().get("oxygen", -1.0)), snappedf(anatomy.vitals.oxygen, 0.1)),
 		"the reserve is in the snapshot, so a carried body arrives short of breath")

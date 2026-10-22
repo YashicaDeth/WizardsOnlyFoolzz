@@ -57,7 +57,9 @@ recovery, lock-on, `hunter_body_motion`.
 
 ## Gore, in order
 
-**G1. Pulse, in the model rather than the HUD.** `Perfusion` gains a rate
+**G1. Pulse, in the model rather than the HUD.** — *Built 2026-10-23:*
+`Perfusion.pulse()` and the monitor's row, 62 BPM whole → 103 bleeding →
+`PULSE NONE` arrested → 130 with the heart back. G2 below is what reads it. `Perfusion` gains a rate
 derived the same way flow is — from volume, flow, pain and oxygen, raised by
 compensation and falling through the arrest to nothing. The monitor prints
 `PULSE 142 BPM`, or `NO PULSE`. This is first because it is the missing half of

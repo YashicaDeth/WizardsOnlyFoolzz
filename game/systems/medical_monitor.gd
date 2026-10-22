@@ -15,6 +15,8 @@ extends RefCounted
 ## anatomy rather than a number kept here: flow is derived from blood volume,
 ## open vessels, the spine and the heart, and the oxygen reserve is the one
 ## value that model remembers. The screen reads both live, like everything else.
+## The pulse came with them and is derived the same way — `Perfusion.pulse()`
+## reads the same fields plus the reserve, so a heart that stops stops printing.
 ##
 ## The rule for values the body does not have stays: **print `UNKNOWN`, not a
 ## guess.** A missing body has no circulation to report, and says so.
@@ -43,7 +45,7 @@ static func readout(body: Node) -> Dictionary:
 		"subject": "", "has_anatomy": false,
 		"blood_ml": null, "capacity_ml": null, "blood_pct": null,
 		"bleed": null, "internal_bleed": null,
-		"oxygen": null, "perfusion": null,
+		"oxygen": null, "perfusion": null, "pulse": null,
 		"consciousness": null, "pain": null,
 		"vessels_open": null, "spine": null,
 		"downed": false,
@@ -66,6 +68,7 @@ static func readout(body: Node) -> Dictionary:
 	out.internal_bleed = snappedf(float(anatomy.internal_bleed_rate), 0.1)
 	out.oxygen = anatomy.oxygen_pct()
 	out.perfusion = anatomy.perfusion_pct()
+	out.pulse = anatomy.pulse_bpm()
 	out.downed = bool(anatomy.downed)
 	out.consciousness = roundi(clampf(float(anatomy.consciousness), 0.0, 100.0))
 	out.pain = roundi(clampf(float(anatomy.pain), 0.0, 100.0))
@@ -120,6 +123,7 @@ static func lines(body: Node) -> Array[String]:
 		out.append("BLEED UNKNOWN")
 		out.append("INTERNAL UNKNOWN")
 		out.append("O2 UNKNOWN  PERF UNKNOWN")
+		out.append("PULSE UNKNOWN")
 		out.append("CON UNKNOWN  PAIN UNKNOWN")
 		out.append("VESSELS UNKNOWN")
 		out.append("SPINE UNKNOWN")
@@ -146,6 +150,11 @@ static func lines(body: Node) -> Array[String]:
 	# Flow and the reserve it feeds, side by side because they answer different
 	# questions: a body can still move blood with its lungs ruined.
 	out.append("O2 %d%%  PERF %d%%" % [int(report.oxygen), int(report.perfusion)])
+	# The rate that flow is being made at, derived on read like the two above.
+	# A body with nothing circulating prints NONE rather than a number it does
+	# not have.
+	var bpm := int(report.pulse)
+	out.append(("PULSE %d BPM" % bpm) if bpm > 0 else ("PULSE %s" % NONE))
 	out.append("CON %d%%  PAIN %d" % [int(report.consciousness), int(report.pain)])
 	out.append("VESSELS %d OPEN" % int(report.vessels_open))
 	out.append(("SPINE %s" % str(report.spine)) if report.spine != null else "SPINE UNKNOWN")

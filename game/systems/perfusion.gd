@@ -59,6 +59,19 @@ const CARRIED_FLOOR := 0.45
 const OXYGEN_SPEND := 5.5
 const OXYGEN_REPLENISH := 7.0
 
+## The beat. Resting rate, how much faster compensation drives it, and what
+## pain and oxygen debt add per point. Below `BRADYCARDIA_AT` the rate comes
+## down again rather than up, and under `NO_PULSE_FLOW` of its output there is
+## no beat to find at all.
+const RESTING_BPM := 62
+const COMPENSATION_BPM := 78
+const PAIN_BPM := 0.42
+const OXYGEN_DEBT_BPM := 0.30
+const BRADYCARDIA_AT := 25.0
+const FALTER_BPM := 30
+const NO_PULSE_FLOW := 0.12
+const MAX_BPM := 220
+
 ## How much oxygen is left, 0 to 100. The only value this model stores.
 var oxygen := 100.0
 
@@ -117,6 +130,39 @@ func advance(anatomy: Object, open_vessels: int, delta: float) -> bool:
 		return false
 	oxygen = clampf(move_toward(oxygen, target, (OXYGEN_REPLENISH if target >= oxygen else OXYGEN_SPEND) * delta), 0.0, 100.0)
 	return true
+
+
+## The beat, in beats a minute, or 0 when there is nothing to feel. Derived on
+## every read like flow, so a heart that is replaced starts beating on the next
+## call without anyone resetting a rate.
+##
+## It is not perfusion on a different scale. Three drives decide it:
+##
+## - **Compensation.** A body that has lost volume speeds up to defend its
+##   pressure, so a body bleeding while it is still winning reads fast rather
+##   than faint. That is the rate climbing before the pressure falls.
+## - **Pain** and **oxygen debt**, which speed a heart that can still answer.
+## - **The falter.** Below `BRADYCARDIA_AT` oxygen the rate comes down again: a
+##   body nearly out of oxygen goes slow before it goes quiet, and that is the
+##   reading that tells a player to stop fighting and start treating.
+##
+## Under `NO_PULSE_FLOW` of its output there is no beat to find, so it says
+## zero — a ruptured heart reads `NO PULSE` rather than a plausible number for
+## a body that is not circulating.
+func pulse(anatomy: Object, open_vessels := 0) -> int:
+	if anatomy == null:
+		return 0
+	if flow(anatomy, open_vessels) <= NO_PULSE_FLOW:
+		return 0
+	var capacity := maxf(1.0, float(anatomy.blood_capacity))
+	var volume := clampf(float(anatomy.blood_remaining) / capacity, 0.0, 1.0)
+	var compensated := clampf((FULL_VOLUME - volume) / (FULL_VOLUME - ARREST_VOLUME), 0.0, 1.0)
+	var bpm := RESTING_BPM + COMPENSATION_BPM * compensated
+	bpm += PAIN_BPM * clampf(float(anatomy.pain), 0.0, 100.0)
+	bpm += OXYGEN_DEBT_BPM * clampf(100.0 - oxygen, 0.0, 100.0)
+	var falter := clampf((BRADYCARDIA_AT - oxygen) / BRADYCARDIA_AT, 0.0, 1.0)
+	bpm = lerpf(bpm, FALTER_BPM, falter)
+	return roundi(clampf(bpm, 0.0, MAX_BPM))
 
 
 ## Fresh blood carries a full reserve; this is called when a body is configured.
