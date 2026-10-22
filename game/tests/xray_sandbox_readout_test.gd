@@ -170,4 +170,9 @@ func _ready() -> void:
 
 	print("XRAY_SANDBOX_READOUT_TEST_RESULT failures=", failures.size())
 	demo.queue_free()
+	# Let the sandbox actually come down before the tree goes. Quitting on the
+	# same frame as the `queue_free()` left the physics server tearing down rigs
+	# and loose gore mid-frame, which segfaulted on exit often enough to make a
+	# green run look like a failure.
+	await get_tree().process_frame
 	get_tree().quit(0 if failures.is_empty() else 1)

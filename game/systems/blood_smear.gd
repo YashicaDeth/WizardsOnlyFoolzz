@@ -197,10 +197,18 @@ static func follow_while(root: Node, mover: Node3D, bleed_source: Object, second
 		return null
 	if seconds <= 0.0:
 		return null
+	# The motion has two ends that are sampled unconditionally. A tween's steps
+	# are only as reliable as the frame rate: a stalled frame longer than the
+	# motion delivers a single step, and then `follow()`'s first sample only
+	# creates the trail — the whole fall leaves no mark. So the start is sampled
+	# here, before anything moves, and the finish is sampled by the tween's own
+	# `finished`, whatever the steps in between managed.
+	follow_now(root, mover, bleed_source)
 	var sampler := root.create_tween()
 	sampler.set_ignore_time_scale(true)
 	var sample := func(_progress: float) -> void: follow_now(root, mover, bleed_source)
 	sampler.tween_method(sample, 0.0, 1.0, seconds)
+	sampler.finished.connect(func() -> void: follow_now(root, mover, bleed_source))
 	return sampler
 
 
