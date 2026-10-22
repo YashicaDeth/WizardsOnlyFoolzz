@@ -10,8 +10,8 @@ extends Node3D
 ##
 ## - the printed blood and bleed follow a wound, then a heavier one, then stop
 ##   dead when the bleeding is stopped;
-## - a value this anatomy does not have (oxygen) prints `UNKNOWN` rather than a
-##   number invented to fill the row.
+## - circulation is printed from the anatomy's own model, and a missing body
+##   prints `UNKNOWN` rather than a number invented to fill the row.
 
 const MedicalMonitor := preload("res://systems/medical_monitor.gd")
 
@@ -52,7 +52,7 @@ func _ready() -> void:
 	check(str(lines[0]) == "BODY // SUBJECT", "and names whose body it is (%s)" % lines[0])
 	check(line_starting(lines, "BLD ") == "BLD 5.00 L  100% OF 5.00 L", "blood is the real capacity, not a rounded guess (%s)" % line_starting(lines, "BLD "))
 	check(line_starting(lines, "BLEED ") == "BLEED 0.0 mL/s", "an unwounded body is not bleeding (%s)" % line_starting(lines, "BLEED "))
-	check(line_starting(lines, "O2 ") == "O2 UNKNOWN // NOT MODELLED", "oxygen is declared absent rather than invented (%s)" % line_starting(lines, "O2 "))
+	check(line_starting(lines, "O2 ") == "O2 100%  PERF 100%", "a whole body carries a full reserve and full flow (%s)" % line_starting(lines, "O2 "))
 	check(line_starting(lines, "FRACTURES ") == "FRACTURES NONE", "nothing is broken yet (%s)" % line_starting(lines, "FRACTURES "))
 	check(line_starting(lines, "EXPOSED ") == "EXPOSED NONE", "and nothing is exposed (%s)" % line_starting(lines, "EXPOSED "))
 	check(line_starting(lines, "HIT ") == "HIT NONE", "with no hit on record (%s)" % line_starting(lines, "HIT "))
@@ -110,7 +110,7 @@ func _ready() -> void:
 	check(line_starting(MedicalMonitor.lines(body), "VESSELS ") == "VESSELS 1 OPEN", "a taken limb is an open vessel (%s)" % line_starting(MedicalMonitor.lines(body), "VESSELS "))
 	# The honest case: nothing to read.
 	var empty: Array = MedicalMonitor.lines(null)
-	check(str(empty[1]) == "BLD UNKNOWN" and line_starting(empty, "O2 ").ends_with("UNKNOWN // NOT MODELLED"), "a missing body prints UNKNOWN, not zeroes")
+	check(str(empty[1]) == "BLD UNKNOWN" and line_starting(empty, "O2 ") == "O2 UNKNOWN  PERF UNKNOWN", "a missing body prints UNKNOWN, not zeroes")
 	check(empty.size() == lines.size(), "and keeps the same shape, so the panel does not jump")
 
 	print("MEDICAL_MONITOR_TEST_RESULT failures=", failures.size())

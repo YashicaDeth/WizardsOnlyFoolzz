@@ -120,6 +120,13 @@ var bleed_rate := 0.0
 ## B6.8v2. This is deliberately separate from an open wound. The body loses
 ## blood either way, but only an X-ray/anatomy inspection may name this source.
 var internal_bleed_rate := 0.0
+## The body's circulation and the oxygen carried in it. Owned here because it
+## is anatomy rather than a screen: `Perfusion` derives flow from the fields
+## around it and remembers exactly one value of its own — how much oxygen is
+## left. `medical_monitor.gd` reads it, and so does the consciousness below, so
+## running out of oxygen downs a body through the door a stopped heart already
+## uses rather than through a death rule of its own.
+var vitals := Perfusion.new()
 var pain := 0.0
 var consciousness := 100.0
 var dead := false
@@ -188,6 +195,7 @@ func configure(id: String, capacity: float = 5000.0, cybernetics: Variant = {}) 
 		if organ_id == "spine":
 			organ["vertebrae_damaged"] = []
 		organs[organ_id] = organ
+	vitals.reset()
 	set_process(true)
 
 
@@ -715,6 +723,11 @@ func _organ_consciousness_drain() -> float:
 		drain += 9.0
 	if not organ_ok("right_lung"):
 		drain += 9.0
+	# Hypoxia is the same question as a stopped heart — what is keeping this
+	# body from being conscious — so it belongs in the same answer rather than
+	# in a second downing rule. The reserve is read from the model, never
+	# recomputed here.
+	drain += (100.0 - vitals.oxygen) * 0.35
 	return drain
 
 
@@ -730,6 +743,29 @@ func treat_wound(zone_id: String, quality: float) -> void:
 
 func has_internal_bleeding() -> bool:
 	return internal_bleed_rate > 0.01
+
+
+## Circulation as the monitor and the downed sheet read it: flow reaching
+## tissue, and the oxygen reserve the flow maintains, both 0 to 100. Derived on
+## every call from the fields above, so a body bleeding while a screen is open
+## moves on that screen without either side keeping a copy.
+func perfusion_pct() -> int:
+	return roundi(Perfusion.flow(self, _open_vessels()) * 100.0)
+
+
+func oxygen_pct() -> int:
+	return vitals.percent()
+
+
+## The stumps, read from the rig that owns this anatomy rather than counted
+## again here: `BaselineHuman.severed` is the one record of what has come off,
+## and a copy on the anatomy would be a second answer to the same question.
+func _open_vessels() -> int:
+	var holder := get_parent()
+	if holder == null:
+		return 0
+	var severed: Variant = holder.get("severed")
+	return (severed as Array).size() if severed is Array else 0
 
 
 func xray_findings() -> Array[String]:
@@ -802,6 +838,9 @@ func snapshot() -> Dictionary:
 		"blood_capacity": roundi(blood_capacity),
 		"bleed_rate": snappedf(bleed_rate, 0.01),
 		"internal_bleed_rate": snappedf(internal_bleed_rate, 0.01),
+		# The reserve travels with the body the way dose does: a body carried
+		# out of a room does not arrive with full lungs.
+		"oxygen": snappedf(vitals.oxygen, 0.1),
 		"pain": roundi(pain),
 		"consciousness": roundi(consciousness),
 		"critical": critical,
@@ -822,6 +861,9 @@ func restore(state: Dictionary) -> void:
 	blood_remaining = clampf(float(state.get("blood", blood_capacity)), 0.0, blood_capacity)
 	bleed_rate = maxf(0.0, float(state.get("bleed_rate", 0.0)))
 	internal_bleed_rate = maxf(0.0, float(state.get("internal_bleed_rate", 0.0)))
+	# A save written before the reserve existed loads as a whole body, which is
+	# the only honest default: nothing recorded says it was short of oxygen.
+	vitals.oxygen = clampf(float(state.get("oxygen", 100.0)), 0.0, 100.0)
 	pain = clampf(float(state.get("pain", 0.0)), 0.0, 100.0)
 	consciousness = clampf(float(state.get("consciousness", 100.0)), 0.0, 100.0)
 	critical = bool(state.get("critical", false))
@@ -848,10 +890,15 @@ func restore(state: Dictionary) -> void:
 func _process(delta: float) -> void:
 	if dead:
 		return
-	# Healthy bodies are the common case in the larger sandbox.  Dose and blood
-	# loss are the only autonomous anatomy simulation; do not enter either path
-	# for every intact bystander just to discover both are empty.
-	if not _needs_simulation():
+	var simulating := _needs_simulation()
+	# Healthy bodies are the common case in the larger sandbox. Dose, blood loss
+	# and an oxygen reserve still repaying a debt are the autonomous anatomy; an
+	# intact bystander is one float compare and out, so a body nobody has hurt
+	# pays nothing per frame for this model existing.
+	if not simulating and vitals.oxygen >= 100.0:
+		return
+	vitals.advance(self, _open_vessels(), delta)
+	if not simulating:
 		return
 	_burn_dose(delta)
 	var total_bleed := bleed_rate + internal_bleed_rate
