@@ -70,6 +70,7 @@ const BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
 # The range exists to show what the gore systems do, and had none of the ones
 # built since. Greg: *"make the gore sandbox have all the main game changes"*.
 const SKULL_BURST := preload("res://systems/skull_burst.gd")
+const XrayCursor := preload("res://systems/xray_cursor.gd")
 const CAVITY := preload("res://systems/cavity.gd")
 const KILL_SHOT := preload("res://systems/kill_shot.gd")
 const KILL_CAM := preload("res://systems/kill_cam.gd")
@@ -2408,6 +2409,25 @@ func _set_xray(enabled: bool) -> void:
 	_note("X-RAY %s" % ("ON" if xray else "OFF"))
 
 
+## AN. What the X-ray names under the sandbox's own reticle: the tissue the shot
+## line lands in, the bone behind it, and the skeletal landmark it reaches.
+## Resolved by the same `XrayCursor.structures()` the lab's scan overlay draws
+## from, so the sandbox and the lab cannot disagree about what a body is made
+## of. Empty unless the X-ray is on and there is a body under the reticle.
+func xray_structures() -> Array:
+	if not xray:
+		return []
+	if camera == null or not is_instance_valid(camera):
+		return []
+	var from := camera.global_position
+	var along := -camera.global_basis.z
+	var hit := _trace_body(from, along)
+	var rig := hit.get("rig") as BaselineHuman
+	if rig == null:
+		return []
+	return XrayCursor.structures(rig, from, along)
+
+
 func _physics_process(delta: float) -> void:
 	if pad != null:
 		pad.set_combat_context("firearm" if launcher_equipped or str(arsenal.current().get("kind", "")) == "firearm" else "melee")
@@ -2954,6 +2974,13 @@ func _paint_hud() -> void:
 	var acid := Color("9bf01a")
 	var rust := Color("b0552a")
 	var size := hud.size
+	# The X-ray names what is under the reticle in the sandbox too, not only in
+	# the lab's scan overlay: this is where the gore is played with.
+	var named := xray_structures()
+	if not named.is_empty():
+		# Clear of the chest at arm's length; on the reticle it covered the wound
+		# the names were describing.
+		XrayCursor.draw_structures(hud, size * 0.5 + Vector2(56.0, 46.0), named)
 
 	# A damaged field instrument, not a clean debug overlay. The corners and
 	# centre sigil use the same copper/blood language as the front door and the
