@@ -74,6 +74,33 @@ func _ready() -> void:
 	piece.free()
 	bare.free()
 
+	# --- the rest of the legend: where it went in, and where it ended --------
+	var stub_dots: Array = RoundTrails.dots_for(stub)
+	check(stub_dots.size() == 2, "a round that stopped inside has two ends (%d)" % stub_dots.size())
+	check(str(stub_dots[0].kind) == "entry" and (stub_dots[0].tone as Color).is_equal_approx(RoundTrails.ENTRY_TONE),
+		"red where it went in")
+	check(str(stub_dots[1].kind) == "stop" and (stub_dots[1].tone as Color).is_equal_approx(RoundTrails.STOP_TONE),
+		"purple where it stopped")
+	var crossed_dots: Array = RoundTrails.dots_for(crossed)
+	check(crossed_dots.size() == 2 and str(crossed_dots[1].kind) == "exit", "a round that crossed ends on the way out")
+	check(crossed_dots.size() == 2 and (crossed_dots[1].tone as Color).is_equal_approx(RoundTrails.EXIT_TONE), "and blue is where it left")
+	check((crossed_dots[1].at as Vector3).distance_to(crossed_dots[0].at as Vector3) > 0.05,
+		"the two dots are at opposite ends of the path, not stacked on the entry")
+	var dotted := RoundTrails.build(crossed, 0, 1)
+	check(dotted.get_node_or_null("EntryDot") != null and dotted.get_node_or_null("ExitDot") != null,
+		"and the built trail carries both")
+	check(dotted.get_node_or_null("StopDot") == null, "without inventing the one that did not happen")
+	dotted.free()
+
+	# --- a blade is a mark, not a path --------------------------------------
+	var cuts: Array = RoundTrails.cuts_from([shallow, deep, cut, exit])
+	check(cuts.size() == 1, "a blade leaves one mark and the exits leave none (%d)" % cuts.size())
+	var mark := RoundTrails.build_cut(cuts[0] as Dictionary, 0)
+	check(mark.mesh != null and mark.material_override != null, "the cut mark builds")
+	var cut_arrays: Array = mark.mesh.surface_get_arrays(0)
+	check((cut_arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size() == 6, "as a single stroke across the opening")
+	mark.free()
+
 	# --- it goes on and off with the sweep ----------------------------------
 	var part := Node3D.new()
 	add_child(part)
@@ -81,6 +108,12 @@ func _ready() -> void:
 	var holder := part.get_node_or_null(RoundTrails.HOLDER) as Node3D
 	check(holder != null, "a limb with rounds in it carries their trails")
 	check(holder != null and holder.get_child_count() == 2, "one mesh per round")
+	var cut_part := Node3D.new()
+	add_child(cut_part)
+	RoundTrails.refresh(cut_part, [cut])
+	var cut_holder := cut_part.get_node_or_null(RoundTrails.HOLDER) as Node3D
+	check(cut_holder != null and cut_holder.get_child_count() == 1, "a body opened with a blade carries the mark instead of a path")
+	cut_part.queue_free()
 	var first: Node = holder.get_child(0) if holder != null else null
 	RoundTrails.refresh(part, [shallow, deep])
 	var second := part.get_node_or_null(RoundTrails.HOLDER) as Node3D
@@ -106,6 +139,7 @@ func _wound(at: Vector3, normal: Vector3, depth: float, thickness: float, throug
 	return {
 		"at": at, "normal": normal, "depth": depth, "thickness": thickness,
 		"through": through, "type": type, "seed": seed, "radius": 0.03,
+		"aspect": 2.35 if type == "cut" else 1.0, "shape_rotation": 0.3,
 	}
 
 

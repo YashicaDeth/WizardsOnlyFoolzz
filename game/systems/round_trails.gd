@@ -61,6 +61,20 @@ const MAX_TRAILS := 8
 ## Only rounds leave a path. A blade opens a wound with no trajectory worth
 ## drawing, and `WoundMarks` already gives it a crater and a layer.
 const ROUND_TYPES := ["ballistic", "puncture"]
+## A blade is still something the X-ray has to state, and the reference states it
+## in magenta rather than as a path.
+const CUT_TYPES := ["cut", "shear"]
+
+## The rest of the reference's legend: red where a round went in, blue where it
+## left, purple where it stopped, magenta where it was cut. Colours only, because
+## each one is a fact the wound table already holds.
+const ENTRY_TONE := Color("c2382a")
+const EXIT_TONE := Color("3f7fd0")
+const STOP_TONE := Color("8a4fb5")
+const CUT_TONE := Color("c05aa8")
+const DOT_RADIUS := 0.006
+## How wide a cut stroke is against its length. A slash is a line, not a hole.
+const CUT_STROKE := 0.16
 
 ## Lifted off the surface by a hair so the trail does not z-fight the crater it
 ## starts in. `BloodPool.LIFT` uses the same trick for the same reason.
@@ -115,6 +129,47 @@ static func tone_for(index: int, count: int, depth: float) -> Color:
 	return base
 
 
+## Where a round went in, and where it ended: out of the body or inside it. Pure,
+## so a test can read the legend without a scene, and `build()` only draws what
+## this says.
+static func dots_for(trail: Dictionary) -> Array:
+	var out: Array = []
+	var entry: Vector3 = trail.get("at", Vector3.ZERO)
+	var normal: Vector3 = (trail.get("normal", Vector3.UP) as Vector3).normalized()
+	var start := entry + normal * ENTRY_LIFT
+	var finish := start - normal * maxf(float(trail.get("length", 0.02)), 0.001)
+	out.append({"kind": "entry", "tone": ENTRY_TONE, "at": start})
+	if bool(trail.get("through", false)):
+		out.append({"kind": "exit", "tone": EXIT_TONE, "at": finish})
+	elif float(trail.get("depth", 1.0)) < 1.0:
+		out.append({"kind": "stop", "tone": STOP_TONE, "at": finish})
+	return out
+
+
+## The blade wounds the X-ray has to state. Exits are skipped for the same reason
+## they are skipped in `trails_from()`: they are the other end of a mark already
+## drawn, and an exit is not a second cut.
+static func cuts_from(marks: Array) -> Array:
+	var out: Array = []
+	for raw in marks:
+		if not raw is Dictionary:
+			continue
+		var wound: Dictionary = raw
+		if bool(wound.get("exit", false)):
+			continue
+		if not CUT_TYPES.has(str(wound.get("type", ""))):
+			continue
+		out.append({
+			"at": wound.get("at", Vector3.ZERO),
+			"normal": wound.get("normal", Vector3.UP),
+			"radius": float(wound.get("radius", 0.02)),
+			"aspect": float(wound.get("aspect", 1.0)),
+			"rotation": float(wound.get("shape_rotation", 0.0)),
+			"depth": float(wound.get("depth", 1.0)),
+		})
+	return out
+
+
 ## One trail as geometry, in the limb's own local space so it rides the limb
 ## through animation and leaves with it when it is cut off.
 static func build(trail: Dictionary, index: int, count: int) -> MeshInstance3D:
@@ -122,20 +177,21 @@ static func build(trail: Dictionary, index: int, count: int) -> MeshInstance3D:
 	node.name = "Round%d" % index
 	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	node.mesh = _shaft(trail, tone_for(index, count, float(trail.get("depth", 1.0))))
-
-	var material := StandardMaterial3D.new()
-	material.vertex_color_use_as_albedo = true
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	# Unshaded: this is a readout of where a round went, not a lit object, and a
-	# shaded tube in a dark corridor disappears exactly when it is most wanted.
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	# The one thing the X-ray has to beat: the body it is drawn inside. Bone and
-	# organs take priority 4 through `_set_depth_override`; the history of how
-	# they were hit is drawn after them.
-	material.no_depth_test = true
-	material.render_priority = 5
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	node.material_override = material
+	node.material_override = _material()
+	# The legend, drawn as the two ends of the path: a round's history is not only
+	# the line through the body but where it entered and where it ended up.
+	for dot: Dictionary in dots_for(trail):
+		var dot_node := MeshInstance3D.new()
+		dot_node.name = "%sDot" % str(dot.kind).capitalize()
+		var sphere := SphereMesh.new()
+		sphere.radius = DOT_RADIUS
+		sphere.height = DOT_RADIUS * 2.0
+		sphere.radial_segments = 8
+		sphere.rings = 4
+		dot_node.mesh = sphere
+		dot_node.position = dot.get("at", Vector3.ZERO)
+		dot_node.material_override = _point_material(dot.get("tone", ENTRY_TONE), float(trail.get("depth", 1.0)))
+		node.add_child(dot_node)
 	return node
 
 
@@ -168,6 +224,9 @@ static func refresh(part: Node3D, marks: Array) -> void:
 	var trails := trails_from(marks)
 	for index in trails.size():
 		holder.add_child(build(trails[index] as Dictionary, index, trails.size()))
+	var cuts := cuts_from(marks)
+	for index in cuts.size():
+		holder.add_child(build_cut(cuts[index] as Dictionary, index))
 
 
 static func _signature(marks: Array) -> String:
@@ -180,6 +239,72 @@ static func _signature(marks: Array) -> String:
 		if raw is Dictionary:
 			depth_table += "%d." % roundi(float((raw as Dictionary).get("depth", 1.0)) * 100.0)
 	return "%d|%d|%s" % [marks.size(), int(newest.get("seed", 0)), depth_table]
+
+
+## One blade mark: a thin magenta stroke across the opening, in the plane of the
+## skin, at the angle the blade came in at.
+static func build_cut(cut: Dictionary, index: int) -> MeshInstance3D:
+	var node := MeshInstance3D.new()
+	node.name = "Cut%d" % index
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	node.mesh = _stroke(cut)
+	node.material_override = _material()
+	return node
+
+
+static func _material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.vertex_color_use_as_albedo = true
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	# Unshaded: this is a readout of where a round went, not a lit object, and a
+	# shaded tube in a dark corridor disappears exactly when it is most wanted.
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	# The one thing the X-ray has to beat: the body it is drawn inside. Bone and
+	# organs take priority 4 through `_set_depth_override`; the history of how
+	# they were hit is drawn after them.
+	material.no_depth_test = true
+	material.render_priority = 5
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return material
+
+
+static func _point_material(colour: Color, depth: float) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = colour * Color(1, 1, 1, lerpf(0.45, 1.0, clampf(depth, 0.0, 1.0)))
+	# A dot is a fact, not a surface: it is lit by nothing and hidden by nothing.
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.no_depth_test = true
+	material.render_priority = 6
+	return material
+
+
+static func _stroke(cut: Dictionary) -> ArrayMesh:
+	var at: Vector3 = (cut.get("at", Vector3.ZERO) as Vector3)
+	var normal: Vector3 = (cut.get("normal", Vector3.UP) as Vector3).normalized()
+	var reference := Vector3.FORWARD if absf(normal.dot(Vector3.FORWARD)) < 0.98 else Vector3.RIGHT
+	var tangent := reference.cross(normal).normalized()
+	var bitangent := normal.cross(tangent).normalized()
+	var angle := float(cut.get("rotation", 0.0))
+	var along := tangent * cos(angle) + bitangent * sin(angle)
+	var across := normal.cross(along).normalized()
+	var length := maxf(float(cut.get("radius", 0.02)) * maxf(float(cut.get("aspect", 1.0)), 1.0), 0.02)
+	var width := maxf(length * CUT_STROKE, 0.003)
+	var origin := at + normal * ENTRY_LIFT * 1.6
+	var colour := CUT_TONE
+	colour.a = lerpf(0.5, 1.0, clampf(float(cut.get("depth", 1.0)), 0.0, 1.0))
+	var corners: Array[Vector3] = [
+		origin - along * length * 0.5 - across * width * 0.5,
+		origin + along * length * 0.5 - across * width * 0.5,
+		origin + along * length * 0.5 + across * width * 0.5,
+		origin - along * length * 0.5 + across * width * 0.5,
+	]
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for index in [0, 1, 2, 0, 2, 3]:
+		_vertex(surface, corners[index], colour)
+	surface.generate_normals()
+	return surface.commit()
 
 
 static func _shaft(trail: Dictionary, colour: Color) -> ArrayMesh:

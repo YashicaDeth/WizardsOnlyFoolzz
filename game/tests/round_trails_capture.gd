@@ -45,10 +45,13 @@ func _ready() -> void:
 	body.position = Vector3.ZERO
 
 	var camera := Camera3D.new()
-	camera.fov = 26.0
-	camera.position = Vector3(-0.80, 1.16, -0.30)
+	# Far enough back to see the arm, the torso and every end of the legend in one
+	# frame: the last capture was inside the limb, which proved a colour and
+	# nothing about the shape.
+	camera.fov = 32.0
+	camera.position = Vector3(-1.45, 1.34, -1.05)
 	add_child(camera)
-	camera.look_at(Vector3(-0.27, 1.10, 0))
+	camera.look_at(Vector3(-0.20, 1.08, 0))
 	camera.current = true
 
 	await get_tree().process_frame
@@ -61,11 +64,22 @@ func _ready() -> void:
 	body._record_wound("left_arm", Vector3(-0.255, 1.12, -0.03), Vector3(0, 0, 1), 34.0, "ballistic", 0.25)
 	# Buckshot that barely broke the surface, deliberately overlapping the first.
 	body._record_wound("left_arm", Vector3(-0.255, 1.17, -0.03), Vector3(0, 0, 1), 28.0, "ballistic", 0.12)
+	# A blade across the forearm: no path to draw, one magenta stroke, which is
+	# the rest of the reference's legend (`MAGENTA = CUT`).
+	body._record_wound("left_arm", Vector3(-0.255, 1.02, -0.02), Vector3(0.8, 0.0, 1.0), 46.0, "cut", 0.4)
 
 	# Closed first, so anything wrong in the frame can be attributed: the same
 	# body, same camera, only the X-ray differs.
-	await get_tree().process_frame
-	await get_tree().process_frame
+	#
+	# `WorldLook`'s detail textures are `NoiseTexture2D`s, which Godot generates
+	# on a thread. Reading the very first draw after the body is built catches
+	# them mid-generation as two rectangles of uninitialised pixels on the chest
+	# and hips — the "black rectangle of noise" in `DESIGN/CARL_COMPARISON.md`.
+	# In the game they are ready long before anyone looks; here the harness has to
+	# wait for them, because a capture that ships a broken texture is evidence of
+	# nothing.
+	for frame in 40:
+		await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	var closed := get_viewport().get_texture().get_image()
 	closed.save_png(OUT.replace(".png", "_closed.png"))
@@ -81,5 +95,9 @@ func _ready() -> void:
 	var error := image.save_png(OUT)
 	print("CAPTURE ", OUT, " error=", error, " size=", image.get_width(), "x", image.get_height())
 	var holder := body.get_node_or_null("left_arm/RoundTrails")
-	print("TRAILS_ON_ARM ", holder.get_child_count() if holder != null else 0)
+	var names: Array[String] = []
+	if holder != null:
+		for child in holder.get_children():
+			names.append(String(child.name))
+	print("TRAILS_ON_ARM ", holder.get_child_count() if holder != null else 0, " ", names)
 	get_tree().quit(0)
