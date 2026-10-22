@@ -8499,6 +8499,12 @@ func _update_grapple(delta: float) -> void:
 	face_player.y = 0.0
 	if face_player.length_squared() > 0.001:
 		held_body.rotation.y = atan2(face_player.x, face_player.z) + PI
+	# AN6.8. This is the drag the smear system exists for: a person you are
+	# walking across a floor with. The captive's own capsule is the mover
+	# because it is the part in contact, and its rig is the wound that pays for
+	# the trail — hold somebody dry and the floor stays clean. Sampled here, on
+	# the tick that moved them, since nothing else ticks for a held body.
+	BloodSmear.follow(self, held_body, delta, actor.get("rig"))
 	actor.attack_time = 0.0
 	if body_motion != null:
 		body_motion.set_grapple_pose(1.0, true)

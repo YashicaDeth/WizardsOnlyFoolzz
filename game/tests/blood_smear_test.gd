@@ -115,6 +115,63 @@ func _ready() -> void:
 		BloodSmear.follow(self, dry_mover, 1.0 / 60.0, dry)
 	check(BloodSmear.segment_count(self, dry_mover) == 0, "a body with no wound leaves the floor clean")
 
+	# --- the player's own verb: a landed blow's shove ----------------------
+	# Nothing in this block calls the smear system. The only input is
+	# `MeleeDriver.reel()`, the shove a landed blow gives its target, so a trail
+	# here proves the wiring is in the game rather than in the test.
+	var shoved := Node3D.new()
+	shoved.name = "Shoved"
+	add_child(shoved)
+	shoved.position = Vector3(-1.4, 1.0, -1.3)
+	var shoved_rig := BaselineHuman.new()
+	shoved.add_child(shoved_rig)
+	shoved_rig.position = Vector3(0, -1.0, 0)
+	shoved_rig.build("shoved", {"gore": true})
+	await get_tree().physics_frame
+	shoved_rig._record_wound("left_arm", shoved_rig.global_position + Vector3(-0.25, 0.15, -0.03), Vector3(0, 0, 1), 55.0, "ballistic", 0.75)
+	shoved_rig.anatomy.bleed_rate = 3.0
+	shoved_rig.anatomy.blood_remaining = shoved_rig.anatomy.blood_capacity * 0.8
+	var start_at := shoved_rig.global_position.x
+	MeleeDriver.reel(shoved_rig, {"shove": Vector3(1.6, 0, 0), "knockdown": false, "shock": false})
+	for frame in 40:
+		await get_tree().process_frame
+	var shoved_trail := BloodSmear.trail_for(self, shoved_rig)
+	check(not shoved_trail.is_empty(), "a bleeding body shoved by a landed blow marks the floor")
+	check(int(shoved_trail.get("segments", 0)) >= 2, "with a trail, not a single coin (%d segments)" % int(shoved_trail.get("segments", 0)))
+	var shoved_heading: Vector3 = shoved_trail.get("heading", Vector3.ZERO)
+	check(shoved_heading.x > 0.9, "oriented along the blow (%s)" % str(shoved_heading.snapped(Vector3(0.01, 0.01, 0.01))))
+	check(shoved_rig.global_position.x > start_at + 0.05, "and the body really was moved by it (%.2f m)" % (shoved_rig.global_position.x - start_at))
+
+	# --- the same verb when it puts them down: the fall travels --------------
+	# Still none of this calls the smear system. `go_down()` is the anatomy
+	# telling the rig it has been knocked over; the rig's own fall carries it
+	# 0.42 m and that floor has to be marked the same as a drag.
+	var felled_holder := Node3D.new()
+	felled_holder.name = "Felled"
+	add_child(felled_holder)
+	felled_holder.position = Vector3(-3.0, 1.0, 2.0)
+	var felled := BaselineHuman.new()
+	felled_holder.add_child(felled)
+	felled.position = Vector3(0, -1.0, 0)
+	felled.build("felled", {"gore": true, "knockdown_travel": 0.42})
+	await get_tree().physics_frame
+	felled._record_wound("left_leg", felled.global_position + Vector3(0.12, 0.3, 0), Vector3(0, 0, 1), 45.0, "ballistic", 0.6)
+	felled.anatomy.bleed_rate = 3.0
+	felled.anatomy.blood_remaining = felled.anatomy.blood_capacity * 0.8
+	var felled_from := felled.global_position
+	felled.anatomy.go_down()
+	for frame in 40:
+		await get_tree().process_frame
+	var fell := felled.global_position - felled_from
+	fell.y = 0.0
+	check(fell.length() > 0.2, "a knockdown carries the body off its feet (%.2f m)" % fell.length())
+	var felled_trail := BloodSmear.trail_for(self, felled)
+	check(not felled_trail.is_empty(), "a bleeding body knocked off its feet marks the floor it falls across")
+	check(int(felled_trail.get("segments", 0)) >= 2, "with a trail rather than a single mark (%d segments)" % int(felled_trail.get("segments", 0)))
+	var fell_heading: Vector3 = felled_trail.get("heading", Vector3.ZERO)
+	check(fell_heading.dot(fell.normalized() if fell.length_squared() > 0.0001 else Vector3.ZERO) > 0.9,
+		"oriented along the fall (%s)" % str(fell_heading.snapped(Vector3(0.01, 0.01, 0.01))))
+
 	# --- heavy damage throws a mist it can account for ----------------------
 	var mist := BloodSmear.throw_mist(self, Vector3(-1.0, 0.3, 0.3), Vector3(1, 0, 0), 1.0)
 	check(bool(mist.get("ok", false)) and int(mist.get("droplets", 0)) > 0, "a heavy hit throws mist (%d droplets)" % int(mist.get("droplets", 0)))

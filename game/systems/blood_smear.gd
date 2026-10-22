@@ -80,6 +80,7 @@ static var _retired: Array[MeshInstance3D] = []
 const MAX_RETIRED := 24
 
 static var _trails: Dictionary = {}
+static var _clocks: Dictionary = {}
 static var _mists: Array[CPUParticles3D] = []
 
 
@@ -165,6 +166,23 @@ static func follow(root: Node, mover: Node3D, delta: float, bleed_source: Object
 		"length": snappedf(float(trail["length"]), 0.01), "heading": heading,
 		"width": WIDTH, "pool_volume": POOL_FEED,
 	}
+
+
+## The same follower for callers that have no physics tick of their own: a
+## tween, an input handler, a scene script. Delta is measured from the previous
+## sample, so a shoved body is judged on how fast it actually moved rather than
+## on a frame time the caller guessed.
+static func follow_now(root: Node, mover: Node3D, bleed_source: Object = null) -> Dictionary:
+	if mover == null or not is_instance_valid(mover):
+		return {"ok": false, "reason": "no_mover"}
+	var key := mover.get_instance_id()
+	var now := Time.get_ticks_usec()
+	var previous := int(_clocks.get(key, 0))
+	_clocks[key] = now
+	var delta := 1.0 / 60.0
+	if previous > 0:
+		delta = clampf(float(now - previous) / 1000000.0, 0.0005, 0.25)
+	return follow(root, mover, delta, bleed_source)
 
 
 ## Heavy damage throws a short mist the same system accounts for. Called by the
@@ -268,6 +286,7 @@ static func clear() -> void:
 		if node != null and is_instance_valid(node):
 			node.queue_free()
 	_trails.clear()
+	_clocks.clear()
 	for node in _retired:
 		if is_instance_valid(node):
 			node.queue_free()
@@ -348,7 +367,9 @@ static func _floor_under(root: Node, mover: Node3D) -> Variant:
 	var world := viewport.find_world_3d()
 	if world == null:
 		return null
-	var from := mover.global_position
+	# Probed from a hand's width above the mover: a rig's own origin sits on
+	# the floor, and a zero-length ray from exactly on a surface reports nothing.
+	var from := mover.global_position + Vector3.UP * 0.05
 	if from.y > GROUND_REACH + 1.0:
 		return null
 	var query := PhysicsRayQueryParameters3D.create(from, from + Vector3.DOWN * GROUND_REACH)
@@ -398,7 +419,9 @@ static func _retire(root: Node, mover: Node3D) -> void:
 	if trail.get("root") != root:
 		return
 	# The streak stays where it was laid; only the bookkeeping is dropped, so a
-	# body that stops bleeding does not erase the drag that got it there.
+	# body that stops bleeding does not erase the drag that got it there. The
+	# clock goes with it, or a recycled instance id would inherit a stale sample.
+	_clocks.erase(key)
 	var node := trail.get("node") as MeshInstance3D
 	if node != null and is_instance_valid(node):
 		_retired.append(node)

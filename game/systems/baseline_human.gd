@@ -936,6 +936,16 @@ func _on_went_down() -> void:
 	_knockdown_tween.tween_property(self, "rotation:x", -PI * 0.46, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	if _knockdown_travel > 0.0:
 		_knockdown_tween.tween_property(self, "position", landed, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		# AN6.8. A knockdown is a player's blow putting a body down, and it
+		# travels: a bleeding body carried that far across a floor marks it,
+		# the same as one dragged by hand. The fall's own tween is the only
+		# tick this has, so it samples itself while it moves.
+		var scene_root: Node = get_tree().current_scene if is_inside_tree() else null
+		if scene_root != null:
+			var sampler := create_tween()
+			sampler.set_ignore_time_scale(true)
+			var sample := func(_progress: float) -> void: BloodSmear.follow_now(scene_root, self, self)
+			sampler.tween_method(sample, 0.0, 1.0, 0.24)
 	went_down.emit()
 
 
