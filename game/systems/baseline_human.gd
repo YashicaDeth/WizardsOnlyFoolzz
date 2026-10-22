@@ -1725,6 +1725,11 @@ func _refresh_streaks(sites: Array) -> void:
 ## Rough penetration for a hit whose caller did not say what it fired. These are
 ## the same order as `Ballistics.CALIBRES`: a blade barely crosses tissue, a
 ## rifle round crosses a body.
+## AN6.8. Damage at which a hit throws a mist of blood rather than only marking
+## the body. Below this the wound bleeds onto the skin; above it, the hit is
+## heavy enough to put blood in the air, which `BloodSmear` budgets and counts.
+const MIST_DAMAGE := 45.0
+
 const TYPE_PENETRATION := {
 	"ballistic": 0.35,
 	"shear": 0.50,
@@ -1799,6 +1804,12 @@ func _record_wound(zone_id: String, global_point: Vector3, travel: Vector3, dama
 		wound_marks[zone] = WoundMarks.record(wound_marks.get(zone, []) as Array, exit_wound)
 
 	_refresh_wounds(zone)
+	# AN6.8. Heavy damage puts blood in the air. Routed through the smear system
+	# so the mist is drawn and capped in one place instead of by every caller.
+	if damage >= MIST_DAMAGE:
+		var scene_root := get_tree().current_scene
+		if scene_root != null:
+			BloodSmear.throw_mist(scene_root, global_point, travel, clampf(damage / MIST_DAMAGE, 0.5, 3.0))
 	return shot
 
 

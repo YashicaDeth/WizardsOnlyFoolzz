@@ -33,7 +33,7 @@ a vertical surface.
 | **Round history drawn on the body** | **`GREEN LINE = THE LAT[EST]`, `WHITE LINES = EARLI[ER]`, `WHITE EDGE = REACHED BY A RO[UND]`, `FAINT = A PISTOL ROU[ND]`** | `WoundMarks` places craters at real hit points but says nothing about which round or how far it went | **They show the forensics; we show the holes** | **Adopted** — `RoundTrails` |
 | Structure named under the reticle | **Three at once**: `RIGHT LUNG  RIGHT RIB 3  T5 VERTEBRA` | Organ states in a right-hand column; implant tags anchored in 3D | Ours names organs in a panel, theirs names every structure the reticle crosses | **Adopt next** (not built here) |
 | Blood on the floor | Flat decal ovals, wide throw across several metres, some landing on the body | `BloodPool` grows and merges two wet edges, `BloodFlow` drips and streaks, `BloodVeil`, `Footprints`, drying to a darker tone | Ours accumulates; theirs only arrives | **Already ahead** |
-| Blood carried by a moving body | **Confirmed in footage**: a body dragged by the physics gun leaves long red smears across the tiles | No system found that streaks a dragged torso or a crawling player; `BloodPool` grows where drops land but nothing drags them | **Ours pools, theirs is carried** | **Adopt** — the largest remaining gap |
+| Blood carried by a moving body | **Confirmed in footage**: a body dragged by the physics gun leaves long red smears across the tiles | `BloodSmear` (AN6.8): a dragged, thrown or sliding rig lays a continuous tapering streak oriented to its travel, which feeds `BloodPool` and drains the body's own blood | **Closed** — built 2026-10-23 | **Built** |
 | Ragdoll | Bodies go limp immediately and can be grabbed, thrown and turned with a physics gun | `RagdollBody`: joint limits, per-zone masses, settle/sleep/freeze, reuses the live rig so scars and X-ray survive | Theirs is playable with; ours is authored to settle | **Unverified** — no side-by-side motion |
 | Slow motion | `TIME 1.0x` HUD dial | `gore_cam`, `kill_cam`, `execution_beat`, `vats_targeting` | Both have it; presentation not compared | **Unverified** |
 | Gun feel | 9 mm pistol, 12/12, reserve counter | `Ballistics` rounds as travelling objects, `LimbMomentum` for the arm | Ours is more physically committed | **Already ahead** |
@@ -128,9 +128,9 @@ cutting it.
 
 ## Order I would take next
 
-1. **Blood smearing** — confirmed in footage, absent here, and the only row
-   where we are plainly behind.
-2. **The medical monitor** — mostly reading what we already record.
+1. ~~**Blood smearing**~~ — built as `BloodSmear` (AN6.8) on 2026-10-23.
+2. **The medical monitor** — mostly reading what we already record; still the
+   strongest remaining idea in the reference.
 3. **The dot grammar** (entry / exit / stop / fragment / artery) on existing
    trails.
 4. **The scope-lens X-ray** — presentation of a verb we already have.

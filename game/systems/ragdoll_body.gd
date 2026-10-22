@@ -216,6 +216,13 @@ func _physics_process(delta: float) -> void:
 			if lifted_body != null:
 				lifted_body.apply_central_force(Vector3.UP * lifted_body.mass * 20.0)
 	_alive_seconds += delta
+	# AN6.8. A corpse thrown or slid across a floor carries its blood with it.
+	# This is the only place the game moves a body without a player driving it,
+	# so it is where the streak has to be laid.
+	var scene_root := get_tree().current_scene
+	var torso := bodies.get("torso") as RigidBody3D
+	if scene_root != null and torso != null and is_instance_valid(torso):
+		BloodSmear.follow(scene_root, torso, delta, source)
 	if slept:
 		_sleep_seconds += delta
 		if _sleep_seconds >= FREEZE_AFTER_SLEEP_SECONDS or _alive_seconds >= FORCE_FREEZE_SECONDS:
