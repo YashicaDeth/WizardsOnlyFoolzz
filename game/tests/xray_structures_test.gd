@@ -79,6 +79,22 @@ func _ready() -> void:
 	# one that says nothing.
 	check(labels_of(XrayCursor.structures(body, chest_from, Vector3(0, 0, 1))) == chest_labels, "the same aim resolves to the same three names")
 
+	# --- which half of the chest the aim crosses ---------------------------
+	# A rib is one hoop across both halves of the cage, so the side has to come
+	# from where the aim line meets it. Two aims a few centimetres either side of
+	# the midline are the same shot on two ribs, and the body says which.
+	var right_labels := labels_of(XrayCursor.structures(body, chest_from + Vector3(0.06, 0, 0), Vector3(0, 0, 1)))
+	var left_labels := labels_of(XrayCursor.structures(body, chest_from + Vector3(-0.06, 0, 0), Vector3(0, 0, 1)))
+	print("CHEST RIGHT ", right_labels, " LEFT ", left_labels)
+	check(right_labels.size() > 1 and str(right_labels[1]).begins_with("RIGHT RIB"),
+		"a rib crossed on the body's right says so (%s)" % (right_labels[1] if right_labels.size() > 1 else "none"))
+	check(left_labels.size() > 1 and str(left_labels[1]).begins_with("LEFT RIB"),
+		"and the mirror aim says left (%s)" % (left_labels[1] if left_labels.size() > 1 else "none"))
+	# A crossing on the midline is the sternum. Naming a side there would be the
+	# reticle guessing at something the body does not distinguish.
+	check(chest_labels.size() > 1 and not str(chest_labels[1]).begins_with("RIGHT") and not str(chest_labels[1]).begins_with("LEFT"),
+		"a crossing on the midline is given no side it does not have (%s)" % (chest_labels[1] if chest_labels.size() > 1 else "none"))
+
 	# --- a lateral shot: fewer lines rather than an invented bone -----------
 	# Through the left lung the rib cage is in front and the spine is beside the
 	# line, so the body can only name the lung. It must not reach for the rib it
@@ -110,6 +126,36 @@ func _ready() -> void:
 	check(XrayCursor.structures(body, Vector3(4, 1.2, -1.0), Vector3(0, 0, 1)).is_empty(), "an aim that misses the body names nothing")
 	check(XrayCursor.structures(body, lung.global_position + Vector3(0, 0, -1.2), Vector3(0, 0, -1)).is_empty(), "an aim pointing away from the body names nothing")
 	check(XrayCursor.structures(null, lung.global_position, Vector3(0, 0, 1)).is_empty(), "no body at all names nothing")
+
+	# --- the sweep's own rule gates the names ------------------------------
+	# The sweep still draws a skeleton through the shed on purpose (B3.4); naming
+	# is the part that must not claim to have looked through it.
+	var sight := get_world_3d()
+	var heart_at := heart.global_position
+	var clear_labels := labels_of(XrayCursor.structures(body, chest_from, Vector3(0, 0, 1), XrayCursor.READOUT_REACH, sight))
+	check(clear_labels.size() == 3, "a body in line of sight names three through the world query (%s)" % str(clear_labels))
+	var wall := StaticBody3D.new()
+	var wall_shape := CollisionShape3D.new()
+	var wall_box := BoxShape3D.new()
+	wall_box.size = Vector3(0.7, 0.7, 0.08)
+	wall_shape.shape = wall_box
+	wall.add_child(wall_shape)
+	add_child(wall)
+	wall.global_position = Vector3(heart_at.x, heart_at.y - 0.03, heart_at.z - 0.62)
+	for frame in 2:
+		await get_tree().physics_frame
+	check(XrayCursor.structures(body, chest_from, Vector3(0, 0, 1), XrayCursor.READOUT_REACH, sight).is_empty(),
+		"the same body behind a wall names nothing")
+	wall.queue_free()
+	for frame in 2:
+		await get_tree().physics_frame
+	check(labels_of(XrayCursor.structures(body, chest_from, Vector3(0, 0, 1), XrayCursor.READOUT_REACH, sight)) == clear_labels,
+		"and names the same three again once the wall is gone")
+	# The range half of the same rule, asked directly so it is wired rather than
+	# decorative: past `WorldXray.RANGE` nothing is read at any distance.
+	check(not WorldXray.reads(chest_from, chest_from + Vector3(0, 0, WorldXray.RANGE + 3.0), null),
+		"past the sweep's reach nothing is read")
+	check(WorldXray.reads(chest_from, heart_at, null), "and at arm's length it is")
 
 	# --- look at it, when there is a screen to look with --------------------
 	if DisplayServer.get_name() != "headless":

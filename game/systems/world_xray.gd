@@ -38,6 +38,47 @@ static func strength_at(distance: float, reach: float = RANGE) -> float:
 	return clampf(1.0 - (ratio - FALLOFF_FROM) / (1.0 - FALLOFF_FROM), 0.0, 1.0)
 
 
+## How far short of a named structure a sightline is allowed to stop, in metres.
+## The ray ends on the surface of whatever is in front, not at the point inside
+## the body, so a few centimetres of skin must not read as a wall.
+const SIGHT_MARGIN := 0.05
+
+
+## Can the eye get to this point at all: nothing solid between it and the point.
+## `ignore` is the RIDs of whatever the caller is already looking *at* — a rig's
+## own hitboxes must not occlude the organs inside it. With no world (a diagram,
+## a headless test with no geometry) there is nothing to be hidden behind.
+static func in_sight(eye: Vector3, at: Vector3, world: World3D, ignore: Array = []) -> bool:
+	if world == null:
+		return true
+	var span := eye.distance_to(at)
+	if span <= 0.001:
+		return true
+	var query := PhysicsRayQueryParameters3D.create(eye, at)
+	# Every X-ray body's hit geometry is an Area3D; a query that collides with
+	# areas would have the body hide itself.
+	query.collide_with_areas = false
+	query.exclude = ignore
+	var hit := world.direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return true
+	return eye.distance_to(hit.get("position", at)) >= span - SIGHT_MARGIN
+
+
+## The one answer to "does the sweep have hold of this thing from here", which
+## naming and anything else that reports must ask rather than inventing its own.
+##
+## Range is `strength_at()`'s own rule, so a body the sweep has dropped is never
+## named however clear its anatomy is on paper. The sightline is the same one
+## `BlackMirrorCamera` tests its depth targets with: the sweep draws through the
+## shed on purpose (B3.4), but identifying a lung through it would be the
+## instrument asserting something the eye cannot check.
+static func reads(eye: Vector3, at: Vector3, world: World3D = null, ignore: Array = []) -> bool:
+	if strength_at(eye.distance_to(at)) <= 0.0:
+		return false
+	return in_sight(eye, at, world, ignore)
+
+
 ## Turns the sweep on or off across a set of rigs, and hands back what is
 ## currently lit so the caller can report it without asking a second time.
 ## Bodies that fall out of range are put back the way they were found — a rig

@@ -34,6 +34,10 @@ const SOOT := Color(0.05, 0.036, 0.028, 0.88)
 ## lab's rip prompt uses: the X-ray reaches 22 m, but naming what is under the
 ## crosshair is about the body in front of you.
 const READOUT_REACH := OrganSystem.RIP_REACH
+## How far from the chest's own midline a crossing has to be before it belongs to
+## a side. Under this it met the sternum, and naming a side there would be the
+## reticle guessing rather than reading the body.
+const SIDE_EPS := 0.01
 ## Bones the ray can name, for the zones whose skeleton is a single piece. The
 ## chest carries named ribs and numbered vertebrae of its own, so it is not in
 ## this table.
@@ -125,7 +129,13 @@ static func draw(canvas: CanvasItem, at: Vector2, active: bool, elapsed: float) 
 ## is `{"kind", "label", "at", "depth"}`. An aim that reaches no body, or a body
 ## with nothing at that point, gives an empty list; a ray that crosses only bone
 ## gives bone lines with no tissue line.
-static func structures(rig: Node, from: Vector3, along: Vector3, reach := READOUT_REACH) -> Array[Dictionary]:
+##
+## `world` is the sightline question: with one, the names are gated by
+## `WorldXray.reads()` — the sweep's own range, and nothing solid between the
+## eye and the body — so a body behind the shed is not identified even though the
+## sweep still draws it. Without one (a diagram, a headless test with no
+## geometry) only the anatomy can be answered.
+static func structures(rig: Node, from: Vector3, along: Vector3, reach := READOUT_REACH, world: World3D = null) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if rig == null or not is_instance_valid(rig) or not rig.is_inside_tree():
 		return out
@@ -166,6 +176,12 @@ static func structures(rig: Node, from: Vector3, along: Vector3, reach := READOU
 			"label": label, "at": cross.get("at", from), "depth": snappedf(float(cross.get("depth", 0.0)), 0.001),
 		})
 		slots += 1
+	if out.is_empty():
+		return out
+	# One sightline for the whole readout, to the nearest thing named: if the eye
+	# cannot reach that, nothing behind it is being looked at either.
+	if not WorldXray.reads(from, out[0].get("at", from), world):
+		out.clear()
 	return out
 
 
@@ -207,24 +223,45 @@ static func _bone_crossings(body: BaselineHuman, from: Vector3, ray: Vector3, re
 			var span := _ray_box_span(piece.global_transform * piece.get_aabb(), from, ray)
 			if span.x < 0.0:
 				continue
-			var label := _bone_label(piece, zone)
 			for depth in [span.x, span.y]:
 				var at_depth := float(depth)
 				if at_depth < 0.0 or at_depth > reach:
 					continue
-				hits.append({"label": label, "at": from + ray * at_depth, "depth": at_depth})
+				var at := from + ray * at_depth
+				hits.append({"label": _bone_label(body, piece, zone, at), "at": at, "depth": at_depth})
 	hits.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.depth) < float(b.depth))
 	return hits
 
 
 ## The name the skeleton itself carries: the 33 vertebrae are numbered, the ribs
-## are numbered, and the single-bone zones are named by the zone they belong to.
-static func _bone_label(piece: MeshInstance3D, zone: String) -> String:
+## are numbered and sided, and the single-bone zones are named by the zone they
+## belong to.
+##
+## A rib is one hoop across both halves of the chest, so its side cannot come from
+## the piece — it comes from where the aim line actually crosses that hoop, which
+## is what distinguishes `RIGHT RIB 3` from `LEFT RIB 3`. The vertebrae are on the
+## midline and get no side; the limbs carry theirs in `BONE_LABELS`.
+static func _bone_label(body: BaselineHuman, piece: MeshInstance3D, zone: String, at: Vector3) -> String:
 	if piece.has_meta("vertebra"):
 		return "VERTEBRA %d" % int(piece.get_meta("vertebra"))
 	if piece.has_meta("rib"):
-		return "RIB %d" % int(piece.get_meta("rib"))
+		return "%sRIB %d" % [_side_of(body, at), int(piece.get_meta("rib"))]
 	return str(BONE_LABELS.get(zone, "BONE"))
+
+
+## The side of the body a point is on, read from the chest's own axis rather than
+## from a second table: the rig builds its left at -X and its right at +X, so a
+## crossing on one half of the rib cage is named for that half.
+static func _side_of(body: BaselineHuman, at: Vector3) -> String:
+	var chest := body.parts.get("torso") as Node3D
+	if chest == null or not is_instance_valid(chest) or not chest.is_inside_tree():
+		return ""
+	var across := (at - chest.global_position).dot(chest.global_transform.basis.x.normalized())
+	if across > SIDE_EPS:
+		return "RIGHT "
+	if across < -SIDE_EPS:
+		return "LEFT "
+	return ""
 
 
 ## Entry and exit depths of a ray through an axis-aligned box, as `Vector2(entry,

@@ -145,7 +145,7 @@ func _draw() -> void:
 	# landmark the ray reaches. Resolved by `XrayCursor` from the same anatomy
 	# and the body's own skeleton, so this panel and the cursor agree.
 	if rig is BaselineHuman:
-		var lines := XrayCursor.structures(rig, camera.global_position, -camera.global_basis.z)
+		var lines := XrayCursor.structures(rig, camera.global_position, -camera.global_basis.z, XrayCursor.READOUT_REACH, camera.get_world_3d())
 		# Off the crosshair and clear of the chest, so the names read as a label
 		# beside the aim rather than as text printed on the body.
 		XrayCursor.draw_structures(self, size * 0.5 + Vector2(28.0, 32.0), lines)

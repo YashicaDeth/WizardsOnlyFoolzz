@@ -2413,7 +2413,9 @@ func _set_xray(enabled: bool) -> void:
 ## line lands in, the bone behind it, and the skeletal landmark it reaches.
 ## Resolved by the same `XrayCursor.structures()` the lab's scan overlay draws
 ## from, so the sandbox and the lab cannot disagree about what a body is made
-## of. Empty unless the X-ray is on and there is a body under the reticle.
+## of. Handed the world for the same reason the overlay is: a body behind the
+## range's wall is drawn by the sweep but is not identified through it. Empty
+## unless the X-ray is on and there is a body under the reticle.
 func xray_structures() -> Array:
 	if not xray:
 		return []
@@ -2425,7 +2427,7 @@ func xray_structures() -> Array:
 	var rig := hit.get("rig") as BaselineHuman
 	if rig == null:
 		return []
-	return XrayCursor.structures(rig, from, along)
+	return XrayCursor.structures(rig, from, along, XrayCursor.READOUT_REACH, camera.get_world_3d())
 
 
 func _physics_process(delta: float) -> void:
