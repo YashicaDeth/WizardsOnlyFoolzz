@@ -60,9 +60,10 @@ func _ready() -> void:
 	# Under the heart, which is where the fourth rib's hoop crosses the shot:
 	# the same body-relative line the lab test uses, so the sandbox and the lab
 	# are being read at the same point rather than at two different aims.
-	# A few centimetres to the body's right of the midline, so the rib the shot
-	# crosses is on a side the body can actually name: a sternum shot has no side.
-	var aim := heart.global_position - rig.global_transform.basis.y * 0.06 + rig.global_transform.basis.x * 0.06
+	# Medial, so the spine column is behind the tissue and the third line exists no
+	# matter how the dummy is standing. The side check gets its own lateral aim
+	# below, because 6 cm off the midline misses the vertebrae.
+	var aim := heart.global_position - rig.global_transform.basis.y * 0.06
 	var from := aim - along * 1.2
 	var camera := demo.get("camera") as Camera3D
 	camera.global_position = from
@@ -84,17 +85,28 @@ func _ready() -> void:
 	var first_kind := str((lines[0] as Dictionary).get("kind", "")) if not lines.is_empty() else ""
 	check(labels.size() > 0 and not labels[0].is_empty() and first_kind in ["tissue", "hardware"],
 		"what the reticle lands in is named (%s / %s)" % [first_kind, labels[0] if not labels.is_empty() else "none"])
-	check(labels.size() > 1 and labels[1].begins_with("RIGHT RIB"),
-		"the bone behind it is a named rib on the side the aim crossed (%s)" % (labels[1] if labels.size() > 1 else "none"))
-	# Which bone is deepest depends on how this dummy happens to be standing, so
-	# the sandbox asserts the slot — the lab test asserts what may fill it.
-	check(labels.size() > 2 and str((lines[2] as Dictionary).get("kind", "")) == "landmark",
-		"and the deepest line is the landmark (%s)" % (labels[2] if labels.size() > 2 else "none"))
+	# The heart sits in the left chest, so the hoop behind this aim is a left rib;
+	# the lab test is where both sides and the sternum are asserted.
+	check(labels.size() > 1 and labels[1].contains("RIB"),
+		"the bone behind it is a named rib (%s)" % (labels[1] if labels.size() > 1 else "none"))
+	check(labels.size() > 2 and labels[2].begins_with("VERTEBRA"),
+		"and the landmark is the column the shot reaches (%s)" % (labels[2] if labels.size() > 2 else "none"))
 
 	# No fourth path: the sandbox must be answering with the same resolution the
 	# lab's overlay draws, not with its own idea of a body.
 	check(labels == labels_of(XrayCursor.structures(rig, from, along, XrayCursor.READOUT_REACH, camera.get_world_3d())),
 		"the sandbox and the lab resolve the same three names")
+
+	# --- and which half of the chest it names -------------------------------
+	# The same shot a few centimetres to the body's right: the rib is the same
+	# hoop, but the body says which side the line went through.
+	var side_aim := aim + rig.global_transform.basis.x * 0.06
+	camera.global_position = side_aim - along * 1.2
+	camera.look_at(side_aim, Vector3.UP)
+	var side_labels := labels_of(demo.xray_structures())
+	print("SANDBOX SIDE ", side_labels)
+	check(side_labels.size() > 1 and str(side_labels[1]).begins_with("RIGHT RIB"),
+		"a shot on the dummy's right names the rib on that side (%s)" % (side_labels[1] if side_labels.size() > 1 else "none"))
 
 	# --- off again -----------------------------------------------------------
 	demo.call("_set_xray", false)
