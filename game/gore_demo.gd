@@ -3019,7 +3019,7 @@ func _paint_hud() -> void:
 	# only while M is on and the reticle is on a body.
 	var vitals := monitor_lines()
 	if not vitals.is_empty():
-		MedicalMonitor.paint_lines(hud, Vector2(size.x - 300.0, 208.0), vitals)
+		MedicalMonitor.paint_lines(hud, Vector2(size.x - 300.0, 248.0), vitals)
 
 	# A damaged field instrument, not a clean debug overlay. The corners and
 	# centre sigil use the same copper/blood language as the front door and the
