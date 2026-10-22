@@ -97,9 +97,11 @@ MAGENTA        = CUT
 ```
 
 We took the spine of that: the path, the recency, the bone-reached end, the
-depth fade. The dots, fragments, artery pulse and cut are not built. They are
-the obvious next increment and they all read from the same wound table, so they
-are additions to `RoundTrails` rather than a new system.
+depth fade, and since then the dots and the cut as well — `RoundTrails` draws
+`ENTRY_TONE` (red), `EXIT_TONE` (blue), `STOP_TONE` (purple) and `CUT_TONE`
+(magenta). Fragments and the artery pulse are not built; they read from the
+same wound table, so they are additions to `RoundTrails` rather than a new
+system. `DESIGN/GORE_AND_COMBAT_ROADMAP.md` carries the order and the proofs.
 
 **A medical monitor that is the health bar we have been describing.** Bound to
 `M`, it lists a live body's state while you look at it: blood volume in litres
@@ -129,8 +131,10 @@ cutting it.
 ## Order I would take next
 
 1. ~~**Blood smearing**~~ — built as `BloodSmear` (AN6.8) on 2026-10-23.
-2. **The medical monitor** — mostly reading what we already record; still the
-   strongest remaining idea in the reference.
-3. **The dot grammar** (entry / exit / stop / fragment / artery) on existing
-   trails.
+2. ~~**The medical monitor**~~ — built as `MedicalMonitor` (`M`), with real
+   oxygen and perfusion since 2026-10-23. Still short of the reference: no
+   pulse row, no pellet count on the hit line.
+3. ~~**The dot grammar**~~ — entry / exit / stop and cut are on `RoundTrails`.
+   Left of it: fragments, and the artery pulse that makes a stump spray in
+   time with a heart.
 4. **The scope-lens X-ray** — presentation of a verb we already have.
