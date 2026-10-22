@@ -31,6 +31,9 @@ const BLOCK_STAMINA_PER_DAMAGE := 0.9
 ## Below this stagger share a hit only flinches; at or above it the target
 ## reels. Heavy and charged blows clear it, lights mostly do not.
 const STAGGER_AT := 0.45
+## How long the shove takes to travel. The smear samples for exactly this long
+## from the same constant, so the trail and the motion cannot drift apart.
+const REEL_SECONDS := 0.12
 
 ## The one tuning table for how a hit feels. Hitstop in seconds of real
 ## time (brief: 60-90 ms), camera kick in BodyCam units, damage factors per
@@ -391,19 +394,14 @@ static func reel(rig: Node3D, report: Dictionary) -> void:
 	var tween := holder.create_tween()
 	tween.set_ignore_time_scale(true)
 	var lean := Vector3(-0.28 if bool(report.get("knockdown", false)) else -0.16, 0, 0)
-	tween.tween_property(holder, "position", holder.position + shove.limit_length(0.6), 0.12)
+	tween.tween_property(holder, "position", holder.position + shove.limit_length(0.6), REEL_SECONDS)
 	# AN6.8. This shove is the player's verb landing on somebody, and a landed
 	# blow is how a body is moved without anybody having hold of it: a bleeding
-	# target pushed across a floor has to mark the floor it crossed. Sampled from
-	# the shove's own tween because `reel()` is static and has no frame of its
-	# own; the smear system measures the delta.
-	var scene_root := rig.get_tree().current_scene
-	if scene_root != null:
-		var sampler := holder.create_tween()
-		sampler.set_ignore_time_scale(true)
-		var sample := func(_progress: float) -> void: BloodSmear.follow_now(scene_root, rig, rig)
-		sampler.tween_method(sample, 0.0, 1.0, 0.12)
-	tween.parallel().tween_property(holder, "rotation", rest + lean, 0.12)
+	# target pushed across a floor has to mark the floor it crossed. `reel()` is
+	# static and has no frame of its own, so the smear system lends it one for
+	# exactly as long as this tween moves the body.
+	BloodSmear.follow_while(rig.get_tree().current_scene, rig, rig, REEL_SECONDS)
+	tween.parallel().tween_property(holder, "rotation", rest + lean, REEL_SECONDS)
 	tween.tween_property(holder, "rotation", rest, 0.45 if bool(report.get("shock", false)) else 0.3)
 
 

@@ -27,6 +27,9 @@ signal resolved(outcome: String)
 const ZONES := ["head", "torso", "left_arm", "right_arm", "left_leg", "right_leg"]
 const LIMBS := ["left_arm", "right_arm", "left_leg", "right_leg"]
 const SEVERING_DAMAGE := ["cut", "shear", "ballistic"]
+## How long the opt-in knockdown travel takes. Its smear sampler is given the
+## same constant, so the trail ends where the body does.
+const KNOCKDOWN_SECONDS := 0.24
 const SEVER_THRESHOLD_RATIO := 0.85
 const SEVER_HEALTH_RATIO := 0.25
 ## AN6.4. Where a limb actually bends, on the same -1..1 axis `BodyMesh`'s own
@@ -933,19 +936,14 @@ func _on_went_down() -> void:
 	forward = forward.normalized()
 	var landed := position + forward * _knockdown_travel
 	_knockdown_tween = create_tween().set_parallel(true)
-	_knockdown_tween.tween_property(self, "rotation:x", -PI * 0.46, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_knockdown_tween.tween_property(self, "rotation:x", -PI * 0.46, KNOCKDOWN_SECONDS).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	if _knockdown_travel > 0.0:
-		_knockdown_tween.tween_property(self, "position", landed, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		_knockdown_tween.tween_property(self, "position", landed, KNOCKDOWN_SECONDS).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		# AN6.8. A knockdown is a player's blow putting a body down, and it
 		# travels: a bleeding body carried that far across a floor marks it,
-		# the same as one dragged by hand. The fall's own tween is the only
-		# tick this has, so it samples itself while it moves.
-		var scene_root: Node = get_tree().current_scene if is_inside_tree() else null
-		if scene_root != null:
-			var sampler := create_tween()
-			sampler.set_ignore_time_scale(true)
-			var sample := func(_progress: float) -> void: BloodSmear.follow_now(scene_root, self, self)
-			sampler.tween_method(sample, 0.0, 1.0, 0.24)
+		# the same as one dragged by hand. Sampled through the one sampler in
+		# the smear system, for the length of this fall.
+		BloodSmear.follow_while(get_tree().current_scene if is_inside_tree() else null, self, self, KNOCKDOWN_SECONDS)
 	went_down.emit()
 
 

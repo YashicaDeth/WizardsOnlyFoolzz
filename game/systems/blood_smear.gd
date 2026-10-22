@@ -185,6 +185,25 @@ static func follow_now(root: Node, mover: Node3D, bleed_source: Object = null) -
 	return follow(root, mover, delta, bleed_source)
 
 
+## The tick itself, for a mover whose whole motion is a tween: a shove, a fall.
+## One sampler lives here rather than a copy in every caller, so the clock, the
+## spacing and the duration are read from the same place as the motion being
+## watched. `seconds` is the caller's motion tween's own duration. Returns the
+## sampler so a caller can kill it, or null when there is nothing to watch.
+static func follow_while(root: Node, mover: Node3D, bleed_source: Object, seconds: float) -> Tween:
+	if root == null or not root.is_inside_tree():
+		return null
+	if mover == null or not is_instance_valid(mover) or not mover.is_inside_tree():
+		return null
+	if seconds <= 0.0:
+		return null
+	var sampler := root.create_tween()
+	sampler.set_ignore_time_scale(true)
+	var sample := func(_progress: float) -> void: follow_now(root, mover, bleed_source)
+	sampler.tween_method(sample, 0.0, 1.0, seconds)
+	return sampler
+
+
 ## Heavy damage throws a short mist the same system accounts for. Called by the
 ## wound that caused it, not by a timer: uncaused mist would hang on every hit.
 static func throw_mist(root: Node, at: Vector3, direction: Vector3, volume: float = 1.0) -> Dictionary:
@@ -225,8 +244,12 @@ static func throw_mist(root: Node, at: Vector3, direction: Vector3, volume: floa
 	speck.material = material
 	puff.mesh = speck
 	puff.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	puff.global_position = at
+	# Into the tree before it is placed: a global position set on a node with no
+	# parent is not global, it is a local transform against nothing, so the puff
+	# used to land wherever the root's own origin was and log an engine error on
+	# every heavy hit.
 	root.add_child(puff)
+	puff.global_position = at
 	puff.emitting = true
 
 	_mists.append(puff)

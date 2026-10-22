@@ -173,9 +173,23 @@ func _ready() -> void:
 		"oriented along the fall (%s)" % str(fell_heading.snapped(Vector3(0.01, 0.01, 0.01))))
 
 	# --- heavy damage throws a mist it can account for ----------------------
-	var mist := BloodSmear.throw_mist(self, Vector3(-1.0, 0.3, 0.3), Vector3(1, 0, 0), 1.0)
+	var mist_at := Vector3(-1.0, 0.3, 0.3)
+	var mist := BloodSmear.throw_mist(self, mist_at, Vector3(1, 0, 0), 1.0)
 	check(bool(mist.get("ok", false)) and int(mist.get("droplets", 0)) > 0, "a heavy hit throws mist (%d droplets)" % int(mist.get("droplets", 0)))
 	check(BloodSmear.mist_count() >= 1, "and the system counts what it threw")
+	# It has to be a place in the world. A global position assigned before the
+	# node enters the tree is a local one against nothing, which used to put
+	# every puff at the root's origin and log an engine error on every hit.
+	var placed := false
+	# Matched by where it is, not by name: a sibling already called BloodMist
+	# makes Godot give this one an internal name, and the point of the check is
+	# the world position rather than the label.
+	for child in get_children():
+		if child is CPUParticles3D:
+			var puff := child as CPUParticles3D
+			if puff.is_inside_tree() and puff.global_position.distance_to(mist_at) < 0.001:
+				placed = true
+	check(placed, "and it hangs where the hit was, in world space")
 	for index in BloodSmear.MAX_MISTS + 4:
 		BloodSmear.throw_mist(self, Vector3(-1.0, 0.3, 0.3), Vector3(1, 0, 0), 0.4)
 	check(BloodSmear.mist_count() <= BloodSmear.MAX_MISTS, "mist is capped at %d" % BloodSmear.MAX_MISTS)
