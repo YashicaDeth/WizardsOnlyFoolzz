@@ -15,6 +15,8 @@ extends Node
 const DEMO := preload("res://gore_demo.tscn")
 const XrayCursor := preload("res://systems/xray_cursor.gd")
 const OUT := "P:/GameDev/Temp/xray_sandbox.png"
+const MONITOR_OUT := "P:/GameDev/Temp/medical_monitor.png"
+const MedicalMonitor := preload("res://systems/medical_monitor.gd")
 
 var failures: Array[String] = []
 
@@ -112,6 +114,32 @@ func _ready() -> void:
 	demo.call("_set_xray", false)
 	check((demo.xray_structures() as Array).is_empty(), "turning the X-ray off silences the names again")
 
+	# --- the medical monitor on a wounded dummy ------------------------------
+	check((demo.monitor_lines() as Array).is_empty(), "M is closed until it is asked")
+	rig.hit("left_arm", 26.0, 6.0, "cut")
+	rig.hit("torso", 44.0, 10.0, "ballistic")
+	await get_tree().create_timer(0.2).timeout
+	# Re-aimed on where the heart actually is now: the dummy has been hit twice
+	# since the last aim and may have moved.
+	var vitals_aim := (rig.organ_parts.get("heart") as Node3D).global_position
+	var vitals_from := vitals_aim - rig.global_transform.basis.z * 1.2
+	camera.global_position = vitals_from
+	camera.look_at(vitals_aim, Vector3.UP)
+	demo.call("_toggle_monitor")
+	check(bool(demo.get("monitor")), "M opens the sandbox's monitor")
+	var vitals: Array = demo.monitor_lines()
+	print("MONITOR ", vitals)
+	check(vitals.size() >= 10, "it prints the body it is on (%d lines)" % vitals.size())
+	check(str(vitals[0]).begins_with("BODY //"), "naming the subject (%s)" % (vitals[0] if not vitals.is_empty() else "none"))
+	var printed_bleed := ""
+	for line in vitals:
+		if str(line).begins_with("BLEED "):
+			printed_bleed = str(line)
+	check(printed_bleed == "BLEED %.1f mL/s" % float(rig.anatomy.bleed_rate), "with the body's own rate (%s)" % printed_bleed)
+	check(rig.anatomy.bleed_rate > 0.0, "and these hits are bleeding")
+	# No second copy: the sandbox's answer is the monitor's answer for this rig.
+	check(vitals == MedicalMonitor.lines(rig), "the sandbox does not keep its own numbers")
+
 	# --- look at it, when there is a screen to look with --------------------
 	if DisplayServer.get_name() != "headless":
 		demo.set_process(false)
@@ -127,6 +155,18 @@ func _ready() -> void:
 		var image := get_viewport().get_texture().get_image()
 		var error := image.save_png(OUT)
 		print("CAPTURE ", OUT, " error=", error)
+		# The monitor on the wounded body, with the skeleton off: this is the
+		# screen as it is read, not as the X-ray happens to light it.
+		demo.call("_set_xray", false)
+		camera.global_position = vitals_from
+		camera.look_at(vitals_aim, Vector3.UP)
+		hud.queue_redraw()
+		for frame in 4:
+			await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		var vitals_image := get_viewport().get_texture().get_image()
+		var vitals_error := vitals_image.save_png(MONITOR_OUT)
+		print("CAPTURE ", MONITOR_OUT, " error=", vitals_error)
 
 	print("XRAY_SANDBOX_READOUT_TEST_RESULT failures=", failures.size())
 	demo.queue_free()

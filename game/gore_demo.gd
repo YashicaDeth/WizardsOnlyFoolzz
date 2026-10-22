@@ -71,6 +71,7 @@ const BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
 # built since. Greg: *"make the gore sandbox have all the main game changes"*.
 const SKULL_BURST := preload("res://systems/skull_burst.gd")
 const XrayCursor := preload("res://systems/xray_cursor.gd")
+const MedicalMonitor := preload("res://systems/medical_monitor.gd")
 const CAVITY := preload("res://systems/cavity.gd")
 const KILL_SHOT := preload("res://systems/kill_shot.gd")
 const KILL_CAM := preload("res://systems/kill_cam.gd")
@@ -260,6 +261,9 @@ var slowed := 0.0
 ## is twelve times longer than it was asked for.
 var hitstop := 0.0
 var xray := false
+## The medical monitor: the body's own numbers, on the same key as its other
+## verbs, and only while a real body is under the reticle.
+var monitor := false
 var spent := 0
 var severed_total := 0
 var last_note := ""
@@ -1995,6 +1999,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_Q: _cut()
 			KEY_R: _reset()
 			KEY_X: _set_xray(not xray)
+			KEY_M: _toggle_monitor()
 			KEY_ESCAPE: _step_out()
 			KEY_6: _switch_weapon(HunterArsenal.SLOT_ORDER.find("sword"))
 			KEY_7: _switch_weapon(HunterArsenal.SLOT_ORDER.find("shotgun"))
@@ -2423,11 +2428,38 @@ func xray_structures() -> Array:
 		return []
 	var from := camera.global_position
 	var along := -camera.global_basis.z
-	var hit := _trace_body(from, along)
-	var rig := hit.get("rig") as BaselineHuman
+	var rig := _reticle_body()
 	if rig == null:
 		return []
 	return XrayCursor.structures(rig, from, along, XrayCursor.READOUT_REACH, camera.get_world_3d())
+
+
+## The real body the reticle is on, or null. One answer, so the names and the
+## monitor are looking at the same thing in the same frame.
+func _reticle_body() -> BaselineHuman:
+	if camera == null or not is_instance_valid(camera):
+		return null
+	var hit := _trace_body(camera.global_position, -camera.global_basis.z)
+	var rig := hit.get("rig") as BaselineHuman
+	if rig == null or not is_instance_valid(rig) or rig.anatomy == null:
+		return null
+	return rig
+
+
+## The monitor's own lines, exactly as printed, or nothing when it is closed or
+## there is no body under the reticle. No cached state: it asks the body.
+func monitor_lines() -> Array:
+	if not monitor:
+		return []
+	var rig := _reticle_body()
+	if rig == null:
+		return []
+	return MedicalMonitor.lines(rig)
+
+
+func _toggle_monitor() -> void:
+	monitor = not monitor
+	_note("MONITOR %s" % ("ON" if monitor else "OFF"))
 
 
 func _physics_process(delta: float) -> void:
@@ -2983,6 +3015,11 @@ func _paint_hud() -> void:
 		# Clear of the chest at arm's length; on the reticle it covered the wound
 		# the names were describing.
 		XrayCursor.draw_structures(hud, size * 0.5 + Vector2(56.0, 46.0), named)
+	# The body's numbers, at the right edge where the lab keeps its column, and
+	# only while M is on and the reticle is on a body.
+	var vitals := monitor_lines()
+	if not vitals.is_empty():
+		MedicalMonitor.paint_lines(hud, Vector2(size.x - 300.0, 208.0), vitals)
 
 	# A damaged field instrument, not a clean debug overlay. The corners and
 	# centre sigil use the same copper/blood language as the front door and the
