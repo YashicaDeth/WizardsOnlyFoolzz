@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wizards Only Fools — the working document</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the document</a>
+
+<header class="top">
+  <a class="brand" href="#/">
+    <span class="mark" aria-hidden="true">WOF</span>
+    <span class="brand-text">
+      <b>Wizards Only Fools</b>
+      <i>the working document</i>
+    </span>
+  </a>
+
+  <form class="find" id="find" role="search">
+    <input id="q" type="search" placeholder="search every document and note" autocomplete="off" aria-label="Search">
+    <kbd>/</kbd>
+  </form>
+
+  <nav class="tabs" aria-label="Views">
+    <a href="#/" data-view="home">Today</a>
+    <a href="#/plan" data-view="plan">Plan</a>
+    <a href="#/docs" data-view="docs">Documents</a>
+    <a href="#/notes" data-view="notes">Notes</a>
+    <a href="#/art" data-view="art">Art</a>
+    <a href="#/archive" data-view="archive">Archive</a>
+  </nav>
+</header>
+
+<div class="shell">
+  <aside class="rail" id="rail" aria-label="Documents"></aside>
+
+  <main id="main" tabindex="-1"></main>
+
+  <aside class="side" id="side" aria-label="Context"></aside>
+</div>
+
+<div class="lightbox" id="lightbox" hidden>
+  <button class="lightbox-close" id="lightbox-close" aria-label="Close">×</button>
+  <figure>
+    <img id="lightbox-img" alt="">
+    <figcaption id="lightbox-cap"></figcaption>
+  </figure>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="/app.js"></script>
+</body>
+</html>
