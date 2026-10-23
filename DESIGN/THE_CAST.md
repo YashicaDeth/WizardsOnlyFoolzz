@@ -102,6 +102,31 @@ facility slice needs a board the player can read, which means:
 - **no new named person enters the slice unless they take a seat, hold a door,
   or can be met twice.**
 
+### The v0.1 number
+
+The slice reads one faction's board — celloutz — so the cast is the ladder's
+seats plus the people the story has to be specific about:
+
+| Who | Count | Where it comes from |
+| --- | ---: | --- |
+| Seated people | 40 | 1 + 3 + 9 + 27 (`THE_LADDER.md` §1); OUTSIDE is uncapped and not counted |
+| Authored people | 4 | The Examiner, Hollis, the numbered guard, the Lower Works sentinel (§5) |
+| **Named people in the slice** | **44** | the ceiling when every seat is filled; a fresh save seats fewer |
+
+Of those 44, the drawing and casting work is split by band, not by taste:
+
+| Work | Count | Why |
+| --- | ---: | --- |
+| Hand-authored face and body | 4 | The four the story has to be specific about (§5) |
+| Rig-generated face, band pass (dress, silhouette, one distinguishing mark) | 13 | SINGULARITY + PRIVY + OFFICE: the bands with authority over the facility, so they must read across a room (§4) |
+| Rig-generated face, standard | 27 | NETWORK: met on the facility floor |
+| Crowd | uncapped | OUTSIDE; never met twice, never needs a name on screen |
+
+Retinue (`THE_LADDER.md` §5, **PROPOSAL**) would add one to three bodyguards to
+each PRIVY and OFFICE seat — up to 36 more named people — and is excluded from
+these numbers until Greg answers it. Per-faction ring names do not change any
+count; they change the words on the card.
+
 ## 7. What a card is allowed to say
 
 The card is the unit of legibility, shared by the board, the dossier and the

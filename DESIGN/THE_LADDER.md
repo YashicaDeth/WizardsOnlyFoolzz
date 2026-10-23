@@ -45,19 +45,21 @@ respect · faction · combat · leverage · knowledge · relationships
 | `outside` | OUTSIDE | ∞ | everyone else |
 
 Forty seats, then the crowd. Placement is **lexicographic, not a hidden
-scalar**: an eligible person takes the highest band with a free seat or falls
-one band, and within a band they sort on `class, influence, access, leverage,
-relationships, faction, wealth, knowledge, reputation, respect, fear, combat`,
-then on id so it is stable.
+scalar**: a person starts at the highest band they are eligible for and is moved
+down one band at a time until a seat is free or they reach OUTSIDE, which is
+uncapped (`pyramid_society.gd:121-126`). Within a band they sort on `class,
+influence, access, leverage, relationships, faction, wealth, knowledge,
+reputation, respect, fear, combat`, then on id so it is stable.
 
 ### The shape
 
 `pyramid()` reports `geometry: "3x3_expanding_horseshoe"`. Each placement
-carries `row`, `column`, `depth`, and two normalized coordinates,
-`horseshoe_x` / `horseshoe_y`, derived from `alignment * PI * 0.82`. Both poles
-curve back toward the apex: alignment above +0.15 is `ABOVE`, below -0.15 is
-`BELOW`, in between is `HINGE`. A renderer may draw this flat or use `depth` as
-a third axis.
+carries a `position` dictionary holding `row`, `column`, `depth` and two
+normalized coordinates, `horseshoe_x` / `horseshoe_y`, derived from
+`alignment * PI * 0.82` (`pyramid_society.gd:405-410`; the test reads them as
+`receiver.position.horseshoe_x`). Both poles curve back toward the apex:
+alignment above +0.15 is `ABOVE`, below -0.15 is `BELOW`, in between is `HINGE`.
+A renderer may draw this flat or use `depth` as a third axis.
 
 ### Death and return
 
@@ -115,8 +117,8 @@ Seven reads at a glance. Thirty-three never will.
 ## 4. One ladder per faction
 
 `pyramid(faction_id)` already filters by `faction_id`, so a table per faction is
-free. The texture comes from **eight tables with five rungs each**, not one
-ladder with forty rungs.
+free. The texture comes from **eleven tables with five rungs each**, not one
+ladder with forty rungs — one table for each id listed below.
 
 Faction ids that exist today:
 
@@ -152,9 +154,11 @@ its one interesting verb:
   means the board fills itself with people who have a reason to hate you, and
   the player can read the reason on the card.
 
-If Greg says no, the fallback is seniority: the longest-held `RankYears` in the
+If Greg says no, the fallback is seniority: the longest-serving person in the
 band below takes the seat at dawn. Nothing else in this document depends on the
-choice.
+choice, but note that no tenureship field exists yet — `RankYears` belongs to
+enRAGE, not to this codebase — so seniority needs a first-seen hour recorded on
+the subject before it can be used.
 
 **PROPOSAL — retinue.** Every PRIVY and OFFICE seat carries one to three named
 bodyguards, themselves OUTSIDE. That is where "more players" comes from without
