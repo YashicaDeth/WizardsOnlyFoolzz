@@ -25,8 +25,11 @@ const LEFT_SHOULDER := Vector3(-0.22, -0.46, 0.12)
 ## Grip rest per held thing, camera space, and the weapon's turn there.
 const REST := {
 	"": {"at": Vector3(0.16, -0.21, -0.40), "turn": Vector3(0.35, 0.10, -0.20)},
-	"cleaver": {"at": Vector3(0.24, -0.27, -0.45), "turn": Vector3(0.95, 0.22, -0.32)},
-	"staff": {"at": Vector3(0.20, -0.28, -0.42), "turn": Vector3(0.16, 0.32, -0.30)},
+	"cleaver": {"at": Vector3(0.23, -0.27, -0.44), "turn": Vector3(0.16, 0.38, -0.16)},
+	# A 1.6 m staff held 0.3 m from the eye fills the frame whatever it does.
+	# Held up and out to the right, the shaft leaves the picture instead of
+	# crossing the middle of it, and the hand still reads as holding it.
+	"staff": {"at": Vector3(0.30, -0.34, -0.56), "turn": Vector3(0.26, 0.48, -0.10)},
 	"sidearm": {"at": Vector3(0.14, -0.20, -0.55), "turn": Vector3(0.02, 0.04, 0.0)},
 	"default": {"at": Vector3(0.22, -0.27, -0.45), "turn": Vector3(0.80, 0.22, -0.30)},
 }
@@ -65,6 +68,11 @@ const MAGAZINE_DROP := Vector3(0, -0.145, 0.012)
 ## Presentation-only clearance below the sight line. Zero restores the old
 ## shouldered hand placement without moving the gun or either sight marker.
 const ADS_HAND_DROP := 0.035
+## A hand at rest points along the forearm, out of the bottom corner of the
+## frame, and shows its knuckles to its owner. Turning the fingers toward the
+## view instead kinks the wrist: the sleeve and the hand have to agree on which
+## way the arm runs.
+const BARE_TURN := Vector3(-PI * 0.5, 0.0, -PI * 0.5)
 
 var weapon_id := "-"
 ## player-81: true keeps the jester gloves (the forced humiliation set, worn
@@ -142,7 +150,7 @@ func take(id: String) -> void:
 		var fist := HeldGear.build_humiliation_hand(1)
 		fist.name = "RightGripHand"
 		HeldGear.set_pose(fist, "fist")
-		fist.rotation = Vector3(-PI * 0.5, 0.0, PI * 0.5)
+		fist.rotation = BARE_TURN
 		fist.set_meta("forearm_entry", Vector3(0.47, -0.53, -0.30))
 		held.add_child(fist)
 	else:
@@ -299,7 +307,10 @@ func pose(delta: float) -> void:
 			left_rest = {"at": LEFT_REST.at.lerp(LEFT_GUARD.at, maxf(_guard_amount, 0.7 if weapon_id.is_empty() else 0.0)), "turn": LEFT_GUARD.turn}
 		var placed := _compose(LEFT_SHOULDER, left_rest, _mirrored(left_key) if swinging_left else left_key, sway)
 		# Fingers forward, palm in: the same turn the grip mount gives a hand.
-		left_hand.transform = Transform3D(placed.basis * Basis.from_euler(Vector3(-PI * 0.5, 0.0, -PI * 0.5)) * Basis.from_scale(Vector3.ONE * 1.16), placed.origin)
+		# player-82: the hand keeps whatever size it was built at -- the fool's
+		# 1.16 glove, or the model's own on bare skin -- instead of the pose
+		# forcing the theatrical scale back onto a relaxed hand.
+		left_hand.transform = Transform3D(placed.basis * Basis.from_euler(BARE_TURN) * Basis.from_scale(Vector3.ONE * left_hand.scale.x), placed.origin)
 		HeldGear.set_pose(left_hand, "fist" if weapon_id.is_empty() or _guard_amount > 0.3 else "cup")
 	# The pistol comes up onto its sights through the owner's ADS.
 	if ads != null and aim_blend > 0.0 and is_inside_tree() and camera != null:
