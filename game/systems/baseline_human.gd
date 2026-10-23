@@ -23,6 +23,11 @@ signal zone_disabled(zone_id: String)
 signal limb_severed(zone_id: String, report: Dictionary)
 signal went_down()
 signal resolved(outcome: String)
+## One beat of an open artery: where the stump is in the world and which way it
+## threw. Whoever owns the camera listens for the player's own body, so a jet
+## coming at the face arrives on the lens through the same veil every other
+## close dose uses.
+signal arterial_beat(zone_id: String, at: Vector3, jet: Vector3)
 
 const ZONES := ["head", "torso", "left_arm", "right_arm", "left_leg", "right_leg"]
 const LIMBS := ["left_arm", "right_arm", "left_leg", "right_leg"]
@@ -54,6 +59,10 @@ const MID_BONE_STRESS_FLOOR := 0.7
 ## than merely destroyed. Tuned so an untreated stump is a clock measured in
 ## tens of seconds, not minutes.
 const STUMP_BLEED := 26.0
+## Beats left once the body is dead. A cut neck throws a few more times and then
+## it is over; without this a corpse still holding blood reads a resting pulse
+## and fountains for as long as the scene lives.
+const AGONAL_BEATS := 3
 ## A human spine is authored as 33 vertebrae here. It is both the anatomical
 ## count and a deliberate recurring number in the game's body language.
 const SPINE_VERTEBRAE := 33
@@ -217,6 +226,25 @@ var zone_depth: Dictionary = {}
 ## it away at the door; keeping it is the whole of B10.4's "a body carries its
 ## whole history visibly". See `wound_marks.gd`.
 var wound_marks: Dictionary = {}
+## Every landed blow as one line: where, what made it, which bone it crossed,
+## which round into this body it was, and when. The marks above are what you
+## look at and are capped per zone; this is what the X-ray reads back, and it is
+## the record that survives a reload. See `scar_ledger.gd`.
+var scars: Array = []
+## Where each severed stump sits on this body, in the rig's own space so it
+## rides the torso through a knockdown, a drag or a ragdoll, and which way that
+## stump points. Captured when the limb comes off: a whole-limb sever frees the
+## part, after which `_zone_origin()` answers with the rig's feet.
+var _stump_local: Dictionary = {}
+var _stump_out: Dictionary = {}
+## The arterial clock, in beats rather than seconds, so the rate can change
+## under it (compensation, pain, the falter) without the spray jumping.
+var _beat_phase := 0.0
+## How many beats this body has thrown, which is what paces the mist: one puff
+## per beat would be a fog machine at sixty a minute.
+var _beat_index := 0
+## Beats thrown after death, counted down from `AGONAL_BEATS`.
+var _agonal_beats := AGONAL_BEATS
 ## Fractional drops owed. Bleeding runs well under one drop per frame, so the
 ## rate is accumulated and spent whole rather than rounded every frame — which
 ## would round to zero forever or to one every frame, and neither is a rate.
@@ -373,6 +401,7 @@ func build(id: String, config: Dictionary = {}) -> void:
 		# opened to, so restoring the marks first would draw every old graze
 		# claiming to show bone.
 		wound_marks = WoundMarks.from_records(restored.get("wound_marks", {}), ZONES)
+		scars = ScarLedger.from_records(restored.get("scars", []))
 		# A limb that is not there has no health to have. Ordinary saves already
 		# wrote zero here because `_sever_zone` zeroes it, but a body restored
 		# from scars alone has no saved zone numbers at all — and a missing arm
@@ -383,6 +412,9 @@ func build(id: String, config: Dictionary = {}) -> void:
 			if not stump.is_empty():
 				stump["health"] = 0.0
 				anatomy.zones[zone_id] = stump
+			# A restored body has to keep spurting from the same places, or a
+			# load would leave an open stump that bleeds invisibly.
+			_record_stump(zone_id)
 		if anatomy.downed:
 			rotation.x = -PI * 0.46
 		for zone_id in ZONES:
@@ -731,6 +763,9 @@ func _sever_zone(zone: String, direction: Vector3, result: Dictionary, cut_point
 		zone_state["health"] = 0.0
 		anatomy.zones[zone] = zone_state
 	severed.append(zone)
+	# Before the part goes: once a whole limb is thrown there is no node left to
+	# ask where the shoulder was.
+	_record_stump(zone)
 	result["disabled"] = true
 	result["severed"] = true
 	result["sever_direction"] = direction
@@ -1023,6 +1058,7 @@ func behead() -> void:
 		head["health"] = 0.0
 		anatomy.zones["head"] = head
 	severed.append("head")
+	_record_stump("head")
 	if gore:
 		_shed_chunks("head", 90.0, "shear", "brain")
 	if gore:
@@ -1153,6 +1189,7 @@ func snapshot() -> Dictionary:
 	# limb's own space, drawn where it landed — existed only for as long as the
 	# rig did, so every load rebuilt an unmarked body carrying a damage number.
 	state["wound_marks"] = WoundMarks.to_records(wound_marks)
+	state["scars"] = ScarLedger.to_records(scars)
 	return state
 
 
@@ -1160,7 +1197,7 @@ func snapshot() -> Dictionary:
 ## whitelist rather than a list of things to strip, so a new statistic added to
 ## `AnatomyComponent.snapshot()` does not silently start surviving restarts
 ## because nobody remembered to add it to a denylist.
-const SCAR_KEYS := ["wound_marks", "zone_depth", "severed", "cybernetics"]
+const SCAR_KEYS := ["wound_marks", "scars", "zone_depth", "severed", "cybernetics"]
 
 
 ## What a body carries across a quantum restart, as opposed to across a load.
@@ -1542,7 +1579,7 @@ func _gore_root() -> Node:
 	return scene if scene != null else self
 
 
-func _spray(origin: Vector3, bias: Vector3, count: int) -> void:
+func _spray(origin: Vector3, bias: Vector3, count: int, speed := Vector2(1.9, 5.5)) -> void:
 	var root := _gore_root()
 	for index in maxi(1, roundi(count * detail)):
 		if live_gore >= live_gore_budget():
@@ -1556,7 +1593,7 @@ func _spray(origin: Vector3, bias: Vector3, count: int) -> void:
 		root.add_child(drop)
 		drop.global_position = origin + Vector3(randf_range(-0.09, 0.09), randf_range(-0.09, 0.09), randf_range(-0.09, 0.09))
 		var spread := (bias.normalized() + Vector3(randf_range(-0.75, 0.75), randf_range(0.05, 0.7), randf_range(-0.75, 0.75))).normalized()
-		_loose.append({"node": drop, "velocity": spread * (1.9 + randf() * 3.6), "life": 1.3 + randf() * 1.0, "splat": true, "size": blob.radius})
+		_loose.append({"node": drop, "velocity": spread * randf_range(speed.x, speed.y), "life": 1.3 + randf() * 1.0, "splat": true, "size": blob.radius})
 		live_gore += 1
 
 
@@ -1630,6 +1667,101 @@ func _bleed(delta: float) -> void:
 		_drip_owed -= 1.0
 		_drip_one(sites[randi() % sites.size()])
 	_refresh_streaks(sites)
+
+
+## Where a severed stump sits on this body, kept in the rig's own space so it
+## rides the torso through a knockdown, a drag or a ragdoll. Captured when the
+## limb comes off, because a whole-limb sever frees the part and `_zone_origin()`
+## would then answer with the rig's own feet.
+func _record_stump(zone: String) -> void:
+	var part := parts.get(zone) as Node3D
+	var at: Vector3
+	if part != null and is_instance_valid(part) and part.is_inside_tree():
+		at = part.global_position
+	else:
+		var layout: Dictionary = _layout if not _layout.is_empty() else (SEATED if _seated else STANDING)
+		var spec: Dictionary = layout.get(zone, {})
+		at = to_global(spec.get("at", Vector3.ZERO) as Vector3)
+	_stump_local[zone] = to_local(at)
+	# Away from the body's own centre line, so an arm throws out to the side and
+	# a leg throws down and forward rather than every stump throwing straight up.
+	var outward := at - global_position
+	outward.y = 0.0
+	# A head or a shoulder sits on the centre line, so its outward is degenerate
+	# and the neck it was cut through points at the sky.
+	var flat := outward.normalized() if outward.length_squared() > 0.0001 else Vector3.UP
+	_stump_out[zone] = (global_transform.basis.inverse() * flat).normalized()
+
+
+## The arterial clock.
+##
+## One heart, so one clock for every stump a body has open: an arm and a leg
+## both gone spurt from both on the same beat, because there is only one
+## ventricle behind them. The rate is not invented here either — it is
+## `anatomy.pulse_bpm()`, the number the medical monitor prints, so a body
+## bleeding while it compensates spurts faster, a body faltering spurts slow and
+## heavy, and a body whose heart has stopped does not spurt at all.
+##
+## This does not change what the body loses. That is still `bleed_rate`, which
+## `_sever_zone()` already raised when the limb came off; this decides the shape
+## the leaving blood takes.
+func _arterial_beats(delta: float) -> void:
+	if not gore or anatomy == null or _stump_local.is_empty():
+		return
+	var bpm := anatomy.pulse_bpm()
+	if bpm <= 0:
+		# The heart has stopped, so nothing is thrown. The clock parks rather
+		# than winding up, so a heart that starts again beats a whole beat
+		# before it throws instead of firing the moment it returns.
+		_beat_phase = 0.0
+		return
+	if anatomy.dead:
+		# Death stops the pump, but not in the same frame. The last few beats
+		# come slower and weaker, and then nothing: the neck of a beheaded body
+		# is the one stump in the game whose last beat is expected.
+		if _agonal_beats <= 0:
+			_beat_phase = 0.0
+			return
+		bpm = maxi(20, bpm / 2)
+	_beat_phase += float(bpm) * delta / 60.0
+	if _beat_phase < 1.0:
+		return
+	# At most one spurt per frame: a hitch must not unload three beats of blood
+	# into one picture, and the gore budget is spent per beat either way.
+	_beat_phase = minf(_beat_phase - 1.0, 0.999)
+	_beat_index += 1
+	if anatomy.dead:
+		_agonal_beats -= 1
+	for zone in _stump_local.keys():
+		_spurt_stump(str(zone))
+
+
+## One beat, out of one stump.
+func _spurt_stump(zone: String) -> void:
+	# A dressed stump is a closed artery: the heart is still beating, and the
+	# hole it used to throw through is not open any more.
+	if anatomy.is_treated(zone):
+		return
+	if live_gore >= live_gore_budget():
+		return
+	var at: Vector3 = to_global(_stump_local[zone] as Vector3)
+	var outward: Vector3 = global_transform.basis * (_stump_out.get(zone, Vector3.UP) as Vector3)
+	var volume := clampf(anatomy.blood_remaining / maxf(1.0, anatomy.blood_capacity), 0.0, 1.0)
+	var jet := BloodFlow.spurt_velocity(outward, volume)
+	var speed := jet.length()
+	# Drops, down the same `_loose` ballistics as every other piece of gore, so
+	# they land on whatever is under the stump and stain it through `_splat()`
+	# and `BloodPool` rather than through a second falling-blood path.
+	_spray(at, jet, BloodFlow.spurt_drops(volume), Vector2(speed * 0.82, speed * 1.14))
+	# The fine end of the jet. Every few beats, not every beat: one puff a second
+	# beside one wound is a wound, and a puff per beat is a smoke machine. Same
+	# budget and same materials as every other mist, so a stump does not
+	# introduce a second kind of blood.
+	if _beat_index % BloodFlow.SPURT_MIST_EVERY == 0:
+		var root := _gore_root()
+		if root != null:
+			BloodSmear.throw_mist(root, at, jet, 0.45 + 0.55 * volume)
+	arterial_beat.emit(zone, at, jet)
 
 
 ## The body process is called for every standing person.  Keep an intact body
@@ -1803,6 +1935,10 @@ func _record_wound(zone_id: String, global_point: Vector3, travel: Vector3, dama
 	# A hole that nearly went through looks nearly like one that did.
 	wound["radius"] = float(wound["radius"]) * lerpf(0.62, 1.0, float(shot["fraction"]))
 	wound_marks[zone] = WoundMarks.record(wound_marks.get(zone, []) as Array, wound)
+	# One scar per landed blow, written where the hit is still in hand: the point,
+	# the type, the depth and whether it crossed a bone are all already decided
+	# above, and the hour is the only thing this adds.
+	scars = ScarLedger.record(scars, zone, wound, WorldClock.minutes())
 
 	# --- and out the other side ------------------------------------------
 	if bool(shot["through"]):
@@ -2090,6 +2226,10 @@ func _process(delta: float) -> void:
 	_apply_pain_posture(own_delta)
 	if _needs_bleed_update():
 		_bleed(own_delta)
+	# The heart beats whether or not there is a wound mark to run down: a stump
+	# is its own site and `_bleeding_sites()` never contains one.
+	if not _stump_local.is_empty():
+		_arterial_beats(own_delta)
 	if _loose.is_empty():
 		return
 	delta = own_delta

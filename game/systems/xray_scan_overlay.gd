@@ -28,6 +28,15 @@ const STATE_TONES := {"OK": SCAN, "BRUISED": BRASS, "DAMAGED": Color("d06a2a"), 
 const TAG_HZ := 20.0
 const SCAN_EVERY := 0.2
 
+## Brief 2, `scar-ledger`. A body carries one line per landed blow, and this is
+## where it is read back: the mark sits at the impact point in the limb's own
+## space, and a scar that crossed a bone is drawn in bone rather than in scan
+## green. Six labels is what a body can carry on screen before the marks become
+## a legend of their own; the rest are still there on the next read, oldest
+## first in `BaselineHuman.scars`.
+const SCAR_LABELS := 6
+const SCAR_TONE := Color("c05aa8")
+
 ## A BaselineHuman, or a machine that answers `xray_report()` and
 ## `xray_point(entry)` (job 9: the Lower Works sentinel's plates).
 var rig: Node3D
@@ -145,10 +154,53 @@ func _draw() -> void:
 	# landmark the ray reaches. Resolved by `XrayCursor` from the same anatomy
 	# and the body's own skeleton, so this panel and the cursor agree.
 	if rig is BaselineHuman:
+		_draw_scars(rig as BaselineHuman)
 		var lines := XrayCursor.structures(rig, camera.global_position, -camera.global_basis.z, XrayCursor.READOUT_REACH, camera.get_world_3d())
 		# Off the crosshair and clear of the chest, so the names read as a label
 		# beside the aim rather than as text printed on the body.
 		XrayCursor.draw_structures(self, size * 0.5 + Vector2(28.0, 32.0), lines)
+
+
+## The body's own ledger, drawn where each blow landed. The mark is the impact
+## point; the label is the line the person would be read by.
+func _draw_scars(body: BaselineHuman) -> void:
+	var scars: Array = body.scars
+	if scars.is_empty():
+		return
+	var shown := 0
+	var side := 0
+	for index in range(scars.size() - 1, -1, -1):
+		if shown >= SCAR_LABELS:
+			break
+		var scar: Dictionary = scars[index]
+		var part := body.parts.get(str(scar.get("zone", ""))) as Node3D
+		if part == null or not part.is_inside_tree():
+			continue
+		var local: Variant = scar.get("at", Vector3.ZERO)
+		var at3: Vector3 = part.to_global(local if local is Vector3 else Vector3.ZERO)
+		if camera.is_position_behind(at3):
+			continue
+		var at := camera.unproject_position(at3)
+		var crossed := str(scar.get("bone", ""))
+		var tone: Color = BONE if not crossed.is_empty() else SCAR_TONE
+		# At the bone, a cross; in meat, the same cross smaller and duller.
+		var arm := 7.0 if not crossed.is_empty() else 5.0
+		draw_line(at - Vector2(arm, 0.0), at + Vector2(arm, 0.0), tone, 1.6)
+		draw_line(at - Vector2(0.0, arm), at + Vector2(0.0, arm), tone, 1.6)
+		var dir := -1.0 if side % 2 == 0 else 1.0
+		side += 1
+		var text := ScarLedger.line(scar)
+		var detail := crossed if not crossed.is_empty() else "FLESH"
+		var text_w := CellOutzType.width(text, 8.0, 1.0)
+		var detail_w := CellOutzType.width(detail, 7.0, 1.0)
+		var box_w := maxf(text_w, detail_w) + 10.0
+		var elbow := at + Vector2(dir * 30.0, -12.0 - float(shown) * 10.0)
+		var box_at := elbow + Vector2(0.0 if dir > 0.0 else -box_w, -10.0)
+		draw_line(at, elbow, tone * Color(1, 1, 1, 0.7), 1.0)
+		draw_rect(Rect2(box_at, Vector2(box_w, 24.0)), SOOT * Color(1, 1, 1, 0.9))
+		CellOutzType.draw_text(self, box_at + Vector2(5, 3), text, 8.0, BONE * Color(1, 1, 1, 0.9), 0.8)
+		CellOutzType.draw_text(self, box_at + Vector2(5, 13), detail, 7.0, tone, 0.8)
+		shown += 1
 
 
 func _draw_column() -> void:

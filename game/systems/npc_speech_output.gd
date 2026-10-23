@@ -206,6 +206,16 @@ class PipedVoice extends Voice:
 			_thread.wait_to_finish()
 			_thread = null
 
+	## A synthesis still running when this is freed takes its `Thread` with it, and
+	## Godot tears a Thread that was never waited for down badly enough to take the
+	## process with it. The last thing this does is let its worker finish.
+	func _notification(what: int) -> void:
+		if what != NOTIFICATION_PREDELETE or _thread == null:
+			return
+		if _thread.is_alive():
+			_thread.wait_to_finish()
+		_thread = null
+
 
 ## Subtitles only. Used when the OS has no speech, and in headless tests, where
 ## the point is that the conversation loop does not care which one it has.
