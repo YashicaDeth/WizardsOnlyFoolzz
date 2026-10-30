@@ -21,7 +21,12 @@ func _ready() -> void:
 	var carry := Carry.new()
 	carry.items.append({"label": vat.STAFF_KEYCARD, "kind": "key", "mass": 0.05, "perishes": false, "age": 0.0})
 	carry.save_to_history()
-	check(vat._pit_door_open() and vat._first_run_objective().contains("PIT DOOR"), "his keycard opens it, and the objective says so")
+	# One map (facility.gd V01_ONE_MAP): the pit route is sealed, so his card
+	# opens the staff door and the objective names that instead. The pit wording
+	# belongs to the older two-map build -- first_run_walk_test branches the same
+	# way, and this assertion had not been carried across with it.
+	var way_on := "STAFF DOOR" if vat.FACILITY_MAP_SCRIPT.V01_ONE_MAP else "PIT DOOR"
+	check(vat._pit_door_open() and vat._first_run_objective().contains(way_on), "his keycard opens the way on, and the objective names %s" % way_on)
 	vat.free()
 
 	# Service Arcade: sight. The gate is jammed; the crawlway gets you past.
