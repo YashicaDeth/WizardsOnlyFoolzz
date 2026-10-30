@@ -34,6 +34,13 @@ func _ready() -> void:
 		"the second leaf keeps interactions and carried interfaces together")
 	card.change_page(1)
 	check(card.page == 0, "turning beyond the last leaf wraps without an empty page")
+	# Slice 13. The header used to be one fixed sentence everywhere, so the card
+	# could not tell you which page of the index you were standing on.
+	check(card.subject_line() == "WHAT THIS BODY CAN BE MADE TO DO", "with nothing behind it the card describes itself")
+	card.set_reading("WIRE")
+	check(card.subject_line() == "READING // WIRE", "the card names the page it is held up over (%s)" % card.subject_line())
+	card.set_reading("")
+	check(card.subject_line() == "WHAT THIS BODY CAN BE MADE TO DO", "and goes back to describing itself when that page closes")
 	card.close()
 	var stayed := card.page
 	card.change_page(1)

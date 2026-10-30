@@ -1668,6 +1668,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				if handheld.is_open:
 					handheld.jump_to_mode(0)
 				else:
+					_sync_keys_card_tab()
 					keys_card.toggle()
 			KEY_F2: handheld.jump_to_mode(1)
 			KEY_F3: handheld.jump_to_mode(2)
@@ -7569,6 +7570,20 @@ func _announce_third_person_unlock() -> void:
 ## in here by name because AG2.1 is specifically that nobody — including Greg —
 ## could remember it existed, and holding B is in here because AG2.2 is
 ## specifically that the wheel teaches itself to nobody.
+## Slice 13. The card printed one fixed sentence everywhere, so a player who had
+## forgotten which page of the index they were on had to close the card and
+## look. Naming the page costs one string and one call, and keeps the rule that
+## the owning scene tells the card what is behind it rather than the card
+## guessing.
+func _sync_keys_card_tab() -> void:
+	if keys_card == null or world_index == null:
+		return
+	if not world_index.visible:
+		keys_card.set_reading("")
+		return
+	keys_card.set_reading(str(WORLD_INDEX.PAGES[clampi(int(world_index.page), 0, WORLD_INDEX.PAGES.size() - 1)]))
+
+
 func _build_keys_card() -> void:
 	keys_card.configure("F1", [
 		{"group": "MOVING", "rows": [
