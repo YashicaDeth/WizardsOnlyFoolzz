@@ -34,6 +34,94 @@ export ATG_TEST_MODE=1
 # this is generous; it exists to stop one hung scene eating the whole run.
 TIMEOUT="${ATG_TEST_TIMEOUT:-200}"
 
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) IS_WINDOWS=1 ;;
+  *)                    IS_WINDOWS=0 ;;
+esac
+
+RUN_LOG_DIR="$TEMP/atg-run-tests"
+mkdir -p "$RUN_LOG_DIR" 2>/dev/null
+
+# Killing a timed-out suite is not as simple as killing what we started.
+#
+# `timeout` signals only the process it launched, and that is the *console
+# wrapper*. The wrapper starts the real engine detached: `ps -W` reports it as
+# Godot_v4.7.2-stable_win64.exe with PPID 0 and PGID 0, so there is no parent
+# chain for `taskkill /T` to walk. Killing the wrapper therefore leaves a live
+# headless engine holding game/.godot, and every later suite in the run fails
+# against a locked project instead of only the one that hung.
+#
+# So the engine is found by identity -- its own command line -- and the scene
+# path is what makes that safe: only a Godot process handed this exact scene is
+# ours. The name is filtered too, because the bash and powershell processes
+# running this very query carry the same string and would match themselves.
+kill_headless_engine() {
+  local scene="$1"
+  [ "$IS_WINDOWS" = "1" ] || return 0
+  ATG_KILL_SCENE="res://tests/$scene.tscn" powershell -NoProfile -Command '
+    Get-CimInstance Win32_Process |
+      Where-Object { $_.Name -like "Godot*" -and $_.CommandLine -like ("*" + $env:ATG_KILL_SCENE + "*") } |
+      ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+  ' >/dev/null 2>&1 || true
+}
+
+# The suite in flight, so an abort can kill exactly what the timeout would have.
+CURRENT_SCENE=""
+CURRENT_WRAPPER=""
+CURRENT_WATCHDOG=""
+
+# Run one scene under a hard ceiling. Combined output lands in $2; returns the
+# suite's own exit code, or 124 when the ceiling was reached and the engine was
+# killed. A watchdog subshell replaces `timeout` because the process worth
+# killing is not the one `timeout` would have signalled.
+run_suite() {
+  local name="$1" log="$2"
+  local flag="$RUN_LOG_DIR/$name.timed-out"
+  rm -f "$flag" "$log"
+  if [ "$windowed" = "1" ]; then
+    "$GODOT" --path "$ROOT/game" "res://tests/$name.tscn" >"$log" 2>&1 &
+  else
+    "$GODOT" --headless --path "$ROOT/game" "res://tests/$name.tscn" >"$log" 2>&1 &
+  fi
+  local wrapper=$!
+  CURRENT_SCENE="$name"
+  CURRENT_WRAPPER="$wrapper"
+  # The flag file is what separates a hang from a suite that exits non-zero;
+  # both leave wait reporting a failure, and only one of them is a timeout.
+  ( sleep "$TIMEOUT"; : >"$flag"; kill_headless_engine "$name"; kill -KILL "$wrapper" 2>/dev/null ) >/dev/null 2>&1 &
+  local watchdog=$!
+  CURRENT_WATCHDOG="$watchdog"
+  wait "$wrapper"
+  local status=$?
+  kill "$watchdog" 2>/dev/null
+  wait "$watchdog" 2>/dev/null
+  CURRENT_SCENE=""
+  CURRENT_WRAPPER=""
+  CURRENT_WATCHDOG=""
+  if [ -f "$flag" ]; then
+    return 124
+  fi
+  return $status
+}
+
+# The same orphan appears when the run is *aborted* -- Ctrl+C, an editor
+# stopping it, or a harness killing this script -- because the engine outlives
+# the wrapper either way. A timeout alone would not cover that, so the suite in
+# flight is cleaned up on the way out.
+stop_in_flight() {
+  [ -n "$CURRENT_WATCHDOG" ] && kill "$CURRENT_WATCHDOG" 2>/dev/null
+  [ -n "$CURRENT_SCENE" ] && kill_headless_engine "$CURRENT_SCENE"
+  [ -n "$CURRENT_WRAPPER" ] && kill -KILL "$CURRENT_WRAPPER" 2>/dev/null
+  CURRENT_SCENE=""
+  CURRENT_WRAPPER=""
+  CURRENT_WATCHDOG=""
+  return 0
+}
+
+trap 'stop_in_flight' EXIT
+trap 'stop_in_flight; exit 130' INT
+trap 'stop_in_flight; exit 143' TERM
+
 # What to run before committing: the spine of the game plus whatever has been
 # touched most. Not a substitute for --all, just the set worth the wait.
 CORE=(
@@ -115,12 +203,9 @@ printf '%.0s-' {1..78}; echo
 broken=0
 ran=0
 for name in "${scenes[@]}"; do
-  if [ "$windowed" = "1" ]; then
-    output="$(timeout "$TIMEOUT" "$GODOT" --path "$ROOT/game" "res://tests/$name.tscn" 2>&1)"
-  else
-    output="$(timeout "$TIMEOUT" "$GODOT" --headless --path "$ROOT/game" "res://tests/$name.tscn" 2>&1)"
-  fi
+  run_suite "$name" "$RUN_LOG_DIR/$name.log"
   code=$?
+  output="$(cat "$RUN_LOG_DIR/$name.log" 2>/dev/null)"
   fails="$(printf '%s' "$output" | grep -c '^FAIL' || true)"
   # Whatever it chose to say about itself, if it said anything.
   marker="$(printf '%s' "$output" | grep -oE '([A-Z0-9_]+_RESULT failures=[0-9]+|failures: [0-9]+)' | tail -1)"
