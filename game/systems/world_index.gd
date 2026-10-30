@@ -2147,12 +2147,68 @@ func _draw_post(feed: Rect2, post: Dictionary, y: float) -> void:
 
 # --- page six: one-use hunt work -------------------------------------------
 
+## Slice 8. Local work orders used to exist only on the FILE page of the place
+## that posted them, so finding something to do nearby meant opening every
+## revealed holding in turn. WORK is where a player goes looking for work, so
+## the orders are listed here too.
+##
+## Plain data, no drawing: the same reason `_rebuild_links()` was pulled out of
+## the paint, so a test can ask what the page would show without a frame.
+func local_work_lines() -> Array:
+	var rows: Array = []
+	for holding: Dictionary in AshbloomHoldings.overview().get("holdings", []):
+		var place := WorldHistory.subject(str(holding.get("record", "")))
+		if not bool(place.get("revealed", false)):
+			continue
+		var place_name := str(place.get("name", str(holding.get("name", holding.get("id", "")))))
+		var progress := "%d/%d" % [int(place.get("local_work_completed", 0)), int(place.get("local_work_required", 0))]
+		for job: Dictionary in AshbloomHoldings.work_orders(str(holding.get("id", ""))):
+			rows.append({
+				"id": str(job.get("id", "")),
+				"place": place_name,
+				"name": str(job.get("name", "LOCAL ORDER")),
+				"status": str(job.get("status", "offered")),
+				"progress": progress,
+			})
+	return rows
+
+
+func _draw_local_work(rect: Rect2, top: float, limit: int) -> float:
+	var font := ThemeDB.fallback_font
+	var rows := local_work_lines()
+	if rows.is_empty():
+		return top
+	CellOutzType.draw_text(self, Vector2(rect.position.x, top), "LOCAL WORK", 12.0, MOSS, 1.1)
+	draw_line(Vector2(rect.position.x, top + 16), Vector2(rect.end.x, top + 16), MOSS * Color(1, 1, 1, 0.3), 1.0)
+	var y := top + 44.0
+	for row: Dictionary in rows.slice(0, limit):
+		# Deliberately larger than the rail's rows. `_draw_screen_decay()` puts a
+		# black line every 3px over the whole plate *after* the page draws, and at
+		# 10-12px that slices a glyph into unreadable mush on white paper. The note
+		# is plain ink for the same reason: a saturated accent at this weight
+		# survives the slicing worse than dark text does.
+		draw_string(font, Vector2(rect.position.x, y), str(row.name), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 4, 16, INK)
+		# The row's name already begins with the place that posted it, so the
+		# note carries only what the name does not: its state and the claim it
+		# presses on.
+		draw_string(font, Vector2(rect.position.x + 2, y + 20), "%s  //  CLAIM %s" % [str(row.status).to_upper(), str(row.progress)], HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 4, 14, INK * Color(1, 1, 1, 0.66))
+		y += 50.0
+	if rows.size() > limit:
+		draw_string(font, Vector2(rect.position.x + 2, y), "+%d MORE" % (rows.size() - limit), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 11, INK * Color(1, 1, 1, 0.5))
+		y += 16.0
+	return y
+
+
 func _draw_contract(rect: Rect2) -> void:
 	var font := ThemeDB.fallback_font
 	var entry := _selected()
 	if entry.is_empty():
 		CellOutzType.draw_stamped(self, rect.position, "NO CONTRACTS CIRCULATING", 20.0, INK * Color(1, 1, 1, 0.5), COPPER * Color(1, 1, 1, 0.2), 1.3)
 		draw_string(font, rect.position + Vector2(2, 48), "TOP-TIER WORK APPEARS ONLY AFTER A REAL PATRON POSTS AN EXACT OBSTRUCTION.", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 12, INK * Color(1, 1, 1, 0.48))
+		# No contract is the state where this page has room to spare, so the
+		# local orders a player can actually take get the whole body.
+		# `top` is an absolute Y, so it must be offset by the page's own origin.
+		_draw_local_work(rect, rect.position.y + 84.0, 8)
 		return
 	var contract := WorldHistory.subject(str(entry.id))
 	var status := str(contract.get("status", "offered")).to_upper()
@@ -2200,6 +2256,9 @@ func _draw_contract(rect: Rect2) -> void:
 	if not str(contract.get("target_outcome", "")).is_empty():
 		draw_string(font, Vector2(rect.position.x + 2, sy + 32), "RECORDED OUTCOME // %s" % str(contract.target_outcome).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 12, SPORE)
 
+	var waiting := local_work_lines().size()
+	if waiting > 0:
+		draw_string(font, Vector2(rect.position.x + 2, rect.size.y - 104), "%d LOCAL ORDER%s WAITING AT NEARBY HOLDINGS" % [waiting, "" if waiting == 1 else "S"], HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 10, COPPER * Color(1, 1, 1, 0.9))
 	var action_rect := Rect2(rect.position + Vector2(0, rect.size.y - 82), Vector2(rect.size.x, 48))
 	if status == "OFFERED":
 		var hot := action_rect.has_point(cursor_at)

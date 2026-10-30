@@ -93,6 +93,24 @@ func _ready() -> void:
 	index_panel._unhandled_input(away)
 	_check(int(index_panel.get("rail_hover")) == -1, "moving off the rail clears the hover")
 
+	# Slice 8. Local work used to be readable only on the FILE page of the place
+	# that posted it. WORK is where a player looks for work, so it lists them.
+	AshbloomHoldings.ensure()
+	WorldHistory.amend_subject("ashbloom:bone_yard", {"revealed": true})
+	AshbloomHoldings.work_orders("bone_yard")
+	var expected := 0
+	for definition: Dictionary in AshbloomHoldings.DEFINITIONS:
+		if bool(WorldHistory.subject(str(definition["record"])).get("revealed", false)):
+			expected += AshbloomHoldings.work_orders(str(definition["id"])).size()
+	var lines: Array = index_panel.local_work_lines()
+	_check(expected > 0, "a revealed holding posts real local work (%d orders)" % expected)
+	_check(lines.size() == expected, "the WORK page lists every posted order (%d of %d)" % [lines.size(), expected])
+	var complete := not lines.is_empty()
+	for line: Dictionary in lines:
+		if ["name", "place", "status", "progress"].any(func(key: String) -> bool: return str(line.get(key, "")).is_empty()):
+			complete = false
+	_check(complete, "every row names its order, its place, its state and the claim it presses on")
+
 	_finish()
 
 
