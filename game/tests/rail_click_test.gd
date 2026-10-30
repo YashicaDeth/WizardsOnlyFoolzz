@@ -29,13 +29,23 @@ func _ready() -> void:
 	add_child(layer)
 	var index_panel: Control = INDEX.new()
 	layer.add_child(index_panel)
+	# The panel lays itself out against its own size, falling back to the
+	# viewport. Headless reports a 64x64 viewport, which is under the 640x400
+	# floor the layout refuses to draw below, so the suite passed only on a
+	# machine with a real window and silently proved nothing anywhere else.
+	# Give it the design resolution instead of inheriting the host's.
+	index_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	index_panel.size = Vector2(
+		float(ProjectSettings.get_setting("display/window/size/viewport_width", 1280)),
+		float(ProjectSettings.get_setting("display/window/size/viewport_height", 720)))
 	await get_tree().process_frame
 	index_panel.open()
 	# Rects are collected while painting, so the panel has to actually paint.
+	# No paint needed: the rail's hit areas come from `_process`, so a few frames
+	# are enough. The old wait on `RenderingServer.frame_post_draw` never returned
+	# under `--headless` and turned this suite into a 200s timeout.
 	for _frame in 6:
 		await get_tree().process_frame
-	await RenderingServer.frame_post_draw
-	await get_tree().process_frame
 
 	var rects: Array = index_panel.get("_rail_rects")
 	_check(rects.size() > 0, "the rail collects a hit area per visible row (%d)" % rects.size())
@@ -66,8 +76,6 @@ func _ready() -> void:
 	# also exactly what a real pointer does.
 	for _frame in 4:
 		await get_tree().process_frame
-	await RenderingServer.frame_post_draw
-	await get_tree().process_frame
 	rects = index_panel.get("_rail_rects")
 
 	# Hovering marks it without selecting it.
@@ -96,4 +104,8 @@ func _finish() -> void:
 		print("FAIL: %d" % failures.size())
 		for failure in failures:
 			print("  - ", failure)
+	# The runner reads `<NAME>_RESULT failures=N`; without it this suite reported
+	# "(no marker)" even when it passed, which reads exactly like a suite that
+	# proved nothing.
+	print("RAIL_CLICK_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

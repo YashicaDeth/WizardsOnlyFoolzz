@@ -317,6 +317,7 @@ func _process(delta: float) -> void:
 	rail_scroll = Motion.approach(rail_scroll, rail_scroll_target, delta, Motion.SCROLL)
 	if cursor_follows_mouse:
 		cursor_at = get_global_mouse_position()
+	_rebuild_rail_rects()
 	_rebuild_links()
 	queue_redraw()
 
@@ -777,6 +778,58 @@ func _panel_rect() -> Rect2:
 	return Rect2(body.position + Vector2(262, 0), body.size - Vector2(262, 0))
 
 
+## The rail column, exactly as `_draw()` derives it. `_rail_rects` used to exist
+## only as a side effect of painting the rail, which meant nothing but the paint
+## loop could ask what was pointable — and on `--headless` nothing paints at all,
+## so the list stayed empty forever. Same fix as `_rebuild_links()`, for the same
+## reason.
+func _rail_rect() -> Rect2:
+	var viewport := size
+	if viewport.x < 640.0 or viewport.y < 400.0:
+		viewport = get_viewport_rect().size
+	if viewport.x < 640.0 or viewport.y < 400.0:
+		return Rect2()
+	var plate := Rect2(Vector2(54, 44), viewport - Vector2(108, 88))
+	var body := Rect2(plate.position + Vector2(22, 122), plate.size - Vector2(44, 176))
+	return Rect2(body.position, Vector2(246, body.size.y))
+
+
+## Where each visible row sits, as plain geometry with no drawing attached.
+## `_draw_rail()` paints against these rows and `_rebuild_rail_rects()` stores
+## them, so the painted row and the clickable row are the same rect by
+## construction rather than by two copies of the same arithmetic.
+func _rail_row_rects(rect: Rect2) -> Array:
+	if rect.size == Vector2.ZERO:
+		return []
+	var row_height := 34.0
+	var top := rect.position.y + 56.0
+	var offset := rail_scroll * row_height
+	var rows: Array = []
+	for index in _rail_cache.size():
+		var y := top + float(index) * row_height - offset
+		if y < top - row_height or y > rect.position.y + rect.size.y - 8.0:
+			continue
+		rows.append({
+			"index": index,
+			"rect": Rect2(Vector2(rect.position.x - 6, y - 13), Vector2(rect.size.x - 8, row_height - 2.0)),
+		})
+	return rows
+
+
+func _rebuild_rail_rects() -> void:
+	var rect := _rail_rect()
+	if rect.size == Vector2.ZERO:
+		_rail_rects = []
+		return
+	# The scroll follows the selection. Set here rather than in the paint so the
+	# target still advances on a machine that never draws a frame.
+	var row_height := 34.0
+	var top := rect.position.y + 56.0
+	var visible_rows := int((rect.position.y + rect.size.y - top) / row_height)
+	rail_scroll_target = clampf(float(rail_index) - float(visible_rows) * 0.5, 0.0, maxf(0.0, float(_rail_cache.size() - visible_rows)))
+	_rail_rects = _rail_row_rects(rect)
+
+
 ## The wound and implant rows `_draw_file` prints down its right column,
 ## as plain layout with no drawing attached — the same row heights and
 ## offsets `_draw_file` paints against, kept in the one place instead of two.
@@ -1112,7 +1165,6 @@ func _draw_rail(rect: Rect2) -> void:
 	var row_height := 34.0
 	var top := rect.position.y + 56.0
 	var visible_rows := int((rect.position.y + rect.size.y - top) / row_height)
-	rail_scroll_target = clampf(float(rail_index) - float(visible_rows) * 0.5, 0.0, maxf(0.0, float(_rail_cache.size() - visible_rows)))
 	var offset := rail_scroll * row_height
 
 	# A8.3. The highlight is drawn at its travelling position, not at the row.
@@ -1125,16 +1177,14 @@ func _draw_rail(rect: Rect2) -> void:
 			]), COPPER * Color(1, 1, 1, 0.17))
 			draw_line(Vector2(rect.position.x - 6, marker_y - 13), Vector2(rect.position.x - 6, marker_y + 15), HOT, 2.5)
 
-	_rail_rects.clear()
-	for index in _rail_cache.size():
-		var y := top + float(index) * row_height - offset
-		if y < top - row_height or y > rect.position.y + rect.size.y - 8.0:
-			continue
+	# The rows, and the areas a click can land in, from one geometry pass.
+	_rail_rects = _rail_row_rects(rect)
+	for row: Dictionary in _rail_rects:
+		var index: int = int(row["index"])
+		var row_rect: Rect2 = row["rect"]
+		var y := row_rect.position.y + 13.0
 		var entry: Dictionary = _rail_cache[index]
 		var active := index == rail_index
-		# The row's hit area, in the same place the row is actually painted.
-		var row_rect := Rect2(Vector2(rect.position.x - 6, y - 13), Vector2(rect.size.x - 8, row_height - 2.0))
-		_rail_rects.append({"index": index, "rect": row_rect})
 		# Hover is a lighter mark than selection on purpose: it says "this is
 		# where a click would land", not "this is what you are reading".
 		if index == rail_hover and not active:

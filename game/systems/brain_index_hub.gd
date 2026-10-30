@@ -288,7 +288,28 @@ func _draw() -> void:
 		"MAP":
 			_draw_handoff(content, "MAP", "The satellite first; L turns to the facility sheet.", "ENTER OPENS THE MAP")
 	_draw_vat()
-	CellOutzType.draw_condensed(self, Vector2(frame.position.x + 26, frame.end.y - 16), "TAB CLOSES  //  Q E OR ARROWS: TABS  //  DRAG THE BODY TO TURN IT  //  CLICK A PART TO READ IT", 8.0, DIM, 0.7)
+	CellOutzType.draw_condensed(self, Vector2(frame.position.x + 26, frame.end.y - 16), footer_line(), 8.0, DIM, 0.7)
+
+
+## The footer names where the current tab hands over, instead of printing one
+## generic hint line under all five. TASKS and MAP already promise a handover
+## in their content; the footer used to say nothing about it, so the only clue
+## that ENTER did anything was the panel you landed on.
+##
+## Kept out of `_draw()` so the line can be read — and asserted — without a
+## frame having been painted.
+func footer_line() -> String:
+	var hint := ""
+	match TABS[clampi(tab, 0, TABS.size() - 1)]:
+		"BRAIN INDEX":
+			hint = "ENTER OPENS THE PHOTO ALBUM"
+		"TASKS":
+			hint = "ENTER OPENS THE WORLD INDEX"
+		"MAP":
+			hint = "ENTER OPENS THE MAP"
+		_:
+			hint = "DRAG THE BODY TO TURN IT  //  CLICK A PART TO READ IT"
+	return "TAB CLOSES  //  Q E OR ARROWS: TABS  //  %s" % hint
 
 
 ## Brushed chrome: a bright upper bevel, a dark lower one, rivets. The frame

@@ -42,6 +42,19 @@ func _ready() -> void:
 	check(hub_arm != null and hub_arm.get_node_or_null("HeldWeapon") != null, "the body in the vat holds the weapon you have out")
 	key(hunt, KEY_RIGHT)
 	check(hunt.brain_hub.tab == 1, "arrows move between tabs")
+	# The footer used to print one generic hint under all five tabs, so nothing
+	# on screen said that ENTER did anything until you had already pressed it.
+	for tab_name in BrainIndexHub.TABS:
+		hunt.brain_hub.tab = BrainIndexHub.TABS.find(tab_name)
+		var line: String = hunt.brain_hub.footer_line()
+		if tab_name in ["BRAIN INDEX", "TASKS", "MAP"]:
+			check(line.contains("ENTER OPENS"), "the footer names the handover on %s (%s)" % [tab_name, line])
+		else:
+			check(not line.contains("ENTER OPENS"), "the footer promises no handover on %s" % tab_name)
+	hunt.brain_hub.tab = BrainIndexHub.TABS.find("CARRY")
+	var carry_footer: String = hunt.brain_hub.footer_line()
+	hunt.brain_hub.tab = BrainIndexHub.TABS.find("TASKS")
+	check(carry_footer != hunt.brain_hub.footer_line(), "the footer is not one line reused under every tab")
 	hunt.brain_hub.tab = BrainIndexHub.TABS.find("MAP")
 	key(hunt, KEY_ENTER)
 	check(hunt.panel_mode == "map" and not hunt.brain_hub.visible, "the MAP tab hands over to the satellite map")
