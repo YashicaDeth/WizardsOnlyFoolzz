@@ -42,6 +42,37 @@ func _click() -> InputEventMouseButton:
 	return event
 
 
+## Every beat is timed and printed, so a pacing regression shows up as a number
+## in the log instead of a memory of "it felt slower". These are wall-clock
+## seconds: the route drives physics-heavy maps far faster than a player can,
+## so the numbers compare one run of this suite to the next, not to a human.
+var _started_msec := 0
+var _marks: Array = []
+
+
+func mark(label: String) -> void:
+	if _started_msec == 0:
+		_started_msec = Time.get_ticks_msec()
+		_marks.append([label, 0.0])
+		print("  %6.2fs  +0.00s  %s" % [0.0, label])
+		return
+	var at := (Time.get_ticks_msec() - _started_msec) / 1000.0
+	var since := at
+	if not _marks.is_empty():
+		since = at - float(_marks[_marks.size() - 1][1])
+	_marks.append([label, at])
+	print("  %6.2fs  +%.2fs  %s" % [at, since, label])
+
+
+func _print_timings() -> void:
+	if _marks.is_empty():
+		return
+	print("--- route timing (wall clock) ---")
+	for row: Array in _marks:
+		print("  %6.2fs  %s" % [float(row[1]), str(row[0])])
+	print("  route wall total: %.2fs" % float(_marks[_marks.size() - 1][1]))
+
+
 ## A route test replaces whole physics-heavy maps much faster than a player
 ## can. Give Jolt one physics step after the deferred free so its completed
 ## jobs are reclaimed before the next map creates another full batch.
@@ -101,6 +132,7 @@ func _complete_live_breakout(vat: Node, route_name: String) -> void:
 func _through_the_facility(route_name: String) -> Node:
 	WorldHistory.clear_history()
 	WorldHistory.amend_subject(FacilityRoutes.SUBJECT, {"completed_routes": [FacilityRoutes.ROUTE_HEAT_ELEVATOR]})  # a returning run: this walks every route, not the first-run lessons
+	mark("%s: vat entered" % route_name)
 	print("--- %s: the vat ---" % route_name)
 	var vat = load("res://vat_chamber.tscn").instantiate()
 	vat.hands_on_breakout = true
@@ -116,6 +148,7 @@ func _through_the_facility(route_name: String) -> Node:
 	check(vat.phase == "wired", "%s: the drained tank leaves you in the wires" % route_name)
 	_complete_live_breakout(vat, route_name)
 	check(vat.breakout_complete and vat.can_move, "%s: GET REVENGE, the glass goes, and you stand" % route_name)
+	mark("%s: out of the tank" % route_name)
 	check(vat.facility_map != null and vat.facility_map.player == vat.player, "%s: the connected facility keeps the opening player" % route_name)
 	vat.player.global_position = vat.stuck_tank_marker.global_position + Vector3(0, 0.9, 1.2)
 	vat._interact()
@@ -142,6 +175,7 @@ func _through_the_facility(route_name: String) -> Node:
 	arcade._interact()
 	arcade._interact()
 	check(arcade.gate_open and arcade.lower_works_requested, "%s: the card opens the pressure gate onward" % route_name)
+	mark("%s: arcade cleared" % route_name)
 	await _free_route_scene(arcade)
 
 	print("--- %s: the Lower Works ---" % route_name)
@@ -166,6 +200,7 @@ func _into_the_hunt(route_name: String, expected_route: String) -> void:
 	check(arrival.size() == 3 and Vector2(landed.x, landed.z).distance_to(Vector2(float(arrival[0]), float(arrival[2]))) < 2.5,
 		"%s: the Hunt opens where this route surfaces (at %s, expected %s)" % [route_name, str(hunt.player), str(arrival)])
 	check(FacilityRoutes.pending_surface_handoff().is_empty(), "%s: and the handoff is consumed, once" % route_name)
+	mark("%s: Hunt arrived" % route_name)
 	check(OpeningDirector.reached("left_facility"), "%s: the opening run is out of the facility" % route_name)
 	await _free_route_scene(hunt)
 
@@ -175,12 +210,14 @@ func _ready() -> void:
 		get_tree().quit(2)
 		return
 
+	mark("route start")
 	var city = await _through_the_facility("heat elevator")
 	city.player.global_position = city.FUSE_AT + Vector3(0, 0.1, 0)
 	city._interact()
 	city.player.global_position = city.LIFT_AT + Vector3(0, 0.9, 3.2)
 	city._interact()
 	check(city.lift_requested, "heat elevator: the fuse powers the lift and it carries you up")
+	mark("heat elevator: lift requested")
 	await _free_route_scene(city)
 	await _into_the_hunt("heat elevator", FacilityRoutes.ROUTE_HEAT_ELEVATOR)
 	var lift_arrival: Vector3 = FacilityRoutes.route(FacilityRoutes.ROUTE_HEAT_ELEVATOR).surface_position
@@ -198,6 +235,7 @@ func _ready() -> void:
 		drains._physics_process(0.016)
 	drains._interact()
 	check(drains.surfaced, "old drains: gallery, cistern, and out through the storm outfall")
+	mark("old drains: outfall")
 	await _free_route_scene(drains)
 	await _into_the_hunt("old drains", FacilityRoutes.ROUTE_STEALTH)
 	var drain_arrival: Vector3 = FacilityRoutes.route(FacilityRoutes.ROUTE_STEALTH).surface_position
@@ -219,6 +257,7 @@ func _ready() -> void:
 	bay.player.global_position = Vector3(0, bay.RAMP_RISE + 0.9, bay.RAMP_TOP_Z + 0.5)
 	bay.step(0.05)
 	check(bay.surface_requested, "doctor's route: his bay, the call, and up the ramp")
+	mark("doctor's route: ramp")
 	await _free_route_scene(bay)
 	await _into_the_hunt("doctor's route", FacilityRoutes.ROUTE_DOCTOR)
 
@@ -231,8 +270,11 @@ func _ready() -> void:
 	await get_tree().process_frame
 	falls._complete("driving")
 	check(falls.travel_requested, "derby tunnels: out of the gorge past the dry falls")
+	mark("derby tunnels: dry falls")
 	await _free_route_scene(falls)
 	await _into_the_hunt("derby tunnels", "derby_tunnels")
 
+	mark("route complete")
+	_print_timings()
 	print("FIRST_THIRTY_ROUTE_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
