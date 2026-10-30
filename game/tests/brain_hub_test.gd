@@ -55,6 +55,40 @@ func _ready() -> void:
 	var carry_footer: String = hunt.brain_hub.footer_line()
 	hunt.brain_hub.tab = BrainIndexHub.TABS.find("TASKS")
 	check(carry_footer != hunt.brain_hub.footer_line(), "the footer is not one line reused under every tab")
+	# Slice 12. Every kind the carrying systems write has its own mark and its
+	# own colour. The bag used to draw one grey box for keycards, patches,
+	# implants and loose goods alike, so four different objects looked the same
+	# and the mark carried no information at all.
+	var families := {
+		"meat": ["organ", "limb", "chunk", "meat", "muscle", "fat", "skin"],
+		"pill": ["substance", "smokeable", "drug"],
+		"chip": ["cybernetic", "implant"],
+	}
+	var sharing := {}
+	for kind in BrainIndex.CARRY_MARKS:
+		var mark: String = BrainIndex.carry_mark({"kind": str(kind)})
+		check(mark != BrainIndex.UNKNOWN_MARK, "%s has a mark of its own" % kind)
+		check(BrainIndexHub.KIND_TINT.has(kind), "%s has its own colour in the bag" % kind)
+		sharing[mark] = (sharing.get(mark, []) as Array) + [str(kind)]
+	for mark in sharing:
+		var at_mark: Array = sharing[mark]
+		if at_mark.size() == 1:
+			continue
+		check(families.has(mark) and (families[mark] as Array).size() == at_mark.size(),
+			"only the kinds that are one object share the %s mark (%s)" % [mark, at_mark])
+	check(BrainIndex.carry_mark({"kind": "skin", "skin": "dry_blood"}) == "paint"
+		and BrainIndex.carry_mark({"kind": "skin", "zone": "left_arm"}) == "meat",
+		"the one kind that names two objects is split by what the item carries")
+	# And the tab draws that list rather than keeping a second table of its own.
+	var bag: Array = hunt.brain_hub.carry.items.duplicate()
+	hunt.brain_hub.carry.items.clear()
+	hunt.brain_hub.carry.items.append({"label": "EXAMINER KEYCARD", "kind": "key", "mass": 0.05})
+	hunt.brain_hub.carry.items.append({"label": "CLOTH PATCH", "kind": "patch", "mass": 0.1})
+	hunt.brain_hub.carry.items.append({"label": "SOMEONE'S LIVER", "kind": "organ", "mass": 1.4})
+	var drawn: Array[String] = hunt.brain_hub.carry_marks()
+	check(drawn.size() == 3 and drawn[0] == "key" and drawn[1] == "patch" and drawn[2] == "meat",
+		"the CARRY tab draws each thing as itself (%s)" % [drawn])
+	hunt.brain_hub.carry.items = bag
 	hunt.brain_hub.tab = BrainIndexHub.TABS.find("MAP")
 	key(hunt, KEY_ENTER)
 	check(hunt.panel_mode == "map" and not hunt.brain_hub.visible, "the MAP tab hands over to the satellite map")

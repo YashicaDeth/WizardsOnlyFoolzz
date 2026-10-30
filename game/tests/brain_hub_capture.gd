@@ -4,10 +4,11 @@ extends Node
 ## carried items with their icons) and COMBAT (blood by style and weapon).
 ## `-- --out=DIR`.
 
-func key(hunt, code: int) -> void:
+func key(hunt, code: int, shift := false) -> void:
 	var event := InputEventKey.new()
 	event.keycode = code
 	event.pressed = true
+	event.shift_pressed = shift
 	hunt._unhandled_input(event)
 
 
@@ -31,11 +32,17 @@ func _ready() -> void:
 	carry.items.append({"label": "LIFT FUSE", "kind": "tool", "mass": 0.2})
 	carry.items.append({"label": "SOMEONE'S LIVER", "kind": "organ", "mass": 1.4})
 	carry.items.append({"label": "SALVAGED IMPLANT", "kind": "cybernetic", "mass": 0.9})
+	# Slice 12: the three kinds that used to draw the same placeholder box.
+	carry.items.append({"label": "EXAMINER KEYCARD", "kind": "key", "mass": 0.05})
+	carry.items.append({"label": "CLOTH PATCH", "kind": "patch", "mass": 0.1})
+	carry.items.append({"label": "BUNDLE OF RAGS", "kind": "goods", "mass": 0.4})
 	carry.items.append(Outfit.part_item("jester_cap", 0.8))
 	hunt.arsenal.apply_skins()
 	hunt.blood_ledger.credit("sidearm", 180, "kill")
 	hunt.blood_ledger.credit("sword", 90, "hit")
-	key(hunt, KEY_TAB)
+	# Tab is the field inventory since 26 September; the hub is Shift+Tab. This
+	# fixture kept pressing Tab and so captured the wrong screen.
+	key(hunt, KEY_TAB, true)
 	for _f in 20:
 		await get_tree().process_frame
 	await RenderingServer.frame_post_draw

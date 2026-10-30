@@ -783,6 +783,113 @@ static func carry_listing(subject_id: String = "player") -> Array:
 	return rows
 
 
+## Slice 12. Every kind `carry.gd` can actually put in your hands, and the mark
+## the index draws for it. This is the vocabulary; the colour half lives in the
+## hub's `KIND_TINT` beside the plate it is drawn on, and `brain_hub_test` walks
+## this table checking the two agree, so a kind added to one cannot go bare in
+## the other.
+##
+## The names agree in meaning with the pocket rack (`nerve_rig.gd`'s
+## `pocket_glyph()`: meat, pill, bone, chip) because they are the same three
+## kinds of object seen at two sizes — a 6px tag hung off a sacrum, a 20px box
+## in a list. The rack buckets everything else into "thing"; the bag is where
+## you read what you own, so nothing there is allowed to be a placeholder.
+const CARRY_MARKS := {
+	"weapon": "weapon", "tool": "tool", "ammo": "ammo", "key": "key",
+	"patch": "patch", "garment": "garment", "case": "case", "goods": "goods",
+	"skin": "paint",
+	"bone": "bone",
+	"organ": "meat", "limb": "meat", "chunk": "meat", "meat": "meat",
+	"muscle": "meat", "fat": "meat",
+	"cybernetic": "chip", "implant": "chip",
+	"substance": "pill", "smokeable": "pill", "drug": "pill",
+}
+## What a kind nobody has taught the index yet gets. An outlined box, empty:
+## an answer-shaped lie would be worse than admitting the index does not know.
+const UNKNOWN_MARK := "unknown"
+
+
+## The mark for one carried thing. The kind is the word the carrying system
+## wrote, with one exception: `weapon_skins.gd` mints a paint as kind "skin",
+## and `carry.take_chunk()` writes a flayed layer's own name, which can also be
+## "skin". A paint names the skin it is; a body layer names a zone. That is the
+## split, and it is the item's own field that decides, not a guess.
+static func carry_mark(item: Dictionary) -> String:
+	var kind := str(item.get("kind", ""))
+	if kind == "skin":
+		return "paint" if item.has("skin") else "meat"
+	return str(CARRY_MARKS.get(kind, UNKNOWN_MARK))
+
+
+## The mark itself, drawn into any canvas at `at`. Shapes only: the frame, the
+## plate and the colour belong to the surface, because a mark in a list needs a
+## box round it and a mark on a body tag does not.
+static func draw_carry_mark(canvas: CanvasItem, at: Vector2, mark: String, tint: Color, alpha := 1.0) -> void:
+	var ink := tint * Color(1.0, 1.0, 1.0, alpha)
+	var line := Color(tint.lightened(0.45), 0.55 * alpha)
+	match mark:
+		"weapon":
+			canvas.draw_rect(Rect2(at + Vector2(-8, -5), Vector2(16, 5)), ink)
+			canvas.draw_rect(Rect2(at + Vector2(-7, 0), Vector2(5, 8)), ink)
+		"tool":
+			canvas.draw_line(at + Vector2(-7, 7), at + Vector2(5, -5), ink, 3.0)
+			canvas.draw_circle(at + Vector2(5, -5), 3.5, ink)
+		"ammo":
+			for round_index in 3:
+				canvas.draw_rect(Rect2(at + Vector2(-7 + round_index * 5, -6), Vector2(3, 12)), ink)
+		"key":
+			# A card rather than a key. The keycard is the only thing that opens
+			# a door by being carried, and a cartoon key would promise a lock.
+			canvas.draw_rect(Rect2(at + Vector2(-8, -5), Vector2(16, 10)), ink)
+			canvas.draw_rect(Rect2(at + Vector2(-5, -2), Vector2(4, 3)), line)
+			canvas.draw_line(at + Vector2(-1, 3), at + Vector2(6, 3), line, 1.0)
+		"patch":
+			canvas.draw_rect(Rect2(at + Vector2(-7, -7), Vector2(14, 14)), ink)
+			# Stitches down both edges, so a patch reads as repair, not as a box.
+			for stitch in 3:
+				canvas.draw_line(at + Vector2(-7, -5 + stitch * 5), at + Vector2(-9, -4 + stitch * 5), line, 1.0)
+				canvas.draw_line(at + Vector2(7, -5 + stitch * 5), at + Vector2(9, -4 + stitch * 5), line, 1.0)
+		"garment":
+			canvas.draw_colored_polygon(PackedVector2Array([
+				at + Vector2(-8, -6), at + Vector2(-3, -8), at + Vector2(3, -8), at + Vector2(8, -6),
+				at + Vector2(6, -1), at + Vector2(4, -2), at + Vector2(4, 8), at + Vector2(-4, 8),
+				at + Vector2(-4, -2), at + Vector2(-6, -1),
+			]), ink)
+		"paint":
+			canvas.draw_colored_polygon(PackedVector2Array([
+				at + Vector2(0, -8), at + Vector2(7, 0), at + Vector2(0, 8), at + Vector2(-7, 0),
+			]), ink)
+		"case":
+			canvas.draw_rect(Rect2(at + Vector2(-8, -5), Vector2(16, 11)), ink)
+			canvas.draw_rect(Rect2(at + Vector2(-3, -8), Vector2(6, 3)), ink)
+			canvas.draw_line(at + Vector2(-8, 0), at + Vector2(8, 0), Color(0, 0, 0, 0.5 * alpha), 1.0)
+		"pill":
+			canvas.draw_rect(Rect2(at + Vector2(-3, -8), Vector2(6, 16)), ink)
+			canvas.draw_rect(Rect2(at + Vector2(-4, -9), Vector2(8, 3)), line)
+		"chip":
+			canvas.draw_rect(Rect2(at + Vector2(-6, -6), Vector2(12, 12)), ink)
+			for pin in 3:
+				canvas.draw_line(at + Vector2(-9, -4 + pin * 4), at + Vector2(-6, -4 + pin * 4), ink, 1.0)
+				canvas.draw_line(at + Vector2(6, -4 + pin * 4), at + Vector2(9, -4 + pin * 4), ink, 1.0)
+		"meat":
+			canvas.draw_circle(at + Vector2(-2, 0), 6.0, ink)
+			canvas.draw_circle(at + Vector2(3, 2), 5.0, ink)
+		"bone":
+			canvas.draw_line(at + Vector2(-6, 6), at + Vector2(6, -6), ink, 3.0)
+			canvas.draw_circle(at + Vector2(-6, 6), 2.5, ink)
+			canvas.draw_circle(at + Vector2(6, -6), 2.5, ink)
+		"goods":
+			# A tied bundle. Loose goods are a shape with no name of their own,
+			# and this is what that looks like when it is in your hands.
+			canvas.draw_colored_polygon(PackedVector2Array([
+				at + Vector2(-8, 6), at + Vector2(-6, -4), at + Vector2(0, -2),
+				at + Vector2(6, -4), at + Vector2(8, 6),
+			]), ink)
+			canvas.draw_line(at + Vector2(0, -3), at + Vector2(0, 7), line, 1.2)
+		_:
+			canvas.draw_rect(Rect2(at + Vector2(-5, -8), Vector2(10, 16)), Color(tint, 0.85 * alpha), false, 1.4)
+
+
 ## AT2.4. Every dose already writes `substance_taken` (`substances.gd`); this
 ## reads that log back as a reopenable record instead of a drug experience
 ## needing to be saved into a second place to be reopenable at all. Strain and

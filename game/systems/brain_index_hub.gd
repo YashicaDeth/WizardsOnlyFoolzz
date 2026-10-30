@@ -30,10 +30,16 @@ const HOT := Color("d8402c")
 const TEAL := Color("5fc4b4")
 const GROUND := Color(0.035, 0.02, 0.022, 0.96)
 ## One colour per kind of thing carried, so the bag stops being nine identical
-## placeholder bottles (Greg's walkthrough).
+## placeholder bottles (Greg's walkthrough). Slice 12: every kind in
+## `BrainIndex.CARRY_MARKS` is named here, because a kind with no tint fell back
+## to DIM and drew in the same grey as every other untaught kind.
 const KIND_TINT := {
 	"skin": Color("d9a38a"), "fat": Color("e8d27a"), "muscle": Color("b43a34"), "bone": Color("e6dfc9"),
 	"organ": Color("8e1e2a"), "cybernetic": Color("7fb8c9"), "limb": Color("c46a55"), "substance": Color("8f6ad1"),
+	"weapon": Color("b9b6ac"), "tool": Color("c08a4a"), "ammo": Color("d6b56a"), "key": Color("e8c96a"),
+	"patch": Color("9c7a5a"), "garment": Color("8a8f7a"), "case": Color("6f5a44"), "goods": Color("a89a86"),
+	"implant": Color("7fb8c9"), "drug": Color("8f6ad1"), "smokeable": Color("8f6ad1"),
+	"chunk": Color("8e1e2a"), "meat": Color("8e1e2a"),
 }
 
 var tab := 0
@@ -388,6 +394,10 @@ func _draw_carry(rect: Rect2) -> void:
 	draw_rect(bar, DIM * Color(1, 1, 1, 0.2))
 	draw_rect(Rect2(bar.position, Vector2(bar.size.x * clampf(mass / 28.0, 0.0, 1.0), bar.size.y)), TEAL)
 	y += 16.0
+	# The marks are the index's, in bag order. Read through `carry_marks()` rather
+	# than computed here so that what the tab draws and what it reports drawing
+	# are the same list.
+	var marks: Array[String] = carry_marks()
 	var columns := 2
 	var cell := Vector2((rect.size.x - 48) / columns, 30)
 	for index in items.size():
@@ -397,53 +407,33 @@ func _draw_carry(rect: Rect2) -> void:
 			draw_string(font, Vector2(rect.position.x + 24, rect.end.y - 14), "+%d MORE" % (items.size() - index), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, DIM)
 			break
 		var kind := str(item.get("kind", ""))
+		var mark := str(marks[index])
 		var tint: Color = KIND_TINT.get(kind, DIM)
-		if kind == "skin":
+		if mark == "paint":
+			# A weapon's paint wears its tier's colour; body kinds wear their own.
 			tint = Color(str(WeaponSkins.tier(str(item.get("tier", "issue"))).ink))
-		_icon(at + Vector2(8, 14), kind, tint)
+		_icon(at + Vector2(8, 14), mark, tint)
 		draw_string(font, at + Vector2(24, 19), str(item.get("label", "?")), HORIZONTAL_ALIGNMENT_LEFT, cell.x - 30, 13, INK)
 
 
-## A small drawn icon per kind of thing, so the bag stops being one
-## placeholder shape (Greg's walkthrough: "carry icons are all the same").
-func _icon(c: Vector2, kind: String, tint: Color) -> void:
-	var line := INK * Color(1, 1, 1, 0.55)
-	match kind:
-		"weapon":
-			draw_rect(Rect2(c + Vector2(-8, -5), Vector2(16, 5)), tint)
-			draw_rect(Rect2(c + Vector2(-7, 0), Vector2(5, 8)), tint)
-		"tool":
-			draw_line(c + Vector2(-7, 7), c + Vector2(5, -5), tint, 3.0)
-			draw_circle(c + Vector2(5, -5), 3.5, tint)
-		"ammo":
-			for i in 3:
-				draw_rect(Rect2(c + Vector2(-7 + i * 5, -6), Vector2(3, 12)), tint)
-		"skin":
-			draw_colored_polygon(PackedVector2Array([c + Vector2(0, -8), c + Vector2(7, 0), c + Vector2(0, 8), c + Vector2(-7, 0)]), tint)
-		"case":
-			draw_rect(Rect2(c + Vector2(-8, -5), Vector2(16, 11)), tint)
-			draw_rect(Rect2(c + Vector2(-3, -8), Vector2(6, 3)), tint)
-			draw_line(c + Vector2(-8, 0), c + Vector2(8, 0), Color(0, 0, 0, 0.5), 1.0)
-		"garment":
-			draw_colored_polygon(PackedVector2Array([c + Vector2(-8, -6), c + Vector2(-3, -8), c + Vector2(3, -8), c + Vector2(8, -6), c + Vector2(6, -1), c + Vector2(4, -2), c + Vector2(4, 8), c + Vector2(-4, 8), c + Vector2(-4, -2), c + Vector2(-6, -1)]), tint)
-		"substance", "drug", "smokeable":
-			draw_rect(Rect2(c + Vector2(-3, -8), Vector2(6, 16)), tint)
-			draw_rect(Rect2(c + Vector2(-4, -9), Vector2(8, 3)), line)
-		"cybernetic":
-			draw_rect(Rect2(c + Vector2(-6, -6), Vector2(12, 12)), tint)
-			for i in 3:
-				draw_line(c + Vector2(-9, -4 + i * 4), c + Vector2(-6, -4 + i * 4), tint, 1.0)
-				draw_line(c + Vector2(6, -4 + i * 4), c + Vector2(9, -4 + i * 4), tint, 1.0)
-		"organ", "meat", "chunk", "muscle", "fat", "limb":
-			draw_circle(c + Vector2(-2, 0), 6.0, tint)
-			draw_circle(c + Vector2(3, 2), 5.0, tint)
-		"bone":
-			draw_line(c + Vector2(-6, 6), c + Vector2(6, -6), tint, 3.0)
-			draw_circle(c + Vector2(-6, 6), 2.5, tint)
-			draw_circle(c + Vector2(6, -6), 2.5, tint)
-		_:
-			draw_rect(Rect2(c + Vector2(-5, -8), Vector2(10, 16)), tint * Color(1, 1, 1, 0.85))
-	draw_rect(Rect2(c + Vector2(-10, -10), Vector2(20, 20)), line * Color(1, 1, 1, 0.4), false, 1.0)
+## The marks the CARRY tab will draw, in bag order. The drawer reads this, so a
+## test can see what the tab is about to draw without a window or a paint pass.
+func carry_marks() -> Array[String]:
+	var out: Array[String] = []
+	if carry == null:
+		return out
+	for item in carry.items:
+		out.append(BrainIndex.carry_mark(item as Dictionary))
+	return out
+
+
+## A small drawn mark per kind of thing, so the bag stops being one placeholder
+## shape (Greg's walkthrough: "carry icons are all the same"). The vocabulary
+## and the shapes are the index's — this only puts the plate round them, because
+## a mark in a list needs a frame and a mark on a body tag does not.
+func _icon(c: Vector2, mark: String, tint: Color) -> void:
+	BrainIndex.draw_carry_mark(self, c, mark, tint)
+	draw_rect(Rect2(c + Vector2(-10, -10), Vector2(20, 20)), INK * Color(1, 1, 1, 0.22), false, 1.0)
 
 
 func _draw_combat(rect: Rect2) -> void:
