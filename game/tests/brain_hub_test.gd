@@ -74,5 +74,15 @@ func _ready() -> void:
 	check(not hunt.brain_hub.album.visible and hunt.brain_hub.visible, "Escape puts the album away and leaves the hub open")
 	key(hunt, KEY_TAB)
 	check(hunt.panel_mode == "" and not hunt.brain_hub.visible, "and Tab again closes it")
+	# Slice 13. F1 names the page of the index you are actually reading. The
+	# unit test covers the empty case; this drives the real scene so the wiring
+	# cannot rot silently while keys_card_test still passes.
+	hunt.world_index.open()
+	hunt.world_index.page = 2
+	key(hunt, KEY_F1)
+	check(hunt.keys_card.reading == "WIRE", "F1 names the index page being read (%s)" % hunt.keys_card.reading)
+	key(hunt, KEY_F1)
+	hunt.world_index.close()
+	hunt.world_index.visible = false
 	print("BRAIN_HUB_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
