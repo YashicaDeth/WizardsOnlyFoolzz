@@ -413,6 +413,15 @@ func cut_string(from: String, to: String) -> bool:
 ## L3.2 / L3.3. Whether the world actually bears the connection out. This is
 ## never shown on the board — it is only consulted when a lead would open, and
 ## when the player goes and acts on the claim.
+## A work order carries the record of the place that issued it, and the short
+## holding id the map uses for that same ground. Either one is the place.
+func _job_belongs_to_place(job_ref: String, place_ref: String) -> bool:
+	var job: Dictionary = WorldHistory.subject(job_ref)
+	if str(job.get("kind", "")) != "job":
+		return false
+	return str(job.get("place_id", "")) == place_ref or str(job.get("holding_id", "")) == place_ref
+
+
 func supports(from: String, to: String) -> bool:
 	var theory := _theory(from)
 	var other := to
@@ -429,6 +438,14 @@ func supports(from: String, to: String) -> bool:
 			if haystack.contains(token):
 				return true
 		return false
+	# Slice 11. A work order is issued by the place that posted it and says so in
+	# its own record. Nothing else in this chain knew that, so pinning a job and
+	# the ground it belongs to and stringing them read as an unsupported claim:
+	# the board treated a fact the world had already written down as a guess.
+	# Checked after the theory branch, because a theory still judges its evidence
+	# by kind rather than by parentage.
+	if _job_belongs_to_place(from, to) or _job_belongs_to_place(to, from):
+		return true
 	# Between two pieces of evidence: the world has to actually connect them.
 	if WorldHistory.relationship_strength(from, to) != 0 or WorldHistory.relationship_strength(to, from) != 0:
 		return true
