@@ -111,6 +111,26 @@ func _ready() -> void:
 			complete = false
 	_check(complete, "every row names its order, its place, its state and the claim it presses on")
 
+	# Slice 9. Land is already a subject in this list, but every holding's role is
+	# the same "ASHBLOOM HOLDING", so the search matched names only and the note
+	# the survey wrote on a place was unreachable.
+	index_panel.set("search_query", "quarry")
+	index_panel.call("_rebuild_rail")
+	var rail_rows: Array = index_panel.get("_rail_cache")
+	var hit := rail_rows.any(func(row: Dictionary) -> bool: return str(row.get("id", "")) == "ashbloom:bone_yard")
+	_check(hit, "searching a field note finds the land it was written on (%d rows)" % rail_rows.size())
+	var note_text := ""
+	for row: Dictionary in rail_rows:
+		if str(row.get("id", "")) == "ashbloom:bone_yard":
+			note_text = str(row.get("note", ""))
+	_check(note_text.to_lower().contains("quarry"), "and the row shows the field note rather than the holding type (%s)" % note_text)
+	index_panel.set("search_query", "raider")
+	index_panel.call("_rebuild_rail")
+	var unrevealed := (index_panel.get("_rail_cache") as Array).any(func(row: Dictionary) -> bool: return str(row.get("id", "")) == "ashbloom:black_mile_yards")
+	_check(not unrevealed, "land the player has not stood on stays out of the search")
+	index_panel.set("search_query", "")
+	index_panel.call("_rebuild_rail")
+
 	_finish()
 
 

@@ -260,7 +260,14 @@ func _rebuild_rail() -> void:
 				if not _is_person(subject):
 					continue
 				var person_label := str(subject.get("name", subject_id))
+				# Slice 9. Land is a subject in this list too, but every holding's
+				# `role` is the same "ASHBLOOM HOLDING", so the search matched names
+				# only: typing what the survey actually wrote on a place — its field
+				# note — found nothing. Land reports the field note; people report
+				# their role, which is the thing that distinguishes them.
 				var person_note := str(subject.get("role", ""))
+				if str(subject.get("kind", "")) == "place":
+					person_note = str(subject.get("note", ""))
 				if _matches(person_label, person_note):
 					_rail_cache.append({"id": subject_id, "label": person_label, "note": person_note})
 		1:
