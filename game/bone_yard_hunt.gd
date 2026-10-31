@@ -9227,7 +9227,7 @@ func _build_keys_card() -> void:
 			["GUARD MID-SWING", "FEINT (BLOOD TREE)"],
 			["Z", "LOCK ON"],
 			["WHEEL", "CYCLE TARGET"],
-			["1 2 3", "SWORD / SHOTGUN / PISTOL"],
+			["1 2 3", "CLEAVER / SHOTGUN / PISTOL"],
 			["4", "CARRIED LIMB"],
 			["HOLD 4", "FIELD DRESSING // +20 BLOOD"],
 			["5", "PUT THEM DOWN"],

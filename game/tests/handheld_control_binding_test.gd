@@ -190,6 +190,8 @@ func _ready() -> void:
 	check(rows.any(func(row: Array): return row[0] == "HOLD K" and "RE-DECANT" in row[1]), "holding K is labelled as the re-decant")
 	check(rows.any(func(row: Array): return row[0] == "K" and "WIZARD EYES" in row[1]), "a tap of K is labelled as wizard eyes")
 	check(rows.any(func(row: Array): return row[0] == "HOLD J" and "DEPTH" in row[1]), "holding J is labelled as the depth scan")
+	check(rows.any(func(row: Array): return row[0] == "1 2 3" and "CLEAVER" in row[1] and "SWORD" not in row[1]),
+		"the keys card names slot 1 the cleaver the arsenal issues, not the sword")
 	check(rows.any(func(row: Array): return row[0] == HANDHELD.CARRY_KEY_LABEL and "CARRY" in str(row[1]).to_upper()),
 		"the keys card names the bag's own key")
 
