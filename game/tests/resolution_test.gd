@@ -76,6 +76,7 @@ func _ready() -> void:
 	hunt.encounter_actors.erase(moving)
 	var escape := InputEventKey.new()
 	escape.keycode = KEY_ESCAPE
+	escape.physical_keycode = KEY_ESCAPE
 	escape.pressed = true
 	hunt.resolution_ui._input(escape)
 	check(not hunt.resolution_ui.visible and actor.rig.is_downed(), "Escape cancels without choosing")
@@ -99,6 +100,9 @@ func _ready() -> void:
 	var loot_before: int = hunt.loose_loot.size()
 	hunt._open_resolution(doomed)
 	hunt.resolution_ui.buttons[0].pressed.emit()
+	# Fix-58: EXECUTE is a beat; run it to its blow.
+	check(hunt.execution.active and not doomed.anatomy.dead, "execute starts the finisher beat rather than killing on the press")
+	hunt.execution.complete_now()
 	check(doomed.anatomy.dead and WorldHistory.subject(doomed.subject_id).status == "dead", "execution persists death")
 	check(hunt.loose_loot.size() == loot_before + 1, "execution drops loot once")
 	check(hunt.kill_cam.active and hunt.kill_cam.anatomy_state.organs.heart.ruptured, "execution camera carries actual ruptured heart")

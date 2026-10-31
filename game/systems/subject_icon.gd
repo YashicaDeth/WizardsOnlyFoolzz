@@ -171,8 +171,24 @@ func damage_state() -> Dictionary:
 
 
 func _process(delta: float) -> void:
+	# X10.6: a whole 3D render a frame is only worth it while the panel that
+	# shows it is open. Closed, it stops drawing and stops turning.
+	var shown := _shown()
+	render_target_update_mode = SubViewport.UPDATE_ALWAYS if shown else SubViewport.UPDATE_DISABLED
+	if not shown:
+		return
 	elapsed += delta
 	_pivot.rotation.y = elapsed * spin_speed
 	# A slight nod, so it reads as something being turned over and looked at
 	# rather than a model on a turntable.
 	_pivot.rotation.x = sin(elapsed * 0.7) * 0.09
+
+
+## The panel that shows this viewport: the nearest CanvasItem above it.
+func _shown() -> bool:
+	var at := get_parent()
+	while at != null:
+		if at is CanvasItem:
+			return (at as CanvasItem).is_visible_in_tree()
+		at = at.get_parent()
+	return true

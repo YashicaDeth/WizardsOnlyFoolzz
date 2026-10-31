@@ -96,6 +96,11 @@ func diagnostic_state() -> Dictionary:
 func _process(delta: float) -> void:
 	var target := 1.0 if expanded else 0.0
 	reveal = move_toward(reveal, target, delta * (6.5 if expanded else 8.0))
+	# Greg, 30 September (the sandbox frame rate): PartViewer renders its
+	# three-light 3D scene every frame, and this panel is hidden nearly always.
+	# Rendering it only while it shows was half the sandbox's frame.
+	if viewer != null:
+		viewer.render_target_update_mode = SubViewport.UPDATE_ALWAYS if reveal > 0.001 else SubViewport.UPDATE_DISABLED
 	_layout_specimen()
 	if specimen != null:
 		specimen.visible = reveal > 0.001

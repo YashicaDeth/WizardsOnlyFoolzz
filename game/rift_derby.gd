@@ -1,7 +1,13 @@
 extends Node3D
+const LOOK := preload("res://systems/look_settings.gd")
 
 ## The authored Bone Yard kit was modelled for a 29m bowl, which plays as a
 ## playpen. The whole venue is scaled up together so the geometry still matches.
+## Greg, 24 September: the derby comes out through the old tunnels at the dry
+## blood waterfall, not straight onto the surface. The drivable tunnel stretch
+## between them is its own piece (`derby_tunnels.tscn`), which goes on to the falls.
+const DERBY_EXIT_SCENE := "res://derby_tunnels.tscn"
+const DERBY_EXIT_CAPTION := "through the old tunnels // out over the dry falls"
 const ARENA_SCALE := 1.85
 ## Kept equal to ARENA_SCALE for now. Greg asked for a bigger arena and a
 ## uniform multiplier does not deliver one: at 2.15 and 2.45 the wreckers drift
@@ -34,7 +40,6 @@ const AI_DRIVER := preload("res://systems/derby_ai_driver.gd")
 const MAX_ENGAGED := 3
 const ENGAGE_RAMP := 13.0
 const REASSIGN_EVERY := 2.6
-const KILL_CAM := preload("res://systems/kill_cam.gd")
 const PIT_RADIO := preload("res://systems/pit_radio.gd")
 const WORLD_INDEX := preload("res://systems/world_index.gd")
 const SILHOUETTE := preload("res://systems/silhouette.gd")
@@ -190,7 +195,9 @@ var _cab_tracers: Array = []
 const CAB_TRACER_LIFE := 0.16
 const CAB_TRACER_WIDTH := 0.03
 var derby_audio: Node
-var kill_cam: Control
+## Walkthrough 2: a driver's death is a slow-motion shot of the real body in
+## the cab, not the X-ray card (the Hunt keeps the card).
+var gore_cam: GoreCam
 var pit_radio: Control
 
 @onready var camera: Camera3D = $Camera3D
@@ -229,9 +236,9 @@ func _ready() -> void:
 	derby_audio.name = "DerbyAudio"
 	add_child(derby_audio)
 	derby_audio.attach_engine_to(boat)
-	kill_cam = KILL_CAM.new()
-	kill_cam.name = "KillCam"
-	$HUD.add_child(kill_cam)
+	gore_cam = GoreCam.new()
+	gore_cam.name = "GoreCam"
+	add_child(gore_cam)
 	pit_radio = PIT_RADIO.new()
 	pit_radio.name = "PitRadio"
 	$HUD.add_child(pit_radio)
@@ -319,8 +326,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	# the texture Greg asked for.
 	if event is InputEventMouseMotion and in_cab and not index_open and not leaving_on_foot:
 		var motion := event as InputEventMouseMotion
-		aim_yaw = clampf(aim_yaw - motion.relative.x * 0.0022, -1.15, 1.15)
-		aim_pitch = clampf(aim_pitch - motion.relative.y * 0.0022, -0.5, 0.42)
+		aim_yaw = clampf(aim_yaw - LOOK.dx(motion.relative) * 0.0022, -1.15, 1.15)
+		aim_pitch = clampf(aim_pitch - LOOK.dy(motion.relative) * 0.0022, -0.5, 0.42)
 	if event is InputEventMouseButton and event.pressed and not leaving_on_foot:
 		var click := event as InputEventMouseButton
 		if click.button_index == MOUSE_BUTTON_LEFT and in_cab and not index_open:
@@ -1210,7 +1217,7 @@ func _on_vehicle_impact(other: Node, closing_speed: float, self_share: float) ->
 	elif closing_speed > 7.0:
 		# First-pass softening, same user feedback as `_on_wrecker_impact()`:
 		# was `closing_speed * 0.4`. Not a definitive rebalance.
-		integrity = maxi(0, integrity - roundi(closing_speed * 0.3))
+		_take_hull(roundi(closing_speed * 0.3))
 		# V1.1/V1.2. `integrity` stays the tuned, authoritative number — this
 		# only mirrors it into the chassis's own generic `condition` field so
 		# handling degradation and the engine's damage rattle read the same
@@ -1237,7 +1244,7 @@ func _on_wrecker_impact(other: Node, closing_speed: float, self_share: float, wr
 	# quickly"): was `0.55 * ... , 1, 18`. Not a definitive rebalance — just
 	# less punishing per hit until it's played more.
 	var damage := clampi(roundi(closing_speed * 0.4 * (0.4 + attacker_share * 0.6)), 1, 14)
-	integrity = maxi(0, integrity - damage)
+	_take_hull(damage)
 	# V1.1/V1.2. See the mirror note in `_on_vehicle_impact()`.
 	boat.condition = clampf(float(integrity) / 100.0, 0.0, 1.0)
 	_update_player_damage_visual((boat.global_position - wrecker.global_position).normalized())
@@ -1292,7 +1299,7 @@ func _damage_target(target: Node3D, collision_speed: float = 0.0, self_share: fl
 	var impact_direction := (target.global_position - boat.global_position).normalized()
 	# Only physical contact transfers impact energy back into our chassis.
 	if not cab_round:
-		integrity = maxi(0, integrity - clampi(roundi(energy * 0.22 * (0.35 + 0.65 * (1.0 - self_share))), 1, 34))
+		_take_hull(clampi(roundi(energy * 0.22 * (0.35 + 0.65 * (1.0 - self_share))), 1, 34))
 		boat.condition = clampf(float(integrity) / 100.0, 0.0, 1.0)
 		_update_player_damage_visual(-impact_direction)
 	_update_wrecker_damage_visual(target, target_integrity, impact_direction)
@@ -1835,7 +1842,8 @@ func _begin_ringmaster_encounter() -> void:
 	ringmaster_rig.build(RINGMASTER_SLOT, {
 		"flesh": Color("6a5240"), "variation": 41, "gore": false, "blood": 4300.0,
 	})
-	HunterAppearance.style_world_rig(ringmaster_rig, RINGMASTER_SLOT, true)
+	# No garments on him: the coat is his clothing.
+	HunterAppearance.style_world_rig(ringmaster_rig, RINGMASTER_SLOT, true, true)
 	WorldHistory.record_event("ringmaster_encountered", {"venue": "underground_colosseum"})
 
 
@@ -1944,7 +1952,7 @@ func _update_climb_out(delta: float) -> void:
 		if is_colosseum:
 			_begin_ringmaster_encounter()
 		else:
-			Interstitial.travel("res://bone_yard_hunt.tscn", "walking out into the ashbloom expanse")
+			Interstitial.travel(DERBY_EXIT_SCENE, DERBY_EXIT_CAPTION)
 
 
 func _update_hud() -> void:
@@ -2080,7 +2088,27 @@ func _leave_derby(result: String) -> void:
 		return
 	leaving = true
 	WorldHistory.record_event("derby_result_accepted", {"result": result, "score": score, "disabled": disabled_count})
-	Interstitial.travel("res://bone_yard_hunt.tscn", "walking out into the ashbloom expanse")
+	if result == "lost" and not derby_rebirth.is_empty():
+		Interstitial.travel(str(derby_rebirth.scene), "wrecked // %s grows you back" % str(derby_rebirth.vat.label).to_lower())
+		return
+	Interstitial.travel(DERBY_EXIT_SCENE, DERBY_EXIT_CAPTION)
+
+
+## Set when a crush killed you: where the next body grows.
+var derby_rebirth: Dictionary = {}
+## How far the blow that emptied the hull went past zero. A wreck finished
+## off gently is a capture; one slammed well past it is a death.
+var last_overkill := 0
+const CRUSH_OVERKILL := 10
+
+
+func _take_hull(amount: int) -> void:
+	last_overkill = amount - integrity
+	integrity = maxi(0, integrity - amount)
+
+
+func crushed() -> bool:
+	return integrity <= 0 and last_overkill >= CRUSH_OVERKILL
 
 
 func _finish_round(result: String) -> void:
@@ -2115,6 +2143,11 @@ func _finish_round(result: String) -> void:
 		# a forfeitable body (F5); routing the wreck through it too means the
 		# Captain is the one who has you when the scene changes, not the count.
 		DEFEAT_ROUTER.route(CAST.id_for(CAPTAIN_SLOT), "rift_derby_quarry")
+		# Greg, 24 September: a wreck is a capture (the Captain drags you out
+		# alive, as before); a car crushed far past zero is a death, and the
+		# Captain who owns the body now is whose vat grows the next one.
+		if crushed():
+			derby_rebirth = VatRebirth.die(venue, "crushed in the derby", CAST.id_for(CAPTAIN_SLOT), Vector3.ZERO)
 
 
 func _add_authored_environment_collision(root_node: Node) -> void:
@@ -2332,12 +2365,8 @@ func _crush_driver(target: Node3D, subject_id: String, impact_direction: Vector3
 		dynamic_interface.announce_impact(999, false)
 	mode_label.visible = true
 	mode_label.text = "DRIVER CRUSHED IN THE CAB" if ram_crush else "DRIVER KILLED"
-	if kill_cam != null:
-		var zone := "torso" if ram_crush else "head"
-		kill_cam.trigger(
-			"DERBY DRIVER", zone, impact_direction,
-			"FRONT END THROUGH THE CAB" if ram_crush else "IMPACT TRAUMA",
-		)
+	if gore_cam != null:
+		gore_cam.trigger(origin, impact_direction, $HUD as CanvasLayer)
 	WorldHistory.update_subject(subject_id, {
 		"name": "Derby driver", "kind": "person", "status": "dead",
 		"memory": "Crushed in the cab of their own wrecker at the Bone Yard.",

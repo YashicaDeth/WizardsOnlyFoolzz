@@ -7,6 +7,8 @@ possible such thing: standard library only, no TD install, no patch to load.
     python tools/psy_dials.py                 # cycle the presets, 6s apart
     python tools/psy_dials.py sober           # snap to one preset
     python tools/psy_dials.py kaleidoscope_segments=8 lut_strength=0.6
+    python tools/psy_dials.py materia=deliriant    # a materia class at peak
+                                                   # (mechanics lab, OSC on)
 
 Start-PsyLab.ps1 first, or there is nothing listening.
 """
@@ -31,6 +33,17 @@ DIALS = {
     "cut_intensity": 0.0,
     "cut_seed": 0.0,
     "cut_rate": 0.0,
+    # drug-70: the materia dials.
+    "kaleidoscope_clear": 0.0,
+    "palette_cycle": 0.0,
+    "mirror_fold": 0.0,
+    "melt_strength": 0.0,
+    "pulse_strength": 0.0,
+    "beat_level": 0.0,
+    "saturation_shift": 0.0,
+    "darkness": 0.0,
+    "tunnel": 0.0,
+    "edge_figures": 0.0,
 }
 
 # Named states rather than named drugs: AU decides which substance reaches for
@@ -95,6 +108,16 @@ def main():
 
     pairs = dict(a.split("=", 1) for a in args if "=" in a)
     names = [a for a in args if "=" not in a]
+
+    if "materia" in pairs:
+        # /materia/preset <class> 1.0, which the materia station reads.
+        def pad(raw):
+            raw += b"\x00"
+            return raw + b"\x00" * ((4 - len(raw) % 4) % 4)
+        packet = pad(b"/materia/preset") + pad(b",sf") + pad(pairs["materia"].encode()) + struct.pack(">f", 1.0)
+        sock.sendto(packet, (HOST, PORT))
+        print("materia preset " + pairs["materia"])
+        return
 
     if pairs:
         send(sock, {k: float(v) for k, v in pairs.items()})

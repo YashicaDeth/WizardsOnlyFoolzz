@@ -26,7 +26,7 @@ func _ready() -> void:
 	check(ROUTES.record_assault_breakthrough("shaft", "blast barrier destroyed in play"), "the final barrier has a demonstrated cause")
 	check(ROUTES.traverse("blast_shaft"), "the blast shaft completes the direct assault")
 	var handoff := ROUTES.consume_surface_handoff()
-	check(handoff.surface_position == [30.0, 0.0, -14.0], "direct assault reaches the exposed eastern ridge")
+	check(handoff.surface_position == [120.0, 0.0, -100.0], "direct assault reaches the exposed north-east ridge")
 	check(int(WorldHistory.subject("celloutz").get("standing", 0)) == -30, "CellOutz remembers the executive breach")
 	check(WorldHistory.event_count("facility_assault_breakthrough") == 3, "all three played breakthroughs remain in the shared ledger")
 	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "assault transactions close")

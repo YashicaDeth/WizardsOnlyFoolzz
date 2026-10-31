@@ -1,4 +1,10 @@
 extends Node3D
+const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
+const BODY_CAM := preload("res://systems/body_cam_feel.gd")
+const FIELD_MEDS := preload("res://systems/field_meds.gd")
+## Hold 4: a FIELD DRESSING, +20 blood (Greg, 26 September).
+var meds := FIELD_MEDS.new()
+const LOOK := preload("res://systems/look_settings.gd")
 
 ## THE LOWER WORKS — the first piece of the buried city between the intake
 ## facility and the underground heat.  It is deliberately authored from a
@@ -10,12 +16,35 @@ const OPENING := preload("res://systems/opening_director.gd")
 const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
 const RIVAL_TACTICS := preload("res://systems/rival_tactics.gd")
 const LAB_DRESSING := preload("res://systems/lab_dressing.gd")
+const FACILITY_ROUTES := preload("res://systems/facility_routes.gd")
+const WORLD_BREAK := preload("res://systems/world_break.gd")
 
 const ENTRY := Vector3(0, 1.0, 16.0)
+## Things the breach tool breaks (`DESIGN/GOAL_LOOP_2.md` 0.2), near the way
+## in and off the line from the entry to the lift: the gantry and its ramp
+## are on the west side, so the east floor takes the heavier pieces.
+const PROPS := [
+	["crate", "lower_works_crate_1", Vector3(5.0, 0, 12.5), 0.0],
+	["crate", "lower_works_crate_2", Vector3(5.9, 0, 12.2), 0.3],
+	["barrel", "lower_works_barrel_1", Vector3(6.8, 0, 13.4), 0.0],
+	["barrel", "lower_works_barrel_2", Vector3(4.6, 0, 13.6), 0.0],
+	["locker", "lower_works_locker", Vector3(14.1, 0, 9.6), -PI * 0.5],
+	["monitor", "lower_works_monitor", Vector3(4.2, 0, 3.2), 0.0],
+	["chair", "lower_works_chair", Vector3(4.3, 0, 4.1), PI],
+	["jar", "lower_works_jar_1", Vector3(-3.6, 0, 11.0), 0.0],
+	["jar", "lower_works_jar_2", Vector3(-3.25, 0, 11.35), 0.0],
+]
 const FUSE_AT := Vector3(11.2, 0.85, 1.8)
 const SHORTCUT_AT := Vector3(-10.2, 0.0, -8.0)
 const LIFT_AT := Vector3(0, 0.0, -38.0)
-const EXIT_AT := Vector3(0, 0.0, -47.0)
+## The second way out (Greg, 24 September): a hatch into the old drains, on
+## the open floor east of the lift, clear of the galleries and pipe racks.
+const DRAIN_AT := Vector3(9.0, 0.0, -35.0)
+const DRAIN_REACH := 2.4
+## The trigger is the elevator you can see. It sat 9 m past the cage, at
+## z -47, so standing at the lift and pressing E did nothing and the prompt
+## never showed: the run ended here for Greg on first launch (2026-09-24).
+const EXIT_AT := LIFT_AT
 
 ## AD3. The third way down.
 ##
@@ -67,26 +96,49 @@ var camera: Camera3D
 var objective: Label
 var prompt: Label
 var status: Label
+var osd: BodyCamOSD
 var yaw := 0.0
 var pitch := -0.05
 var fuse_taken := false
 var shortcut_open := false
 var shortcut_gate: StaticBody3D
+var shortcut_label: Label3D
+## Greg's playtest: the heat elevator had no doors and no collision -- you
+## walked into the cage. Two leaves on its front, a lamp that says whether
+## it will take you, and they slide apart once the fuse is in and you come.
+var lift_doors: Array[Node3D] = []
+var lift_lamp: OmniLight3D
+var lift_doors_open := 0.0
 var fuse_visual: MeshInstance3D
 var patrol: Node3D
 var patrol_phase := 0.0
 var patrol_tactic: Dictionary = {}
 var patrol_tree: Resource
 var patrol_alert := false
+## Greg's playtest: this room's lesson is stealth. Holding Ctrl (not
+## sprinting) creeps: slower, and the sentinel only catches you close.
+var creeping := false
+const HEAR_WALKING := 11.0
+const HEAR_CREEPING := 4.5
 var patrol_disabled := false
 var patrol_attack_cooldown := 0.0
 var blood := 100.0
+## Where your old bodies lie if the sentinel kills you (`RebirthSite`).
+var rebirth_site: RebirthSite
 var breach_tool_ready := false
 var breach_flash: OmniLight3D
 var sentinel_disable_reason := ""
 
 
 func _ready() -> void:
+	# Greg, 28 September: every room has its own ambience and a music bed.
+	var ambient_bed_script := preload("res://systems/ambient_bed.gd")
+	if ambient_bed_script.wanted():
+		add_child(ambient_bed_script.new().setup("city"))
+	# Greg, 28 September: each new key shown once (KeyHints).
+	KeyHints.offer_opening_keys(self)
+	KeyHints.offer_in(self, "creep", KEY_CTRL, "HOLD CTRL", "creep past it")
+	preload("res://systems/run_timer.gd").enter("lower_works")
 	var environment := WorldEnvironment.new()
 	# Not `ossuary`. It is mauve from zenith to ground and carries the densest
 	# fog of any preset in `world_look.gd`, and the note beside that preset
@@ -99,14 +151,21 @@ func _ready() -> void:
 	_build_city_shell()
 	_build_gantry()
 	_build_landmark_lift()
+	_build_drain_hatch()
 	_build_fuse_branch()
 	_build_patrol()
+	for spec in PROPS:
+		BreakableProp.place(self, spec[0], spec[1], spec[2], spec[3])
 	_build_player()
+	rebirth_site = RebirthSite.new()
+	add_child(rebirth_site)
+	rebirth_site.setup("lower_works", player)
 	_build_hud()
 	# The arcade's optional breach tool carries forward as a compact, deliberate
 	# first combat choice.  The fuse remains the quiet route; neither route is
 	# a false pickup that disappears at the next scene swap.
-	breach_tool_ready = WorldHistory.event_count("service_arcade_breach_tool_taken") > 0
+	# Carried, not merely once taken: a death leaves it on the old body.
+	breach_tool_ready = VatRebirth.carries("BREACH TOOL")
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	WorldHistory.record_event("lower_works_entered", {"location": "lower_works"})
 
@@ -115,6 +174,8 @@ func _build_player() -> void:
 	player = CharacterBody3D.new()
 	player.position = ENTRY
 	add_child(player)
+	# Greg, 28 September: what your bare feet land on here.
+	player.set_meta("surface", "concrete")
 	var collider := CollisionShape3D.new()
 	var capsule := CapsuleShape3D.new()
 	capsule.radius = 0.34
@@ -125,6 +186,9 @@ func _build_player() -> void:
 	camera.position.y = 0.77
 	camera.fov = 88.0
 	player.add_child(camera)
+	LabSurface.attach_body_cam(camera)
+	if VatRebirth.carries("BREACH TOOL"):
+		LabSurface.hold_in_view(camera, LabSurface.breach_tool())
 	breach_flash = OmniLight3D.new()
 	breach_flash.name = "BreachFlash"
 	breach_flash.light_color = Color("f0a24b")
@@ -157,6 +221,11 @@ func _build_hud() -> void:
 	prompt.add_theme_font_size_override("font_size", 15)
 	prompt.add_theme_color_override("font_color", Color("dd9851"))
 	layer.add_child(prompt)
+	osd = BodyCamOSD.new()
+	osd.name = "BodyCamOSD"
+	layer.add_child(osd)
+	osd.adopt(status, objective, prompt, "SUBLEVEL 0C  //  LOWER WORKS")
+	osd.camera = camera
 
 
 func _build_city_shell() -> void:
@@ -190,7 +259,14 @@ func _build_city_shell() -> void:
 		# why the district's own design note says navigation is by a real
 		# object rather than an arrow. It was the only object lit well enough
 		# to navigate by.
-		light.light_energy = 1.9
+		# Greg on first launch (Dust to Bones, 24 September): Lower Works is
+		# "too dark". Measured in the Forward+ renderer at the opening hour, the
+		# entry view averaged 2.8/255 with 95% of the frame near-black: range
+		# was fixed above, but 1.9 hung 8.7 m up still delivers almost nothing
+		# to the floor. At 9.5 (sconces 6.4) it averages 15.3 with half the
+		# frame still in shadow -- vaults, galleries and the lift read, and it
+		# stays darker than the decant room (30-45).
+		light.light_energy = 14.0
 		light.omni_range = BAY_LAMP_RANGE
 		light.shadow_enabled = false
 		add_child(light)
@@ -204,7 +280,7 @@ func _build_city_shell() -> void:
 			sconce.name = "WallSconce%d" % bay
 			sconce.position = Vector3(side * 13.4, 3.4, z)
 			sconce.light_color = Color("c2662f")
-			sconce.light_energy = 1.6
+			sconce.light_energy = 10.0
 			sconce.omni_range = 9.5
 			sconce.shadow_enabled = false
 			add_child(sconce)
@@ -372,6 +448,47 @@ func _build_hanging_cable(at: Vector3, seed: int) -> void:
 	add_child(cable)
 
 
+func _build_drain_hatch() -> void:
+	var frame := MeshInstance3D.new()
+	var frame_mesh := BoxMesh.new()
+	frame_mesh.size = Vector3(2.0, 0.08, 2.0)
+	frame_mesh.material = LabSurface.material("rust")
+	frame.mesh = frame_mesh
+	frame.position = DRAIN_AT + Vector3(0, 0.04, 0)
+	add_child(frame)
+	var hole := MeshInstance3D.new()
+	var hole_mesh := BoxMesh.new()
+	hole_mesh.size = Vector3(1.5, 0.09, 1.5)
+	var dark := StandardMaterial3D.new()
+	dark.albedo_color = Color("050605")
+	hole_mesh.material = dark
+	hole.mesh = hole_mesh
+	hole.position = DRAIN_AT + Vector3(0, 0.05, 0)
+	add_child(hole)
+	for bar in 5:
+		var rod := MeshInstance3D.new()
+		var rod_mesh := BoxMesh.new()
+		rod_mesh.size = Vector3(0.07, 0.06, 1.6)
+		rod_mesh.material = LabSurface.material("rust")
+		rod.mesh = rod_mesh
+		rod.position = DRAIN_AT + Vector3(-0.6 + float(bar) * 0.3, 0.11, 0)
+		add_child(rod)
+	var draft := OmniLight3D.new()
+	draft.position = DRAIN_AT + Vector3(0, 0.6, 0)
+	draft.light_color = Color("7fa07a")
+	draft.light_energy = 1.4
+	draft.omni_range = 4.0
+	add_child(draft)
+	var label := Label3D.new()
+	label.text = "OLD DRAIN // STORM OUTFALL"
+	label.font_size = 26
+	label.outline_size = 8
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.modulate = Color("b9c9a4")
+	label.position = DRAIN_AT + Vector3(0, 1.3, 0)
+	add_child(label)
+
+
 func _build_landmark_lift() -> void:
 	# The lift is visible from almost the whole district, so navigation is based
 	# on a real object instead of an arrow.
@@ -395,6 +512,33 @@ func _build_landmark_lift() -> void:
 	cage.mesh = cage_mesh
 	cage.position = LIFT_AT + Vector3(0, 3.5, 0)
 	add_child(cage)
+	var solid := StaticBody3D.new()
+	var shape := CollisionShape3D.new()
+	var cylinder := CylinderShape3D.new()
+	cylinder.radius = 2.7
+	cylinder.height = 7.0
+	shape.shape = cylinder
+	solid.add_child(shape)
+	solid.position = cage.position
+	add_child(solid)
+	# The doors face back up the hall, the way you come at it.
+	for side in [-1.0, 1.0]:
+		var leaf := MeshInstance3D.new()
+		var leaf_mesh := BoxMesh.new()
+		leaf_mesh.size = Vector3(1.2, 2.8, 0.12)
+		leaf_mesh.material = WorldLook.surface(Color("5a3a26"), "metal", 2500)
+		leaf.mesh = leaf_mesh
+		leaf.position = LIFT_AT + Vector3(side * 0.6, 1.4, CAR_FRONT + 0.06)
+		leaf.set_meta("side", side)
+		add_child(leaf)
+		lift_doors.append(leaf)
+	lift_lamp = OmniLight3D.new()
+	lift_lamp.position = LIFT_AT + Vector3(0, 3.3, CAR_FRONT + 0.3)
+	lift_lamp.light_color = Color("c0392b")
+	lift_lamp.light_energy = 2.5
+	lift_lamp.omni_range = 4.0
+	add_child(lift_lamp)
+	_build_lift_car()
 	var beam := OmniLight3D.new()
 	beam.position = LIFT_AT + Vector3(0, 8.4, 0)
 	beam.light_color = Color("d36f34")
@@ -409,6 +553,89 @@ func _build_landmark_lift() -> void:
 	label.modulate = Color("e8a55a")
 	label.position = LIFT_AT + Vector3(0, 8.1, 1.0)
 	add_child(label)
+
+
+## Greg's playtest: behind the doors was the shaft's blank skin. A car stands
+## out of the shaft now -- walls, a grated floor, a warm lamp, the call panel
+## and a rail -- and you step in to ride (E within reach of the shaft centre).
+const CAR_FRONT := 4.1
+const CAR_HALF := 1.25
+const CAR_HEIGHT := 3.0
+
+
+func _build_lift_car() -> void:
+	var depth := CAR_FRONT - 2.6
+	var mid_z := LIFT_AT.z + 2.6 + depth * 0.5
+	for side in [-1.0, 1.0]:
+		_slab(Vector3(0.12, CAR_HEIGHT, depth), Vector3(LIFT_AT.x + side * CAR_HALF, CAR_HEIGHT * 0.5, mid_z), "metal", Color("3a2a20"))
+	_slab(Vector3(CAR_HALF * 2.0 + 0.12, 0.12, depth), Vector3(LIFT_AT.x, CAR_HEIGHT, mid_z), "metal", Color("2a1f19"))
+	var grate := MeshInstance3D.new()
+	var grate_mesh := BoxMesh.new()
+	grate_mesh.size = Vector3(CAR_HALF * 2.0, 0.04, depth)
+	grate_mesh.material = WorldLook.surface(Color("4a4038"), "metal", 2510)
+	grate.mesh = grate_mesh
+	grate.position = Vector3(LIFT_AT.x, 0.03, mid_z)
+	add_child(grate)
+	# The back of the car: a lit steel wall with a rail across it.
+	var back := MeshInstance3D.new()
+	var back_mesh := BoxMesh.new()
+	back_mesh.size = Vector3(CAR_HALF * 2.0, CAR_HEIGHT, 0.08)
+	back_mesh.material = WorldLook.surface(Color("6a5646"), "metal", 2511)
+	back.mesh = back_mesh
+	# In front of the shaft's bulge (2.7 m at the centre), or it shows through.
+	back.position = Vector3(LIFT_AT.x, CAR_HEIGHT * 0.5, LIFT_AT.z + 2.76)
+	add_child(back)
+	var rail := MeshInstance3D.new()
+	var rail_mesh := CylinderMesh.new()
+	rail_mesh.top_radius = 0.025
+	rail_mesh.bottom_radius = 0.025
+	rail_mesh.height = CAR_HALF * 1.8
+	rail_mesh.material = WorldLook.surface(Color("b8a88c"), "metal", 2512)
+	rail.mesh = rail_mesh
+	rail.rotation_degrees.z = 90.0
+	rail.position = Vector3(LIFT_AT.x, 1.0, LIFT_AT.z + 2.86)
+	add_child(rail)
+	# The call panel on the right wall, two buttons: UP lit.
+	var panel := MeshInstance3D.new()
+	var panel_mesh := BoxMesh.new()
+	panel_mesh.size = Vector3(0.04, 0.4, 0.22)
+	panel_mesh.material = WorldLook.surface(Color("1c1814"), "metal", 2513)
+	panel.mesh = panel_mesh
+	panel.position = Vector3(LIFT_AT.x + CAR_HALF - 0.08, 1.35, mid_z + 0.2)
+	add_child(panel)
+	for index in 2:
+		var button := MeshInstance3D.new()
+		var button_mesh := SphereMesh.new()
+		button_mesh.radius = 0.03
+		button_mesh.height = 0.06
+		var glow := StandardMaterial3D.new()
+		glow.albedo_color = Color("efa755") if index == 0 else Color("3a2a20")
+		glow.emission_enabled = index == 0
+		glow.emission = Color("efa755")
+		glow.emission_energy_multiplier = 2.0
+		button_mesh.material = glow
+		button.mesh = button_mesh
+		button.position = panel.position + Vector3(-0.03, 0.08 - index * 0.16, 0)
+		add_child(button)
+	var inside := OmniLight3D.new()
+	inside.light_color = Color("e2b57a")
+	inside.light_energy = 1.8
+	inside.omni_range = 3.2
+	inside.position = Vector3(LIFT_AT.x, CAR_HEIGHT - 0.3, mid_z)
+	add_child(inside)
+
+
+## Fuse in and you close: the leaves part with a groan. Otherwise they shut.
+func _update_lift_doors(delta: float) -> void:
+	if lift_doors.is_empty() or player == null:
+		return
+	var want := 1.0 if fuse_taken and _flat_distance(LIFT_AT) < 7.5 else 0.0
+	if want > lift_doors_open and lift_doors_open <= 0.0:
+		preload("res://systems/sight_audio.gd").play_at(self, "creak", LIFT_AT + Vector3(0, 1.4, 2.8), 0.0)
+	lift_doors_open = move_toward(lift_doors_open, want, delta / 1.2)
+	for leaf in lift_doors:
+		var side: float = leaf.get_meta("side")
+		leaf.position.x = LIFT_AT.x + side * (0.6 + 1.15 * ease(lift_doors_open, -2.0))
 
 
 func _build_fuse_branch() -> void:
@@ -434,13 +661,13 @@ func _build_fuse_branch() -> void:
 	fuse_label.position = FUSE_AT + Vector3(0, 0.75, 0)
 	add_child(fuse_label)
 	shortcut_gate = _slab(Vector3(4.4, 4.6, 0.42), SHORTCUT_AT + Vector3(0, 2.3, 0), "metal", Color("42221a"))
-	var gate_label := Label3D.new()
-	gate_label.text = "SERVICE SHORTCUT\nLIFT FUSE REQUIRED"
-	gate_label.font_size = 28
-	gate_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	gate_label.modulate = Color("c76a3e")
-	gate_label.position = SHORTCUT_AT + Vector3(0, 4.8, 0.4)
-	add_child(gate_label)
+	shortcut_label = Label3D.new()
+	shortcut_label.text = "SERVICE SHORTCUT\nLOCKED  //  NEEDS A LIFT FUSE"
+	shortcut_label.font_size = 28
+	shortcut_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	shortcut_label.modulate = Color("c0392b")
+	shortcut_label.position = SHORTCUT_AT + Vector3(0, 4.8, 0.4)
+	add_child(shortcut_label)
 
 
 func _build_patrol() -> void:
@@ -473,14 +700,15 @@ func _build_patrol() -> void:
 	patrol.add_child(eye)
 
 
-func _slab(dimensions: Vector3, at: Vector3, kind: String, color: Color) -> StaticBody3D:
+func _slab(dimensions: Vector3, at: Vector3, _kind: String, _color: Color) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.position = at
 	add_child(body)
 	var visual := MeshInstance3D.new()
 	var mesh := BoxMesh.new()
 	mesh.size = dimensions
-	mesh.material = WorldLook.surface(color, kind, int(at.x * 37.0 + at.z * 23.0))
+	# Real lab surfaces (Greg, 2026-09-24), chosen by the slab's shape.
+	mesh.material = LabSurface.for_slab(dimensions, at)
 	visual.mesh = mesh
 	body.add_child(visual)
 	var collider := CollisionShape3D.new()
@@ -492,18 +720,22 @@ func _slab(dimensions: Vector3, at: Vector3, kind: String, color: Color) -> Stat
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# No fighting while a dressing goes on (hold 4).
+	if meds.busy() and event is InputEventMouseButton and event.pressed:
+		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-			_discharge_breach_tool()
+			_swing_breach_tool()
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		yaw -= event.relative.x * 0.0026
-		pitch = clampf(pitch - event.relative.y * 0.0024, -1.15, 0.95)
+		yaw -= LOOK.dx(event.relative) * 0.0026
+		pitch = clampf(pitch - LOOK.dy(event.relative) * 0.0024, -1.15, 0.95)
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
 		_interact()
 
 
 func _physics_process(delta: float) -> void:
+	_update_lift_doors(delta)
 	var input := Vector3(Input.get_axis("move_left", "move_right"), 0.0, Input.get_axis("move_forward", "move_back"))
 	var direction := (Basis(Vector3.UP, yaw) * input).normalized()
 	# Greg: *"maybe jumping and running should maybe be unlocked"*. They should.
@@ -512,19 +744,37 @@ func _physics_process(delta: float) -> void:
 	# follows them. `sprint` is already an action in the project; jump is Space,
 	# read directly the way every other key in this scene is.
 	var pace := WALK_SPEED * (SPRINT_SCALE if Input.is_action_pressed("sprint") else 1.0)
-	player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 17.0 * delta)
-	player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 17.0 * delta)
-	if player.is_on_floor():
-		# The downward bias keeps them on slopes rather than skipping off the
-		# ramps, so the jump has to be written after it rather than into it.
-		player.velocity.y = -2.0
-		if Input.is_key_pressed(KEY_SPACE):
-			player.velocity.y = JUMP_SPEED
-	else:
-		player.velocity.y -= 18.0 * delta
-	player.move_and_slide()
+	creeping = Input.is_action_pressed("crouch") and not Input.is_action_pressed("sprint")
+	if creeping:
+		pace *= 0.45
+	# Mid-climb the haul owns the body; the rest of the frame still runs.
+	if not JUMP_CLIMB.busy(player):
+		# Greg, 26 September: sprint + Ctrl slides.
+		if Input.is_action_just_pressed("crouch"):
+			JUMP_CLIMB.try_slide(player, yaw, Input.is_action_pressed("sprint"))
+		if not JUMP_CLIMB.slide_step(player, delta):
+			player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 26.0 * delta)
+			player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 26.0 * delta)
+		if player.is_on_floor():
+			# The downward bias keeps them on slopes rather than skipping off the
+			# ramps, so the jump has to be written after it rather than into it.
+			player.velocity.y = -2.0
+			if Input.is_key_pressed(KEY_SPACE):
+				# Greg, 26 September: climb as well as jump. A ledge up to chest
+				# height ahead is hauled onto; otherwise this is the same jump.
+				JUMP_CLIMB.press(player, yaw, JUMP_SPEED / JUMP_CLIMB.JUMP_SPEED, "lower_works_climbed")
+		else:
+			player.velocity.y -= 18.0 * delta
+		# The view drops low for the slide.
+		camera.position.y = move_toward(camera.position.y, 0.3 if JUMP_CLIMB.sliding(player) else 0.77, get_physics_process_delta_time() * 4.0)
+		player.move_and_slide()
+		# Small falls: they sting, never kill (the gantries are high here).
+		var fall_hurt := JUMP_CLIMB.landing_damage(player)
+		if fall_hurt > 0.0:
+			blood = maxf(1.0, blood - fall_hurt)
+	meds.step(self, delta, func() -> void: blood = minf(100.0, blood + FIELD_MEDS.HEALS))
 	player.rotation.y = yaw
-	camera.rotation = Vector3(pitch, 0, 0)
+	BODY_CAM.apply(camera, player, delta, pitch)
 	patrol_phase += delta
 	if breach_flash != null:
 		breach_flash.light_energy = move_toward(breach_flash.light_energy, 0.0, delta * 18.0)
@@ -550,7 +800,8 @@ func _patrol_step(delta: float) -> void:
 	var overhead: float = player.global_position.y - patrol.global_position.y
 	difference.y = 0.0
 	var distance := difference.length()
-	patrol_alert = distance < 11.0
+	# Once it has you it keeps you; creeping only helps before it notices.
+	patrol_alert = distance < (HEAR_CREEPING if creeping and not patrol_alert else HEAR_WALKING)
 	if not patrol_alert:
 		patrol.position.x = sin(patrol_phase * 0.55) * 6.2
 		patrol.rotation.y = cos(patrol_phase * 0.55) * 0.45
@@ -571,8 +822,14 @@ func _patrol_step(delta: float) -> void:
 	# bottom of the far ramp.
 	if distance < 2.0 and patrol_attack_cooldown <= 0.0 and overhead <= GANTRY_CLEARANCE:
 		patrol_attack_cooldown = 1.25
-		blood = maxf(25.0, blood - 6.0)
+		# Greg, 24 September: every killer in minutes 0-30 sends you to the
+		# vat. The sentinel used to stop at a quarter of your blood; now it
+		# finishes what it starts, and your old body stays down here.
+		blood = maxf(0.0, blood - 6.0)
+		BODY_CAM.hit(camera, 0.06)
 		WorldHistory.record_event("lower_works_sentinel_strike", {"location": "lower_works", "damage": 6})
+		if blood <= 0.0:
+			rebirth_site.die("cut down by the Lower Works sentinel", "lower_works_sentinel")
 
 
 func _flat_distance(at: Vector3) -> float:
@@ -582,14 +839,26 @@ func _flat_distance(at: Vector3) -> float:
 
 
 func _interact() -> void:
+	if not rebirth_site.try_recover().is_empty():
+		return
 	if not fuse_taken and _flat_distance(FUSE_AT) <= 2.4:
 		fuse_taken = true
 		fuse_visual.visible = false
+		shortcut_label.text = "SERVICE SHORTCUT\n[E] SHUNT THE FUSE  //  OPEN IT"
+		shortcut_label.modulate = Color("efa755")
+		lift_lamp.light_color = Color("5fbf6a")
 		WorldHistory.record_event("lower_works_lift_fuse_taken", {"location": "lower_works"})
 		return
 	if fuse_taken and not shortcut_open and _flat_distance(SHORTCUT_AT) <= 3.0:
 		shortcut_open = true
-		shortcut_gate.queue_free()
+		# It grinds up into the lintel instead of blinking out.
+		for child in shortcut_gate.get_children():
+			if child is CollisionShape3D:
+				(child as CollisionShape3D).disabled = true
+		create_tween().tween_property(shortcut_gate, "position:y", shortcut_gate.position.y + 4.4, 1.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+		preload("res://systems/sight_audio.gd").play_at(self, "creak", SHORTCUT_AT, 2.0)
+		shortcut_label.text = "SERVICE SHORTCUT\nOPEN"
+		shortcut_label.modulate = Color("5fbf6a")
 		# The fuse has a tactical job as well as a route job: shunting this
 		# side circuit drops the only sentinel's local relay.  It turns the
 		# optional walk to the west gallery into a real safer route, instead of
@@ -597,10 +866,25 @@ func _interact() -> void:
 		_disable_sentinel("relay_disabled")
 		WorldHistory.record_event("lower_works_shortcut_powered", {"location": "lower_works", "sentinel_relay": "disabled"})
 		return
+	if _flat_distance(DRAIN_AT) <= DRAIN_REACH:
+		if not FACILITY_ROUTES.escaped_once():
+			objective.text = "OBJECTIVE // THE GRATE IS RUSTED SHUT  //  REACH THE HEAT ELEVATOR"
+			return
+		_enter_drains()
+		return
 	if _flat_distance(EXIT_AT) <= 4.0 and fuse_taken:
-		_record_pit_entry()
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-		Interstitial.travel("res://underground_colosseum.tscn", "lower works elevator // the heat below is awake")
+		if patrol_alert and not patrol_disabled:
+			objective.text = "OBJECTIVE // IT IS ON YOU  //  LOSE IT OR PUT IT DOWN FIRST"
+			return
+		_ride_heat_elevator()
+
+
+## The attack button with the ram in hand: it breaks what it meets, and still
+## interrupts the sentinel when that is close enough.
+func _swing_breach_tool() -> void:
+	if breach_tool_ready:
+		WORLD_BREAK.swing(camera, FacilityGuardPost.RAM_DAMAGE, "breach_tool", player)
+	_discharge_breach_tool()
 
 
 func _discharge_breach_tool() -> void:
@@ -630,28 +914,62 @@ func _disable_sentinel(reason: String) -> void:
 		eye.light_energy = 0.35
 
 
-func _record_pit_entry() -> void:
-	if OPENING.reached("entered_pit"):
+var lift_requested := false
+var drains_requested := false
+
+
+## Greg, 24 September: with the derby shelved as an exit, the heat elevator
+## goes up, not down. It is a facility route like every other: the route
+## graph hands the Hunt its arrival point.
+func _ride_heat_elevator() -> void:
+	if lift_requested:
 		return
+	lift_requested = true
 	WorldHistory.begin_ledger_batch()
-	OPENING.advance("entered_pit")
-	FACILITY_TERRITORY.apply_event("opening_entered_pit")
-	WorldHistory.amend_subject("player", {"status": "racked for a heat"})
-	WorldHistory.record_event("lower_works_entered_pit", {"location": "lower_works"})
+	if str(FACILITY_ROUTES.ensure().get("active_route", "")) != FACILITY_ROUTES.ROUTE_HEAT_ELEVATOR:
+		FACILITY_ROUTES.begin(FACILITY_ROUTES.ROUTE_HEAT_ELEVATOR)
+	FACILITY_ROUTES.traverse("heat_elevator")
+	OPENING.advance("left_facility")
+	FACILITY_TERRITORY.apply_event("facility_surfaced")
+	WorldHistory.amend_subject("player", {"status": "up the heat elevator", "left_facility_by": "heat_elevator"})
+	WorldHistory.record_event("lower_works_heat_elevator_ascended", {"location": "lower_works"})
 	WorldHistory.commit_ledger_batch()
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if OS.get_environment("ATG_TEST_MODE") != "1":
+		Interstitial.travel("res://bone_yard_hunt.tscn", "heat elevator // up into the ashbloom expanse")
+
+
+## The other way out: down into the old drains, which surface somewhere else.
+func _enter_drains() -> void:
+	if drains_requested:
+		return
+	drains_requested = true
+	WorldHistory.record_event("lower_works_drain_entered", {"location": "lower_works"})
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if OS.get_environment("ATG_TEST_MODE") != "1":
+		Interstitial.travel("res://old_drains.tscn", "old drain // follow the water out")
 
 
 func _update_hud() -> void:
 	var guard_state := ("SENTINEL INTERRUPTED" if sentinel_disable_reason == "breach_interrupted" else "SENTINEL RELAY DOWN") if patrol_disabled else ("SENTINEL ENGAGED" if patrol_alert else "SENTINEL PATROL")
 	status.text = "BLOOD %03d%%   PAIN 86   LOWER WORKS // %s" % [roundi(blood), guard_state]
 	objective.text = "OBJECTIVE // " + ("REACH THE HEAT ELEVATOR" if fuse_taken else "FIND A LIFT FUSE")
-	if not fuse_taken and _flat_distance(FUSE_AT) <= 2.4:
+	if not rebirth_site.nearest().is_empty():
+		prompt.text = "[E] TAKE BACK WHAT YOUR OLD BODY HOLDS"
+	elif not fuse_taken and _flat_distance(FUSE_AT) <= 2.4:
 		prompt.text = "[E] TAKE LIFT FUSE"
+		osd.point_at(FUSE_AT + Vector3(0, 0.3, 0))
 	elif fuse_taken and not shortcut_open and _flat_distance(SHORTCUT_AT) <= 3.0:
 		prompt.text = "[E] POWER SHORTCUT // DISABLE SENTINEL"
+		osd.point_at(SHORTCUT_AT + Vector3(0, 1.4, 0))
+	elif _flat_distance(DRAIN_AT) <= DRAIN_REACH:
+		prompt.text = "[E] DROP INTO THE OLD DRAINS" if FACILITY_ROUTES.escaped_once() else "A DRAIN GRATE  //  RUSTED SHUT"
+		osd.point_at(DRAIN_AT + Vector3(0, 0.2, 0))
 	elif fuse_taken and _flat_distance(EXIT_AT) <= 4.0:
-		prompt.text = "[E] DESCEND TO THE UNDERGROUND HEAT"
+		prompt.text = "[E] RIDE THE HEAT ELEVATOR UP"
+		osd.point_at(LIFT_AT + Vector3(0, 2.2, 0))
 	elif breach_tool_ready and patrol_alert and not patrol_disabled:
 		prompt.text = "[LMB] DISCHARGE BREACH TOOL // INTERRUPT SENTINEL"
 	else:
-		prompt.text = "WASD MOVE   //   MOUSE LOOK   //   E INTERACT"
+		# AX3.6: no standing controls strip; keys are taught once (KeyHints).
+		prompt.text = ""

@@ -292,8 +292,10 @@ func _test_organs() -> void:
 	# that organ's actual mesh behind the opening; a shallow mark does neither.
 	var opened := _rig()
 	var gut := opened.organ_parts["gut"] as MeshInstance3D
-	var gut_surface := gut.global_position + Vector3(0.0, 0.0, 0.12)
-	opened.hit_at(gut_surface, 40.0, 8.0, "cut", Vector3(0.0, 0.0, -1.0))
+	# From the front (-Z): lab-48 put the organs behind the sternum and the
+	# kidneys and spine behind them, so a cut from +Z now finds a kidney.
+	var gut_surface := gut.global_position + Vector3(0.0, 0.0, -0.12)
+	opened.hit_at(gut_surface, 40.0, 8.0, "cut", Vector3(0.0, 0.0, 1.0))
 	var torso_wounds := opened.parts["torso"].get_node_or_null("Wounds") as Node3D
 	var cavity_count := 0
 	var cavity_source: Mesh = null

@@ -56,6 +56,16 @@ func _ready() -> void:
 	_check(not chunk.freeze, "releasing after a repeated hold call still leaves the chunk unfrozen")
 	_check(chunk.linear_velocity == thrown_velocity, "and a hold that was already active does not overwrite the saved velocity")
 
+	print("a chunk freed during the hold does not wedge release()")
+	var doomed := RigidBody3D.new()
+	add_child(doomed)
+	GORE_CHUNKS.live.append(doomed)
+	GORE_CHUNKS.hold()
+	doomed.free()
+	GORE_CHUNKS.release()
+	_check(not chunk.freeze, "the surviving chunk is still released")
+	_check(GORE_CHUNKS._held_chunks.is_empty(), "and the hold list is cleared rather than failing every frame after")
+
 	chunk.queue_free()
 	GORE_CHUNKS.live.clear()
 

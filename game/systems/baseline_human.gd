@@ -23,10 +23,18 @@ signal zone_disabled(zone_id: String)
 signal limb_severed(zone_id: String, report: Dictionary)
 signal went_down()
 signal resolved(outcome: String)
+## One beat of an open artery: where the stump is in the world and which way it
+## threw. Whoever owns the camera listens for the player's own body, so a jet
+## coming at the face arrives on the lens through the same veil every other
+## close dose uses.
+signal arterial_beat(zone_id: String, at: Vector3, jet: Vector3)
 
 const ZONES := ["head", "torso", "left_arm", "right_arm", "left_leg", "right_leg"]
 const LIMBS := ["left_arm", "right_arm", "left_leg", "right_leg"]
 const SEVERING_DAMAGE := ["cut", "shear", "ballistic"]
+## How long the opt-in knockdown travel takes. Its smear sampler is given the
+## same constant, so the trail ends where the body does.
+const KNOCKDOWN_SECONDS := 0.24
 const SEVER_THRESHOLD_RATIO := 0.85
 const SEVER_HEALTH_RATIO := 0.25
 ## AN6.4. Where a limb actually bends, on the same -1..1 axis `BodyMesh`'s own
@@ -51,6 +59,10 @@ const MID_BONE_STRESS_FLOOR := 0.7
 ## than merely destroyed. Tuned so an untreated stump is a clock measured in
 ## tens of seconds, not minutes.
 const STUMP_BLEED := 26.0
+## Beats left once the body is dead. A cut neck throws a few more times and then
+## it is over; without this a corpse still holding blood reads a resting pulse
+## and fountains for as long as the scene lives.
+const AGONAL_BEATS := 3
 ## A human spine is authored as 33 vertebrae here. It is both the anatomical
 ## count and a deliberate recurring number in the game's body language.
 const SPINE_VERTEBRAE := 33
@@ -93,6 +105,25 @@ const BONE := Color("cfc2a4")
 const BLOOD := Color("6b0f0c")
 const BLOOD_DARK := Color("3d0907")
 const ORGAN := Color("7a1a16")
+## How many shades between ORGAN and BLOOD_DARK a spilled organ blob takes.
+const ORGAN_SHADES := 4
+## The materials every body's gore shares (blood, dark blood, bone, the organ
+## shades), in all six of WorldLook's variations, built the first time any
+## body is: 0.4 s once, at load, instead of 10 ms stalls through the first
+## minute of a fight (Greg's 30 Sep playtest, 7 fps).
+static var _gore_materials_warm := false
+
+
+static func _warm_gore_materials() -> void:
+	if _gore_materials_warm:
+		return
+	_gore_materials_warm = true
+	var shared: Array = [[BLOOD, "flesh"], [BLOOD_DARK, "flesh"], [BONE, "bone"]]
+	for shade in ORGAN_SHADES:
+		shared.append([ORGAN.lerp(BLOOD_DARK, float(shade) / float(ORGAN_SHADES - 1)), "flesh"])
+	for pair: Array in shared:
+		for bucket in 6:
+			WorldLook.surface(pair[0], pair[1], bucket)
 ## Below this share of a zone's health the bone has gone through the skin and
 ## stays gone: a compound fracture is a state of the body, not an effect.
 const FRACTURE_RATIO := 0.4
@@ -147,14 +178,24 @@ static var detail := 1.0
 
 ## Organs are positioned relative to the zone that contains them, so the seated
 ## and standing layouts both place them correctly without a second table.
+## Front is -Z (the rig faces -Z, as `BodyForms.REGIONS` says). Lab-48: this
+## table had the spine at -Z, in front of the heart, so the X-ray showed every
+## body inside out; the organs now sit behind the sternum and the spine behind
+## them.
 const ORGAN_LAYOUT := {
 	"brain": {"zone": "head", "at": Vector3(0, 0.01, 0), "size": 0.072, "tint": "9c8a86"},
-	"heart": {"zone": "torso", "at": Vector3(-0.05, 0.10, 0.03), "size": 0.060, "tint": "6d100e"},
+	"heart": {"zone": "torso", "at": Vector3(-0.05, 0.10, -0.04), "size": 0.060, "tint": "6d100e"},
 	"left_lung": {"zone": "torso", "at": Vector3(-0.12, 0.14, 0.0), "size": 0.076, "tint": "8a4d4a"},
 	"right_lung": {"zone": "torso", "at": Vector3(0.12, 0.14, 0.0), "size": 0.076, "tint": "8a4d4a"},
-	"liver": {"zone": "torso", "at": Vector3(0.08, -0.07, 0.02), "size": 0.070, "tint": "5a2015"},
-	"gut": {"zone": "torso", "at": Vector3(0.0, -0.18, 0.03), "size": 0.088, "tint": "8d7a52"},
-	"spine": {"zone": "torso", "at": Vector3(0.0, 0.0, -0.10), "size": 0.042, "tint": "cfc2a4"},
+	"liver": {"zone": "torso", "at": Vector3(0.08, -0.06, -0.03), "size": 0.070, "tint": "5a2015"},
+	"gut": {"zone": "torso", "at": Vector3(0.0, -0.19, -0.04), "size": 0.088, "tint": "8d7a52"},
+	"spine": {"zone": "torso", "at": Vector3(0.0, 0.0, 0.10), "size": 0.042, "tint": "cfc2a4"},
+	# Lab-48 (Greg, 5 Oct: "heart, lungs, liver, stomach, guts, kidneys,
+	# brain"). The stomach under the heart on the left, the kidneys low
+	# against the spine either side of it.
+	"stomach": {"zone": "torso", "at": Vector3(-0.08, -0.06, -0.04), "size": 0.058, "tint": "a86a5a"},
+	"left_kidney": {"zone": "torso", "at": Vector3(-0.08, -0.12, 0.06), "size": 0.042, "tint": "5e1a22"},
+	"right_kidney": {"zone": "torso", "at": Vector3(0.08, -0.13, 0.06), "size": 0.042, "tint": "5e1a22"},
 }
 
 var anatomy: AnatomyComponent
@@ -185,6 +226,25 @@ var zone_depth: Dictionary = {}
 ## it away at the door; keeping it is the whole of B10.4's "a body carries its
 ## whole history visibly". See `wound_marks.gd`.
 var wound_marks: Dictionary = {}
+## Every landed blow as one line: where, what made it, which bone it crossed,
+## which round into this body it was, and when. The marks above are what you
+## look at and are capped per zone; this is what the X-ray reads back, and it is
+## the record that survives a reload. See `scar_ledger.gd`.
+var scars: Array = []
+## Where each severed stump sits on this body, in the rig's own space so it
+## rides the torso through a knockdown, a drag or a ragdoll, and which way that
+## stump points. Captured when the limb comes off: a whole-limb sever frees the
+## part, after which `_zone_origin()` answers with the rig's feet.
+var _stump_local: Dictionary = {}
+var _stump_out: Dictionary = {}
+## The arterial clock, in beats rather than seconds, so the rate can change
+## under it (compensation, pain, the falter) without the spray jumping.
+var _beat_phase := 0.0
+## How many beats this body has thrown, which is what paces the mist: one puff
+## per beat would be a fog machine at sixty a minute.
+var _beat_index := 0
+## Beats thrown after death, counted down from `AGONAL_BEATS`.
+var _agonal_beats := AGONAL_BEATS
 ## Fractional drops owed. Bleeding runs well under one drop per frame, so the
 ## rate is accumulated and spent whole rather than rounded every frame — which
 ## would round to zero forever or to one every frame, and neither is a rate.
@@ -210,6 +270,8 @@ var build_factor := 1.0
 ## by no renderer and no system. It drives this, the same way the BUILD row was
 ## wired to `build_factor` when it had the same problem.
 var frame_factor := 0.5
+## The intake's ANATOMY answer, for the forms `BodyForms` builds.
+var anatomy_sex := "unformed"
 
 var _layout: Dictionary = {}
 var _flesh := Color("6b5842")
@@ -221,6 +283,18 @@ var _loose: Array[Dictionary] = []
 ## reads as landing in the arena instead of snapping through its own feet.
 var _knockdown_travel := 0.0
 var _knockdown_tween: Tween
+## Opt-in only. Living knockdowns keep the established authored fall; a body
+## that actually dies can hand these exact zone nodes to physics instead.
+var _ragdoll_enabled := false
+var ragdoll_body: RagdollBody
+## Job 2. The rigged skeleton this body's zones ride, when it has one
+## (`RiggedBody.attach`, or `"rigged": true` in the build config). Null keeps
+## every zone where the layout put it, exactly as before.
+var rigged: RiggedBody
+var _last_hit_direction := Vector3.ZERO
+var _last_hit_impulse := 0.0
+var _last_hit_zone := "torso"
+var _last_hit_attack_id := ""
 ## O2.7 v4. Greg: *"gore and chunk physics still run at full speed through a
 ## hit, so a limb can leave a body that has not moved yet"*. Exactly right, and
 ## it is the most visible hole left in the hitstop work — the whole effect is
@@ -243,6 +317,7 @@ static func canonical_zone(zone_id: String) -> String:
 
 func build(id: String, config: Dictionary = {}) -> void:
 	subject_id = id
+	_warm_gore_materials()
 	# Default to the world's gore setting rather than to true. Every rig used to
 	# be born with gore on and every caller had to remember to turn it off - and
 	# one of them did not, which is how the Hunt Grounds shipped ignoring the
@@ -255,10 +330,12 @@ func build(id: String, config: Dictionary = {}) -> void:
 	gore = bool(config.get("gore", apply_gore_setting()))
 	_seated = bool(config.get("seated", false))
 	_knockdown_travel = maxf(0.0, float(config.get("knockdown_travel", 0.0)))
+	_ragdoll_enabled = bool(config.get("ragdoll", false))
 	_flesh = config.get("flesh", Color("6b5842")) as Color
 	_variation = int(config.get("variation", 0))
 	build_factor = clampf(float(config.get("build", 1.0)), 0.7, 1.4)
 	frame_factor = clampf(float(config.get("frame", 0.5)), 0.0, 1.0)
+	anatomy_sex = str(config.get("anatomy_sex", "unformed"))
 	var layout := _scaled_layout(SEATED if _seated else STANDING)
 	_layout = layout
 
@@ -305,6 +382,7 @@ func build(id: String, config: Dictionary = {}) -> void:
 	anatomy.configure(id, float(config.get("blood", 5000.0)), config.get("cybernetics", {}))
 	anatomy.organ_ruptured.connect(_on_organ_ruptured)
 	anatomy.went_down.connect(_on_went_down)
+	anatomy.died.connect(_on_died)
 	# Initial prosthetics must read on the mesh before the body is wounded.
 	for zone_id in ZONES:
 		_refresh_zone(zone_id)
@@ -323,6 +401,7 @@ func build(id: String, config: Dictionary = {}) -> void:
 		# opened to, so restoring the marks first would draw every old graze
 		# claiming to show bone.
 		wound_marks = WoundMarks.from_records(restored.get("wound_marks", {}), ZONES)
+		scars = ScarLedger.from_records(restored.get("scars", []))
 		# A limb that is not there has no health to have. Ordinary saves already
 		# wrote zero here because `_sever_zone` zeroes it, but a body restored
 		# from scars alone has no saved zone numbers at all — and a missing arm
@@ -333,6 +412,9 @@ func build(id: String, config: Dictionary = {}) -> void:
 			if not stump.is_empty():
 				stump["health"] = 0.0
 				anatomy.zones[zone_id] = stump
+			# A restored body has to keep spurting from the same places, or a
+			# load would leave an open stump that bleeds invisibly.
+			_record_stump(zone_id)
 		if anatomy.downed:
 			rotation.x = -PI * 0.46
 		for zone_id in ZONES:
@@ -341,6 +423,10 @@ func build(id: String, config: Dictionary = {}) -> void:
 		for organ_id in organ_parts:
 			if not anatomy.organ_ok(organ_id):
 				_hide_organ(str(organ_id))
+	# A body nobody has dressed is naked: its forms, and their censor.
+	BodyForms.refresh(self)
+	if bool(config.get("rigged", false)) and not _seated:
+		RiggedBody.attach(self)
 
 
 ## The old torso ended at a vertical wall and the arm began as another separate
@@ -451,12 +537,10 @@ func _build_organs() -> void:
 			continue
 		var organ := MeshInstance3D.new()
 		organ.name = "organ_%s" % organ_id
-		var mesh := SphereMesh.new()
-		# Organs are inside a body, so they are the size that body is.
-		mesh.radius = float(spec.size) * build_factor
-		mesh.height = mesh.radius * (2.6 if organ_id == "spine" else 2.0)
-		mesh.material = WorldLook.surface(Color(str(spec.tint)), "bone" if organ_id == "spine" else "flesh", _variation + ORGAN_LAYOUT.keys().find(organ_id))
-		organ.mesh = mesh
+		# Organs are inside a body, so they are the size that body is. Shaped
+		# and wet (`OrganMeshes`), with the material on the surface as before.
+		organ.mesh = OrganMeshes.mesh_for(str(organ_id), float(spec.size) * build_factor, Color(str(spec.tint)), _variation + ORGAN_LAYOUT.keys().find(organ_id))
+		organ.set_meta("radius", float(spec.size) * build_factor)
 		organ.position = (spec.at as Vector3) * build_factor
 		organ.visible = false
 		host.add_child(organ)
@@ -511,11 +595,16 @@ func _build_bones(layout: Dictionary) -> void:
 				# They stay legible as a continuous column at normal camera distance.
 				for index in SPINE_VERTEBRAE:
 					var fraction := float(index) / float(SPINE_VERTEBRAE - 1)
-					var vertebra := _bone_piece(frame, BodyMesh.vertebra(), Vector3(0, lerpf(length * 0.43, -length * 0.43, fraction), -0.072))
+					# Behind the organs: front is -Z (lab-48 turned this round).
+					var vertebra := _bone_piece(frame, BodyMesh.vertebra(), Vector3(0, lerpf(length * 0.43, -length * 0.43, fraction), 0.072))
 					vertebra.set_meta("vertebra", index + 1)
 				for index in 5:
-					var rib := _bone_piece(frame, BodyMesh.arc_tube(0.148, 0.098, 0.011, PI * 0.12, PI * 0.88), Vector3(0, length * 0.30 - index * 0.052, -0.012))
-					rib.rotation.x = 0.14
+					# The arc bulges toward -Z, the chest, and opens at the spine.
+					var rib := _bone_piece(frame, BodyMesh.arc_tube(0.148, 0.098, 0.011, PI * 0.12, PI * 0.88), Vector3(0, length * 0.30 - index * 0.052, 0.012))
+					rib.rotation = Vector3(0.14, PI, 0.0)
+					# Numbered like the vertebrae, so the X-ray reticle can name the
+					# rib the aim line actually crosses rather than "a rib".
+					rib.set_meta("rib", index + 1)
 			_:
 				_bone_piece(frame, BodyMesh.long_bone(length * 0.92, 0.019), Vector3.ZERO)
 
@@ -544,6 +633,10 @@ func reveal_organs(revealed: bool) -> void:
 		var part := parts[zone_id] as MeshInstance3D
 		if part != null and is_instance_valid(part) and not severed.has(zone_id):
 			part.transparency = 0.62 if revealed else 0.0
+			# AN6.7. What has already been done to this body, drawn where it was
+			# done. An empty list is what takes it away, so letting go of the sweep
+			# leaves no debug drawing on a corpse.
+			RoundTrails.refresh(part, wound_marks.get(zone_id, []) as Array if revealed else [])
 
 
 ## B3.4. Seeing into a body is not worth much if the shed in front of it still
@@ -568,16 +661,22 @@ func _set_depth_override(piece: MeshInstance3D, enabled: bool) -> void:
 	if material == null and piece.mesh is PrimitiveMesh:
 		# Organs carry their material on the mesh rather than as an override.
 		material = (piece.mesh as PrimitiveMesh).material as StandardMaterial3D
+	elif material == null and piece.mesh != null and piece.mesh.get_surface_count() > 0:
+		material = piece.mesh.surface_get_material(0) as StandardMaterial3D
 	if material == null:
 		return
 	material.no_depth_test = enabled
 	material.render_priority = 4 if enabled else 0
 
 
-func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt", organ_id := "", hit_direction := Vector3.ZERO, joint_alignment := 1.0, cut_point: Variant = null, cut_plane: Variant = null) -> Dictionary:
+func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt", organ_id := "", hit_direction := Vector3.ZERO, joint_alignment := 1.0, cut_point: Variant = null, cut_plane: Variant = null, attack_id := "") -> Dictionary:
 	var zone := canonical_zone(zone_id)
 	if severed.has(zone) and not anatomy.installed_parts.has(zone):
 		return {"accepted": false, "reason": "severed", "zone": zone, "severed": false}
+	_last_hit_zone = zone
+	_last_hit_direction = _resolved_hit_direction(zone, hit_direction)
+	_last_hit_impulse = maxf(impulse, 0.0)
+	_last_hit_attack_id = attack_id.strip_edges().to_lower()
 	var penetrates := damage_type in ["cut", "puncture", "ballistic", "shear"]
 	if penetrates and organ_id.is_empty():
 		organ_id = _organ_in_zone(zone)
@@ -585,7 +684,23 @@ func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt",
 	# for every rig that was never dressed — the audit that proves it is
 	# `clothing_shell_test`'s "naked is unchanged" plus the untouched suites.
 	var cloth := ClothingShell.resolve_hit(wardrobe, zone, damage, damage_type)
-	var result := anatomy.apply_hit(zone, damage - float(cloth.absorbed), impulse, damage_type, organ_id)
+	var result: Dictionary
+	if anatomy.dead and _ragdoll_enabled and ragdoll_body != null:
+		# A corpse still owns its anatomy. Cutting it must continue to address the
+		# real zone rather than a disposable physics duplicate.
+		var corpse_zone: Dictionary = anatomy.zones.get(zone, {})
+		var corpse_damage := maxf(0.0, damage - float(cloth.absorbed))
+		if not corpse_zone.is_empty():
+			corpse_zone["health"] = maxf(0.0, float(corpse_zone.get("health", 0.0)) - corpse_damage)
+			anatomy.zones[zone] = corpse_zone
+		result = {
+			"accepted": true,
+			"zone": zone,
+			"damage": corpse_damage,
+			"disabled": zone_health(zone) <= 0.0,
+		}
+	else:
+		result = anatomy.apply_hit(zone, damage - float(cloth.absorbed), impulse, damage_type, organ_id)
 	result["cloth_absorbed"] = float(cloth.absorbed)
 	result["cloth_breached"] = bool(cloth.breached)
 	result["cloth_integrity"] = float(cloth.integrity)
@@ -595,7 +710,7 @@ func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt",
 		# soaking is the stain a fight leaves, not the fight itself.
 		ClothingShell.stain(self, zone, damage * 0.005)
 		_dress_zone(zone, (_layout.get(zone, {}) as Dictionary).get("size", Vector3.ONE))
-	var direction := _resolved_hit_direction(zone, hit_direction)
+	var direction := _last_hit_direction
 	var did_sever := _accumulate_sever_stress(zone, float(result.get("damage", 0.0)), damage_type, direction, joint_alignment)
 	if did_sever:
 		_sever_zone(zone, direction, result, cut_point, cut_plane)
@@ -648,6 +763,9 @@ func _sever_zone(zone: String, direction: Vector3, result: Dictionary, cut_point
 		zone_state["health"] = 0.0
 		anatomy.zones[zone] = zone_state
 	severed.append(zone)
+	# Before the part goes: once a whole limb is thrown there is no node left to
+	# ask where the shoulder was.
+	_record_stump(zone)
 	result["disabled"] = true
 	result["severed"] = true
 	result["sever_direction"] = direction
@@ -717,7 +835,7 @@ func mark_opened(zone_id: String, layer: int) -> int:
 ## and never read by anything. Left at -1 it is derived from the damage type, so
 ## every existing caller keeps working and a caller that knows what it fired
 ## gets a wound that reflects it.
-func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type := "blunt", hit_direction := Vector3.ZERO, penetration := -1.0, cut_plane: Variant = null) -> Dictionary:
+func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type := "blunt", hit_direction := Vector3.ZERO, penetration := -1.0, cut_plane: Variant = null, attack_id := "") -> Dictionary:
 	var zone := zone_nearest(global_point)
 	# Kept before `hit()` resolves, because `hit()` may sever the limb and the
 	# point has to be recorded against the limb that was actually struck.
@@ -734,7 +852,7 @@ func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type :=
 	# so a range or a HUD is told stopped/grazed/lodged/through instead of
 	# inferring it from the size of a capped wound-mark array. Neither is
 	# optional and neither conflicts with the other.
-	var result := hit(zone, damage, impulse, damage_type, organ_id, hit_direction, _joint_alignment_at(zone, global_point), global_point, cut_plane)
+	var result := hit(zone, damage, impulse, damage_type, organ_id, hit_direction, _joint_alignment_at(zone, global_point), global_point, cut_plane, attack_id)
 	if not penetration_report.is_empty():
 		result["penetration"] = penetration_report
 	return result
@@ -856,10 +974,34 @@ func _on_went_down() -> void:
 	forward = forward.normalized()
 	var landed := position + forward * _knockdown_travel
 	_knockdown_tween = create_tween().set_parallel(true)
-	_knockdown_tween.tween_property(self, "rotation:x", -PI * 0.46, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_knockdown_tween.tween_property(self, "rotation:x", -PI * 0.46, KNOCKDOWN_SECONDS).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	if _knockdown_travel > 0.0:
-		_knockdown_tween.tween_property(self, "position", landed, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		_knockdown_tween.tween_property(self, "position", landed, KNOCKDOWN_SECONDS).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		# AN6.8. A knockdown is a player's blow putting a body down, and it
+		# travels: a bleeding body carried that far across a floor marks it,
+		# the same as one dragged by hand. Sampled through the one sampler in
+		# the smear system, for the length of this fall.
+		BloodSmear.follow_while(get_tree().current_scene if is_inside_tree() else null, self, self, KNOCKDOWN_SECONDS)
 	went_down.emit()
+
+
+func _on_died(_report: Dictionary) -> void:
+	if ragdoll_body != null or not is_inside_tree():
+		return
+	if not _ragdoll_enabled:
+		_on_went_down()
+		return
+	# A rigged body falls on its own skeleton: same zones, same wounds, joints
+	# that hold (Job 2).
+	if rigged != null and is_instance_valid(rigged):
+		rigged.die(_last_hit_zone, _last_hit_impulse, _last_hit_direction, _last_hit_attack_id)
+		return
+	var holder := get_parent()
+	if holder == null:
+		return
+	ragdoll_body = RagdollBody.new()
+	holder.add_child(ragdoll_body)
+	ragdoll_body.activate(self, _last_hit_zone, _last_hit_impulse, _last_hit_direction, _last_hit_attack_id)
 
 
 ## B2.7v2. This uses the anatomy's shared posture answer, rather than making
@@ -916,6 +1058,7 @@ func behead() -> void:
 		head["health"] = 0.0
 		anatomy.zones["head"] = head
 	severed.append("head")
+	_record_stump("head")
 	if gore:
 		_shed_chunks("head", 90.0, "shear", "brain")
 	if gore:
@@ -993,7 +1136,7 @@ func _spill_organ(organ_id: String) -> void:
 
 	var shape_node := CollisionShape3D.new()
 	var shape := SphereShape3D.new()
-	shape.radius = maxf(0.03, (organ.mesh as SphereMesh).radius)
+	shape.radius = maxf(0.03, float(organ.get_meta("radius", 0.05)))
 	shape_node.shape = shape
 	body.add_child(shape_node)
 
@@ -1046,6 +1189,7 @@ func snapshot() -> Dictionary:
 	# limb's own space, drawn where it landed — existed only for as long as the
 	# rig did, so every load rebuilt an unmarked body carrying a damage number.
 	state["wound_marks"] = WoundMarks.to_records(wound_marks)
+	state["scars"] = ScarLedger.to_records(scars)
 	return state
 
 
@@ -1053,7 +1197,7 @@ func snapshot() -> Dictionary:
 ## whitelist rather than a list of things to strip, so a new statistic added to
 ## `AnatomyComponent.snapshot()` does not silently start surviving restarts
 ## because nobody remembered to add it to a denylist.
-const SCAR_KEYS := ["wound_marks", "zone_depth", "severed", "cybernetics"]
+const SCAR_KEYS := ["wound_marks", "scars", "zone_depth", "severed", "cybernetics"]
 
 
 ## What a body carries across a quantum restart, as opposed to across a load.
@@ -1110,14 +1254,22 @@ static func config_from_subject(record: Dictionary) -> Dictionary:
 	# displayed a size setting but the player rig ignored it completely.
 	var selected_build := clampf(float(appearance.get("build", 0.5)), 0.0, 1.0)
 	var combined_build := clampf(float(race.get("build", 1.0)) * lerpf(0.86, 1.18, selected_build), 0.7, 1.4)
+	# Face drives the rig's procedural variation, so two players with
+	# different faces are not the same generated head -- except when the face
+	# has named axes. Then the axes shape the skull themselves, and a skin
+	# re-rolled from their combined scalar made every slider repaint the whole
+	# face (Greg, 2026-09-24: "each slider is changing the entire thing"). The
+	# skin then follows who the person is, and holds still while you edit.
+	var variation := 1 + int(clampf(float(appearance.get("face", 0.5)), 0.0, 1.0) * 24.0)
+	if appearance.get("axes") is Dictionary and not (appearance.axes as Dictionary).is_empty():
+		variation = 1 + posmod(hash(str(appearance.get("name", "THE HUNTER"))), 24)
 	var config := {
-		# Face drives the rig's procedural variation, so two players with
-		# different faces are not the same generated head.
-		"variation": 1 + int(clampf(float(appearance.get("face", 0.5)), 0.0, 1.0) * 24.0),
+		"variation": variation,
 		"flesh": Color("7a6350").darkened(wear * 0.35),
 		"blood": blood_volume(str(sheet_anatomy.get("blood_type", "O-RUST"))),
 		"build": combined_build,
 		"frame": frame_from_anatomy_sex(str(record.get("anatomy_sex", "unformed"))),
+		"anatomy_sex": str(record.get("anatomy_sex", "unformed")),
 		"cybernetics": grown_cybernetics(sheet_anatomy),
 	}
 	if record.get("anatomy_state") is Dictionary:
@@ -1237,6 +1389,9 @@ func dress(wardrobe_: Dictionary) -> void:
 	wardrobe = wardrobe_
 	for zone_id in ZONES:
 		_dress_zone(zone_id, (_layout.get(zone_id, {}) as Dictionary).get("size", Vector3.ONE))
+	# What the clothes no longer cover shows, under the censor unless the
+	# player turned it off (Greg, 24 September).
+	BodyForms.refresh(self)
 
 
 ## The garment over a zone, if it has one. A shell child of the part itself so
@@ -1250,6 +1405,10 @@ func _dress_zone(zone_id: String, size: Vector3) -> void:
 		return
 	var integrity := float(wardrobe.get(zone_id, 0.0))
 	var old := part.get_node_or_null("Garment") as MeshInstance3D
+	# A zone can be covered without a shell over it: a cap protects the head
+	# while its own geometry, not a sleeve over the face, is what shows.
+	if zone_id in wardrobe.get("no_shell", []):
+		integrity = 0.0
 	if integrity <= 0.0:
 		if old != null and is_instance_valid(old):
 			part.remove_child(old)
@@ -1261,17 +1420,40 @@ func _dress_zone(zone_id: String, size: Vector3) -> void:
 	var length := size.z if _leg_points_forward(zone_id) else size.y
 	if old != null and is_instance_valid(old):
 		old.mesh = ClothingShell.shell_mesh(zone_id, length * 0.5)
-		old.material_override = ClothingShell.shell_material(integrity, ClothingShell.soak_of(self, zone_id), str(wardrobe.get("style", "plain")), zone_id)
+		old.material_override = _garment_material(zone_id, integrity)
 		return
 	var shell := MeshInstance3D.new()
 	shell.name = "Garment"
 	shell.mesh = ClothingShell.shell_mesh(zone_id, length * 0.5)
-	shell.material_override = ClothingShell.shell_material(integrity, ClothingShell.soak_of(self, zone_id), str(wardrobe.get("style", "plain")), zone_id)
+	shell.material_override = _garment_material(zone_id, integrity)
 	part.add_child(shell)
 
 
+## The cloth on one zone. A wardrobe built from worn parts (`Outfit`) names a
+## style per zone and may carry a skin for it; an older whole-body wardrobe
+## has one "style" for everything, and still works unchanged.
+func _garment_material(zone_id: String, integrity: float) -> Material:
+	var skins: Dictionary = wardrobe.get("skins", {})
+	if skins.has(zone_id):
+		return WeaponSkins.material_for(skins[zone_id])
+	var style := str((wardrobe.get("styles", {}) as Dictionary).get(zone_id, wardrobe.get("style", "plain")))
+	return ClothingShell.shell_material(integrity, ClothingShell.soak_of(self, zone_id), style, zone_id)
+
+
 func _zone_material(zone_id: String, tint: Color, kind := "flesh") -> StandardMaterial3D:
-	var material := WorldLook.surface(tint, kind, _variation + ZONES.find(zone_id))
+	# Greg's 30 Sep playtest (7 fps): the tint moves with every blow (bruised,
+	# then opened), so asking WorldLook for it generated a fresh grain pair
+	# (10 ms) on nearly every hit, several zones at a time. The grain is the
+	# body's own flesh, built once; the damage colour is an exact per-channel
+	# tint over it, so a flesh-coloured texel shows the damage colour itself.
+	var base := _flesh if kind == "flesh" else tint
+	var material := WorldLook.surface(base, kind, _variation + ZONES.find(zone_id))
+	var drift := material.albedo_color
+	material.albedo_color = Color(
+		drift.r * clampf(tint.r / maxf(base.r, 0.01), 0.02, 3.0),
+		drift.g * clampf(tint.g / maxf(base.g, 0.01), 0.02, 3.0),
+		drift.b * clampf(tint.b / maxf(base.b, 0.01), 0.02, 3.0),
+		drift.a)
 	# Generated surfaces are open where a limb has been taken off, and the
 	# insides are supposed to be visible when they are.
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
@@ -1397,7 +1579,7 @@ func _gore_root() -> Node:
 	return scene if scene != null else self
 
 
-func _spray(origin: Vector3, bias: Vector3, count: int) -> void:
+func _spray(origin: Vector3, bias: Vector3, count: int, speed := Vector2(1.9, 5.5)) -> void:
 	var root := _gore_root()
 	for index in maxi(1, roundi(count * detail)):
 		if live_gore >= live_gore_budget():
@@ -1411,7 +1593,7 @@ func _spray(origin: Vector3, bias: Vector3, count: int) -> void:
 		root.add_child(drop)
 		drop.global_position = origin + Vector3(randf_range(-0.09, 0.09), randf_range(-0.09, 0.09), randf_range(-0.09, 0.09))
 		var spread := (bias.normalized() + Vector3(randf_range(-0.75, 0.75), randf_range(0.05, 0.7), randf_range(-0.75, 0.75))).normalized()
-		_loose.append({"node": drop, "velocity": spread * (1.9 + randf() * 3.6), "life": 1.3 + randf() * 1.0, "splat": true, "size": blob.radius})
+		_loose.append({"node": drop, "velocity": spread * randf_range(speed.x, speed.y), "life": 1.3 + randf() * 1.0, "splat": true, "size": blob.radius})
 		live_gore += 1
 
 
@@ -1430,7 +1612,9 @@ func _spill_guts() -> void:
 		var blob := SphereMesh.new()
 		blob.radius = 0.075 + randf() * 0.07
 		blob.height = blob.radius * 2.0 * (1.2 + randf() * 0.9)
-		blob.material = WorldLook.surface(ORGAN.lerp(BLOOD_DARK, randf()), "flesh", index + _variation + 9)
+		# Four shades, not a random colour: a random one missed WorldLook's
+		# cache every time (a 10 ms texture pair per blob).
+		blob.material = WorldLook.surface(ORGAN.lerp(BLOOD_DARK, float(randi() % ORGAN_SHADES) / float(ORGAN_SHADES - 1)), "flesh", index + _variation + 9)
 		organ.mesh = blob
 		root.add_child(organ)
 		organ.global_position = origin + Vector3(randf_range(-0.12, 0.12), randf_range(-0.1, 0.1), randf_range(-0.12, 0.12))
@@ -1483,6 +1667,101 @@ func _bleed(delta: float) -> void:
 		_drip_owed -= 1.0
 		_drip_one(sites[randi() % sites.size()])
 	_refresh_streaks(sites)
+
+
+## Where a severed stump sits on this body, kept in the rig's own space so it
+## rides the torso through a knockdown, a drag or a ragdoll. Captured when the
+## limb comes off, because a whole-limb sever frees the part and `_zone_origin()`
+## would then answer with the rig's own feet.
+func _record_stump(zone: String) -> void:
+	var part := parts.get(zone) as Node3D
+	var at: Vector3
+	if part != null and is_instance_valid(part) and part.is_inside_tree():
+		at = part.global_position
+	else:
+		var layout: Dictionary = _layout if not _layout.is_empty() else (SEATED if _seated else STANDING)
+		var spec: Dictionary = layout.get(zone, {})
+		at = to_global(spec.get("at", Vector3.ZERO) as Vector3)
+	_stump_local[zone] = to_local(at)
+	# Away from the body's own centre line, so an arm throws out to the side and
+	# a leg throws down and forward rather than every stump throwing straight up.
+	var outward := at - global_position
+	outward.y = 0.0
+	# A head or a shoulder sits on the centre line, so its outward is degenerate
+	# and the neck it was cut through points at the sky.
+	var flat := outward.normalized() if outward.length_squared() > 0.0001 else Vector3.UP
+	_stump_out[zone] = (global_transform.basis.inverse() * flat).normalized()
+
+
+## The arterial clock.
+##
+## One heart, so one clock for every stump a body has open: an arm and a leg
+## both gone spurt from both on the same beat, because there is only one
+## ventricle behind them. The rate is not invented here either — it is
+## `anatomy.pulse_bpm()`, the number the medical monitor prints, so a body
+## bleeding while it compensates spurts faster, a body faltering spurts slow and
+## heavy, and a body whose heart has stopped does not spurt at all.
+##
+## This does not change what the body loses. That is still `bleed_rate`, which
+## `_sever_zone()` already raised when the limb came off; this decides the shape
+## the leaving blood takes.
+func _arterial_beats(delta: float) -> void:
+	if not gore or anatomy == null or _stump_local.is_empty():
+		return
+	var bpm := anatomy.pulse_bpm()
+	if bpm <= 0:
+		# The heart has stopped, so nothing is thrown. The clock parks rather
+		# than winding up, so a heart that starts again beats a whole beat
+		# before it throws instead of firing the moment it returns.
+		_beat_phase = 0.0
+		return
+	if anatomy.dead:
+		# Death stops the pump, but not in the same frame. The last few beats
+		# come slower and weaker, and then nothing: the neck of a beheaded body
+		# is the one stump in the game whose last beat is expected.
+		if _agonal_beats <= 0:
+			_beat_phase = 0.0
+			return
+		bpm = maxi(20, bpm / 2)
+	_beat_phase += float(bpm) * delta / 60.0
+	if _beat_phase < 1.0:
+		return
+	# At most one spurt per frame: a hitch must not unload three beats of blood
+	# into one picture, and the gore budget is spent per beat either way.
+	_beat_phase = minf(_beat_phase - 1.0, 0.999)
+	_beat_index += 1
+	if anatomy.dead:
+		_agonal_beats -= 1
+	for zone in _stump_local.keys():
+		_spurt_stump(str(zone))
+
+
+## One beat, out of one stump.
+func _spurt_stump(zone: String) -> void:
+	# A dressed stump is a closed artery: the heart is still beating, and the
+	# hole it used to throw through is not open any more.
+	if anatomy.is_treated(zone):
+		return
+	if live_gore >= live_gore_budget():
+		return
+	var at: Vector3 = to_global(_stump_local[zone] as Vector3)
+	var outward: Vector3 = global_transform.basis * (_stump_out.get(zone, Vector3.UP) as Vector3)
+	var volume := clampf(anatomy.blood_remaining / maxf(1.0, anatomy.blood_capacity), 0.0, 1.0)
+	var jet := BloodFlow.spurt_velocity(outward, volume)
+	var speed := jet.length()
+	# Drops, down the same `_loose` ballistics as every other piece of gore, so
+	# they land on whatever is under the stump and stain it through `_splat()`
+	# and `BloodPool` rather than through a second falling-blood path.
+	_spray(at, jet, BloodFlow.spurt_drops(volume), Vector2(speed * 0.82, speed * 1.14))
+	# The fine end of the jet. Every few beats, not every beat: one puff a second
+	# beside one wound is a wound, and a puff per beat is a smoke machine. Same
+	# budget and same materials as every other mist, so a stump does not
+	# introduce a second kind of blood.
+	if _beat_index % BloodFlow.SPURT_MIST_EVERY == 0:
+		var root := _gore_root()
+		if root != null:
+			BloodSmear.throw_mist(root, at, jet, 0.45 + 0.55 * volume)
+	arterial_beat.emit(zone, at, jet)
 
 
 ## The body process is called for every standing person.  Keep an intact body
@@ -1589,6 +1868,11 @@ func _refresh_streaks(sites: Array) -> void:
 ## Rough penetration for a hit whose caller did not say what it fired. These are
 ## the same order as `Ballistics.CALIBRES`: a blade barely crosses tissue, a
 ## rifle round crosses a body.
+## AN6.8. Damage at which a hit throws a mist of blood rather than only marking
+## the body. Below this the wound bleeds onto the skin; above it, the hit is
+## heavy enough to put blood in the air, which `BloodSmear` budgets and counts.
+const MIST_DAMAGE := 45.0
+
 const TYPE_PENETRATION := {
 	"ballistic": 0.35,
 	"shear": 0.50,
@@ -1638,6 +1922,10 @@ func _record_wound(zone_id: String, global_point: Vector3, travel: Vector3, dama
 	var wound: Dictionary = WoundMarks.make(surface["at"], surface["normal"], damage, damage_type, layer, local_travel)
 	wound["depth"] = shot["fraction"]
 	wound["through"] = shot["through"]
+	# AN6.7. How much body the round crossed, so the X-ray trail can be the length
+	# of the path later without asking `Penetration` a second time from a point
+	# on a limb that may by then be somewhere else entirely.
+	wound["thickness"] = float(shot["thickness"])
 	# Keep the identity of what lay behind this exact opening. The wound can then
 	# show the body's real organ mesh while it is present, and the same window
 	# empties when that organ ruptures and becomes a loose physics body.
@@ -1647,6 +1935,10 @@ func _record_wound(zone_id: String, global_point: Vector3, travel: Vector3, dama
 	# A hole that nearly went through looks nearly like one that did.
 	wound["radius"] = float(wound["radius"]) * lerpf(0.62, 1.0, float(shot["fraction"]))
 	wound_marks[zone] = WoundMarks.record(wound_marks.get(zone, []) as Array, wound)
+	# One scar per landed blow, written where the hit is still in hand: the point,
+	# the type, the depth and whether it crossed a bone are all already decided
+	# above, and the hour is the only thing this adds.
+	scars = ScarLedger.record(scars, zone, wound, WorldClock.minutes())
 
 	# --- and out the other side ------------------------------------------
 	if bool(shot["through"]):
@@ -1659,6 +1951,12 @@ func _record_wound(zone_id: String, global_point: Vector3, travel: Vector3, dama
 		wound_marks[zone] = WoundMarks.record(wound_marks.get(zone, []) as Array, exit_wound)
 
 	_refresh_wounds(zone)
+	# AN6.8. Heavy damage puts blood in the air. Routed through the smear system
+	# so the mist is drawn and capped in one place instead of by every caller.
+	if damage >= MIST_DAMAGE:
+		var scene_root := get_tree().current_scene
+		if scene_root != null:
+			BloodSmear.throw_mist(scene_root, global_point, travel, clampf(damage / MIST_DAMAGE, 0.5, 3.0))
 	return shot
 
 
@@ -1671,33 +1969,58 @@ func _refresh_wounds(zone_id: String) -> void:
 	if part == null or not is_instance_valid(part):
 		return
 	var holder := part.get_node_or_null("Wounds") as Node3D
-	if holder != null and is_instance_valid(holder):
-		part.remove_child(holder)
-		holder.queue_free()
 	var marks: Array = wound_marks.get(zone, [])
 	if marks.is_empty() or not gore:
+		if holder != null and is_instance_valid(holder):
+			part.remove_child(holder)
+			holder.queue_free()
 		return
-	holder = Node3D.new()
-	holder.name = "Wounds"
-	part.add_child(holder)
+	if holder == null or not is_instance_valid(holder):
+		holder = Node3D.new()
+		holder.name = "Wounds"
+		part.add_child(holder)
+	# Greg's 30 Sep playtest dropped to 7 fps: every blow threw away and
+	# rebuilt every wound on the zone (up to MAX_PER_ZONE meshes and
+	# materials, 340 ms on a busy arm with the real renderer). A wound's look
+	# depends only on itself, the layer the zone is opened to and whether an
+	# organ shows, so each built wound keeps that as its key and only new or
+	# changed wounds are built; dropped ones go.
 	var depth := int(zone_depth.get(zone, 0))
+	var built_nodes := holder.get_children()
+	var kept: Array[Node] = []
 	for wound: Dictionary in marks:
-		# A wound never shows a layer deeper than the limb has actually been
-		# opened to, so a graze recorded before a blast does not retroactively
-		# claim to show bone.
 		var shown: int = mini(int(wound.get("layer", 0)), depth)
-		var tint := Color(str(GoreChunks.LAYER_TINTS[clampi(shown, 0, GoreChunks.LAYER_TINTS.size() - 1)]))
 		var contents: Mesh = null
 		var organ_id := str(wound.get("organ_id", ""))
 		if depth >= GoreChunks.Layer.ORGAN and anatomy.organ_ok(organ_id):
 			var organ := organ_parts.get(organ_id) as MeshInstance3D
 			if organ != null and is_instance_valid(organ):
 				contents = organ.mesh
-		holder.add_child(WoundMarks.build(wound, tint, contents))
+		# The same record (not an equal one), showing the same layer and the
+		# same contents: already built, keep it.
+		var match_node: Node = null
+		for child in built_nodes:
+			if is_same(child.get_meta("wound", null), wound) and int(child.get_meta("shown", -1)) == shown and (child.get_meta("contents") if child.has_meta("contents") else null) == contents:
+				match_node = child
+				break
+		if match_node != null:
+			kept.append(match_node)
+			continue
+		var tint := Color(str(GoreChunks.LAYER_TINTS[clampi(shown, 0, GoreChunks.LAYER_TINTS.size() - 1)]))
+		var built := WoundMarks.build(wound, tint, contents)
+		built.set_meta("wound", wound)
+		built.set_meta("shown", shown)
+		# set_meta(null) removes the key, so an empty wound carries none.
+		if contents != null:
+			built.set_meta("contents", contents)
+		holder.add_child(built)
+		kept.append(built)
+	for child in built_nodes:
+		if not kept.has(child):
+			holder.remove_child(child)
+			child.queue_free()
 
 
-## Reads `zone_depth`, the same ratchet `_shed_chunks` writes, so this survives
-## healing and reattachment exactly the way the remembered depth does.
 func _update_layer_exposure(zone_id: String, prosthetic: bool) -> void:
 	var part := parts.get(zone_id) as Node3D
 	if part == null or not is_instance_valid(part):
@@ -1767,6 +2090,8 @@ func _throw_limb(zone_id: String, hit_direction := Vector3.ZERO) -> void:
 	shape_node.shape = shape
 	limb.add_child(shape_node)
 	GoreChunks.register_whole_limb(limb, zone_id, anatomy.subject_id)
+	if rigged != null and is_instance_valid(rigged):
+		rigged.skin_severed_limb(zone_id, limb, visual)
 	var launch := hit_direction.normalized() if hit_direction.length_squared() > 0.001 else Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0)).normalized()
 	limb.apply_central_impulse((launch * 2.25 + Vector3.UP * 2.1) * limb.mass)
 	limb.apply_torque_impulse(Vector3(randf_range(-3.0, 3.0), randf_range(-3.0, 3.0), randf_range(-3.0, 3.0)))
@@ -1901,6 +2226,10 @@ func _process(delta: float) -> void:
 	_apply_pain_posture(own_delta)
 	if _needs_bleed_update():
 		_bleed(own_delta)
+	# The heart beats whether or not there is a wound mark to run down: a stump
+	# is its own site and `_bleeding_sites()` never contains one.
+	if not _stump_local.is_empty():
+		_arterial_beats(own_delta)
 	if _loose.is_empty():
 		return
 	delta = own_delta
@@ -1982,10 +2311,7 @@ func _land_splat(at: Vector3, size: float, velocity := Vector3.DOWN) -> void:
 	# also feeds the pool set, which is what finally makes a body bleeding out
 	# onto one spot leave a stain that grows.
 	BloodPool.keep(root, landed, BloodPool.DROP_VOLUME)
-	while splats.size() > splat_budget():
-		var oldest: Node3D = splats.pop_front()
-		if is_instance_valid(oldest):
-			oldest.queue_free()
+	_trim_splats()
 
 
 ## Both scenes read the GORE setting through here, so the Hunt Grounds and the
@@ -2056,10 +2382,17 @@ static func mark_ground_for_chunk(world: World3D, root: Node, at: Vector3, veloc
 	root.add_child(splat)
 	splats.append(splat)
 	_remember_blood(root, splat)
+	_trim_splats()
+
+
+## `splats` is static and outlives the scene (a vat rebirth reloads it), so it
+## can hold freed marks; popping one into a typed variable was a SCRIPT ERROR
+## that aborted the trim, once per landed drop (bughunt-79-c).
+static func _trim_splats() -> void:
+	splats = splats.filter(func(splat: Variant) -> bool: return is_instance_valid(splat))
 	while splats.size() > splat_budget():
 		var oldest: Node3D = splats.pop_front()
-		if is_instance_valid(oldest):
-			oldest.queue_free()
+		oldest.queue_free()
 
 
 static func _blood_scene_key(root: Node) -> String:

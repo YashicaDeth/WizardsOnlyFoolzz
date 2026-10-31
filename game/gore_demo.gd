@@ -70,6 +70,8 @@ const BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
 # The range exists to show what the gore systems do, and had none of the ones
 # built since. Greg: *"make the gore sandbox have all the main game changes"*.
 const SKULL_BURST := preload("res://systems/skull_burst.gd")
+const XrayCursor := preload("res://systems/xray_cursor.gd")
+const MedicalMonitor := preload("res://systems/medical_monitor.gd")
 const CAVITY := preload("res://systems/cavity.gd")
 const KILL_SHOT := preload("res://systems/kill_shot.gd")
 const KILL_CAM := preload("res://systems/kill_cam.gd")
@@ -152,6 +154,7 @@ var bodies: Array = []
 var ballistics: Node3D
 var impact_feel: Node
 var hud: Control
+var reticle: AlgizReticle
 var kill_cam: KillCam
 var field_hud: Control
 var living_map: Control
@@ -170,6 +173,76 @@ var guard_aim := Vector2.ZERO
 var guard_held := 0.0
 var swing_released_side := ""
 var third_person := false
+## The body and the shoulder camera V actually moves to (Greg, 30 September).
+var avatar: SandboxAvatar
+## Third person swings come from the keys, not the mouse (the mouse is the
+## camera there): the side being fed to the arm and how long is left of it.
+var _tp_swing_side := ""
+var _tp_swing_left := 0.0
+var _tp_chain := 0
+## Codex's roll and third-person sword attacks (DESIGN/CODEX_BRIEF_SOULS_MELEE).
+var roll := SoulsRoll.new()
+var moveset := SwordMoveset.new()
+## Bodies this attack has already cut, so one sweep lands once per body.
+var _moveset_struck: Array = []
+## The one body fighting you when enemies are on; -1 for none.
+var duelist := -1
+## J switches: a duel (one at a time, the rest wait) or the pack (all at once,
+## spread out).
+var duel_mode := true
+## One hand or two (Y / triangle), fed to the moveset.
+var stance := "one_hand"
+## Souls guard over the shoulder: what a block costs, and how far round the
+## front it covers (cosine of the half-angle).
+const GUARD_BLOCK_STAMINA := 22.0
+const GUARD_FRONT := 0.2
+## You, hit: your own poise and shove, and the stun that follows a hit.
+var player_poise := Knockback.new()
+var player_stun := 0.0
+const PLAYER_HIT_STUN := 0.35
+const PLAYER_POISE_BREAK_STUN := 0.8
+## The PS4 pad (SoulsPad), Bloodborne / Dark Souls 3 layout.
+var pad: SoulsPad
+## Over the shoulder the walk is a jog; Shift or O held sprints (Souls).
+const JOG_SPEED := 4.2
+const SPRINT_SPEED := 7.0
+const SPRINT_STAMINA_PER_SECOND := 14.0
+## Real seconds the left button has been held for a third-person blade;
+## -1 when not held. Holding past HEAVY_HOLD is the heavy.
+var _blade_held := -1.0
+const HEAVY_HOLD := 0.35
+## How much of the weapon's own damage each attack carries.
+## Knockback is tuned (Knockback.SHOVE_PER_IMPULSE) for an impulse near 10:
+## a light shoves 0.25 m, a heavy 0.9 m, a running blow 0.6 m, three lights
+## break poise. The cleaver's impulse is 28, so blows are scaled onto that.
+const KNOCKBACK_PER_IMPULSE := 10.0 / 28.0
+## A broken poise adds this much shove and the strongest stagger, and the
+## body's next strike is pushed back: the opening to follow up.
+const POISE_BREAK_SHOVE := 0.45
+## The duel (Greg, 30 September): one fights, the rest wait in a ring.
+const WAIT_RADIUS := 5.0
+const WAIT_SPEED := 1.4
+## Radians a second the waiting ring drifts round you.
+const WAIT_DRIFT := 0.12
+## How close two standing bodies may get, centre to centre.
+const BODY_SPACING := 1.0
+## Pack mode: everyone comes, but no two closer than this, so they surround
+## you from their own sides instead of piling onto one spot.
+const PACK_SPACING := 2.0
+## The body's share of a swing: how much of the arc the hips turn through,
+## how far an overhead leans, and what share of the reach the live frames step.
+const SWING_TWIST := 0.5
+const SWING_LEAN := 0.16
+const SWING_STEP := 0.12
+const SEPARATION_PASSES := 3
+## The attacker's rhythm: the ring it circles on, how fast it strafes and
+## closes, and how much of its cadence is left when it steps in.
+const CIRCLE_RADIUS := 2.8
+const CIRCLE_SPEED := 2.2
+const STRAFE_SPEED := 1.5
+const PRESS_SPEED := 3.2
+const PRESS_AT := 0.4
+const MOVESET_WEIGHT := {"light_1": 1.0, "light_2": 1.0, "light_3": 1.25, "heavy": 1.7, "running_attack": 1.3, "roll_attack": 1.1}
 var last_read: Dictionary = {}
 var pending_melee: Dictionary = {}
 var melee_windup := -1.0
@@ -188,6 +261,9 @@ var slowed := 0.0
 ## is twelve times longer than it was asked for.
 var hitstop := 0.0
 var xray := false
+## The medical monitor: the body's own numbers, on the same key as its other
+## verbs, and only while a real body is under the reticle.
+var monitor := false
 var spent := 0
 var severed_total := 0
 var last_note := ""
@@ -197,6 +273,19 @@ var note_life := 0.0
 ## player-owned switch, not an invisible sandbox argument.
 var enemies_enabled := false
 var simulation_health := 100
+## Sparring (N cycles): how often a body swings, and how much of the weapon in
+## its hand reaches you.
+const SPAR_LEVELS := [
+	{"name": "EASY", "cadence": 1.6, "damage": 0.25},
+	{"name": "FAIR", "cadence": 1.05, "damage": 0.5},
+	{"name": "BRUTAL", "cadence": 0.7, "damage": 1.0},
+]
+## The side an armed body's blow comes in on, a pattern you can learn:
+## forehand, overhead, forehand, backhand. It leans into it as it winds up.
+const SWING_PATTERN := [BladeRead.LEFT, BladeRead.HIGH, BladeRead.LEFT, BladeRead.RIGHT]
+const FISTS := {"label": "FISTS", "damage": 8.0, "damage_type": "blunt"}
+var spar_level := 1
+var parry_spark: ParrySpark
 var mode_button: Button
 var jump_queued := false
 var vertical_velocity := 0.0
@@ -268,11 +357,21 @@ var smoke_draw_started := 0.0
 
 
 func _ready() -> void:
+	# SoulsPad owns the sandbox's pad stream (including its sticks and device
+	# de-duplication). Registering the scene prevents the global compatibility
+	# bridge from synthesizing a second mouse combat event for the same press.
+	var pad_bridge := get_node_or_null("/root/PadBridge")
+	if pad_bridge != null:
+		pad_bridge.set_combat_receiver(self)
 	# The sandbox player has the same persisted body ledger a main-game dose
 	# charges.  There is no free, sandbox-only consumption path.
 	WorldHistory.register_subject(SANDBOX_SUBJECT, {"name": "SANDBOX WITNESS", "kind": "person", "anatomy_state": {}})
 	_build_room()
 	_build_camera()
+	avatar = SandboxAvatar.new()
+	add_child(avatar)
+	avatar.build()
+	_build_pad()
 	impact_feel = IMPACT_FEEL.new()
 	add_child(impact_feel)
 	ballistics = BALLISTICS.new()
@@ -280,6 +379,8 @@ func _ready() -> void:
 	# The whole of the fix. A round decides what it did when it gets there.
 	ballistics.round_hit.connect(_on_round_hit)
 	ballistics.round_expired.connect(_on_round_expired)
+	parry_spark = ParrySpark.new()
+	add_child(parry_spark)
 	arsenal = HunterArsenal.new()
 	add_child(arsenal)
 	# The arm exists before the first swing does, same as AN1.2 in the Hunt.
@@ -462,6 +563,12 @@ func _spawn_body(index: int) -> void:
 		# grounded fall pose.  A body cannot be allowed to tunnel beneath the
 		# range floor just because it has gone down.
 		"knockdown_travel": 0.42,
+		# Greg, 30 September: a death falls as a ragdoll, along the blow
+		# (Codex's RagdollBody). Living knockdowns keep the authored tip-over.
+		"ragdoll": true,
+		# Job 2: a rigged skin on the zones, and the death ragdoll on its
+		# skeleton (joints that hold) instead of six loose boxes.
+		"rigged": true,
 		"cybernetics": {"torso": {"name": "ceramic sternum", "armor": 0.18}},
 	})
 	# Greg: *"the gore in the gore sandbox is not up to date with the gore in the
@@ -495,6 +602,13 @@ func _spawn_body(index: int) -> void:
 		"guard": BladeRead.SIDES[index % BladeRead.SIDES.size()],
 		"guard_age": 1.0,
 		"guard_hold": 1.4 + float(index % 4) * 0.4,
+		# Greg, 29 September: a weapon in a hand is a weapon. The cleaver odd
+		# bodies hold is what they strike with, and it drops when they do.
+		"weapon": "sword" if index % 2 == 1 else "",
+		"weapon_node": rig.find_child("HeldAshlineCleaver", true, false),
+		# Souls poise and shove (Codex's Knockback): blows push the body back
+		# along the blow, and enough of them break its footing.
+		"knockback": Knockback.new(),
 	})
 
 
@@ -637,6 +751,10 @@ func _fire() -> void:
 		_fire_launcher()
 		return
 	if str(arsenal.current().get("kind", "")) == "melee":
+		if third_person:
+			# Released early it is a light, held it becomes the heavy.
+			_blade_held = 0.0
+			return
 		_melee_swing()
 		return
 	var attack: Dictionary = arsenal.begin_attack()
@@ -647,7 +765,7 @@ func _fire() -> void:
 			_: _note("BUSY")
 		return
 	var along := -camera.global_transform.basis.z
-	var start := camera.global_position + along * 0.6
+	var start := _shot_origin(along, 0.6)
 	# `shot_directions()` returns one direction for a single-pellet weapon and
 	# several for a shotgun — mirrors `bone_yard_hunt.gd`'s own
 	# `_resolve_firearm()` exactly, calibre included, so the range and the Hunt
@@ -693,7 +811,7 @@ func _fire_launcher() -> void:
 	launcher_rounds -= 1
 	launcher_cooldown = 1.15
 	var along := -camera.global_transform.basis.z
-	var start := _muzzle_world(camera.global_position + along * 0.7)
+	var start := _muzzle_world(_shot_origin(along, 0.7))
 	_shot_serial += 1
 	ballistics.fire(start, along, "rocket", 0.0, 1, "demo", {
 		"source": SHOT_SOURCE,
@@ -754,9 +872,17 @@ func _feed_field_hud() -> void:
 
 
 ## Which way the player guard is held right now, from the mouse.
-func _player_guard() -> String:
+func _player_guard(incoming := "", attacker := Vector3.INF) -> String:
 	if not guarding:
 		return ""
+	# Souls, over the shoulder: a raised guard meets whatever comes at your
+	# front, whichever side; timing (the parry window) is the skill. From
+	# behind it meets nothing. First person keeps the mouse-picked side.
+	if third_person and not incoming.is_empty():
+		var front := Vector3(-sin(avatar.facing_yaw), 0.0, -cos(avatar.facing_yaw))
+		var to := attacker - eye if attacker != Vector3.INF else front
+		to.y = 0.0
+		return incoming if to.length_squared() < 0.0001 or front.dot(to.normalized()) > GUARD_FRONT else ""
 	var side := BladeRead.guard_side(guard_aim)
 	# Neutral until the mouse says otherwise, rather than snapping to whatever
 	# the first pixel of drift happened to be.
@@ -794,7 +920,17 @@ func _melee_swing() -> void:
 	if not bool(attack.get("accepted", false)):
 		return
 	_gear_recoil = 1.0
-	swing_released_side = BladeRead.swing_side(arm.velocity)
+	if third_person:
+		# Committed at release, from the keys: push picks the side, no push
+		# alternates forehand and backhand. The arm is then driven along it for
+		# the wind-up so commitment and the cut plane are real, not the mouse.
+		_tp_swing_side = _tp_side_from_keys()
+		_tp_swing_left = maxf(0.01, float(attack.get("windup", 0.12)))
+		swing_released_side = _tp_swing_side
+		if avatar.motion != null:
+			avatar.motion.trigger_attack(_tp_swing_left + 0.25, "melee")
+	else:
+		swing_released_side = BladeRead.swing_side(arm.velocity)
 	attack["released_side"] = swing_released_side
 	pending_melee = attack
 	melee_windup = maxf(0.01, float(attack.get("windup", 0.12)))
@@ -809,28 +945,46 @@ func _resolve_melee_swing() -> void:
 	melee_windup = -1.0
 	if attack.is_empty():
 		return
-	var along := -camera.global_transform.basis.z
-	var start := camera.global_position + along * 0.6
+	# Over the shoulder the blow leaves the body, at the lock or the way it
+	# faces; from the camera it would start metres behind the player.
+	var along := avatar.strike_direction(eye) if third_person else -camera.global_transform.basis.z
+	var origin := eye if third_person else camera.global_position
+	var start := origin + along * (0.3 if third_person else 0.6)
 	var reach := float(attack.get("range", 3.0))
 	var found := _trace_body(start, along)
 	var released_side := str(attack.get("released_side", ""))
-	if found.is_empty() or camera.global_position.distance_to(found.get("position", start)) > reach:
+	if found.is_empty() or origin.distance_to(found.get("position", start)) > reach:
 		# A miss carries through and has to be caught, which is why whiffing a
 		# committed swing is a real cost rather than a free probe.
 		arm.whiff()
 		_note("MISS // %s" % released_side.to_upper() if not released_side.is_empty() else "MISS")
 		return
-	var rig: BaselineHuman = found["rig"]
-	var zone: String = found["zone"]
-	var damage_type := str(attack.get("damage_type", "cut"))
-	var landed: Vector3 = found.get("position", start)
-
 	# Which way this swing is going, off the arm rather than off the camera.
 	# In first person that is read here, at contact, so the mouse is still
 	# steering and a drag lands where it was dragged to. In third person the
 	# direction was locked when it was released and the player is wearing it.
 	var contact_side := BladeRead.swing_side(arm.velocity)
 	var side := BladeRead.committed_side(released_side, contact_side, not third_person)
+	_melee_contact(attack, found, along, origin, side)
+
+
+## A blade meeting a body, whichever way it was swung: the guard read, the
+## cut, the stagger. Shared by the mouse swing and the third-person moveset.
+func _melee_contact(attack: Dictionary, found: Dictionary, along: Vector3, origin: Vector3, side: String) -> void:
+	var started := Time.get_ticks_usec()
+	_melee_contact_body(attack, found, along, origin, side)
+	last_contact_ms = (Time.get_ticks_usec() - started) / 1000.0
+
+
+## What one landed blow costs, in ms (the soak and the readout show it).
+var last_contact_ms := 0.0
+
+
+func _melee_contact_body(attack: Dictionary, found: Dictionary, along: Vector3, origin: Vector3, side: String) -> void:
+	var rig: BaselineHuman = found["rig"]
+	var zone: String = found["zone"]
+	var damage_type := str(attack.get("damage_type", "cut"))
+	var landed: Vector3 = found.get("position", origin)
 	var defender := _entry_for(rig)
 	var read: Dictionary = BladeRead.resolve(
 		str(defender.get("guard", "")), float(defender.get("guard_age", 99.0)), side, arm.head_speed())
@@ -843,9 +997,11 @@ func _resolve_melee_swing() -> void:
 		var defender_motion := defender.get("motion") as HunterBodyMotion
 		if defender_motion != null and is_instance_valid(defender_motion):
 			defender_motion.trigger_parry()
-		_note("PARRIED // %s MET %s" % [str(read.guard).to_upper(), side.to_upper()])
+		parry_spark.burst(landed - along * 0.25, camera.global_transform.basis * arm.velocity)
+		_note("PARRIED // %s MET %s" % [str(defender.get("guard", "")).to_upper(), side.to_upper()])
 		return
 	if str(read.outcome) == "block":
+		parry_spark.burst(landed - along * 0.2, camera.global_transform.basis * arm.velocity, 0.5)
 		_note("BLOCKED // %s" % side.to_upper())
 
 	# The cut lands on the plane the edge actually swept, which is what makes
@@ -854,11 +1010,12 @@ func _resolve_melee_swing() -> void:
 	var earned_damage := float(attack.get("damage", 0.0)) * lerpf(0.35, 1.35, commitment)
 	var result: Dictionary = rig.hit_at(
 		landed, earned_damage * through, float(attack.get("impulse", 0.0)) * through,
-		damage_type, along, -1.0, arm.cut_plane(camera.global_transform.basis, landed))
+		damage_type, along, -1.0, arm.cut_plane(camera.global_transform.basis, landed), str(attack.get("attack", "")))
 	if not bool(result.get("accepted", true)):
 		_note("%s ALREADY GONE" % _spoken(zone))
 		return
 	_trigger_body_hit_reaction(rig, along, zone, float(result.get("damage", attack.get("damage", 0.0))))
+	_shove(defender, rig, attack, along, through)
 	var off := bool(result.get("severed", false))
 	if off:
 		severed_total += 1
@@ -866,15 +1023,271 @@ func _resolve_melee_swing() -> void:
 	arm.strike(_melee_bite(off), -along)
 	var defender_hit := defender.get("motion") as HunterBodyMotion
 	if defender_hit != null and is_instance_valid(defender_hit):
-		defender_hit.trigger_stagger(rig.to_local(camera.global_position), 1.0 if off else 0.6)
+		defender_hit.trigger_stagger(rig.to_local(origin), 1.0 if off else 0.6)
 	_note("%s OFF // %s" % [_spoken(zone), side.to_upper()] if off else "HIT // %s // %s" % [_spoken(zone), side.to_upper()])
 	_try_finisher(rig, str(arsenal.current_id), zone, along, float(result.get("damage", 0.0)), damage_type)
+
+
+## The blow pushes the body back along it (Knockback), less through a block;
+## past its poise it breaks: the hardest stagger, a longer shove, and its next
+## strike put off. The shove itself is walked out in _update_training_bodies.
+func _shove(defender: Dictionary, rig: BaselineHuman, attack: Dictionary, along: Vector3, through: float) -> void:
+	var poise := defender.get("knockback") as Knockback
+	if poise == null or rig.anatomy.dead:
+		return
+	# The moveset's own packet (per weapon and stance) when the blow has one.
+	var packet: Variant = attack.get("packet", str(attack.get("attack", "")))
+	var report: Dictionary = poise.apply(float(attack.get("impulse", 18.0)) * KNOCKBACK_PER_IMPULSE * through, along, packet)
+	if not bool(report.get("knockdown", false)):
+		return
+	var motion := defender.get("motion") as HunterBodyMotion
+	if motion != null and is_instance_valid(motion):
+		motion.trigger_stagger(rig.to_local(rig.global_position - along), 2.0)
+	poise.apply(POISE_BREAK_SHOVE / Knockback.SHOVE_PER_IMPULSE, along, "")
+	poise.poise = Knockback.MAX_POISE
+	defender["attack_ready"] = float(SPAR_LEVELS[spar_level].cadence) * 1.5
+	_note("POISE BROKEN")
+
+
+## You, hit (Bloodborne): the blow shoves you back along it (your own
+## Knockback) and a hit stuns you for a moment, so you cannot swing or roll
+## straight back through it; a broken poise stuns longer. A block shoves less
+## and does not stun.
+func _player_struck(stats: Dictionary, from: Vector3, blocked: bool) -> void:
+	var along := eye - from
+	along.y = 0.0
+	if along.length_squared() < 0.0001:
+		return
+	# The weapon decides the shove, not the difficulty: a cleaver moves you
+	# ~0.25 m on any setting.
+	var strength := float(stats.get("impulse", 8.0)) * KNOCKBACK_PER_IMPULSE
+	var report: Dictionary = player_poise.apply(strength * (0.4 if blocked else 1.0), along.normalized(), "")
+	if blocked:
+		return
+	var broken := bool(report.get("knockdown", false))
+	player_stun = maxf(player_stun, PLAYER_POISE_BREAK_STUN if broken else PLAYER_HIT_STUN)
+	if broken:
+		player_poise.poise = Knockback.MAX_POISE
+	if avatar != null and avatar.motion != null:
+		avatar.motion.trigger_hit(along.normalized(), 1.0 if broken else 0.5)
 
 
 ## How hard the blade is stopped. Taking a limb off is barely stopped at all;
 ## meeting one that stays on is what jars the arm.
 func _melee_bite(severed: bool) -> float:
 	return 0.25 if severed else 0.75
+
+
+## Where a round leaves. From the eye this is just ahead of the lens; over
+## the shoulder the lens is metres behind the player, so the round starts past
+## the head along the same aim line instead of passing through your own back.
+func _shot_origin(along: Vector3, ahead: float) -> Vector3:
+	var from := camera.global_position
+	if avatar != null and avatar.visible:
+		ahead = maxf(ahead, along.dot(eye - from) + 0.5)
+	return from + along * ahead
+
+
+## The look delta per real second that drives the arm through each side, in
+## the mouse's own convention (x right, y down). Signs are pinned by
+## third_person_sandbox_test: fed for a wind-up, BladeRead reads the side back.
+## ponytail: one fixed push per side; Codex's SwordMoveset replaces this with
+## authored light/heavy chains (DESIGN/CODEX_BRIEF_SOULS_MELEE_2026-09-30.md).
+const TP_SWING_PUSH := {
+	"left": Vector2(-9.0, 0.0), "right": Vector2(9.0, 0.0),
+	"high": Vector2(0.0, -9.0), "low": Vector2(0.0, 9.0),
+}
+
+
+func _tp_side_from_keys() -> String:
+	if Input.is_key_pressed(KEY_W):
+		return BladeRead.HIGH
+	if Input.is_key_pressed(KEY_S):
+		return BladeRead.LOW
+	if Input.is_key_pressed(KEY_A):
+		return BladeRead.LEFT
+	if Input.is_key_pressed(KEY_D):
+		return BladeRead.RIGHT
+	_tp_chain += 1
+	return BladeRead.RIGHT if _tp_chain % 2 == 1 else BladeRead.LEFT
+
+
+## Which attack a third-person press asks for: the heavy if held, else one
+## out of a roll, a running one at a sprint, or the next light in the chain.
+func _moveset_request(heavy: bool, charge := 0.0) -> Dictionary:
+	if player_stun > 0.0:
+		return {"accepted": false, "buffered": false, "stamina_cost": 0.0, "attack": ""}
+	_sync_moveset()
+	var result: Dictionary
+	if heavy:
+		# Bloodborne's R2: held past CHARGED_HEAVY_SECONDS it is the charged
+		# heavy, which breaks a full poise.
+		result = moveset.request_heavy_release(charge, stamina)
+	elif roll.is_rolling() or roll.recovering():
+		roll.cancel()
+		dodge_remaining = 0.0
+		result = moveset.request_roll_attack(stamina)
+	elif Vector2(walk.x, walk.z).length() > 5.5:
+		result = moveset.request_running_attack(stamina)
+	else:
+		result = moveset.request_light(stamina)
+	if bool(result.get("accepted", false)):
+		stamina -= float(result.get("stamina_cost", 0.0))
+		_begin_moveset_attack(str(result.get("attack", "")))
+	elif not bool(result.get("buffered", false)) and not moveset.is_attacking():
+		_note("TOO TIRED TO SWING")
+	return result
+
+
+## The moveset for what is in hand and how it is held (Codex's per-weapon
+## tables); a sword the table does not know swings as the sword. Not changed
+## mid-swing: configure() resets the chain.
+func _sync_moveset() -> void:
+	if moveset.is_attacking():
+		return
+	var held := str(arsenal.current_id)
+	var table := held if SwordMoveset.WEAPON_TABLES.has(held) else "sword"
+	if moveset.weapon_id != table or moveset.stance != stance:
+		moveset.configure(table, stance)
+
+
+## Dark Souls' triangle: one hand or both. Two-handed is slower, wider and
+## breaks poise harder.
+func _toggle_stance() -> void:
+	stance = "two_hand" if stance == "one_hand" else "one_hand"
+	_sync_moveset()
+	_note("TWO-HANDED" if stance == "two_hand" else "ONE-HANDED")
+
+
+## The left button let go: a tap is the light chain, a hold was the heavy
+## (charged past CHARGED_HEAVY_SECONDS).
+func _blade_release() -> void:
+	var held := _blade_held
+	_blade_held = -1.0
+	if held < HEAVY_HOLD:
+		_moveset_request(false)
+	else:
+		_moveset_request(true, held)
+
+
+func _begin_moveset_attack(attack_id: String) -> void:
+	var definition: Dictionary = moveset.attack_definition(attack_id)
+	# Omnidirectional (Greg: Souls-like, "locked in place" once swinging):
+	# the blow turns to wherever you push at the moment you press, then the
+	# body holds that facing until the swing lets go. A lock wins.
+	var push := _sandbox_move_input()
+	if avatar.lock_target == null and push.length_squared() > 0.04:
+		avatar.facing_yaw = atan2(-push.x, -push.z)
+	_moveset_struck.clear()
+	_gear_recoil = 1.0
+	# The arm is driven along the attack's side for its wind-up and active
+	# frames, so commitment and the cut plane are this attack's, not zero.
+	_tp_swing_side = str(definition.get("side", BladeRead.RIGHT))
+	_tp_swing_left = float(definition.get("windup", 0.2)) + float(definition.get("active", 0.15))
+	swing_released_side = _tp_swing_side
+	_note(attack_id.replace("_", " ").to_upper())
+
+
+## Once a physics frame: the attack's clock, its hits, the body's pose.
+func _advance_moveset(real_delta: float) -> void:
+	if _blade_held >= 0.0:
+		var before := _blade_held
+		_blade_held += real_delta
+		if before < HEAVY_HOLD and _blade_held >= HEAVY_HOLD:
+			_note("HEAVY // HOLD TO CHARGE")
+		elif before < SwordMoveset.CHARGED_HEAVY_SECONDS and _blade_held >= SwordMoveset.CHARGED_HEAVY_SECONDS:
+			_note("CHARGED // RELEASE")
+	var report: Dictionary = moveset.tick(real_delta, avatar.global_position, avatar.facing_yaw)
+	if bool(report.get("started_buffered", false)):
+		var roll_to: Vector3 = report.get("roll_direction", Vector3.ZERO)
+		if roll_to.length_squared() > 0.0001:
+			_start_roll(roll_to)
+		elif moveset.is_attacking():
+			stamina -= float(report.get("stamina_cost", 0.0))
+			_begin_moveset_attack(moveset.current_attack())
+	var points: PackedVector3Array = report.get("hit_points", PackedVector3Array())
+	if not points.is_empty():
+		_moveset_sweep(points, str(report.get("attack", "")), str(report.get("side", "")))
+	var motion := avatar.motion
+	if motion != null:
+		if moveset.is_attacking():
+			motion.set_moveset_pose(str(report.get("phase", "")), float(report.get("phase_progress", 0.0)), str(report.get("side", "")), str(report.get("attack", "")))
+		else:
+			motion.clear_moveset_pose()
+		if roll.is_rolling():
+			motion.set_roll_pose(roll.progress())
+		else:
+			motion.clear_roll_pose()
+	avatar.turn_locked = moveset.is_attacking() and moveset.phase() != "windup"
+	_swing_body(real_delta)
+
+
+## The whole body in the swing (Greg: the fighting "looks clunky"; the
+## contact sheets showed a rigid body with only the forearm moving). The hips
+## wind back toward where the arc starts, turn through it while the blade is
+## live and settle; overheads lean back then drive forward; the live frames
+## step the body into the blow. Twist and lean are the avatar's; the step
+## moves the player.
+func _swing_body(real_delta: float) -> void:
+	if not moveset.is_attacking():
+		avatar.swing_twist = move_toward(avatar.swing_twist, 0.0, real_delta * 4.0)
+		avatar.swing_lean = move_toward(avatar.swing_lean, 0.0, real_delta * 2.0)
+		return
+	var definition: Dictionary = moveset.current_definition()
+	var start := float(definition.get("arc_start", 0.0))
+	var finish := float(definition.get("arc_end", 0.0))
+	var progress := moveset.phase_progress()
+	var eased := progress * progress * (3.0 - 2.0 * progress)
+	var angle := 0.0
+	var lean := 0.0
+	var overhead := str(definition.get("motion", "")).contains("overhead")
+	match moveset.phase():
+		"windup":
+			angle = lerpf(0.0, start, eased)
+			lean = lerpf(0.0, -SWING_LEAN * 0.6, eased) if overhead else 0.0
+		"active":
+			angle = lerpf(start, finish, eased)
+			lean = lerpf(-SWING_LEAN * 0.6, SWING_LEAN, eased) if overhead else 0.0
+			# Step into it: a share of the reach over the live frames.
+			var along := Vector3(-sin(avatar.facing_yaw), 0.0, -cos(avatar.facing_yaw))
+			eye += along * (float(definition.get("reach", 2.5)) * SWING_STEP / maxf(float(definition.get("active", 0.15)), 0.05)) * real_delta
+		"recovery":
+			angle = lerpf(finish, 0.0, eased)
+			lean = lerpf(SWING_LEAN, 0.0, eased) if overhead else 0.0
+	# A positive arc angle is the blade to the body's right; turning toward it
+	# is a negative yaw about the hips.
+	avatar.swing_twist = -angle * SWING_TWIST
+	avatar.swing_lean = lean
+
+
+## The blade's path this frame, from the shoulder out to each arc point: any
+## body it crosses is cut, once per attack.
+func _moveset_sweep(points: PackedVector3Array, attack_id: String, side: String) -> void:
+	var shoulder := avatar.global_position + Vector3.UP * 1.35
+	for point in points:
+		var along := point - shoulder
+		if along.length_squared() < 0.0001:
+			continue
+		var found := _trace_body(shoulder, along)
+		if found.is_empty() or shoulder.distance_to(found.get("position", shoulder)) > along.length():
+			continue
+		var rig := found.get("rig") as BaselineHuman
+		if _moveset_struck.has(rig):
+			continue
+		_moveset_struck.append(rig)
+		var weapon: Dictionary = arsenal.current()
+		var weight := float(MOVESET_WEIGHT.get(attack_id, MOVESET_WEIGHT.get("heavy", 1.0) if attack_id == "charged_heavy" else 1.0))
+		var definition: Dictionary = moveset.attack_definition(attack_id)
+		definition["attack"] = attack_id
+		var attack := {
+			"damage": float(weapon.get("damage", 24.0)) * weight,
+			"impulse": float(weapon.get("impulse", 18.0)) * weight,
+			# The shiv punctures and fists bruise: the moveset says what hits.
+			"damage_type": str(definition.get("damage_type", weapon.get("damage_type", "cut"))),
+			"attack": attack_id,
+			"packet": definition,
+		}
+		_melee_contact(attack, found, along.normalized(), shoulder, side)
 
 
 ## The bodies entry for a rig, so a swing can ask what its target was holding.
@@ -1187,6 +1600,7 @@ func _switch_weapon(slot: int) -> void:
 	view_gear.take(arsenal.current_id)
 	_gear_rest = view_gear.position
 	_refresh_muzzle_anchor()
+	_sync_moveset()
 	_note("EQUIPPED // %s" % str(arsenal.current().label))
 
 
@@ -1203,7 +1617,9 @@ func _equip_launcher() -> void:
 
 
 func _muzzle_world(fallback: Vector3) -> Vector3:
-	if muzzle_point != null and is_instance_valid(muzzle_point):
+	# The muzzle rides the first-person viewmodel, which is behind the player
+	# over the shoulder.
+	if muzzle_point != null and is_instance_valid(muzzle_point) and not (avatar != null and avatar.visible):
 		return muzzle_point.global_position
 	return fallback
 
@@ -1409,7 +1825,8 @@ func _trace_body(from: Vector3, along: Vector3) -> Dictionary:
 		if hit.is_empty():
 			return {}
 		var collider := hit.get("collider") as Node
-		if collider != null and not GoreChunks.identify(collider).is_empty():
+		# Loose gore, and your own body when the camera is behind it.
+		if collider != null and (not GoreChunks.identify(collider).is_empty() or (avatar != null and avatar.owns(collider))):
 			skip.append(hit.get("rid"))
 			continue
 		var rig := _rig_above(collider)
@@ -1492,7 +1909,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		# The same movement that turns the head swings the blade. This is the
 		# whole of the Mordhau input model and it costs one line, because
 		# `LimbMomentum.advance()` has always taken a look delta.
-		_look_delta += turn
+		# Over the shoulder the mouse is the camera, and feeding it to the arm
+		# read every camera turn as a swing: that was third person breaking.
+		if not third_person:
+			_look_delta += turn
 		if guarding:
 			guard_aim += motion.relative
 	if event is InputEventMouseButton:
@@ -1507,6 +1927,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				_grapple_pressure()
 			else:
 				_fire()
+		elif click.button_index == MOUSE_BUTTON_LEFT and not click.pressed and _blade_held >= 0.0:
+			_blade_release()
 		elif click.button_index == MOUSE_BUTTON_RIGHT:
 			if launcher_equipped or str(arsenal.current().get("kind", "")) == "firearm":
 				firearm_aiming = click.pressed
@@ -1547,19 +1969,28 @@ func _unhandled_input(event: InputEvent) -> void:
 				_note("FULL CONTROL REFERENCE" if controls_expanded else "ESSENTIAL CONTROLS ONLY")
 			KEY_C: _toggle_grapple()
 			KEY_H: _set_enemies_enabled(not enemies_enabled)
+			KEY_Y: _toggle_stance()
+			KEY_J:
+				duel_mode = not duel_mode
+				duelist = -1
+				_note("DUEL // ONE AT A TIME" if duel_mode else "PACK // ALL AT ONCE, SPREAD OUT")
+			KEY_N:
+				spar_level = (spar_level + 1) % SPAR_LEVELS.size()
+				_note("SPARRING // %s" % str(SPAR_LEVELS[spar_level].name))
+				_update_mode_button()
 			KEY_SPACE:
 				var move := _sandbox_move_input()
 				if move.length_squared() > 0.01:
 					_begin_dodge(move)
+				elif third_person:
+					# Souls: no jump over the shoulder; SPACE still is a backstep.
+					_backstep()
 				else:
 					jump_queued = true
 			KEY_E: _take_station_item()
 			KEY_F: _open_nearest_body()
-			KEY_V:
-				third_person = not third_person
-				# The registers differ in when the swing direction is read, so
-				# say which one is running rather than leaving it to be felt.
-				_note("THIRD PERSON // COMMITTED SWINGS" if third_person else "FIRST PERSON // DRAG YOUR SWINGS")
+			KEY_Z: _toggle_lock_on()
+			KEY_V: _toggle_view()
 			KEY_G:
 				if handheld != null:
 					handheld.toggle_device()
@@ -1568,6 +1999,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_Q: _cut()
 			KEY_R: _reset()
 			KEY_X: _set_xray(not xray)
+			KEY_M: _toggle_monitor()
 			KEY_ESCAPE: _step_out()
 			KEY_6: _switch_weapon(HunterArsenal.SLOT_ORDER.find("sword"))
 			KEY_7: _switch_weapon(HunterArsenal.SLOT_ORDER.find("shotgun"))
@@ -1588,7 +2020,99 @@ func _sandbox_move_input() -> Vector3:
 	if Input.is_key_pressed(KEY_S): move += forward
 	if Input.is_key_pressed(KEY_A): move -= right
 	if Input.is_key_pressed(KEY_D): move += right
-	return move.normalized()
+	if move.length_squared() > 0.0:
+		return move.normalized()
+	# The pad's stick is analog: a half push is a half-speed walk.
+	var stick := pad.move_stick() if pad != null else Vector2.ZERO
+	return forward * stick.y + right * stick.x
+
+
+func _toggle_lock_on() -> void:
+	var was_locked := avatar.lock_target != null
+	if avatar.toggle_lock(bodies, eye, -camera.global_transform.basis.z):
+		_note("LOCKED // Z OR R3 RELEASES")
+	else:
+		_note("LOCK RELEASED" if was_locked else "NOTHING TO LOCK ON TO")
+
+
+func _toggle_view() -> void:
+	third_person = not third_person
+	avatar.third_person = third_person
+	if not third_person:
+		avatar.release_lock()
+	# The registers differ in when the swing direction is read, so say which
+	# one is running rather than leaving it to be felt.
+	_note("THIRD PERSON // COMMITTED SWINGS" if third_person else "FIRST PERSON // DRAG YOUR SWINGS")
+
+
+## Souls: a roll with nothing pushed is a backstep, straight back from where
+## the body faces (or from the lock).
+func _backstep() -> bool:
+	var back := Vector3(sin(avatar.facing_yaw), 0.0, cos(avatar.facing_yaw))
+	return _begin_dodge(back)
+
+
+## Sprinting over the shoulder: Shift (Elden Ring) or O held (Bloodborne),
+## moving, and with stamina to spend.
+func _sprinting() -> bool:
+	if not third_person or stamina <= 1.0:
+		return false
+	var held := Input.is_key_pressed(KEY_SHIFT) or (pad != null and pad.sprinting)
+	return held and _sandbox_move_input().length_squared() > 0.04
+
+
+# --- The pad (SoulsPad): each verb is the keyboard's own. ---
+func _build_pad() -> void:
+	pad = SoulsPad.new()
+	pad.name = "SoulsPad"
+	add_child(pad)
+	pad.light.connect(func() -> void: _pad_attack(false))
+	pad.heavy.connect(func(held: float) -> void: _pad_attack(true, held))
+	pad.fire.connect(_fire)
+	pad.aim_changed.connect(func(held: bool) -> void: firearm_aiming = held)
+	pad.stance_toggle.connect(_toggle_stance)
+	pad.roll.connect(func() -> void:
+		var move := _sandbox_move_input()
+		if move.length_squared() > 0.01:
+			_begin_dodge(move)
+		else:
+			_backstep())
+	pad.lock.connect(_toggle_lock_on)
+	pad.view.connect(_toggle_view)
+	pad.interact.connect(_take_station_item)
+	pad.guard_changed.connect(func(held: bool, parry: bool) -> void:
+		guarding = held
+		guard_aim = Vector2.ZERO
+		guard_held = 0.0
+		if not held:
+			_note("GUARD DOWN")
+		elif parry:
+			_note("PARRY // MEET THE BLOW LATE"))
+	pad.weapon_step.connect(func(step: int) -> void:
+		var total := HunterArsenal.SLOT_ORDER.size()
+		_switch_weapon(posmod(HunterArsenal.SLOT_ORDER.find(arsenal.current_id) + step, total)))
+	pad.duel_toggle.connect(func() -> void:
+		duel_mode = not duel_mode
+		duelist = -1
+		_note("DUEL // ONE AT A TIME" if duel_mode else "PACK // ALL AT ONCE, SPREAD OUT"))
+	pad.enemies_toggle.connect(func() -> void: _set_enemies_enabled(not enemies_enabled))
+
+
+## R1 / R2. The layer has already resolved these to light and heavy; firearms
+## arrive on the separate R2 `fire` signal, so R1 can never become a second
+## trigger merely because the held item changed.
+func _pad_attack(heavy: bool, charge := 0.0) -> void:
+	if third_person and str(arsenal.current().get("kind", "")) == "melee" and not launcher_equipped:
+		_moveset_request(heavy, charge)
+	elif str(arsenal.current().get("kind", "")) != "firearm":
+		_fire()
+
+
+## Combat itself is consumed by this scene's SoulsPad, which reads the same
+## CombatInputLayer data. This receiver intentionally absorbs PadBridge's
+## compatibility copy so one physical press cannot attack twice.
+func _pad_combat_verb(_verb: String, _pressed: bool) -> void:
+	pass
 
 
 func _begin_dodge(requested_direction := Vector3.ZERO) -> bool:
@@ -1599,11 +2123,24 @@ func _begin_dodge(requested_direction := Vector3.ZERO) -> bool:
 	if requested.length_squared() <= 0.01:
 		return false
 	dodge_direction = requested.normalized()
-	dodge_remaining = 0.28
-	dodge_cooldown = 0.75
-	stamina -= 25.0
+	# Mid-swing, a roll is buffered and fires the frame the swing lets go.
+	if moveset.is_attacking():
+		return moveset.buffer_roll(dodge_direction)
+	return _start_roll(dodge_direction)
+
+
+## Codex's SoulsRoll owns the timing (duration, i-frames, recovery); the
+## sandbox mirrors it into dodge_remaining/dodge_cooldown so everything that
+## already read those (HUD, grapple, tests) keeps its meaning.
+func _start_roll(direction: Vector3) -> bool:
+	if player_stun > 0.0 or not roll.start(direction, stamina):
+		return false
+	dodge_direction = direction
+	dodge_remaining = SoulsRoll.DURATION
+	dodge_cooldown = SoulsRoll.DURATION + SoulsRoll.RECOVERY
+	stamina -= roll.stamina_cost()
 	firearm_aiming = false
-	_note("DODGE // COMMIT, RECOVER, MOVE AGAIN")
+	_note("ROLL // COMMIT, RECOVER, MOVE AGAIN")
 	return true
 
 
@@ -1805,11 +2342,18 @@ func _take_nearest_weapon() -> bool:
 	_refresh_muzzle_anchor()
 	nearest["available"] = false
 	(nearest.get("model") as Node3D).visible = false
-	_note("TAKEN FROM RACK // %s" % str(arsenal.current().get("label", weapon_id)).to_upper())
+	_note("%s // %s" % ["TAKEN OFF THE FLOOR" if bool(nearest.get("dropped", false)) else "TAKEN FROM RACK", str(arsenal.current().get("label", weapon_id)).to_upper()])
 	return true
 
 
 func _restore_weapon_rack() -> void:
+	# What the bodies dropped goes with them; they come back holding their own.
+	for index in range(weapon_pickups.size() - 1, -1, -1):
+		if bool(weapon_pickups[index].get("dropped", false)):
+			var dropped := weapon_pickups[index].get("model") as Node3D
+			if dropped != null and is_instance_valid(dropped):
+				dropped.queue_free()
+			weapon_pickups.remove_at(index)
 	for pickup: Dictionary in weapon_pickups:
 		pickup["available"] = true
 		var model := pickup.get("model") as Node3D
@@ -1870,7 +2414,57 @@ func _set_xray(enabled: bool) -> void:
 	_note("X-RAY %s" % ("ON" if xray else "OFF"))
 
 
+## AN. What the X-ray names under the sandbox's own reticle: the tissue the shot
+## line lands in, the bone behind it, and the skeletal landmark it reaches.
+## Resolved by the same `XrayCursor.structures()` the lab's scan overlay draws
+## from, so the sandbox and the lab cannot disagree about what a body is made
+## of. Handed the world for the same reason the overlay is: a body behind the
+## range's wall is drawn by the sweep but is not identified through it. Empty
+## unless the X-ray is on and there is a body under the reticle.
+func xray_structures() -> Array:
+	if not xray:
+		return []
+	if camera == null or not is_instance_valid(camera):
+		return []
+	var from := camera.global_position
+	var along := -camera.global_basis.z
+	var rig := _reticle_body()
+	if rig == null:
+		return []
+	return XrayCursor.structures(rig, from, along, XrayCursor.READOUT_REACH, camera.get_world_3d())
+
+
+## The real body the reticle is on, or null. One answer, so the names and the
+## monitor are looking at the same thing in the same frame.
+func _reticle_body() -> BaselineHuman:
+	if camera == null or not is_instance_valid(camera):
+		return null
+	var hit := _trace_body(camera.global_position, -camera.global_basis.z)
+	var rig := hit.get("rig") as BaselineHuman
+	if rig == null or not is_instance_valid(rig) or rig.anatomy == null:
+		return null
+	return rig
+
+
+## The monitor's own lines, exactly as printed, or nothing when it is closed or
+## there is no body under the reticle. No cached state: it asks the body.
+func monitor_lines() -> Array:
+	if not monitor:
+		return []
+	var rig := _reticle_body()
+	if rig == null:
+		return []
+	return MedicalMonitor.lines(rig)
+
+
+func _toggle_monitor() -> void:
+	monitor = not monitor
+	_note("MONITOR %s" % ("ON" if monitor else "OFF"))
+
+
 func _physics_process(delta: float) -> void:
+	if pad != null:
+		pad.set_combat_context("firearm" if launcher_equipped or str(arsenal.current().get("kind", "")) == "firearm" else "melee")
 	# Real seconds, whatever the clock is doing to everything else. `delta` is
 	# `real * time_scale` by definition, so this inverts it exactly — and it is
 	# the only honest way to time anything in a scene that bends time on purpose.
@@ -1879,16 +2473,33 @@ func _physics_process(delta: float) -> void:
 	# Held, not toggled. The world slows; your own aim and your own feet do not,
 	# which is what makes a slow-motion execution feel like something you are
 	# doing rather than something being shown to you.
-	var want := 1.0 if Input.is_key_pressed(KEY_SHIFT) else 0.0
+	# Over the shoulder Shift is the sprint (Elden Ring), so slow motion is a
+	# first-person posture.
+	var want := 1.0 if Input.is_key_pressed(KEY_SHIFT) and not third_person else 0.0
 	slowed = move_toward(slowed, want, real_delta * 5.0)
 	hitstop = maxf(0.0, hitstop - real_delta)
 	Engine.time_scale = lerpf(1.0, SLOW_SCALE, slowed) * (HITSTOP_SCALE if hitstop > 0.0 else 1.0)
 
 	var move := _sandbox_move_input()
-	var move_speed := 7.0 * (0.68 if firearm_aiming else 1.0)
+	var sprinting := _sprinting()
+	var pace := (SPRINT_SPEED if sprinting else JOG_SPEED) if third_person else 7.0
+	var move_speed := pace * (0.68 if firearm_aiming else 1.0)
+	if sprinting:
+		stamina = maxf(0.0, stamina - SPRINT_STAMINA_PER_SECOND * real_delta)
+	if pad != null:
+		var turn := pad.look(real_delta)
+		if turn != Vector2.ZERO:
+			yaw -= turn.x
+			pitch = clampf(pitch - turn.y, -1.2, 0.9)
+			# First person, the stick is the mouse: it swings the blade too.
+			if not third_person:
+				_look_delta += turn
 	walk = walk.lerp(move * move_speed, clampf(real_delta * 14.0, 0.0, 1.0))
 	# The arm and guard run in real seconds: sandbox slow motion bends the world,
 	# not the player's input. The delta is already radians, matching the Hunt.
+	if _tp_swing_left > 0.0:
+		_look_delta += TP_SWING_PUSH.get(_tp_swing_side, Vector2.ZERO) * real_delta
+		_tp_swing_left = maxf(0.0, _tp_swing_left - real_delta)
 	if arm != null:
 		var forward := Vector3(sin(yaw), 0.0, cos(yaw))
 		var right := Vector3(forward.z, 0.0, -forward.x)
@@ -1902,14 +2513,22 @@ func _physics_process(delta: float) -> void:
 		melee_windup -= real_delta
 		if melee_windup < 0.0:
 			_resolve_melee_swing()
-	if dodge_remaining > 0.0:
-		eye += dodge_direction * 16.0 * real_delta
+	roll.tick(real_delta)
+	player_stun = maxf(0.0, player_stun - real_delta)
+	eye += player_poise.tick(real_delta)
+	if roll.is_rolling():
+		eye += roll.velocity() * real_delta
+	elif moveset.is_attacking():
+		# A committed swing roots the feet: a drift, not a walk.
+		eye += walk * 0.2 * real_delta
 	else:
 		eye += walk * real_delta
-	dodge_remaining = maxf(0.0, dodge_remaining - real_delta)
+	dodge_remaining = maxf(0.0, dodge_remaining - real_delta) if roll.is_rolling() else 0.0
 	dodge_cooldown = maxf(0.0, dodge_cooldown - real_delta)
+	_advance_moveset(real_delta)
 	if dodge_remaining <= 0.0:
-		stamina = minf(100.0, stamina + 18.0 * real_delta)
+		if not _sprinting():
+			stamina = minf(100.0, stamina + 18.0 * real_delta)
 	eye.x = clampf(eye.x, -ARENA + 2.0, ARENA - 2.0)
 	eye.z = clampf(eye.z, -ARENA + 2.0, ARENA - 2.0)
 	var crouching := Input.is_key_pressed(KEY_CTRL)
@@ -1932,15 +2551,26 @@ func _physics_process(delta: float) -> void:
 	# contact. The feeler has been carrying this the whole time and nothing in
 	# this scene was asking it for anything.
 	var shove: Vector2 = impact_feel.camera_offset()
-	camera.global_position = eye
-	camera.global_transform.basis = Basis(Vector3.UP, yaw + shove.x) * Basis(Vector3.RIGHT, pitch + shove.y) * Basis(Vector3.FORWARD, impact_feel.roll)
+	# The eye and the shoulder are one camera, blended (SandboxAvatar), and a
+	# lock turns the view onto whoever it holds.
+	yaw = avatar.steer_yaw(yaw, eye, real_delta)
+	# Over the shoulder the view tilts only as far as the orbit can follow;
+	# the rest of the stick or mouse would be spent winding up a pitch the
+	# camera then has to unwind before it moves again.
+	if third_person:
+		pitch = clampf(pitch, SandboxAvatar.PITCH_MIN, SandboxAvatar.PITCH_MAX)
+	avatar.advance(real_delta, eye, stance_height, yaw, pitch, walk, dodge_remaining > 0.0,
+		Input.is_key_pressed(KEY_CTRL), camera, shove, -impact_feel.roll)
+	var eye_fov := camera.fov
+	if view_gear != null and is_instance_valid(view_gear):
+		view_gear.visible = not avatar.visible
 	var aiming_now := firearm_aiming and str(arsenal.current().get("kind", "")) == "firearm"
 	if launcher_equipped:
 		aiming_now = firearm_aiming
 	if not aiming_now:
 		firearm_aiming = false
 	firearm_aim_blend = move_toward(firearm_aim_blend, 1.0 if aiming_now else 0.0, real_delta * 7.0)
-	camera.fov = lerpf(78.0, 56.0, firearm_aim_blend)
+	camera.fov = lerpf(eye_fov, 56.0, firearm_aim_blend)
 
 	# Everything a shot owes the eye, timed in real seconds like the hitstop is:
 	# a tracer measured on the bent clock would hang in the air for a second and
@@ -1965,6 +2595,9 @@ func _physics_process(delta: float) -> void:
 
 
 func _exit_tree() -> void:
+	var pad_bridge := get_node_or_null("/root/PadBridge")
+	if pad_bridge != null:
+		pad_bridge.clear_combat_receiver(self)
 	# Leaving this scene with the world still slowed would follow you out of it.
 	Engine.time_scale = 1.0
 
@@ -1993,6 +2626,13 @@ func _build_hud() -> void:
 	living_map.call("attach_world", get_world_3d())
 	hud.draw.connect(_paint_hud)
 	layer.add_child(hud)
+	# The sight is the logo's algiz: upright while nothing fights back,
+	# reversed (death) once sparring is on. Replaces the hand-drawn cross.
+	reticle = AlgizReticle.new()
+	reticle.name = "AlgizReticle"
+	reticle.mark_size = 22.0
+	layer.add_child(reticle)
+	reticle.snap_state(enemies_enabled)
 	# Above the readouts, because when it fires it is the only thing to look at.
 	kill_cam = KILL_CAM.new()
 	kill_cam.name = "KillCam"
@@ -2034,6 +2674,8 @@ func _build_hud() -> void:
 
 
 func _set_enemies_enabled(enabled: bool) -> void:
+	if reticle != null:
+		reticle.set_in_combat(enabled)
 	enemies_enabled = enabled
 	if enabled:
 		simulation_health = 100
@@ -2043,10 +2685,125 @@ func _set_enemies_enabled(enabled: bool) -> void:
 	_update_mode_button()
 
 
+## A body's blow lands with the weapon actually in its hand: that weapon's
+## damage and cut, fists if it holds nothing. Your guard reads it the way
+## theirs reads yours: the right side inside the parry window turns it and
+## knocks an armed hand open, so the weapon flies; the right side late blocks
+## most of it; anything else is open.
+func _enemy_strike(entry: Dictionary, holder: Node3D) -> void:
+	var started := Time.get_ticks_usec()
+	_enemy_strike_body(entry, holder)
+	last_enemy_strike_ms = (Time.get_ticks_usec() - started) / 1000.0
+
+
+## What an enemy's blow on you costs, in ms (the soak shows it).
+var last_enemy_strike_ms := 0.0
+
+
+func _enemy_strike_body(entry: Dictionary, holder: Node3D) -> void:
+	# Inside the roll's i-frames the blow passes through (SoulsRoll).
+	if roll.is_invulnerable():
+		_note("ROLLED THROUGH // %s" % str(entry.get("swing", "")).to_upper())
+		return
+	var armed := _holds_weapon(entry)
+	var stats: Dictionary = HunterArsenal.WEAPONS.get(str(entry.get("weapon", "")), FISTS) if armed else FISTS
+	var side := str(entry.get("swing", BladeRead.HIGH))
+	var read: Dictionary = BladeRead.resolve(_player_guard(side, holder.global_position), guard_held, side, 6.0)
+	var bind := _bind_point(holder.global_position, side)
+	# Souls, over the shoulder: a block costs stamina, and with none left the
+	# guard breaks and the whole blow comes through.
+	if third_person and str(read.outcome) == "block":
+		stamina -= GUARD_BLOCK_STAMINA
+		if stamina <= 0.0:
+			stamina = 0.0
+			guarding = false
+			read = {"outcome": "open", "through": 1.0}
+			_note("GUARD BROKEN")
+	match str(read.outcome):
+		"parry":
+			parry_spark.burst(bind[0], bind[1])
+			_kick(0.5, "cut", false, 0.0)
+			var motion := entry.get("motion") as HunterBodyMotion
+			if motion != null and is_instance_valid(motion):
+				motion.trigger_parry()
+			if armed:
+				_drop_weapon(entry, (holder.global_position - eye).normalized() * 1.4)
+			_note("PARRIED // %s TURNED%s" % [side.to_upper(), " // DISARMED" if armed else ""])
+		"block":
+			parry_spark.burst(bind[0], bind[1], 0.5)
+			_take_training_hit(stats, side, float(read.through), "BLOCKED", holder.global_position)
+		_:
+			_take_training_hit(stats, side, 1.0, "HIT", holder.global_position)
+
+
+func _take_training_hit(stats: Dictionary, side: String, through: float, label: String, from := Vector3.INF) -> void:
+	var damage := float(stats.damage) * float(SPAR_LEVELS[spar_level].damage) * through
+	if from != Vector3.INF:
+		_player_struck(stats, from, label == "BLOCKED")
+	simulation_health = maxi(0, simulation_health - roundi(damage))
+	_kick(clampf(damage / 40.0, 0.12, 0.6), str(stats.damage_type), false, HITSTOP_SHOT)
+	_note("%s // %s %s // %d // SIM HEALTH %03d" % [label, str(stats.label), side.to_upper(), roundi(damage), simulation_health])
+	if simulation_health <= 0:
+		simulation_health = 100
+		eye = Vector3(0.0, stance_height, 9.0)
+		_note("SIMULATION BODY RESET // TARGETS RETAIN DAMAGE")
+
+
+## Where your guard meets their blow: a forearm out from the eye toward them,
+## under it, on the side it came in on; and which way their blade was going.
+func _bind_point(attacker: Vector3, side: String) -> Array:
+	var toward := attacker - eye
+	toward.y = 0.0
+	toward = toward.normalized() if toward.length_squared() > 0.001 else -camera.global_transform.basis.z
+	var right := toward.cross(Vector3.UP).normalized()
+	var at := eye + toward * 0.6 + Vector3.DOWN * 0.2
+	var along := right
+	match side:
+		BladeRead.LEFT:
+			at -= right * 0.22
+		BladeRead.RIGHT:
+			at += right * 0.22
+			along = -right
+		BladeRead.HIGH:
+			at += Vector3.UP * 0.18
+			along = Vector3.DOWN
+		BladeRead.LOW:
+			at += Vector3.DOWN * 0.3
+			along = Vector3.UP
+	return [at, along]
+
+
+func _holds_weapon(entry: Dictionary) -> bool:
+	var weapon := entry.get("weapon_node") as Node3D
+	var rig := entry.get("rig") as BaselineHuman
+	if bool(entry.get("dropped", false)) or weapon == null or not is_instance_valid(weapon):
+		return false
+	return rig != null and is_instance_valid(rig) and rig.is_ancestor_of(weapon)
+
+
+## The weapon leaves the hand (disarmed, dead, or the arm came off with it)
+## and lands on the floor as a pickup like the rack's: E takes it, same stats.
+func _drop_weapon(entry: Dictionary, fling := Vector3.ZERO) -> void:
+	var weapon := entry.get("weapon_node") as Node3D
+	if bool(entry.get("dropped", false)) or str(entry.get("weapon", "")).is_empty() or weapon == null or not is_instance_valid(weapon):
+		return
+	entry["dropped"] = true
+	var from := weapon.global_transform
+	weapon.get_parent().remove_child(weapon)
+	add_child(weapon)
+	weapon.global_transform = from
+	fling.y = 0.0
+	var rest := Vector3(from.origin.x + fling.x, 0.05, from.origin.z + fling.z)
+	var fall := create_tween().set_parallel(true)
+	fall.tween_property(weapon, "global_position", rest, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	fall.tween_property(weapon, "rotation", Vector3(0.0, randf() * TAU, PI * 0.5), 0.35)
+	weapon_pickups.append({"weapon": str(entry.weapon), "model": weapon, "available": true, "dropped": true})
+
+
 func _update_mode_button() -> void:
 	if mode_button == null or not is_instance_valid(mode_button):
 		return
-	mode_button.text = "[H] TRAINING MODE  //  %s" % ("ENEMIES" if enemies_enabled else "DUMMIES")
+	mode_button.text = "[H] TRAINING MODE  //  %s" % ("ENEMIES  //  [N] %s" % str(SPAR_LEVELS[spar_level].name) if enemies_enabled else "DUMMIES")
 	mode_button.add_theme_color_override("font_color", Color("e05032") if enemies_enabled else Color("d7c69e"))
 
 
@@ -2057,6 +2814,8 @@ func _update_mode_button() -> void:
 func _update_training_bodies(real_delta: float) -> void:
 	if grapple_index >= bodies.size():
 		_release_grapple()
+	if enemies_enabled and duel_mode:
+		_pick_duelist()
 	for index in bodies.size():
 		var entry: Dictionary = bodies[index]
 		var holder := entry.get("holder") as Node3D
@@ -2064,10 +2823,20 @@ func _update_training_bodies(real_delta: float) -> void:
 		var motion := entry.get("motion") as HunterBodyMotion
 		if holder == null or rig == null or not is_instance_valid(holder) or not is_instance_valid(rig):
 			continue
+		if rig.anatomy.dead or not _holds_weapon(entry):
+			# Dead, or the arm holding it came off: the weapon is on the floor.
+			_drop_weapon(entry)
 		if rig.anatomy.dead or rig.anatomy.downed:
 			if index == grapple_index:
 				_release_grapple("THE BODY DROPS OUT OF YOUR HOLD")
 			continue
+		var poise := entry.get("knockback") as Knockback
+		if poise != null:
+			var shoved := poise.tick(real_delta)
+			if shoved.length_squared() > 0.0:
+				holder.global_position += shoved
+				holder.global_position.x = clampf(holder.global_position.x, -ARENA + 1.0, ARENA - 1.0)
+				holder.global_position.z = clampf(holder.global_position.z, -ARENA + 1.0, ARENA - 1.0)
 		if index == grapple_index:
 			var forward := -camera.global_transform.basis.z
 			forward.y = 0.0
@@ -2087,33 +2856,151 @@ func _update_training_bodies(real_delta: float) -> void:
 				motion.set_combat_pose(0.0, "")
 				motion.update(real_delta, Vector3.ZERO, true, false, false, false)
 			continue
+		if duel_mode and index != duelist:
+			_hold_back(entry, holder, motion, real_delta)
+			continue
 		var toward := eye - holder.global_position
 		toward.y = 0.0
 		var distance := toward.length()
 		var visual_velocity := Vector3.ZERO
-		if distance > 1.45:
-			var travel_speed := 3.8 if distance > 4.5 else 2.15
-			var step := toward.normalized() * minf(distance - 1.35, real_delta * travel_speed)
-			holder.global_position += step
-			holder.look_at(Vector3(eye.x, holder.global_position.y, eye.z), Vector3.UP)
-			visual_velocity = step / maxf(real_delta, 0.0001)
+		var cadence := float(SPAR_LEVELS[spar_level].cadence)
 		entry["attack_ready"] = float(entry.get("attack_ready", 0.0)) - real_delta
-		var windup := clampf(1.0 - float(entry["attack_ready"]) / 1.05, 0.0, 1.0) if distance <= 1.65 else 0.0
+		# The Souls rhythm (Greg, 30 Sep: the fighting "looks clunky"): circle
+		# at a distance, strafing, while the next blow comes due; press in
+		# fast when it nearly has; after striking, back out to the circle.
+		# The strike rule below is unchanged, so parry and roll timing are too.
+		var pressing := float(entry["attack_ready"]) <= cadence * PRESS_AT or distance > CIRCLE_RADIUS + 1.6
+		var step := Vector3.ZERO
+		if pressing:
+			if distance > 1.45:
+				var travel_speed := 3.8 if distance > 4.5 else PRESS_SPEED
+				step = toward.normalized() * minf(distance - 1.35, real_delta * travel_speed)
+		else:
+			var inward := toward.normalized() if distance > 0.01 else Vector3.FORWARD
+			var sideways := Vector3(-inward.z, 0.0, inward.x) * float(entry.get("strafe", 1.0))
+			var radial := inward * clampf(distance - CIRCLE_RADIUS, -1.0, 1.0)
+			step = (radial * CIRCLE_SPEED + sideways * STRAFE_SPEED) * real_delta
+			if randf() < real_delta * 0.35:
+				entry["strafe"] = -float(entry.get("strafe", 1.0))
+		if step != Vector3.ZERO:
+			holder.global_position += step
+			holder.global_position.x = clampf(holder.global_position.x, -ARENA + 1.0, ARENA - 1.0)
+			holder.global_position.z = clampf(holder.global_position.z, -ARENA + 1.0, ARENA - 1.0)
+			visual_velocity = step / maxf(real_delta, 0.0001)
+		holder.look_at(Vector3(eye.x, holder.global_position.y, eye.z), Vector3.UP)
+		var windup := clampf(1.0 - float(entry["attack_ready"]) / cadence, 0.0, 1.0) if distance <= 1.65 else 0.0
+		if str(entry.get("swing", "")).is_empty():
+			entry["swing"] = SWING_PATTERN[int(entry.get("swings", 0)) % SWING_PATTERN.size()]
 		if motion != null:
 			motion.set_combat_pose(windup, "melee")
+			# The telegraph: the body leans into the side the blow comes in on.
+			if windup > 0.0:
+				motion.set_lean(BladeRead.guard_lean(str(entry.swing)))
 			motion.update(real_delta, visual_velocity, true, visual_velocity.length() > 3.0, false, false)
 		if distance <= 1.65 and float(entry["attack_ready"]) <= 0.0:
-			entry["attack_ready"] = 1.05
+			entry["attack_ready"] = cadence
 			if motion != null:
 				motion.set_combat_pose(0.0, "")
 				motion.trigger_attack(0.62, "melee")
-			simulation_health = maxi(0, simulation_health - 8)
-			_kick(0.24, "blunt", false, HITSTOP_SHOT)
-			_note("TRAINING HIT // SIM HEALTH %03d" % simulation_health)
-			if simulation_health <= 0:
-				simulation_health = 100
-				eye = Vector3(0.0, stance_height, 9.0)
-				_note("SIMULATION BODY RESET // TARGETS RETAIN DAMAGE")
+			_enemy_strike(entry, holder)
+			entry["swings"] = int(entry.get("swings", 0)) + 1
+			entry["swing"] = ""
+	_separate_bodies()
+
+
+## Greg, 30 September: "you should be able to fight 1v1 and it's not just
+## they all rush to kill you and merge into each other". One body fights you
+## at a time: the one you are locked on to, else the one already fighting,
+## else the nearest standing. When it drops, the next steps in.
+func _pick_duelist() -> void:
+	var locked := avatar.locked_rig() if avatar != null else null
+	if locked != null:
+		for index in bodies.size():
+			if (bodies[index] as Dictionary).get("rig") == locked and _can_duel(index):
+				duelist = index
+				return
+	if _can_duel(duelist):
+		return
+	var nearest := -1
+	var best := INF
+	for index in bodies.size():
+		if not _can_duel(index):
+			continue
+		var holder := (bodies[index] as Dictionary).get("holder") as Node3D
+		var gap := Vector2(holder.global_position.x - eye.x, holder.global_position.z - eye.z).length()
+		if gap < best:
+			best = gap
+			nearest = index
+	if nearest >= 0 and duelist >= 0:
+		_note("THE NEXT ONE STEPS IN")
+	duelist = nearest
+
+
+func _can_duel(index: int) -> bool:
+	if index < 0 or index >= bodies.size() or index == grapple_index:
+		return false
+	var entry: Dictionary = bodies[index]
+	var rig := entry.get("rig") as BaselineHuman
+	var holder := entry.get("holder") as Node3D
+	return rig != null and holder != null and is_instance_valid(rig) and is_instance_valid(holder) and not rig.anatomy.dead and not rig.anatomy.downed
+
+
+## The ones waiting their turn: a loose ring at WAIT_RADIUS, drifting slowly
+## around you, facing you with the guard up, never striking. Their clock is
+## held back, so the one that steps in winds up rather than swinging at once.
+func _hold_back(entry: Dictionary, holder: Node3D, motion: HunterBodyMotion, real_delta: float) -> void:
+	var from_you := holder.global_position - eye
+	from_you.y = 0.0
+	if from_you.length_squared() < 0.01:
+		from_you = Vector3.BACK
+	var bearing := atan2(from_you.x, from_you.z) + real_delta * WAIT_DRIFT
+	var spot := Vector3(eye.x + sin(bearing) * WAIT_RADIUS, holder.global_position.y, eye.z + cos(bearing) * WAIT_RADIUS)
+	var to_spot := spot - holder.global_position
+	to_spot.y = 0.0
+	var step := to_spot.limit_length(real_delta * WAIT_SPEED)
+	holder.global_position += step
+	holder.global_position.x = clampf(holder.global_position.x, -ARENA + 1.0, ARENA - 1.0)
+	holder.global_position.z = clampf(holder.global_position.z, -ARENA + 1.0, ARENA - 1.0)
+	holder.look_at(Vector3(eye.x, holder.global_position.y, eye.z), Vector3.UP)
+	entry["attack_ready"] = float(SPAR_LEVELS[spar_level].cadence)
+	if motion != null:
+		motion.set_combat_pose(0.0, "")
+		motion.update(real_delta, step / maxf(real_delta, 0.0001), true, false, false, false)
+
+
+## No two standing bodies closer than BODY_SPACING: each overlapping pair is
+## pushed apart evenly, flat on the floor.
+func _separate_bodies() -> void:
+	# A few passes: pushing one pair apart can shove one of them into a
+	# third (a strafing pack bunches up), and one pass left 1.8 m gaps.
+	for _pass in SEPARATION_PASSES:
+		_separate_once()
+
+
+func _separate_once() -> void:
+	for a in bodies.size():
+		if not _can_duel(a) and a != grapple_index:
+			continue
+		var first := (bodies[a] as Dictionary).get("holder") as Node3D
+		if first == null or not is_instance_valid(first):
+			continue
+		for b in range(a + 1, bodies.size()):
+			if not _can_duel(b) and b != grapple_index:
+				continue
+			var second := (bodies[b] as Dictionary).get("holder") as Node3D
+			if second == null or not is_instance_valid(second):
+				continue
+			var apart := second.global_position - first.global_position
+			apart.y = 0.0
+			var gap := apart.length()
+			var spacing := BODY_SPACING if duel_mode else PACK_SPACING
+			if gap >= spacing:
+				continue
+			var push := (apart / gap if gap > 0.001 else Vector3.RIGHT) * (spacing - gap) * 0.5
+			if a != grapple_index:
+				first.global_position -= push
+			if b != grapple_index:
+				second.global_position += push
 
 
 func _paint_hud() -> void:
@@ -2121,6 +3008,18 @@ func _paint_hud() -> void:
 	var acid := Color("9bf01a")
 	var rust := Color("b0552a")
 	var size := hud.size
+	# The X-ray names what is under the reticle in the sandbox too, not only in
+	# the lab's scan overlay: this is where the gore is played with.
+	var named := xray_structures()
+	if not named.is_empty():
+		# Clear of the chest at arm's length; on the reticle it covered the wound
+		# the names were describing.
+		XrayCursor.draw_structures(hud, size * 0.5 + Vector2(56.0, 46.0), named)
+	# The body's numbers, at the right edge where the lab keeps its column, and
+	# only while M is on and the reticle is on a body.
+	var vitals := monitor_lines()
+	if not vitals.is_empty():
+		MedicalMonitor.paint_lines(hud, Vector2(size.x - 300.0, 248.0), vitals)
 
 	# A damaged field instrument, not a clean debug overlay. The corners and
 	# centre sigil use the same copper/blood language as the front door and the
@@ -2163,7 +3062,7 @@ func _paint_hud() -> void:
 			["SPACE", "JUMP/MOVE+DODGE"], ["C", "GRAPPLE/LET GO"], ["H", "DUMMY/ENEMY"],
 			["6-8", "MELEE/FIREARMS"], ["9", "BREACH LAUNCHER"], ["WHEEL", "CYCLE"], ["T", "RELOAD"],
 			["SHIFT", "HOLD FOR SLOW"], ["X", "X-RAY"], ["Q", "CUT"], ["E", "TAKE"], ["F", "OPEN BODY"],
-			["RMB", "GUARD (MOUSE PICKS SIDE)"], ["V", "1ST/3RD PERSON"],
+			["RMB", "GUARD (MOUSE PICKS SIDE)"], ["V / Z", "3RD PERSON / LOCK ON"],
 			["1-4", "USE/HOLD SMOKE"], ["G", "DEVICE"], ["R", "RESET"], ["CTRL", "CROUCH"], ["F1", "LESS CONTROLS"],
 		]
 	# Emptied rather than branched around, so the layout below stays one code
@@ -2302,12 +3201,3 @@ func _paint_hud() -> void:
 		CellOutzType.draw_text(hud, Vector2(size.x * 0.5 - note_width * 0.5, size.y - 112.0),
 			last_note, 17.0, rust * Color(1, 1, 1, clampf(note_life, 0.0, 1.0)), 3.0)
 
-	# An Algiz-like sight: a cross at the centre rather than an OS pointer,
-	# with branches that pulse during slow time. It stays precise enough to aim.
-	var centre := size * 0.5
-	var sight := rust.lerp(acid, slowed * 0.55) * Color(1, 1, 1, 0.88)
-	hud.draw_circle(centre, 2.0, sight)
-	hud.draw_line(centre + Vector2(0, 15), centre + Vector2(0, -15), sight, 1.5)
-	hud.draw_line(centre + Vector2(0, -9), centre + Vector2(-8, -1), sight, 1.5)
-	hud.draw_line(centre + Vector2(0, -9), centre + Vector2(8, -1), sight, 1.5)
-	hud.draw_arc(centre, 17.0, 0.22, PI - 0.22, 16, sight * Color(1, 1, 1, 0.55), 1.0)

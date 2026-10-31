@@ -63,6 +63,24 @@ var location_announce := 0.0
 ## call the arrival crest back, but ordinary field play leaves the top clear.
 var location_crest_enabled := false
 var pulmonary_diagnostic: Control
+## Brain, column, hanging CRTs and pocket rack. Replaces the mask-and-ampoules
+## corner; null falls back to `_draw_player_state`.
+var nerve_rig: NerveRig
+## imp-68. Greg, 5 Oct ~19:00: the round frowning face "looks dumb" and the
+## three vials at the bottom need rework. The dial picks the face; the pockets
+## follow it. "xray": a bolted CRT with your own skull, and pockets
+## hung off the sacrum as tags. "bodycam" (default, Greg 6 Oct night): a live feed of your own rigged head
+## (the skull plate where there is no body), pockets as tags. "mask": the old
+## jester mask and bottle rack. Pause > DISPLAY / HUD > HUD FACE flips it.
+const FACE_STYLES := FaceMonitor.STYLES
+const FACE_STYLE_DEFAULT := FaceMonitor.DEFAULT_STYLE
+var face_style := FACE_STYLE_DEFAULT:
+	set(value):
+		face_style = value if value in FACE_STYLES else FACE_STYLE_DEFAULT
+		_sync_face_style()
+var face_monitor: FaceMonitor
+var _face_setting_seen := ""
+var _face_setting_clock := 0.0
 
 
 func _ready() -> void:
@@ -70,6 +88,39 @@ func _ready() -> void:
 	pulmonary_diagnostic = PULMONARY_DIAGNOSTIC.new()
 	pulmonary_diagnostic.name = "PulmonaryDiagnostic"
 	add_child(pulmonary_diagnostic)
+	nerve_rig = NerveRig.new()
+	nerve_rig.name = "NerveRig"
+	add_child(nerve_rig)
+	face_monitor = FaceMonitor.new()
+	face_monitor.name = "FaceMonitor"
+	add_child(face_monitor)
+	_poll_face_setting()
+	_sync_face_style()
+
+
+func _sync_face_style() -> void:
+	if face_monitor != null:
+		face_monitor.set_style(face_style)
+		face_monitor.visible = face_style != "mask" and not menu_open
+	if nerve_rig != null:
+		nerve_rig.pocket_style = "rack" if face_style == "mask" else "spine"
+
+
+## The pause menu's HUD FACE row, read when it changes, so a scene or capture
+## that sets `face_style` itself is not overridden every frame.
+func _poll_face_setting() -> void:
+	var chosen := str(WorldHistory.subject("settings").get("hud_face", ""))
+	if chosen == _face_setting_seen:
+		return
+	_face_setting_seen = chosen
+	if chosen in FACE_STYLES:
+		face_style = chosen
+
+
+## The player's own body, for the body-cam face to look at.
+func attach_head(body: Node) -> void:
+	if face_monitor != null:
+		face_monitor.attach_head(body)
 
 
 ## The space between a key and the verb it performs. `draw_condensed` returns
@@ -160,6 +211,13 @@ func set_state(values: Dictionary) -> void:
 	_refresh_affordance_notice()
 	if pulmonary_diagnostic != null:
 		pulmonary_diagnostic.set_state(values)
+	if nerve_rig != null:
+		var rig_values := values.duplicate()
+		rig_values["mood"] = mood_name()
+		nerve_rig.set_state(rig_values)
+	if face_monitor != null:
+		face_monitor.set_state(values)
+		face_monitor.visible = face_style != "mask" and not menu_open
 
 
 func rotate_pulmonary(relative: Vector2) -> void:
@@ -178,6 +236,13 @@ func pulmonary_state() -> Dictionary:
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	_face_setting_clock += delta
+	if _face_setting_clock >= 0.5:
+		_face_setting_clock = 0.0
+		_poll_face_setting()
+	# The face hangs with the rig's monitors, so it recedes and returns with them.
+	if face_monitor != null and nerve_rig != null:
+		face_monitor.modulate.a = nerve_rig.presence
 	# The organ view has inertia of its own: inhalation fills quickly, exhalation
 	# clears slowly, a cough snaps on and decays, and saved tissue state changes
 	# without one-frame colour pops.
@@ -193,7 +258,15 @@ func _process(delta: float) -> void:
 	location_announce = maxf(0.0, location_announce - delta)
 	lung_linger = maxf(0.0, lung_linger - delta)
 	affordance_notice_time = maxf(0.0, affordance_notice_time - delta)
-	queue_redraw()
+	# Greg's playtest (frame rate): HUD redraws at 30 Hz, not every frame. The
+	# house typeface draws glyphs as polygons; this canvas cost 2.7 ms a frame.
+	_redraw_clock += delta
+	if _redraw_clock >= 1.0 / 30.0:
+		_redraw_clock = 0.0
+		queue_redraw()
+
+
+var _redraw_clock := 0.0
 
 
 func _draw() -> void:
@@ -208,7 +281,11 @@ func _draw() -> void:
 		_draw_location_crest()
 	_draw_world_condition()
 	_draw_hunt_thread()
-	_draw_player_state()
+	# Greg: the face should be visible. With the nerve rig up it is the face
+	# only, hung below the monitors; the rig owns the fluids and the mood word.
+	# The face is the FaceMonitor's unless the dial asks for the old mask.
+	if nerve_rig == null or face_style == "mask":
+		_draw_player_state(nerve_rig != null)
 	_draw_minimap()
 	_draw_lung_xray()
 	_draw_breath()
@@ -357,10 +434,10 @@ func _draw_regal_vitals() -> void:
 ## body state without importing somebody else's portrait-widget design, and
 ## the reservoirs underneath are fluids rather than rectangular progress bars:
 ## blood, filthy stamina water, and magick only after a ritual has made it real.
-func _draw_player_state() -> void:
+func _draw_player_state(face_only := false) -> void:
 	var head_damage := region_damage("head")
 	var head_slip := Vector2(round(sin(elapsed * 7.0) * head_damage * 4.0), round(cos(elapsed * 5.3) * head_damage * 2.0))
-	var portrait := Vector2(size.x - 74.0, 68.0) + head_slip
+	var portrait := (Vector2(size.x - 205.0, 215.0) if face_only else Vector2(size.x - 74.0, 68.0)) + head_slip
 	var mood := mood_name()
 	var mood_tint := TEAL
 	if mood in ["HURTING", "AGONY", "CHOKING"]:
@@ -388,13 +465,18 @@ func _draw_player_state() -> void:
 		draw_circle(eye + Vector2(side * 1.5, 0), 1.8, mood_tint)
 	var mouth_curve := -5.0 if mood == "STEADY" else (8.0 if mood in ["HURTING", "AGONY", "CHOKING"] else 2.0)
 	draw_arc(portrait + Vector2(0, 11 - mouth_curve * 0.25), 9.0, 0.25 if mouth_curve > 0 else PI + 0.25, PI - 0.25 if mouth_curve > 0 else TAU - 0.25, 12, BONE, 1.5)
-	var mood_width := CellOutzType.width_condensed(mood, 10.0, 0.9)
-	CellOutzType.draw_condensed(self, portrait + Vector2(-mood_width - 55, -13), mood, 10.0, mood_tint, 0.9)
-	CellOutzType.draw_condensed(self, portrait + Vector2(-mood_width - 55, 4), "THE HUNTER", 8.0, BONE * Color(1, 1, 1, 0.52), 0.7)
+	if not face_only:
+		var mood_width := CellOutzType.width_condensed(mood, 10.0, 0.9)
+		CellOutzType.draw_condensed(self, portrait + Vector2(-mood_width - 55, -13), mood, 10.0, mood_tint, 0.9)
+		CellOutzType.draw_condensed(self, portrait + Vector2(-mood_width - 55, 4), "THE HUNTER", 8.0, BONE * Color(1, 1, 1, 0.52), 0.7)
 
 	# The reservoirs hang from the portrait like medical ampoules. Their vertical
 	# orientation keeps every player-state read in one narrow silhouette and
 	# makes loss literal: the fluid level falls away from the face above it.
+	if face_only:
+		if head_damage > 0.08:
+			_draw_wound_crack(portrait + Vector2(31, -34), Vector2(-36, 42), head_damage)
+		return
 	var vessel_y := 119.0
 	_draw_vertical_fluid_vessel(Rect2(portrait.x - 36.0, vessel_y, 20, 112), blood, Color("7f080b"), "BLD")
 	# Low stamina is not clean empty glass: sediment takes over as the water is
@@ -573,22 +655,58 @@ func _draw_breath() -> void:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.04, 0.0, 0.0, (spent - 0.7) * 0.12))
 
 
+## Slice 16. The bottom band is one ladder — the condition line, then the
+## scene's prompt, then the control strip — and this file owns the top of it,
+## because the prompt is a Label in the scene's own tree and nothing here can
+## see its text.
+##
+## The block used to sit at `size.y - 110`, which is *inside* the band the
+## prompt occupies: `HUD/Prompt` in `bone_yard_hunt.tscn` runs from 118 above
+## the bottom edge up to 40, and its text is bottom-aligned. At the design size
+## a one-line prompt left the block alone and a wrapped one did not; at the
+## 640x400 layout floor the explanation printed through the prompt it was
+## explaining. Both are measured from the same bottom edge, so moving the block
+## above that band clears it at every window size rather than at one.
+const CONDITION_HOME := 150.0
+## The rect `HUD/Prompt` occupies, measured up from the bottom edge: a 78px
+## band of bottom-aligned text. Held here so this file can be held to staying
+## out of it (`hud_transience_test`). If that label moves in the scene, this
+## moves in the same commit — the two numbers are one layout.
+const PROMPT_BAND := 118.0
+const PROMPT_BAND_HEIGHT := 78.0
+
+
+func prompt_reserve() -> Rect2:
+	return Rect2(0.0, size.y - PROMPT_BAND, size.x, PROMPT_BAND_HEIGHT)
+
+
+func condition_label() -> String:
+	return "BLOOD LOSS // %02d%%" % roundi(blood * 100.0) if blood < 0.55 else "CONSCIOUSNESS // %02d%%" % roundi(consciousness)
+
+
+func condition_detail() -> String:
+	return "FADING // HOLD V: SELF CONDITION" if consciousness < 35.0 else "WOUNDED // HOLD V: SELF CONDITION"
+
+
+## The whole block, rules included, so the test measures what is drawn rather
+## than the words alone.
+func condition_rect() -> Rect2:
+	var width := maxf(CellOutzType.width(condition_label(), 13.0, 1.3), CellOutzType.width_condensed(condition_detail(), 8.0, 0.7))
+	return Rect2(size.x * 0.5 - width * 0.5 - 24.0, size.y - CONDITION_HOME - 17.0, width + 48.0, 34.0)
+
+
 ## The playtest mistook blood-loss collapse for getting progressively higher.
 ## At the point a fullscreen effect changes play, the body must name the cause
-## in the otherwise unused space between the two lower instruments.
+## in the space between the two lower instruments — above the prompt's band,
+## not in it.
 func _draw_critical_condition() -> void:
 	if pulmonary_diagnostic != null and pulmonary_diagnostic.expanded:
 		return
 	if blood >= 0.55 and consciousness >= 55.0:
 		return
-	# Above the contextual E prompt and control strip, between the stable lower
-	# corner instruments. The first capture caught the earlier position printing
-	# directly through a bedroll prompt—the exact overlap this pass is removing.
-	var centre := Vector2(size.x * 0.5, size.y - 110.0)
-	var blood_percent := roundi(blood * 100.0)
-	var consciousness_percent := roundi(consciousness)
-	var label := "BLOOD LOSS // %02d%%" % blood_percent if blood < 0.55 else "CONSCIOUSNESS // %02d%%" % consciousness_percent
-	var detail := "FADING // HOLD V: SELF CONDITION" if consciousness < 35.0 else "WOUNDED // HOLD V: SELF CONDITION"
+	var centre := Vector2(size.x * 0.5, size.y - CONDITION_HOME)
+	var label := condition_label()
+	var detail := condition_detail()
 	var width := maxf(CellOutzType.width(label, 13.0, 1.3), CellOutzType.width_condensed(detail, 8.0, 0.7))
 	draw_line(centre + Vector2(-width * 0.5 - 22, -5), centre + Vector2(-width * 0.5 - 5, -5), BLOOD, 2.0)
 	draw_line(centre + Vector2(width * 0.5 + 5, -5), centre + Vector2(width * 0.5 + 22, -5), BLOOD, 2.0)
@@ -625,12 +743,14 @@ func _draw_hunt_thread() -> void:
 	# Top-right belongs to the player's face and fluids now. A hunt is external
 	# world pressure, so it hangs under the top-left date/air instrument instead.
 	var anchor := Vector2(30, 82)
-	var eye := anchor + Vector2(205, 12)
-	draw_arc(eye, 16, 0, TAU, 24, COPPER * Color(1, 1, 1, 0.45), 2)
-	draw_circle(eye, 4 + sin(elapsed * 3.1), BLOOD)
 	# AG5.8. `ThemeDB.fallback_font` again — the engine face standing in a
 	# panel that otherwise reads in CellOutz's own stencil cut.
-	CellOutzType.draw_text(self, anchor + Vector2(0, -13), "HUNT // %s" % rival_name.to_upper(), 13.0, COPPER)
+	var tag := "HUNT // %s" % rival_name.to_upper()
+	CellOutzType.draw_text(self, anchor + Vector2(0, -13), tag, 13.0, COPPER)
+	# The eye follows the name (it sat at a fixed x and long names ran into it).
+	var eye := anchor + Vector2(CellOutzType.width(tag, 13.0) + 26.0, -5.0)
+	draw_arc(eye, 16, 0, TAU, 24, COPPER * Color(1, 1, 1, 0.45), 2)
+	draw_circle(eye, 4 + sin(elapsed * 3.1), BLOOD)
 	CellOutzType.draw_text(self, anchor + Vector2(0, 8), rival_status, 11.0, BONE * Color(1, 1, 1, 0.65))
 
 
@@ -745,6 +865,9 @@ func _draw_controls() -> void:
 	var offers := _current_offers()
 	if offers.is_empty():
 		return
+	var pad := get_node_or_null("/root/PadBridge")
+	if pad != null:
+		offers = offers.map(func(offer: Array) -> Array: return [pad.hint(str(offer[0]), str(offer[1]), "firearm" if firearm else "melee"), offer[1]])
 
 	# Laid out from the middle, so the strip grows symmetrically rather than
 	# sliding sideways every time an affordance appears or goes.
@@ -767,21 +890,40 @@ func _current_offers() -> Array:
 	var held := str((weapon as Dictionary).get("label", ""))
 	if bare:
 		offers.append(["LMB", "STRIKE"])
-		offers.append(["X", "GUARD"])
+		offers.append([_bound("guard", "X"), "BLOCK"])
 	elif firearm:
 		offers.append(["LMB", "FIRE"])
+		offers.append(["RMB", "AIM"])
 		if int((weapon as Dictionary).get("loaded", 1)) <= 0:
 			offers.append(["R", "RELOAD"])
 	else:
-		offers.append(["LMB", held.to_upper() if held != "" else "STRIKE"])
-		offers.append(["RMB", "HEAVY"])
-		offers.append(["X", "GUARD"])
+		offers.append(["LMB", "LIGHT // %s" % held.to_upper() if held != "" else "LIGHT"])
+		offers.append([_bound("guard", "X"), "BLOCK"])
+		offers.append(["RMB", "PARRY"])
+		offers.append(["MMB", "HEAVY"])
 	if can_dodge:
-		offers.append(["SPACE", "DODGE"])
+		offers.append([_bound("dodge", "SPACE"), "DODGE"])
 	if near_something:
-		offers.append(["E", str(interact_verb).to_upper()])
-	offers.append(["G", "DEVICE"])
+		offers.append([_bound("interact", "E"), str(interact_verb).to_upper()])
+	offers.append([_bound("device", "G"), "DEVICE"])
 	return offers
+
+
+## The key an action is bound to now (PauseGate CONTROLS), as the strip
+## prints it. On the pad the layout is fixed, so the default goes to
+## PadBridge.keys() for its button.
+func _bound(action: String, fallback: String) -> String:
+	var pad := get_node_or_null("/root/PadBridge")
+	if (pad != null and pad.using_pad) or not InputMap.has_action(action):
+		return fallback
+	for event in InputMap.action_get_events(action):
+		if event is InputEventKey:
+			var key := event as InputEventKey
+			# `keyboard_get_keycode_from_physical` is unavailable on the headless
+			# display server. The event already knows its physical label and this
+			# is also what PauseGate uses for the rebind row.
+			return OS.get_keycode_string(key.keycode).to_upper() if key.keycode != KEY_NONE else key.as_text_physical_keycode().to_upper()
+	return fallback
 
 
 func _refresh_affordance_notice() -> void:

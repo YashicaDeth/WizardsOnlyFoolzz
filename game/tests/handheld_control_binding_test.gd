@@ -22,6 +22,8 @@ func _ready() -> void:
 	WorldHistory.clear_history()
 	check(HANDHELD.DROP_KEY == KEY_DELETE, "dropping the device uses the dedicated Delete key")
 	check(HANDHELD.DROP_KEY != KEY_K, "drop no longer shares the irreversible re-decant binding")
+	check(HANDHELD.CARRY_KEY == KEY_F5, "holding the carry has its own key")
+	check(HANDHELD.CARRY_KEY != HANDHELD.DROP_KEY, "the carry key is not the destructive drop key")
 
 	var device := HANDHELD.new()
 	add_child(device)
@@ -37,11 +39,22 @@ func _ready() -> void:
 	click.position = ritual_tab.get_center()
 	device._gui_input(click)
 	check(device.current_mode() == "RITUAL", "clicking a drawn tab selects that exact device app")
+	# Slice 20. The bag's key has to work on a lowered device, or it is only a
+	# second way to click a tab.
+	device.close_device()
+	check(device.open_to("CARRY") and device.is_open and device.current_mode() == "CARRY",
+		"the carry key raises a lowered device already on the bag")
+	check(not device.open_to("BONEYARD"),
+		"a page this device does not carry is refused instead of opening on another")
+	device.open_to("CARRY")
+	device._advance_page_transition(1.0)
+	check(device.displayed_mode() == "CARRY", "the bag finishes its own shutter rather than landing mid-page")
 	device.jump_to_mode(3)
 	device._advance_page_transition(1.0)
 	var tune_before: float = device.radio.khz
 	var tune_right := InputEventKey.new()
 	tune_right.keycode = KEY_RIGHT
+	tune_right.physical_keycode = KEY_RIGHT
 	tune_right.pressed = true
 	check(device.handle_input(tune_right) and device.radio.khz > tune_before,
 		"RADIO owns an advertised tuning key and visibly moves its real dial")
@@ -52,6 +65,7 @@ func _ready() -> void:
 		"merely viewing RADIO cannot finish a lead lock without a deliberate hold")
 	var lock_key := InputEventKey.new()
 	lock_key.keycode = KEY_SPACE
+	lock_key.physical_keycode = KEY_SPACE
 	lock_key.pressed = true
 	check(device.handle_input(lock_key) and device.radio_lock_held,
 		"holding Space begins the receiver's deliberate lock control")
@@ -65,6 +79,7 @@ func _ready() -> void:
 	device.pin_requested.connect(func(ref: String, _kind: String, _title: String): pinned.append(ref))
 	var pin_key := InputEventKey.new()
 	pin_key.keycode = KEY_P
+	pin_key.physical_keycode = KEY_P
 	pin_key.pressed = true
 	check(device.handle_input(pin_key) and pinned.size() == 1 and "TEST HEART" in pinned[0],
 		"CARRY owns P and sends the selected physical object to the Board")
@@ -75,19 +90,41 @@ func _ready() -> void:
 	var hunt = HUNT.instantiate()
 	add_child(hunt)
 	await get_tree().process_frame
+	# Slice 20. From play, F5 is the bag's own key: it raises the mirror on the
+	# CARRY page rather than making the player raise it on whatever app it last
+	# showed and then click the tab.
+	var f5_key := InputEventKey.new()
+	f5_key.keycode = KEY_F5
+	f5_key.physical_keycode = KEY_F5
+	f5_key.pressed = true
+	hunt._unhandled_input(f5_key)
+	check(hunt.handheld.is_open and hunt.handheld.current_mode() == "CARRY",
+		"F5 raises the Black Mirror already on the bag")
+	var f5_escape := InputEventKey.new()
+	f5_escape.keycode = KEY_ESCAPE
+	f5_escape.physical_keycode = KEY_ESCAPE
+	f5_escape.pressed = true
+	hunt._unhandled_input(f5_escape)
+	check(not hunt.handheld.is_open, "Escape lowers the bag the carry key raised")
+	# A real keyboard event carries the physical key as well as the label, and
+	# `device` is bound physically. Without it G reads as KEY_NONE and the card's
+	# own row silently answers nothing in this fixture.
 	var g_key := InputEventKey.new()
 	g_key.keycode = KEY_G
+	g_key.physical_keycode = KEY_G
 	g_key.pressed = true
 	hunt._unhandled_input(g_key)
 	check(hunt.handheld.is_open and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE,
 		"G raises the Black Mirror and releases the pointer for its controls")
 	var f7_key := InputEventKey.new()
 	f7_key.keycode = KEY_F7
+	f7_key.physical_keycode = KEY_F7
 	f7_key.pressed = true
 	hunt._unhandled_input(f7_key)
 	check(hunt.handheld.current_mode() == "FIELD", "F7 reaches the seventh advertised app directly")
 	var escape_key := InputEventKey.new()
 	escape_key.keycode = KEY_ESCAPE
+	escape_key.physical_keycode = KEY_ESCAPE
 	escape_key.pressed = true
 	hunt._unhandled_input(escape_key)
 	# The headless display refuses MOUSE_MODE_CAPTURED and reports VISIBLE even
@@ -97,6 +134,7 @@ func _ready() -> void:
 		"Escape lowers the raised Black Mirror and returns control to play")
 	var map_key := InputEventKey.new()
 	map_key.keycode = KEY_M
+	map_key.physical_keycode = KEY_M
 	map_key.pressed = true
 	hunt._unhandled_input(map_key)
 	check(hunt.panel_mode == "map" and hunt.living_map.visible and not hunt.handheld.is_open,
@@ -110,19 +148,21 @@ func _ready() -> void:
 	hunt._unhandled_input(escape_key)
 	check(hunt.panel_mode.is_empty() and not hunt.living_map.visible,
 		"Escape closes the active full-size interface in one step")
-	var j_key := InputEventKey.new()
-	j_key.keycode = KEY_J
-	j_key.pressed = true
-	hunt._unhandled_input(j_key)
+	# Greg, 26 September: J is the held depth scan now; the artwork is on F9.
+	var art_key := InputEventKey.new()
+	art_key.keycode = KEY_F9
+	art_key.physical_keycode = KEY_F9
+	art_key.pressed = true
+	hunt._unhandled_input(art_key)
 	check(hunt.allusions_artwork.visible and hunt.panel_mode == "artwork" and hunt.get_node_or_null("HUD/NatalSigil") == null,
-		"J opens the interactive artwork without constructing placeholder birth data")
-	hunt._unhandled_input(j_key)
+		"F9 opens the interactive artwork without constructing placeholder birth data")
+	hunt._unhandled_input(art_key)
 	check(not hunt.allusions_artwork.visible and hunt.panel_mode.is_empty(),
-		"a second J press returns directly to play rather than cycling into a natal chart")
+		"a second F9 press returns directly to play rather than cycling into a natal chart")
 	hunt._unhandled_input(g_key)
-	hunt._unhandled_input(j_key)
+	hunt._unhandled_input(art_key)
 	check(not hunt.handheld.is_open and hunt.allusions_artwork.visible and hunt.panel_mode == "artwork",
-		"J lowers the Black Mirror before opening the artwork")
+		"F9 lowers the Black Mirror before opening the artwork")
 	hunt._unhandled_input(g_key)
 	check(hunt.handheld.is_open and not hunt.allusions_artwork.visible and hunt.panel_mode.is_empty(),
 		"G closes the artwork before raising the Black Mirror")
@@ -144,11 +184,16 @@ func _ready() -> void:
 		rows.append_array(group.get("rows", []))
 	check(rows.any(func(row: Array): return row[0] == HANDHELD.DROP_KEY_LABEL and row[1] == "DROP DEVICE"), "the in-world keys card teaches the new drop binding")
 	check(rows.any(func(row: Array): return row[0] == "CLICK / F1-F7" and row[1] == "SELECT DEVICE APP"), "the keys card teaches pointer and direct app selection")
-	check(rows.any(func(row: Array): return row[0] == "TAB" and "NEXT DEVICE APP" in row[1]), "the keys card explains Tab's raised-device meaning")
-	check(rows.any(func(row: Array): return row[0] == "J" and row[1] == "ALLUSIONS ARTWORK"),
-		"the keys card names J's surviving artwork action without promising a sigil")
-	check(rows.any(func(row: Array): return row[0] == "K" and "RE-DECANT" in row[1]), "K remains honestly labelled for its one surviving action")
-	check(rows.filter(func(row: Array): return row[0] == "K").size() == 1, "the card contains no second hidden K action")
+	check(rows.any(func(row: Array): return str(row[0]).begins_with("TAB") and "NEXT DEVICE APP" in row[1]), "the keys card explains Tab's raised-device meaning")
+	check(rows.any(func(row: Array): return row[0] == "F9" and row[1] == "ALLUSIONS ARTWORK"),
+		"the keys card names the artwork's key without promising a sigil")
+	check(rows.any(func(row: Array): return row[0] == "HOLD K" and "RE-DECANT" in row[1]), "holding K is labelled as the re-decant")
+	check(rows.any(func(row: Array): return row[0] == "K" and "WIZARD EYES" in row[1]), "a tap of K is labelled as wizard eyes")
+	check(rows.any(func(row: Array): return row[0] == "HOLD J" and "DEPTH" in row[1]), "holding J is labelled as the depth scan")
+	check(rows.any(func(row: Array): return row[0] == "1 2 3" and "CLEAVER" in row[1] and "SWORD" not in row[1]),
+		"the keys card names slot 1 the cleaver the arsenal issues, not the sword")
+	check(rows.any(func(row: Array): return row[0] == HANDHELD.CARRY_KEY_LABEL and "CARRY" in str(row[1]).to_upper()),
+		"the keys card names the bag's own key")
 
 	print("HANDHELD_CONTROL_BINDING_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

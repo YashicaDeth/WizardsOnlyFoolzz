@@ -119,5 +119,25 @@ func _ready() -> void:
 	board.open()
 	_check(is_equal_approx(board.neglect, 0.0), "opening again immediately resets it rather than compounding")
 
+	print("L5.2 v2 - a job strung to the place that posted it is not a guess")
+	# Reveal through the game's own border crossing rather than patching the
+	# flag: `observe()` opens the territory row, the place and its local work in
+	# one receipt, which is what a player actually does.
+	AshbloomHoldings.observe(Vector2(-155, 0))
+	var orders: Array = AshbloomHoldings.work_orders("bone_yard")
+	_check(not orders.is_empty(), "the Bone Yard posts work that can be strung (%d orders)" % orders.size())
+	if not orders.is_empty():
+		var job_id := str((orders[0] as Dictionary).get("id", ""))
+		board.pin("ashbloom:bone_yard", "photo")
+		board.pin(job_id, "photo")
+		_check(board.supports("ashbloom:bone_yard", job_id), "the board reads the job's own place_id as a real connection")
+		var leads_before := (WorldHistory.subject("pin_board").get("leads", []) as Array).size()
+		_check(board.lay_string("ashbloom:bone_yard", job_id), "so the string lays without being a fabrication")
+		var leads_after := (WorldHistory.subject("pin_board").get("leads", []) as Array).size()
+		_check(leads_after == leads_before + 1, "and a lead opens on it (%d -> %d)" % [leads_before, leads_after])
+		# The control: the same job strung to ground that did not issue it is still
+		# just a claim, so the new check did not make every job string true.
+		_check(not board.supports(job_id, "ashbloom:ossuary_works"), "the same job strung to another holding is still a guess")
+
 	print("L_V2_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

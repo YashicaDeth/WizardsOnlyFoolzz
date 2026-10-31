@@ -109,6 +109,7 @@ func _shoot(tree: SceneTree, name: String, caption: String) -> void:
 func _key(scene: Node, keycode: Key, pressed := true) -> void:
 	var event := InputEventKey.new()
 	event.keycode = keycode
+	event.physical_keycode = keycode
 	event.pressed = pressed
 	scene.call("_unhandled_input", event)
 

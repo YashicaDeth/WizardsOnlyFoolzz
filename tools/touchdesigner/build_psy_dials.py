@@ -53,6 +53,17 @@ DIALS = [
     ("cut_intensity", 0.0, 0.0, 1.0),
     ("cut_seed", 0.0, 0.0, 64.0),
     ("cut_rate", 8.0, 0.5, 30.0),
+    # drug-70: the materia dials (DESIGN/TOUCHDESIGNER_PIPELINE.md). 22 in all.
+    ("kaleidoscope_clear", 0.0, 0.0, 1.5),
+    ("palette_cycle", 0.0, -0.5, 0.5),
+    ("mirror_fold", 0.0, 0.0, 1.0),
+    ("melt_strength", 0.0, 0.0, 0.2),
+    ("pulse_strength", 0.0, 0.0, 1.0),
+    ("beat_level", 0.0, 0.0, 1.0),
+    ("saturation_shift", 0.0, -1.0, 1.0),
+    ("darkness", 0.0, 0.0, 1.0),
+    ("tunnel", 0.0, 0.0, 1.0),
+    ("edge_figures", 0.0, 0.0, 1.0),
 ]
 
 

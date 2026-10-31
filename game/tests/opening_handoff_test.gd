@@ -26,7 +26,11 @@ extends Node
 
 ## Long enough for the whole authored opening with headroom, short enough that a
 ## sequence which stops advancing fails rather than hanging the suite.
-const HANDOFF_BUDGET := 45.0
+## 75 s since 2026-09-24: every line of his closing verdict is now held long
+## enough to read (Greg: the text went by too fast), not a flat three seconds.
+const HANDOFF_BUDGET := 75.0
+
+const BRAIN_HACK := preload("res://systems/brain_hack.gd")
 
 var failures: Array[String] = []
 var opening: Node
@@ -42,18 +46,39 @@ func check(condition: bool, label: String) -> void:
 func press(keycode: Key) -> void:
 	var event := InputEventKey.new()
 	event.keycode = keycode
+	event.physical_keycode = keycode
 	event.pressed = true
 	opening.intake._unhandled_input(event)
+
+
+func breakout_key(keycode: Key) -> void:
+	var event := InputEventKey.new()
+	event.keycode = keycode
+	event.physical_keycode = keycode
+	event.pressed = true
+	opening._unhandled_input(event)
+
+
+func finish() -> void:
+	print("OPENING_HANDOFF_TEST_RESULT failures=", failures.size())
+	get_tree().quit(0 if failures.is_empty() else 1)
 
 
 func _ready() -> void:
 	if OS.get_environment("ATG_TEST_MODE") != "1":
 		get_tree().quit(2)
 		return
+	# The whole live route, the brain hack included (Greg, 25 September).
+	BRAIN_HACK.force_in_tests = true
 	WorldHistory.clear_history()
 	opening = load("res://vat_chamber.tscn").instantiate()
+	opening.hands_on_breakout = true
 	add_child(opening)
 	await get_tree().physics_frame
+	check(opening.intake != null, "the new-run intake loads")
+	if opening.intake == null:
+		finish()
+		return
 
 	print("-- the form does not take a key until it is on screen --")
 	press(KEY_F)
@@ -66,6 +91,9 @@ func _ready() -> void:
 		await get_tree().physics_frame
 		waited += get_physics_process_delta_time()
 	check(opening.intake.intake_armed, "the form arms itself (%.1fs)" % waited)
+	if not opening.intake.intake_armed:
+		finish()
+		return
 
 	print("-- filing it, one tab at a time --")
 	# Page 0 is ROUTE, and row 2 is CHART: a deliberate pass, rather than PRESET
@@ -78,6 +106,16 @@ func _ready() -> void:
 	# Every remaining tab has to be visited, which is the gate he enforces.
 	# Committing the first row of each is what accepting the defaults looks like.
 	for _page in range(1, opening.intake.PAGES.size()):
+		# A tab can start one of his procedures (SCHEDULE does), and the form
+		# takes no keys until he is done; a player waits, so this does too.
+		var working := 0.0
+		while not opening.intake.procedure.is_empty() and working < 25.0:
+			await get_tree().physics_frame
+			working += get_physics_process_delta_time()
+		check(opening.intake.procedure.is_empty(), "the procedure before tab %d finishes" % _page)
+		if not opening.intake.procedure.is_empty():
+			finish()
+			return
 		press(KEY_RIGHT)
 		press(KEY_ENTER)
 		await get_tree().physics_frame
@@ -93,21 +131,54 @@ func _ready() -> void:
 		await get_tree().physics_frame
 		settling += get_physics_process_delta_time()
 	check(opening.intake.procedure.is_empty(), "the procedure he started finishes (%.1fs)" % settling)
+	if not opening.intake.procedure.is_empty():
+		finish()
+		return
 
 	print("-- and he says what it was for before he goes --")
 	press(KEY_F)
 	check(opening.intake.verdict_started, "F on a complete form starts the verdict")
+	if not opening.intake.verdict_started:
+		finish()
+		return
 
 	var elapsed := 0.0
 	while not opening.can_move and elapsed < HANDOFF_BUDGET:
 		await get_tree().physics_frame
 		elapsed += get_physics_process_delta_time()
-	check(opening.can_move, "one filing reaches free movement on the live route (%.1fs after filing)" % elapsed)
+		# Hanging in the wires, the player looks at one and presses E.
+		if opening.phase == "wired" and not opening.umbilicals.is_empty():
+			var cable: Node3D = opening.umbilicals[0]
+			var aim: Vector3 = ((cable.get_child(3) as Node3D).global_position - opening.camera.global_position).normalized()
+			opening.yaw = atan2(-aim.x, -aim.z)
+			opening.pitch = asin(aim.y)
+			opening._update_wired(0.0)
+			breakout_key(KEY_E)
+		elif opening.phase == "cord":
+			breakout_key(KEY_E)
+		elif opening.phase == "smash":
+			var click := InputEventMouseButton.new()
+			click.button_index = MOUSE_BUTTON_LEFT
+			click.pressed = true
+			opening._unhandled_input(click)
+		elif opening.phase == "knees" and opening.boot_hud != null and opening.boot_hud.done:
+			breakout_key(KEY_SPACE)
+	check(opening.can_move, "live handoff after %.1fs: phase=%s wires=%d cord=%d glass=%d" %
+		[elapsed, opening.phase, opening.umbilicals.size(), opening.cord_pulls, opening.glass_blows])
+	if not opening.can_move:
+		finish()
+		return
+	check(WorldHistory.event_count("opening_mouth_cord_torn") == 1, "the live handoff includes the mouth cord")
+	check(WorldHistory.event_count("opening_glass_struck") == opening.GLASS_BLOWS, "the live handoff includes every authored glass strike")
+	check(WorldHistory.event_count("opening_implant_booted") == 1, "the implant boots before control arrives")
 
 	print("-- and what arrives is someone who can stand and walk --")
 	var handoff_height: float = opening.camera.global_position.y
 	var lowest := handoff_height
 	var start: Vector3 = opening.player.position
+	var forward: Vector3 = -opening.camera.global_transform.basis.z
+	forward.y = 0.0
+	forward = forward.normalized()
 	Input.action_press("move_forward")
 	for frame in 120:
 		await get_tree().physics_frame
@@ -115,7 +186,8 @@ func _ready() -> void:
 	Input.action_release("move_forward")
 	check(handoff_height - lowest < 0.12, "standing eye does not fall when physics takes over (drop %.3fm)" % (handoff_height - lowest))
 	check(absf(opening.camera.global_position.y - 1.62) < 0.12, "first steps retain standing eye height")
-	check(opening.player.position.z < start.z - 3.0 and opening.player.is_on_floor(), "first movement walks forward on the grating")
+	var distance: float = (opening.player.position - start).dot(forward)
+	check(distance > 3.0 and opening.player.is_on_floor(), "first movement walks forward on the grating (%.2fm)" % distance)
 	check(opening.breakout_complete and opening.first_acquisition_complete, "breakout and existing restraint acquisition survive the handoff")
 	var cybernetics: Array = WorldHistory.subject("player").get("anatomy_state", {}).get("cybernetics", [])
 	check(cybernetics.any(func(part): return str((part as Dictionary).get("id", "")) == "wetwire chip"), "the wetwire implant is installed as catalogue hardware")
@@ -124,5 +196,4 @@ func _ready() -> void:
 		if argument.begins_with("--capture="):
 			await RenderingServer.frame_post_draw
 			check(get_viewport().get_texture().get_image().save_png(argument.trim_prefix("--capture=")) == OK, "live first-step capture saved")
-	print("OPENING_HANDOFF_TEST_RESULT failures=", failures.size())
-	get_tree().quit(0 if failures.is_empty() else 1)
+	finish()

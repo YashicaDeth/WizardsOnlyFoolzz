@@ -1,5 +1,7 @@
 extends Node
 
+const WOUND_CATALOG := preload("res://systems/wound_catalog.gd")
+
 var failures: Array[String] = []
 
 
@@ -15,10 +17,17 @@ func _ready() -> void:
 		return
 	WorldHistory.clear_history()
 	var opening = load("res://vat_chamber.tscn").instantiate()
+	# Keep automatic-breakout compatibility coverage here; opening_handoff_test
+	# explicitly exercises the playable cord/glass/boot/crawl route.
+	opening.hands_on_breakout = false
 	add_child(opening)
 	await get_tree().process_frame
 	check(opening.phase == "intake", "the handler and sheet are the first playable beat")
 	check(opening.intake != null, "character creation is reachable from a new run")
+	if opening.intake == null:
+		print("OPENING_DIRECTION_TEST_RESULT failures=", failures.size())
+		get_tree().quit(1)
+		return
 	check(opening.clock == 0.0, "the decanting camera does not run behind the form")
 	check(opening.opening_audio.room.playing and opening.opening_audio.pulse.playing, "the Growing Floor has room and body ambience")
 
@@ -37,9 +46,14 @@ func _ready() -> void:
 	# and the walk plus the door plus the head coming back is 4.4s.
 	for _step in 150:
 		opening._update_departure(1.0 / 30.0)
-	check(opening.examiner_node.position.x > examiner_start + 3.0, "the examiner walks to his own door instead of standing there")
+	# Greg, 24 September: he leaves by the door behind the vat, the one the
+	# player will break down to follow him.
+	var his_door: Vector3 = DoctorRoute.DOOR_AT
+	var gone_to := Vector2(opening.examiner_node.global_position.x - his_door.x, opening.examiner_node.global_position.z - his_door.z)
+	check(gone_to.length() < 1.2, "the examiner walks out through his door behind the vat (%.2f m from it)" % gone_to.length())
+	check(opening.examiner_door_heard, "and the door is heard shutting behind him")
 	check(not opening.examiner_node.visible, "and is gone through it before the tank goes")
-	check(absf(opening.staff_door_panel.position.z - opening.STAFF_DOOR_AT.z) < 0.01 and not is_equal_approx(door_start, opening.STAFF_DOOR_AT.z), "the staff door closes behind him")
+	check(absf(opening.staff_door_panel.position.z - opening.STAFF_DOOR_AT.z) < 0.01 and is_equal_approx(door_start, opening.STAFF_DOOR_AT.z), "the staff door stays shut: it is not his way out")
 	check(opening.phase == "submerged", "decanting begins only once he has left")
 	check(opening.get_node("HUD/Objective").text == "", "no escape objective while the man who filed you is still in the room")
 
@@ -47,12 +61,48 @@ func _ready() -> void:
 	opening._update_sequence(0.05)
 	check(opening.phase == "voiding", "the directed camera reaches the voiding beat")
 	check(opening.opening_audio.played_cues.has("drain"), "voiding has its own sound event")
-	opening._breach()
+
+	# The drain does not break the glass by itself. It leaves the body hanging
+	# in the wires under END ALL SUFFERING, and the player tears them out.
+	opening.clock = opening.DRAINED_AT
+	opening._update_sequence(0.05)
+	check(opening.phase == "wired", "a drained tank leaves the player hanging in the wires")
+	check(opening.title.visible and opening.title.text == "END ALL SUFFERING", "the wired beat opens under END ALL SUFFERING")
+	check(opening.umbilicals.size() == 4 and not opening.glass_tank.broken and not opening.breakout_complete, "the wires are still in and the glass still holds")
+	var held_clock: float = opening.clock
+	opening._physics_process(3.0)
+	check(opening.clock == held_clock and opening.phase == "wired", "nothing moves on until the player acts")
+	var pain_before := float(opening.anatomy.call("snapshot").pain)
+	opening._tug_wire(null)
+	check(opening.umbilicals.size() == 4, "tugging at nothing pulls nothing out")
+	var first: Node3D = opening.umbilicals[0]
+	var aim: Vector3 = ((first.get_child(3) as Node3D).global_position - opening.camera.global_position).normalized()
+	opening.yaw = atan2(-aim.x, -aim.z)
+	opening.pitch = asin(aim.y)
+	opening._update_wired(0.0)
+	check(opening._aimed_wire() == first, "looking at a wire aims at it")
+	opening._tug_wire(first)
+	opening._tug_wire(first)
+	check(opening.umbilicals.has(first), "a wire holds until the last tug")
+	check(_tear_all_wires(opening) == 4 and opening.umbilicals.is_empty(), "all four wires come out, one at a time")
+	check(float(opening.anatomy.call("snapshot").pain) > pain_before, "tearing the wires out hurts")
+	check(opening.opening_audio.played_cues.has("tug") and opening.opening_audio.played_cues.has("rip"), "tugging and tearing have their own sound events")
+	check(opening.title.text == "GET REVENGE" and opening.opening_audio.played_cues.has("revenge"), "the last wire turns the screen to GET REVENGE")
+	var wound_labels: Array = (WorldHistory.subject("player").get("wounds", []) as Array).map(func(wound): return WOUND_CATALOG.label(wound))
+	check(wound_labels.has("torn wire sockets"), "the torn wire sockets are recorded as a wound on the body")
+	check(not opening.glass_tank.broken and not opening.breakout_complete, "GET REVENGE holds before the glass goes")
+	opening._physics_process(opening.REVENGE_HOLD + 0.1)
+	check(opening.phase == "floor" and opening.glass_tank.broken, "the glass goes after GET REVENGE")
 	check(opening.opening_audio.played_cues.has("glass"), "the breach has its own sound event")
+	# Job 4: the glass is GlassTank and the spill a FluidBody (real fluid that
+	# pools), dark blood red rather than the old grained floor disc.
+	opening.spill.simulate(2.0)
+	check(opening.spill.volume() > 0.0 and opening.spill.colour.v < 0.5,
+		"the spilled fluid pools as dark red liquid (%.3f m3)" % opening.spill.volume())
 	check(opening.breakout_complete and opening.first_acquisition_complete, "the soul/implant breakout completes instead of stalling in the vat")
 	check(OpeningDirector.reached("broke_free"), "breakout is persisted as an opening stage")
 	var carried: Array = WorldHistory.subject("inventory").get("items", [])
-	check(carried.any(func(item): return str((item as Dictionary).get("label", "")).contains("MEDICAL RESTRAINT")), "the first physical acquisition uses the shared inventory")
+	check(not carried.any(func(item): return str((item as Dictionary).get("label", "")).contains("MEDICAL RESTRAINT")), "no belt in your hand out of the vat (Greg, playtest B)")
 	check(str(WorldHistory.subject("player").get("status", "")) == "broke free", "the player's body and history record the breakout")
 
 	# K3.2. The opening reframed: CellOutz grew you, which is why the debt is
@@ -98,3 +148,19 @@ func _ready() -> void:
 
 	print("OPENING_DIRECTION_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
+
+
+## Aims the real camera at each umbilical and pulls it the way a player does.
+func _tear_all_wires(vat) -> int:
+	var torn := 0
+	while not vat.umbilicals.is_empty() and torn < 8:
+		var cable: Node3D = vat.umbilicals[0]
+		var link: Node3D = cable.get_child(3)
+		var to_link: Vector3 = (link.global_position - vat.camera.global_position).normalized()
+		vat.yaw = atan2(-to_link.x, -to_link.z)
+		vat.pitch = asin(to_link.y)
+		vat._update_wired(0.0)
+		for tug in vat.WIRE_TUGS:
+			vat._tug_wire(vat._aimed_wire())
+		torn += 1
+	return torn

@@ -1,0 +1,1161 @@
+class_name DoctorRoute
+extends Node3D
+
+## The way on is through his door (Greg, 24 September 2026): "you can go back
+## and break down the door with a weapon which shows the destruction physics",
+## then "go through and down an actual elevator with an elevator and a door".
+##
+## Built onto the Growing Floor by `vat_chamber.gd`, which only forwards input
+## and asks for a prompt line. This owns the near wall behind the player's vat
+## (with the doorway and the observation glass he watched through), the door
+## itself (`BreakableDoor`), the HOTLINE CLEAVER beside it (job 3: Greg
+## replaced the fire axe, "200 years in the future, why would they just have
+## an axe"; the internal id stays `axe`), the examination room, and
+## a lift car with doors that rides down to the Support Unit.
+##
+## Everything the room holds beyond the desk, the monitor showing the vat feed
+## and the glass is Greg's to decide (DESIGN/ESCAPE_ROUTES.md), so the room is
+## deliberately bare.
+
+const DOOR_ID := "doctor_door"
+const ROUTE_ID := "doctor_pursuit"
+const ROOM_DISTRICT := "examination_room"
+const DESTINATION := "res://support_unit.tscn"
+const RESTRAINT_LABEL := "BROKEN MEDICAL RESTRAINT"
+const AXE_LABEL := "HOTLINE CLEAVER"
+## What the same tool was called in saves made before job 3.
+const LEGACY_AXE_LABEL := "FIRE AXE"
+const GUN_LABEL := "CELL OUTZ BREACH NINE"
+const GENERATED_MODEL := preload("res://systems/generated_model.gd")
+
+const AXE_REST := Vector3(18.0, 12.0, -28.0)
+const RESTRAINT_REST := Vector3(24.0, -12.0, -32.0)
+
+const OBJECTIVE_DOOR := "GET REVENGE // HE LEFT THROUGH THAT DOOR\nOR ESCAPE THE FACILITY"
+const OBJECTIVE_DOWN := "GET REVENGE // FOLLOW HIM DOWN\nOR ESCAPE THE FACILITY"
+
+## The near wall of the Growing Floor, behind the vat.
+const WALL_Z := 3.6
+const WALL_DEPTH := 0.5
+const WALL_HEIGHT := 4.4
+const WALL_HALF_SPAN := 8.0
+const DOOR_AT := Vector3(1.6, 0.0, WALL_Z)
+const DOOR_SIZE := Vector2(1.2, 2.3)
+## The opening is the leaf plus a hair: the gap either side is too narrow for a
+## body, so the only way through is the leaf.
+const OPENING_HALF := 0.66
+const OPENING_TOP := 2.36
+## The observation glass, left of the door and straight behind the vat.
+const WINDOW_X := Vector2(-2.6, -0.2)
+const WINDOW_Y := Vector2(1.0, 2.3)
+
+## The examination room, on the far side of the wall.
+const ROOM_X := Vector2(-3.5, 4.5)
+const ROOM_Z := Vector2(WALL_Z + WALL_DEPTH * 0.5, 10.5)
+const ROOM_HEIGHT := 3.1
+## The chamber's own floor slab runs to here; the room's floor starts where it stops.
+const CHAMBER_FLOOR_END := 6.2
+
+## The lift: landing doors in the room's back wall, the car in its shaft beyond.
+const CAR_AT := Vector3(0.5, 0.0, 11.8)
+const CAR_HALF := Vector2(1.0, 1.1)
+const CAR_HEIGHT := 2.6
+const CAR_OPENING_HALF := 0.8
+const DESCENT := 14.0
+const RIDE_SECONDS := 6.0
+const DOOR_SECONDS := 0.9
+const SHAFT_BOTTOM := -18.0
+
+const AXE_AT := Vector3(3.5, 0.0, WALL_Z - WALL_DEPTH * 0.5 - 0.05)
+const REACH := 2.4
+const CHARGE_REACH := 1.7
+const COOLDOWN := {"restraint": 0.45, "axe": 0.7, "body": 0.9, "gun": 0.35}
+const BODY_HALF_HEIGHT := 0.85
+const LOOK_SECONDS := 2.4
+
+var chamber: Node3D
+var door: BreakableDoor
+var axe_model: Node3D
+var held_axe: Node3D
+var held_restraint: Node3D
+var carrying_axe := false
+var cooldown := 0.0
+var room_entered := false
+var fight: ExaminerFight
+var _graded_as_office := false
+var last_hit: Dictionary = {}
+
+## Set by a test to see the hand-off without leaving the scene.
+var travel_hook: Callable
+var travel_requested := ""
+var placeholder_shown := false
+
+var car: Node3D
+var car_doors: Array[Node3D] = []
+var landing_doors: Array[Node3D] = []
+var car_indicator: Label3D
+var lift_state := "closed"
+var doors_open := 0.0
+var doors_target := 0.0
+var ride_clock := 0.0
+var car_y := 0.0
+
+var feed_viewport: SubViewport
+## v02-51. The Black Mirror lies on his desk: the v0.1 route's pickup.
+var mirror_model: Node3D
+const MIRROR_REACH := 1.5
+var _was_moving := false
+var _look_left := 0.0
+var _look_from := Vector2.ZERO
+var _look_to := Vector2.ZERO
+
+
+func build(owner_chamber: Node3D) -> void:
+	chamber = owner_chamber
+	name = "DoctorRoute"
+	_build_near_wall()
+	_build_door()
+	_build_axe()
+	_build_room()
+	_build_lift()
+	if door.broken:
+		_open_up()
+
+
+# --- Input and prompt, forwarded by the chamber. ---
+
+## True when the event was used here, so the chamber does not also act on it.
+func handle_input(event: InputEvent) -> bool:
+	if event is InputEventMouseMotion:
+		# The player looking for themselves ends the guided turn.
+		_look_left = 0.0
+		return false
+	if not _can_act():
+		return false
+	# In his office, a blow is for him first, from the mouse or the pad (job 6:
+	# R1 / click hits, L2 / X parries, R2 / right click fires the gun).
+	if fight != null and fight.is_active() and _in_room() and _fight_input(event):
+		return true
+	if event is InputEventMouseButton:
+		var button := event as InputEventMouseButton
+		if not button.pressed:
+			return false
+		if button.button_index == MOUSE_BUTTON_LEFT:
+			return strike(held_weapon())
+		if button.button_index == MOUSE_BUTTON_RIGHT and _gun_rounds() > 0:
+			return strike("gun")
+		return false
+	if event is InputEventKey:
+		var key := event as InputEventKey
+		if not key.pressed or key.echo:
+			return false
+		if key.keycode == KEY_F:
+			return strike("body")
+		if key.keycode == KEY_E:
+			return _use()
+	return false
+
+
+## The examiner fight's share of the input. True when it was used on him.
+func _fight_input(event: InputEvent) -> bool:
+	if event.is_action_pressed("parry"):
+		return fight.player_parry()
+	var gun := event.is_action_pressed("heavy") or (event is InputEventMouseButton and (event as InputEventMouseButton).pressed and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_RIGHT)
+	var swing := event.is_action_pressed("attack")
+	if not gun and not swing:
+		return false
+	# Greg's playtest, "hit him twice... he's dead": blows at him keep the
+	# weapon's own rhythm, the same cooldown as blows at his door.
+	if cooldown > 0.0:
+		return true
+	if gun and _gun_rounds() > 0 and fight.player_strike("gun"):
+		_spend_round()
+		cooldown = float(COOLDOWN["gun"])
+		return true
+	if swing and fight.player_strike(held_weapon()):
+		_swing_held()
+		cooldown = float(COOLDOWN.get(held_weapon(), COOLDOWN["body"]))
+		return true
+	return false
+
+
+## What the prompt line should say here, or "" to leave it to the chamber.
+func prompt_text() -> String:
+	if not _can_act():
+		return ""
+	if fight != null and fight.keycard_in_reach():
+		return "%s TAKE HIS STAFF KEYCARD" % _use_glyph()
+	if _mirror_in_reach():
+		return "%s TAKE THE BLACK MIRROR" % _use_glyph()
+	if lift_state == "riding" or lift_state == "returning":
+		return "GOING DOWN" if lift_state == "riding" else "GOING UP"
+	if lift_state == "arrived":
+		return "[E] RIDE BACK UP" if placeholder_shown else ""
+	if _in_car():
+		return "[E] DOWN" if FacilityRoutes.escaped_once() else "HIS LIFT  //  IT ANSWERS TO HIS KEY"
+	if _near_landing() and lift_state == "closed":
+		return "[E] CALL THE LIFT"
+	if _axe_in_reach():
+		return "[E] TAKE THE HOTLINE CLEAVER"
+	if not door.broken and _flat_distance(DOOR_AT) <= REACH + 0.6:
+		if not _dressed():
+			return "HIS DOOR  //  NOT LIKE THIS  //  NAKED AND SHAKING
+FIND SOMETHING TO WEAR FIRST"
+		var tool := held_weapon()
+		var line := "[F] SHOULDER IT"
+		if tool == "axe":
+			line = "[CLICK] CLEAVE THE DOOR   //   " + line
+		elif tool == "restraint":
+			line = "[CLICK] HIT IT WITH THE RESTRAINT   //   " + line
+		if _gun_rounds() > 0:
+			line += "   //   [RMB] SHOOT (%d)" % _gun_rounds()
+		return "HIS DOOR  //  %s  //  %d%%\n%s" % [door.state.to_upper(), roundi(door.condition() * 100.0), line]
+	return ""
+
+
+func held_weapon() -> String:
+	if carrying_axe:
+		return "axe"
+	if _carries(RESTRAINT_LABEL):
+		return "restraint"
+	return ""
+
+
+## One blow at the door from where the player stands and looks. The body goes
+## in shoulder first along the way they face; everything else lands where the
+## crosshair meets the leaf.
+func strike(weapon: String) -> bool:
+	if weapon == "" or door == null or door.broken or cooldown > 0.0 or not _dressed():
+		return false
+	var camera: Camera3D = chamber.camera
+	var eye := camera.global_position
+	var forward := -camera.global_transform.basis.z
+	var point := Vector3.ZERO
+	var direction := forward
+	if weapon == "body":
+		if _flat_distance(DOOR_AT) > CHARGE_REACH:
+			return false
+		var flat := Vector3(forward.x, 0.0, forward.z).normalized()
+		if flat.dot(Vector3(0, 0, 1)) < 0.5:
+			return false
+		point = Vector3(clampf(chamber.player.global_position.x, DOOR_AT.x - 0.45, DOOR_AT.x + 0.45), 1.3, WALL_Z)
+		direction = flat
+		chamber.player.velocity += flat * 3.0
+		chamber.breach_shake = maxf(chamber.breach_shake, 0.35)
+		chamber.anatomy.call("apply_hit", "torso", 1.0, 0.0, "blunt")
+	else:
+		var hit := _aim_point(eye, forward)
+		if hit == Vector3.INF:
+			return false
+		point = hit
+		if weapon == "gun":
+			_spend_round()
+		chamber.breach_shake = maxf(chamber.breach_shake, 0.12 if weapon == "restraint" else 0.2)
+		_swing_held()
+	cooldown = float(COOLDOWN.get(weapon, 0.5))
+	last_hit = door.hit(weapon, point, direction)
+	if chamber.opening_audio != null:
+		chamber.opening_audio.cue("glass" if weapon == "gun" else "tug")
+	return true
+
+
+func _use_glyph() -> String:
+	return str(chamber.call("_key", "interact")) if chamber != null and chamber.has_method("_key") else "[E]"
+
+
+func _use() -> bool:
+	if fight != null and fight.take_keycard():
+		return true
+	if _mirror_in_reach():
+		_take_mirror()
+		return true
+	if lift_state == "arrived" and placeholder_shown:
+		lift_state = "returning"
+		ride_clock = 0.0
+		return true
+	if _in_car() and lift_state in ["open", "closed"]:
+		if not FacilityRoutes.escaped_once():
+			chamber.subtitle.text = "THE CAR WON'T MOVE  //  HIS KEY, NOT YOURS  //  NOT THIS TIME"
+			return true
+		_ride_down()
+		return true
+	if _near_landing() and lift_state == "closed":
+		lift_state = "open"
+		doors_target = 1.0
+		if chamber.opening_audio != null:
+			chamber.opening_audio.cue("door")
+		return true
+	if _axe_in_reach():
+		_take_axe()
+		return true
+	return false
+
+
+# --- Per frame. ---
+
+func _physics_process(delta: float) -> void:
+	if chamber == null:
+		return
+	_sync_held_restraint()
+	cooldown = maxf(0.0, cooldown - delta)
+	var moving: bool = chamber.can_move and chamber.breakout_complete
+	if moving and not _was_moving:
+		_on_first_steps()
+	_was_moving = moving
+	# Walking off ends the guided turn too: the player acting beats being
+	# steered, and the turn must never bend a step they already chose.
+	if _look_left > 0.0 and Input.get_vector("move_left", "move_right", "move_forward", "move_back").length_squared() > 0.0:
+		_look_left = 0.0
+	if _look_left > 0.0:
+		_look_left = maxf(0.0, _look_left - delta)
+		var t := smoothstep(0.0, 1.0, 1.0 - _look_left / LOOK_SECONDS)
+		chamber.yaw = lerp_angle(_look_from.x, _look_to.x, t)
+		chamber.pitch = lerpf(_look_from.y, _look_to.y, t)
+	if not room_entered and door.broken and _in_room():
+		room_entered = true
+		FacilityRoutes.traverse(ROOM_DISTRICT)
+		WorldHistory.record_event("doctor_route_room_entered", {"location": ROOM_DISTRICT})
+		chamber.subtitle.text = "HIS ROOM  //  THE GLASS HE WATCHED YOU THROUGH"
+	# His room has its own light, so its own grade (HouseLook).
+	var in_office := _in_room() or _in_car(true)
+	if in_office != _graded_as_office:
+		_graded_as_office = in_office
+		var look := get_node_or_null("/root/HouseLook")
+		if look != null:
+			look.set_area("doctor_office" if in_office else "")
+	_update_lift(delta)
+
+
+## Control arrives: the task names his door and the head turns to it, once,
+## unless the player takes the look over themselves.
+func _on_first_steps() -> void:
+	if door.broken:
+		chamber.objective_text = OBJECTIVE_DOWN
+		return
+	chamber.objective_text = OBJECTIVE_DOOR
+	var to_door: Vector3 = DOOR_AT + Vector3(0, 1.3, 0) - chamber.camera.global_position
+	_look_from = Vector2(chamber.yaw, chamber.pitch)
+	_look_to = Vector2(atan2(-to_door.x, -to_door.z), clampf(atan2(to_door.y, Vector2(to_door.x, to_door.z).length()), -0.3, 0.3))
+	_look_left = LOOK_SECONDS
+
+
+func _on_door_broke(method: String) -> void:
+	FacilityRoutes.begin(ROUTE_ID)
+	WorldHistory.record_event("doctor_route_door_broken", {"method": method, "door_id": DOOR_ID})
+	chamber.objective_text = OBJECTIVE_DOWN
+	chamber.subtitle.text = "HIS DOOR IS DOWN"
+	if chamber.opening_audio != null:
+		chamber.opening_audio.cue("door")
+	_open_up()
+
+
+## What the room does once it is open to the player: the monitor shows the vat.
+func _open_up() -> void:
+	if feed_viewport != null:
+		feed_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+
+
+# --- The lift. ---
+
+func _ride_down() -> void:
+	lift_state = "riding"
+	doors_target = 0.0
+	ride_clock = 0.0
+	WorldHistory.record_event("doctor_route_elevator_taken", {"from": ROOM_DISTRICT, "to": DESTINATION})
+	chamber.subtitle.text = ""
+	if chamber.opening_audio != null:
+		chamber.opening_audio.cue("door")
+
+
+func _update_lift(delta: float) -> void:
+	doors_open = move_toward(doors_open, doors_target, delta / DOOR_SECONDS)
+	for index in car_doors.size():
+		var side := -1.0 if index == 0 else 1.0
+		car_doors[index].position.x = side * lerpf(CAR_OPENING_HALF * 0.5, CAR_OPENING_HALF * 1.45, doors_open)
+		landing_doors[index].position.x = CAR_AT.x + side * lerpf(CAR_OPENING_HALF * 0.5, CAR_OPENING_HALF * 1.45, doors_open * (1.0 if car_y > -0.01 else 0.0))
+	match lift_state:
+		"riding":
+			if doors_open > 0.0:
+				_carry_player()
+				return
+			ride_clock += delta
+			var t := clampf(ride_clock / RIDE_SECONDS, 0.0, 1.0)
+			_set_car_y(-DESCENT * smoothstep(0.0, 1.0, t))
+			_carry_player()
+			car_indicator.text = ["0C", "B1", "B2", "B3", "SU"][mini(4, int(t * 4.99))]
+			chamber.breach_shake = maxf(chamber.breach_shake, 0.05 * sin(t * PI))
+			if t >= 1.0:
+				_arrive()
+		"returning":
+			ride_clock += delta
+			var t := clampf(ride_clock / RIDE_SECONDS, 0.0, 1.0)
+			_set_car_y(-DESCENT * (1.0 - smoothstep(0.0, 1.0, t)))
+			_carry_player()
+			car_indicator.text = ["SU", "B3", "B2", "B1", "0C"][mini(4, int(t * 4.99))]
+			if t >= 1.0:
+				lift_state = "open"
+				placeholder_shown = false
+				doors_target = 1.0
+		"arrived":
+			_carry_player()
+
+
+func _arrive() -> void:
+	lift_state = "arrived"
+	WorldHistory.record_event("doctor_route_elevator_arrived", {"to": DESTINATION})
+	if ResourceLoader.exists(DESTINATION):
+		travel_requested = DESTINATION
+		if travel_hook.is_valid():
+			travel_hook.call(DESTINATION)
+		else:
+			Interstitial.travel(DESTINATION, "down after him // the support unit")
+		return
+	# The Support Unit is being built by another lane. Say so plainly rather
+	# than open the doors onto nothing.
+	placeholder_shown = true
+	chamber.subtitle.text = "THE CAR STOPS  //  SUPPORT UNIT NOT BUILT YET  //  THE DOORS STAY SHUT"
+
+
+func _set_car_y(y: float) -> void:
+	car_y = y
+	car.position.y = y
+
+
+## The car holds the body: it goes where the floor goes.
+func _carry_player() -> void:
+	if not _in_car(true):
+		return
+	var player: CharacterBody3D = chamber.player
+	player.global_position.y = car_y + BODY_HALF_HEIGHT + 0.01
+	player.velocity.y = 0.0
+
+
+# --- Where the player is. ---
+
+func _can_act() -> bool:
+	return chamber != null and bool(chamber.can_move) and bool(chamber.breakout_complete)
+
+
+## Greg's playtest: his door stays shut to you until you are out and dressed
+## (0C-4's clothing), so he cannot be reached before the breakout beats.
+func _dressed() -> bool:
+	return preload("res://systems/clothing.gd").worn("player") != "bare"
+
+
+func _flat_distance(to: Vector3) -> float:
+	var offset: Vector3 = to - chamber.player.global_position
+	offset.y = 0.0
+	return offset.length()
+
+
+## Nearer the axe than the door, so the two prompts never fight.
+func _axe_in_reach() -> bool:
+	if carrying_axe or axe_model == null or not axe_model.visible:
+		return false
+	var to_axe := _flat_distance(AXE_AT)
+	return to_axe <= 1.8 and (door.broken or to_axe < _flat_distance(DOOR_AT))
+
+
+func _in_room() -> bool:
+	var at: Vector3 = chamber.player.global_position
+	return at.x > ROOM_X.x and at.x < ROOM_X.y and at.z > ROOM_Z.x + 0.3 and at.z < ROOM_Z.y and at.y > -1.0
+
+
+func _in_car(any_height := false) -> bool:
+	var at: Vector3 = chamber.player.global_position
+	var inside := absf(at.x - CAR_AT.x) < CAR_HALF.x - 0.1 and at.z > CAR_AT.z - CAR_HALF.y + 0.1 and at.z < CAR_AT.z + CAR_HALF.y
+	return inside and (any_height or absf(at.y - (car_y + BODY_HALF_HEIGHT)) < 0.6)
+
+
+func _near_landing() -> bool:
+	var at: Vector3 = chamber.player.global_position
+	return door.broken and absf(at.x - CAR_AT.x) < 1.6 and at.z > ROOM_Z.y - 2.2 and at.z < ROOM_Z.y and absf(car_y) < 0.01
+
+
+## Where the crosshair meets the leaf, or INF when it does not.
+func _aim_point(eye: Vector3, forward: Vector3) -> Vector3:
+	if absf(forward.z) < 0.05:
+		return Vector3.INF
+	var t := (WALL_Z - eye.z) / forward.z
+	if t < 0.0 or t > REACH:
+		return Vector3.INF
+	var point := eye + forward * t
+	if absf(point.x - DOOR_AT.x) > DOOR_SIZE.x * 0.5 or point.y < 0.0 or point.y > DOOR_SIZE.y:
+		return Vector3.INF
+	return point
+
+
+# --- Carry. ---
+
+func _carries(label: String) -> bool:
+	for entry in WorldHistory.subject("inventory").get("items", []):
+		if entry is Dictionary and str((entry as Dictionary).get("label", "")) == label:
+			return true
+	return false
+
+
+func _gun_rounds() -> int:
+	for entry in WorldHistory.subject("inventory").get("items", []):
+		if entry is Dictionary and str((entry as Dictionary).get("label", "")) == GUN_LABEL:
+			return int((entry as Dictionary).get("rounds", 0))
+	return 0
+
+
+func _spend_round() -> void:
+	var carry := Carry.new()
+	for item in carry.items:
+		if str(item.get("label", "")) == GUN_LABEL:
+			item["rounds"] = maxi(0, int(item.get("rounds", 0)) - 1)
+			break
+	carry.save_to_history()
+
+
+func _take_axe() -> void:
+	carrying_axe = true
+	_clear_held_restraint()
+	axe_model.visible = false
+	var carry := Carry.new()
+	carry.items.append({"label": AXE_LABEL, "kind": "tool", "mass": 2.6, "perishes": false, "age": 0.0, "from": "growing_floor"})
+	carry.save_to_history()
+	WorldHistory.record_event("doctor_route_axe_taken", {"location": "growing_floor"})
+	# imp-64: carried by the hunter's animated arms, not hung in view.
+	var arms := FirstPersonArms.new()
+	arms.body = chamber.get("player") as CharacterBody3D
+	chamber.camera.add_child(arms)
+	arms.take("cleaver")
+	held_axe = arms
+	chamber.subtitle.text = "HOTLINE CLEAVER  //  TAKEN OFF THE WALL"
+
+
+func _swing_held() -> void:
+	if held_axe is FirstPersonArms:
+		(held_axe as FirstPersonArms).strike()
+		return
+	var held := held_axe if held_axe != null else held_restraint
+	if held == null:
+		return
+	var rest := AXE_REST if held == held_axe else RESTRAINT_REST
+	var tween := create_tween()
+	tween.tween_property(held, "rotation_degrees", rest + Vector3(-70.0, -10.0, 20.0), 0.12).set_ease(Tween.EASE_OUT)
+	tween.tween_property(held, "rotation_degrees", rest, 0.3).set_trans(Tween.TRANS_QUAD)
+
+
+## The restraint enters Carry after this route is built, when the player tears
+## free of the vat. Mirror that real inventory rather than inventing another
+## equipped state; the axe takes visual precedence exactly as held_weapon does.
+func _sync_held_restraint() -> void:
+	if carrying_axe or not _carries(RESTRAINT_LABEL):
+		_clear_held_restraint()
+		return
+	if held_restraint != null:
+		return
+	held_restraint = _restraint_mesh()
+	LabSurface.hold_in_view(chamber.camera, held_restraint)
+	held_restraint.rotation_degrees = RESTRAINT_REST
+	held_restraint.position += Vector3(0.02, 0.02, 0.0)
+
+
+func _clear_held_restraint() -> void:
+	if held_restraint != null:
+		held_restraint.queue_free()
+		held_restraint = null
+
+
+func _restraint_mesh() -> Node3D:
+	var generated: Node3D = GENERATED_MODEL.make("restraint")
+	if generated != null:
+		return generated
+	# Media-less checkouts still show the carried tool and keep the route fully
+	# playable. Dimensions match the measured generated strap.
+	var restraint := Node3D.new()
+	restraint.name = "DrawnRestraint"
+	var leather := MeshInstance3D.new()
+	var leather_mesh := BoxMesh.new()
+	leather_mesh.size = Vector3(0.055, 0.018, 0.42)
+	leather_mesh.material = WorldLook.surface(Color("39251d"), "leather", 1204)
+	leather.mesh = leather_mesh
+	leather.position.z = -0.22
+	restraint.add_child(leather)
+	for z in [-0.02, -0.44]:
+		var buckle := MeshInstance3D.new()
+		var buckle_mesh := BoxMesh.new()
+		buckle_mesh.size = Vector3(0.09, 0.035, 0.07)
+		buckle_mesh.material = LabSurface.material("plate")
+		buckle.mesh = buckle_mesh
+		buckle.position.z = z
+		restraint.add_child(buckle)
+	return restraint
+
+
+# --- Building. ---
+
+## The Growing Floor's near wall, in pieces around the doorway and the glass.
+func _build_near_wall() -> void:
+	var left := -WALL_HALF_SPAN
+	var right := WALL_HALF_SPAN
+	var door_left := DOOR_AT.x - OPENING_HALF
+	var door_right := DOOR_AT.x + OPENING_HALF
+	_wall_piece(Vector2(left, WINDOW_X.x), Vector2(0.0, WALL_HEIGHT))
+	_wall_piece(WINDOW_X, Vector2(0.0, WINDOW_Y.x))
+	_wall_piece(WINDOW_X, Vector2(WINDOW_Y.y, WALL_HEIGHT))
+	_wall_piece(Vector2(WINDOW_X.y, door_left), Vector2(0.0, WALL_HEIGHT))
+	_wall_piece(Vector2(door_left, door_right), Vector2(OPENING_TOP, WALL_HEIGHT))
+	_wall_piece(Vector2(door_right, right), Vector2(0.0, WALL_HEIGHT))
+	# The glass he watched through: dark from the tank's side, solid to a body.
+	var glass := StaticBody3D.new()
+	glass.name = "ObservationGlass"
+	glass.position = Vector3((WINDOW_X.x + WINDOW_X.y) * 0.5, (WINDOW_Y.x + WINDOW_Y.y) * 0.5, WALL_Z)
+	add_child(glass)
+	var pane := MeshInstance3D.new()
+	var pane_mesh := BoxMesh.new()
+	pane_mesh.size = Vector3(WINDOW_X.y - WINDOW_X.x, WINDOW_Y.y - WINDOW_Y.x, 0.04)
+	var pane_material := StandardMaterial3D.new()
+	pane_material.albedo_color = Color(0.09, 0.12, 0.11, 0.42)
+	pane_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	pane_material.metallic = 0.6
+	pane_material.roughness = 0.08
+	pane_mesh.material = pane_material
+	pane.mesh = pane_mesh
+	glass.add_child(pane)
+	var pane_shape := CollisionShape3D.new()
+	var pane_box := BoxShape3D.new()
+	pane_box.size = pane_mesh.size
+	pane_shape.shape = pane_box
+	glass.add_child(pane_shape)
+	var sill := MeshInstance3D.new()
+	var sill_mesh := BoxMesh.new()
+	sill_mesh.size = Vector3(WINDOW_X.y - WINDOW_X.x + 0.1, 0.06, WALL_DEPTH + 0.06)
+	sill_mesh.material = LabSurface.material("plate")
+	sill.mesh = sill_mesh
+	sill.position = Vector3(glass.position.x, WINDOW_Y.x, WALL_Z)
+	add_child(sill)
+	var sign := Label3D.new()
+	sign.text = "EXAMINATION 0C  //  OBSERVATION"
+	sign.font_size = 34
+	sign.outline_size = 6
+	sign.modulate = Color("d9d0b7")
+	sign.position = Vector3(DOOR_AT.x, OPENING_TOP + 0.35, WALL_Z - WALL_DEPTH * 0.5 - 0.02)
+	# Faces the Growing Floor (-Z), where it is read from.
+	sign.rotation_degrees.y = 180.0
+	sign.pixel_size = 0.004
+	add_child(sign)
+
+
+func _build_door() -> void:
+	door = BreakableDoor.new()
+	door.name = "DoctorDoor"
+	add_child(door)
+	door.position = DOOR_AT
+	# BreakableDoor's room side is its -Z; his room is +Z of the Growing Floor.
+	door.rotation.y = PI
+	door.build(DOOR_ID, DOOR_SIZE, Color("b8b4a6"))
+	door.broke_open.connect(_on_door_broke)
+
+
+## The cleaver on a bracket by the door, a tool rack's lit backing behind it.
+func _build_axe() -> void:
+	axe_model = Node3D.new()
+	axe_model.name = "HotlineCleaver"
+	axe_model.position = AXE_AT + Vector3(0, 1.25, 0)
+	add_child(axe_model)
+	var backing := MeshInstance3D.new()
+	var backing_mesh := BoxMesh.new()
+	backing_mesh.size = Vector3(0.5, 1.15, 0.03)
+	backing_mesh.material = WorldLook.surface(Color("7a1a12"), "paint", 1201)
+	backing.mesh = backing_mesh
+	backing.position = Vector3(0, 0, 0.03)
+	axe_model.add_child(backing)
+	var hung := _axe_mesh()
+	hung.rotation_degrees = Vector3(0, 0, 12.0)
+	axe_model.add_child(hung)
+	var label := Label3D.new()
+	label.text = AXE_LABEL
+	label.font_size = 28
+	label.outline_size = 5
+	label.pixel_size = 0.004
+	label.modulate = Color("f0e2c8")
+	label.position = Vector3(0, 0.7, 0)
+	# Read from the Growing Floor side (-Z), like the door's sign.
+	label.rotation_degrees.y = 180.0
+	axe_model.add_child(label)
+	var lamp := OmniLight3D.new()
+	lamp.light_color = Color("ff5a3a")
+	lamp.light_energy = 0.9
+	lamp.omni_range = 1.4
+	lamp.position = Vector3(0, 0.6, -0.3)
+	axe_model.add_child(lamp)
+	if _carries(AXE_LABEL) or _carries(LEGACY_AXE_LABEL) or WorldHistory.event_count("doctor_route_axe_taken") > 0:
+		axe_model.visible = false
+
+
+## The HOTLINE CLEAVER, the same model the arsenal and the mechanics lab hold
+## (`HeldGear`), stood edge-forward and nose-up like the axe it replaced so
+## the wall bracket and the in-hand rest pose read the same.
+func _axe_mesh() -> Node3D:
+	return cleaver_model()
+
+
+static func cleaver_model() -> Node3D:
+	var holder := Node3D.new()
+	holder.name = "Cleaver"
+	var gear := HeldGear.build_weapon("cleaver")
+	gear.rotation = Vector3(PI * 0.5, 0.0, 0.0)
+	var grip := gear.get_node_or_null("anchor_grip") as Node3D
+	if grip != null:
+		gear.position = -(Basis.from_euler(gear.rotation) * grip.position) + Vector3(0, -0.05, 0)
+	holder.add_child(gear)
+	return holder
+
+
+## His room: the desk facing the glass, the monitor on the vat feed, a lamp,
+## and (Greg's office concept, 26 September) the rest of a working office:
+## see `_dress_room`.
+func _build_room() -> void:
+	var width := ROOM_X.y - ROOM_X.x
+	var centre_x := (ROOM_X.x + ROOM_X.y) * 0.5
+	var depth := ROOM_Z.y - ROOM_Z.x
+	var centre_z := (ROOM_Z.x + ROOM_Z.y) * 0.5
+	_block(Vector3(width + 0.6, 0.4, ROOM_Z.y - CHAMBER_FLOOR_END + 0.2), Vector3(centre_x, -0.2, (CHAMBER_FLOOR_END + ROOM_Z.y) * 0.5), LabSurface.material("floor"))
+	_block(Vector3(width + 0.6, 0.3, depth), Vector3(centre_x, ROOM_HEIGHT + 0.15, centre_z), LabSurface.material("ceiling"))
+	_block(Vector3(0.3, ROOM_HEIGHT, depth), Vector3(ROOM_X.x - 0.15, ROOM_HEIGHT * 0.5, centre_z), LabSurface.material("wall"))
+	_block(Vector3(0.3, ROOM_HEIGHT, depth), Vector3(ROOM_X.y + 0.15, ROOM_HEIGHT * 0.5, centre_z), LabSurface.material("wall"))
+	# The back wall, around the landing doors.
+	var lift_left := CAR_AT.x - CAR_OPENING_HALF
+	var lift_right := CAR_AT.x + CAR_OPENING_HALF
+	_block(Vector3(lift_left - ROOM_X.x, ROOM_HEIGHT, 0.3), Vector3((ROOM_X.x + lift_left) * 0.5, ROOM_HEIGHT * 0.5, ROOM_Z.y), LabSurface.material("wall"))
+	_block(Vector3(ROOM_X.y - lift_right, ROOM_HEIGHT, 0.3), Vector3((ROOM_X.y + lift_right) * 0.5, ROOM_HEIGHT * 0.5, ROOM_Z.y), LabSurface.material("wall"))
+	_block(Vector3(lift_right - lift_left, ROOM_HEIGHT - 2.3, 0.3), Vector3(CAR_AT.x, 2.3 + (ROOM_HEIGHT - 2.3) * 0.5, ROOM_Z.y), LabSurface.material("wall"))
+
+	# The desk, facing the glass: he sat with his back to his door.
+	var desk_at := Vector3((WINDOW_X.x + WINDOW_X.y) * 0.5, 0.0, ROOM_Z.x + 0.75)
+	_block(Vector3(2.0, 0.07, 0.8), desk_at + Vector3(0, 0.84, 0), LabSurface.material("plate"), false)
+	for corner in [Vector2(-0.92, -0.33), Vector2(0.92, -0.33), Vector2(-0.92, 0.33), Vector2(0.92, 0.33)]:
+		_block(Vector3(0.06, 0.82, 0.06), desk_at + Vector3(corner.x, 0.41, corner.y), LabSurface.material("grime"), false)
+	var desk_body := StaticBody3D.new()
+	desk_body.position = desk_at + Vector3(0, 0.45, 0)
+	add_child(desk_body)
+	var desk_shape := CollisionShape3D.new()
+	var desk_box := BoxShape3D.new()
+	desk_box.size = Vector3(2.0, 0.9, 0.8)
+	desk_shape.shape = desk_box
+	desk_body.add_child(desk_shape)
+	_build_black_mirror(desk_at)
+	# The monitor, turned to his chair, showing the tank you were in.
+	var monitor_at := desk_at + Vector3(0.45, 1.2, 0.12)
+	_block(Vector3(0.9, 0.58, 0.08), monitor_at, LabSurface.material("plate"), false)
+	_block(Vector3(0.08, 0.3, 0.08), desk_at + Vector3(0.45, 0.99, 0.1), LabSurface.material("grime"), false)
+	feed_viewport = SubViewport.new()
+	feed_viewport.name = "VatFeed"
+	feed_viewport.size = Vector2i(256, 160)
+	feed_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+	add_child(feed_viewport)
+	var feed_camera := Camera3D.new()
+	feed_camera.fov = 58.0
+	feed_viewport.add_child(feed_camera)
+	feed_camera.look_at_from_position(Vector3(6.8, 3.5, 2.5), Vector3(0, 1.3, 0), Vector3.UP)
+	var screen := MeshInstance3D.new()
+	screen.name = "VatFeedScreen"
+	var screen_mesh := QuadMesh.new()
+	screen_mesh.size = Vector2(0.8, 0.5)
+	var screen_material := StandardMaterial3D.new()
+	screen_material.albedo_texture = feed_viewport.get_texture()
+	screen_material.emission_enabled = true
+	screen_material.emission_texture = feed_viewport.get_texture()
+	screen_material.emission_energy_multiplier = 1.4
+	screen_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	screen_mesh.material = screen_material
+	screen.mesh = screen_mesh
+	# Facing his chair, which is on the room side (+Z) of the desk.
+	screen.position = monitor_at + Vector3(0, 0, 0.045)
+	add_child(screen)
+	var lamp := OmniLight3D.new()
+	lamp.name = "ExamRoomLight"
+	lamp.light_color = Color("cfe3da")
+	lamp.light_energy = 2.2
+	lamp.omni_range = 7.5
+	lamp.position = Vector3(centre_x, ROOM_HEIGHT - 0.3, centre_z - 0.8)
+	add_child(lamp)
+	var tube := MeshInstance3D.new()
+	var tube_mesh := BoxMesh.new()
+	tube_mesh.size = Vector3(1.4, 0.05, 0.14)
+	var tube_material := StandardMaterial3D.new()
+	tube_material.albedo_color = Color("dff0e8")
+	tube_material.emission_enabled = true
+	tube_material.emission = Color("cfe3da")
+	tube_material.emission_energy_multiplier = 2.2
+	tube_mesh.material = tube_material
+	tube.mesh = tube_mesh
+	tube.position = lamp.position + Vector3(0, 0.25, 0)
+	add_child(tube)
+	# The tube is tired and green, not clinical white: the CRTs are what light
+	# this room.
+	lamp.light_color = Color("b9d3a6")
+	lamp.light_energy = 1.5
+	_dress_room()
+	# Greg, 26 September: he is in here, and you can fight him (ExaminerFight).
+	fight = ExaminerFight.new()
+	add_child(fight)
+	fight.setup(self, Vector3(ROOM_X.x + 0.42, 0.0, 7.4), ROOM_X, ROOM_Z)
+
+
+## v02-51 (Greg, 6 Oct: "put it in the v0.1 route, picked up in the examiner
+## office"). The generated phone, screen up on his desk beside the keyboard,
+## with a faint glow off the glass so it reads in the dark room. Once taken it
+## is the handheld's own possessed record, so a rebirth does not lay it out
+## again.
+func _build_black_mirror(desk_at: Vector3) -> void:
+	if BlackMirrorPhone.is_held():
+		return
+	var model: Node3D = GENERATED_MODEL.make("black_mirror")
+	if model == null:
+		var drawn := MeshInstance3D.new()
+		var slab := BoxMesh.new()
+		slab.size = Vector3(0.075, 0.012, 0.155)
+		var glass := StandardMaterial3D.new()
+		glass.albedo_color = Color("0b0c0e")
+		glass.metallic = 0.8
+		glass.roughness = 0.15
+		glass.emission_enabled = true
+		glass.emission = Color(0.25, 0.55, 0.5)
+		glass.emission_energy_multiplier = 0.35
+		slab.material = glass
+		drawn.mesh = slab
+		model = drawn
+	model.name = "DeskBlackMirror"
+	model.position = desk_at + Vector3(-0.55, 0.885, 0.12)
+	model.rotation.y = 0.4
+	add_child(model)
+	var glow := OmniLight3D.new()
+	glow.name = "MirrorGlow"
+	glow.light_color = Color("9bd4b0")
+	glow.light_energy = 0.35
+	glow.omni_range = 0.9
+	glow.shadow_enabled = false
+	glow.position = Vector3(0, 0.08, 0)
+	model.add_child(glow)
+	mirror_model = model
+
+
+func _mirror_in_reach() -> bool:
+	return mirror_model != null and is_instance_valid(mirror_model) and mirror_model.visible and _in_room() and _flat_distance(mirror_model.global_position) <= MIRROR_REACH
+
+
+func _take_mirror() -> void:
+	mirror_model.visible = false
+	BlackMirrorPhone.take(ROOM_DISTRICT)
+	var profile := get_node_or_null("/root/InputProfile")
+	var raise := str(profile.call("glyph", "device")) if profile != null else "G"
+	chamber.subtitle.text = "BLACK MIRROR TAKEN  //  [%s] RAISE IT" % raise
+	if chamber.opening_audio != null:
+		chamber.opening_audio.cue("tug")
+
+
+## What Greg's office concept (26 September) has in it, built from the game's
+## own boxes and surfaces rather than taken from the picture: a bank of green
+## CRTs on a steel bench with a keyboard, a corkboard of his notes above it,
+## filing cabinets by the lift, a gurney with an IV stand, and his blood on
+## the floor. All against the walls: the way from his door to the lift stays
+## clear. Placeholder geometry in the house palette, to swap for authored
+## props.
+func _dress_room() -> void:
+	var crt_green := Color("8bbd79")
+	# The bench along the left wall, halfway down the room.
+	var bench_at := Vector3(ROOM_X.x + 0.42, 0.0, 7.4)
+	_block(Vector3(0.8, 0.9, 2.2), bench_at + Vector3(0, 0.45, 0), _flat(Color("2c2a26")))
+	var crt_spots := [Vector3(0, 1.14, -0.55), Vector3(0, 1.14, 0.1), Vector3(0, 1.6, -0.22)]
+	for index in crt_spots.size():
+		var at: Vector3 = bench_at + crt_spots[index]
+		_block(Vector3(0.46, 0.44, 0.5), at, _flat(Color("9c9580")), false)
+		var glass := MeshInstance3D.new()
+		var glass_mesh := QuadMesh.new()
+		glass_mesh.size = Vector2(0.4, 0.3)
+		var glow := StandardMaterial3D.new()
+		glow.albedo_color = crt_green.darkened(0.55)
+		glow.emission_enabled = true
+		glow.emission = crt_green
+		glow.emission_energy_multiplier = 0.75 - 0.12 * index
+		glass_mesh.material = glow
+		glass.mesh = glass_mesh
+		# Facing into the room (+X).
+		glass.rotation_degrees.y = 90.0
+		glass.position = at + Vector3(0.24, 0.02, 0)
+		add_child(glass)
+	_block(Vector3(0.22, 0.03, 0.62), bench_at + Vector3(0.18, 0.915, 0.9), _flat(Color("3a3632")), false)
+	var screens := OmniLight3D.new()
+	screens.name = "CrtGlow"
+	screens.light_color = crt_green
+	screens.light_energy = 2.6
+	screens.omni_range = 4.2
+	screens.position = bench_at + Vector3(0.9, 1.3, -0.2)
+	add_child(screens)
+	# His notes above the bench.
+	var board_at := Vector3(ROOM_X.x + 0.04, 2.05, 7.4)
+	_block(Vector3(0.04, 0.8, 1.3), board_at, _flat(Color("4e3620")), false)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1316
+	for index in 6:
+		var note := _block(Vector3(0.01, 0.2 + rng.randf() * 0.1, 0.16 + rng.randf() * 0.08), board_at + Vector3(0.03, rng.randf_range(-0.25, 0.25), rng.randf_range(-0.5, 0.5)), _flat(Color("b9ab8a")), false)
+		note.rotation.x = rng.randf_range(-0.12, 0.12)
+	# Filing cabinets by the lift, on the right.
+	for index in 2:
+		var cabinet_at := Vector3(ROOM_X.y - 0.34, 0.0, ROOM_Z.y - 0.45 - 0.62 * index)
+		_block(Vector3(0.6, 1.32, 0.58), cabinet_at + Vector3(0, 0.66, 0), LabSurface.material("plate"))
+		for drawer in 4:
+			_block(Vector3(0.02, 0.03, 0.4), cabinet_at + Vector3(-0.31, 0.2 + 0.31 * drawer, 0), _flat(Color("1a1816")), false)
+	# The gurney along the right wall, and the drip beside it.
+	var gurney_at := Vector3(ROOM_X.y - 0.5, 0.0, 6.2)
+	_block(Vector3(0.8, 0.12, 1.9), gurney_at + Vector3(0, 0.68, 0), LabSurface.material("plate"))
+	_block(Vector3(0.72, 0.1, 1.8), gurney_at + Vector3(0, 0.79, 0), _flat(Color("6f675a")), false)
+	for corner in [Vector2(-0.34, -0.85), Vector2(0.34, -0.85), Vector2(-0.34, 0.85), Vector2(0.34, 0.85)]:
+		_block(Vector3(0.04, 0.62, 0.04), gurney_at + Vector3(corner.x, 0.31, corner.y), LabSurface.material("grime"), false)
+	var drip_at := gurney_at + Vector3(-0.55, 0.0, 1.15)
+	_block(Vector3(0.03, 1.9, 0.03), drip_at + Vector3(0, 0.95, 0), LabSurface.material("plate"), false)
+	var bag := _block(Vector3(0.16, 0.26, 0.05), drip_at + Vector3(0.1, 1.72, 0), _flat(Color("4a0c08"), 0.3), false)
+	bag.rotation.y = 0.3
+	# His blood, old: where he worked and where he lay.
+	for spot in [Vector3(-1.2, 0.012, 5.6), Vector3(3.2, 0.012, 6.6), Vector3(0.9, 0.012, 8.9)]:
+		var stain := _block(Vector3(0.5 + rng.randf() * 0.4, 0.004, 0.3 + rng.randf() * 0.3), spot, _flat(Color("1c0504"), 0.25), false)
+		stain.rotation.y = rng.randf() * TAU
+	_dress_his_life(gurney_at, rng)
+
+
+## Greg's playtest (the room felt empty): a surgery, his records, his
+## specimens and a life of his own. Still against the walls, still boxes.
+func _dress_his_life(gurney_at: Vector3, rng: RandomNumberGenerator) -> void:
+	var steel := LabSurface.material("plate")
+	var strap := _flat(Color("2a1a12"), 0.6)
+	# Surgery: straps across the gurney, a tray of his tools, the lamp over it
+	# and the drain under it.
+	for z in [-0.6, 0.0, 0.6]:
+		_block(Vector3(0.76, 0.03, 0.08), gurney_at + Vector3(0, 0.86, z), strap, false)
+	var tray_at := gurney_at + Vector3(-0.85, 0.0, 1.0)
+	_block(Vector3(0.03, 0.95, 0.03), tray_at + Vector3(0, 0.47, 0), steel, false)
+	_block(Vector3(0.5, 0.02, 0.34), tray_at + Vector3(0, 0.96, 0), steel, false)
+	for index in 5:
+		var tool := _block(Vector3(0.012, 0.008, 0.14 + rng.randf() * 0.06), tray_at + Vector3(-0.18 + index * 0.09, 0.98, rng.randf_range(-0.05, 0.05)), _flat(Color("b8bcb6"), 0.25), false)
+		tool.rotation.y = rng.randf_range(-0.2, 0.2)
+	_block(Vector3(0.12, 0.004, 0.08), tray_at + Vector3(0.12, 0.975, 0.1), _flat(Color("3b0806"), 0.2), false)
+	# Greg's generated bone drill, lying on its side on the tray.
+	var drill := GENERATED_MODEL.make("bone_drill")
+	if drill != null:
+		drill.position = tray_at + Vector3(0.08, 0.97, -0.02)
+		drill.rotation.y = -0.5
+		add_child(drill)
+	var lamp_at := gurney_at + Vector3(0, ROOM_HEIGHT - 0.9, 0)
+	# Greg's generated lamp: its head where the drawn dish hung, its arm up to
+	# a short pole from the ceiling. The drawn pole and dish are the fallback.
+	var lamp := GENERATED_MODEL.make("surgical_lamp")
+	if lamp != null:
+		lamp.position = lamp_at - GENERATED_MODEL.LAMP_HEAD
+		add_child(lamp)
+		var ceiling := gurney_at.y + ROOM_HEIGHT
+		_block(Vector3(0.03, ceiling - lamp.position.y, 0.03), Vector3(lamp.position.x, (ceiling + lamp.position.y) * 0.5, lamp.position.z), steel, false)
+	else:
+		_block(Vector3(0.03, 0.9, 0.03), lamp_at + Vector3(0, 0.45, 0), steel, false)
+		var dish := MeshInstance3D.new()
+		var dish_mesh := CylinderMesh.new()
+		dish_mesh.top_radius = 0.12
+		dish_mesh.bottom_radius = 0.3
+		dish_mesh.height = 0.14
+		dish_mesh.material = steel
+		dish.mesh = dish_mesh
+		dish.position = lamp_at
+		add_child(dish)
+	var surgery := SpotLight3D.new()
+	surgery.name = "SurgeryLamp"
+	surgery.light_color = Color("e8efe0")
+	surgery.light_energy = 3.0
+	surgery.spot_range = 3.2
+	surgery.spot_angle = 26.0
+	surgery.rotation_degrees.x = -90.0
+	surgery.position = lamp_at + Vector3(0, -0.08, 0)
+	add_child(surgery)
+	var drain := MeshInstance3D.new()
+	var grate := CylinderMesh.new()
+	grate.top_radius = 0.14
+	grate.bottom_radius = 0.14
+	grate.height = 0.01
+	grate.material = _flat(Color("0d0b0a"), 0.4)
+	drain.mesh = grate
+	drain.position = gurney_at + Vector3(-0.2, 0.008, 0.2)
+	add_child(drain)
+	# His records: a wall of subjects on the left, yours in the middle, ringed.
+	var wall_at := Vector3(ROOM_X.x + 0.03, 1.7, 5.1)
+	_block(Vector3(0.02, 1.0, 1.6), wall_at, _flat(Color("30261b")), false)
+	for row in 3:
+		for column in 5:
+			var at := wall_at + Vector3(0.02, 0.3 - row * 0.3, -0.6 + column * 0.3)
+			var yours := row == 1 and column == 2
+			_block(Vector3(0.01, 0.2, 0.15), at, _flat(Color("c8c1ae") if yours else Color("8d8676")), false)
+			_block(Vector3(0.012, 0.11, 0.09), at + Vector3(0.002, 0.03, 0), _flat(Color("3a302a")), false)
+			if yours:
+				for side in [-1.0, 1.0]:
+					_block(Vector3(0.014, 0.26, 0.012), at + Vector3(0.004, 0, side * 0.1), _flat(Color("8a0f0b"), 0.4), false)
+					_block(Vector3(0.014, 0.012, 0.21), at + Vector3(0.004, side * 0.13, 0), _flat(Color("8a0f0b"), 0.4), false)
+	# Specimens: shelves of jars on the left wall past the bench, labelled.
+	var shelf_at := Vector3(ROOM_X.x + 0.22, 0.0, 9.7)
+	for level in 3:
+		var y := 0.55 + level * 0.55
+		_block(Vector3(0.4, 0.03, 1.2), shelf_at + Vector3(0, y, 0), steel)
+		for jar_index in 4:
+			var jar_at := shelf_at + Vector3(0, y + 0.13, -0.45 + jar_index * 0.3)
+			var jar := MeshInstance3D.new()
+			var jar_mesh := CylinderMesh.new()
+			jar_mesh.top_radius = 0.08
+			jar_mesh.bottom_radius = 0.08
+			jar_mesh.height = 0.24
+			var fluid := StandardMaterial3D.new()
+			fluid.albedo_color = Color(0.45, 0.4, 0.22, 0.45)
+			fluid.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			fluid.roughness = 0.05
+			jar_mesh.material = fluid
+			jar.mesh = jar_mesh
+			jar.position = jar_at
+			add_child(jar)
+			var part := _block(Vector3(0.07, 0.06 + rng.randf() * 0.06, 0.06), jar_at + Vector3(0, -0.03, 0), _flat(Color("5a2a22").lerp(Color("8a6a55"), rng.randf()), 0.5), false)
+			part.rotation = Vector3(rng.randf(), rng.randf(), rng.randf())
+			_block(Vector3(0.005, 0.05, 0.08), jar_at + Vector3(0.082, 0, 0), _flat(Color("d6ceb8")), false)
+	# A life: his own jacket on a hook by the door, a cold coffee and a photo on the desk.
+	var hook_at := Vector3(ROOM_X.y - 0.05, 1.75, 4.6)
+	_block(Vector3(0.08, 0.03, 0.03), hook_at, steel, false)
+	_block(Vector3(0.1, 0.95, 0.5), hook_at + Vector3(-0.07, -0.5, 0), _flat(Color("3b3530"), 0.9), false)
+	var desk_top := Vector3((WINDOW_X.x + WINDOW_X.y) * 0.5, 0.875, ROOM_Z.x + 0.75)
+	var mug := MeshInstance3D.new()
+	var mug_mesh := CylinderMesh.new()
+	mug_mesh.top_radius = 0.045
+	mug_mesh.bottom_radius = 0.04
+	mug_mesh.height = 0.1
+	mug_mesh.material = _flat(Color("e4ded0"), 0.4)
+	mug.mesh = mug_mesh
+	mug.position = desk_top + Vector3(0.6, 0.05, 0.15)
+	add_child(mug)
+	_block(Vector3(0.07, 0.002, 0.07), desk_top + Vector3(0.6, 0.101, 0.15), _flat(Color("1a0e08"), 0.1), false)
+	var frame := _block(Vector3(0.16, 0.2, 0.02), desk_top + Vector3(-0.7, 0.1, 0.25), _flat(Color("2a2320")), false)
+	frame.rotation.x = -0.25
+	frame.rotation.y = PI + 0.3
+	var picture := _block(Vector3(0.12, 0.15, 0.004), Vector3(0, 0, -0.012), _flat(Color("a39579")), false, frame)
+	picture.position = Vector3(0, 0, -0.012)
+
+
+## A plain authored colour: the procedural paint grain reads as camouflage
+## under the CRT light at this size.
+func _flat(colour: Color, roughness := 0.85) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = colour
+	material.roughness = roughness
+	return material
+
+
+func _build_lift() -> void:
+	# The shaft beyond the back wall, deep enough for the ride.
+	var shaft_height := ROOM_HEIGHT - SHAFT_BOTTOM
+	var shaft_mid := (ROOM_HEIGHT + SHAFT_BOTTOM) * 0.5
+	var concrete := LabSurface.material("wall")
+	_block(Vector3(0.2, shaft_height, CAR_HALF.y * 2.0 + 0.5), Vector3(CAR_AT.x - CAR_HALF.x - 0.15, shaft_mid, CAR_AT.z), concrete)
+	_block(Vector3(0.2, shaft_height, CAR_HALF.y * 2.0 + 0.5), Vector3(CAR_AT.x + CAR_HALF.x + 0.15, shaft_mid, CAR_AT.z), concrete)
+	_block(Vector3(CAR_HALF.x * 2.0 + 0.5, shaft_height, 0.2), Vector3(CAR_AT.x, shaft_mid, CAR_AT.z + CAR_HALF.y + 0.15), concrete)
+	_block(Vector3(CAR_HALF.x * 2.0 + 0.5, 0.3, CAR_HALF.y * 2.0 + 0.5), Vector3(CAR_AT.x, SHAFT_BOTTOM, CAR_AT.z), concrete)
+
+	# Landing doors in the room's back wall.
+	for side in [-1.0, 1.0]:
+		var leaf := _moving_panel(self, Vector3(CAR_OPENING_HALF - 0.015, 2.3, 0.06), Vector3(CAR_AT.x + side * CAR_OPENING_HALF * 0.5, 1.15, ROOM_Z.y - 0.02), LabSurface.material("plate"))
+		leaf.name = "LandingDoor_%s" % ("L" if side < 0.0 else "R")
+		landing_doors.append(leaf)
+	var call_light := OmniLight3D.new()
+	call_light.light_color = Color("ff7a2a")
+	call_light.light_energy = 1.2
+	call_light.omni_range = 1.8
+	call_light.position = Vector3(CAR_AT.x + CAR_OPENING_HALF + 0.35, 1.3, ROOM_Z.y - 0.3)
+	add_child(call_light)
+	_block(Vector3(0.12, 0.22, 0.04), call_light.position + Vector3(0, 0, 0.12), WorldLook.surface(Color("ff7a2a"), "paint", 1210), false)
+
+	# The car. Its own floor, walls, roof and doors all move together.
+	car = Node3D.new()
+	car.name = "LiftCar"
+	car.position = CAR_AT
+	add_child(car)
+	var plate := LabSurface.material("plate")
+	var grime := LabSurface.material("grime")
+	_block(Vector3(CAR_HALF.x * 2.0, 0.2, CAR_HALF.y * 2.0), Vector3(0, -0.1, 0), grime, true, car)
+	_block(Vector3(CAR_HALF.x * 2.0, 0.12, CAR_HALF.y * 2.0), Vector3(0, CAR_HEIGHT + 0.06, 0), plate, true, car)
+	_block(Vector3(0.08, CAR_HEIGHT, CAR_HALF.y * 2.0), Vector3(-CAR_HALF.x + 0.04, CAR_HEIGHT * 0.5, 0), plate, true, car)
+	_block(Vector3(0.08, CAR_HEIGHT, CAR_HALF.y * 2.0), Vector3(CAR_HALF.x - 0.04, CAR_HEIGHT * 0.5, 0), plate, true, car)
+	_block(Vector3(CAR_HALF.x * 2.0, CAR_HEIGHT, 0.08), Vector3(0, CAR_HEIGHT * 0.5, CAR_HALF.y - 0.04), plate, true, car)
+	var stub := CAR_HALF.x - CAR_OPENING_HALF
+	for side in [-1.0, 1.0]:
+		_block(Vector3(stub, CAR_HEIGHT, 0.08), Vector3(side * (CAR_OPENING_HALF + stub * 0.5), CAR_HEIGHT * 0.5, -CAR_HALF.y + 0.04), plate, true, car)
+		var leaf := _moving_panel(car, Vector3(CAR_OPENING_HALF - 0.015, 2.3, 0.05), Vector3(side * CAR_OPENING_HALF * 0.5, 1.15, -CAR_HALF.y + 0.1), grime)
+		leaf.name = "CarDoor_%s" % ("L" if side < 0.0 else "R")
+		car_doors.append(leaf)
+	_block(Vector3(CAR_OPENING_HALF * 2.0, CAR_HEIGHT - 2.3, 0.08), Vector3(0, 2.3 + (CAR_HEIGHT - 2.3) * 0.5, -CAR_HALF.y + 0.04), plate, true, car)
+	# A handrail and the button panel, so it reads as a lift from inside.
+	_block(Vector3(0.04, 0.04, CAR_HALF.y * 1.6), Vector3(CAR_HALF.x - 0.12, 0.95, 0), grime, false, car)
+	_block(Vector3(0.04, 0.04, CAR_HALF.y * 1.6), Vector3(-CAR_HALF.x + 0.12, 0.95, 0), grime, false, car)
+	_block(Vector3(0.03, 0.5, 0.22), Vector3(CAR_HALF.x - 0.1, 1.3, -CAR_HALF.y + 0.35), plate, false, car)
+	for button in 4:
+		_block(Vector3(0.02, 0.05, 0.05), Vector3(CAR_HALF.x - 0.12, 1.45 - float(button) * 0.1, -CAR_HALF.y + 0.35), WorldLook.surface(Color("ffb35a") if button == 3 else Color("5a5650"), "paint", 1220 + button), false, car)
+	car_indicator = Label3D.new()
+	car_indicator.text = "0C"
+	car_indicator.font_size = 64
+	car_indicator.outline_size = 8
+	car_indicator.pixel_size = 0.004
+	car_indicator.modulate = Color("ffb35a")
+	# Inside, above the doors, facing back into the car (+Z).
+	car_indicator.position = Vector3(0, 2.45, -CAR_HALF.y + 0.13)
+	car.add_child(car_indicator)
+	var car_light := OmniLight3D.new()
+	car_light.light_color = Color("ffd9a8")
+	car_light.light_energy = 2.4
+	car_light.omni_range = 3.6
+	car_light.position = Vector3(0, CAR_HEIGHT - 0.25, 0.1)
+	car.add_child(car_light)
+
+
+func _wall_piece(span_x: Vector2, span_y: Vector2) -> void:
+	var size := Vector3(span_x.y - span_x.x, span_y.y - span_y.x, WALL_DEPTH)
+	var at := Vector3((span_x.x + span_x.y) * 0.5, (span_y.x + span_y.y) * 0.5, WALL_Z)
+	# The same surface the single slab had: `LabSurface.for_slab` reads a
+	# standing box as wall whatever its size.
+	_block(size, at, LabSurface.material("wall"))
+
+
+func _block(size: Vector3, at: Vector3, material: Material, solid := true, parent: Node3D = null) -> MeshInstance3D:
+	var host: Node3D = self if parent == null else parent
+	var mesh_instance := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = size
+	box.material = material
+	mesh_instance.mesh = box
+	if not solid:
+		mesh_instance.position = at
+		host.add_child(mesh_instance)
+		return mesh_instance
+	var body := StaticBody3D.new()
+	body.position = at
+	host.add_child(body)
+	body.add_child(mesh_instance)
+	var collision := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = size
+	collision.shape = shape
+	body.add_child(collision)
+	return mesh_instance
+
+
+func _moving_panel(parent: Node3D, size: Vector3, at: Vector3, material: Material) -> Node3D:
+	var body := AnimatableBody3D.new()
+	body.sync_to_physics = false
+	body.position = at
+	parent.add_child(body)
+	var mesh_instance := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = size
+	box.material = material
+	mesh_instance.mesh = box
+	body.add_child(mesh_instance)
+	var collision := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = size
+	collision.shape = shape
+	body.add_child(collision)
+	return body

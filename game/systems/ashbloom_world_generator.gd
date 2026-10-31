@@ -47,6 +47,26 @@ func generate(seed_value: int = 774013) -> void:
 			if lot % 2 == 0:
 				var light_at := Vector3(lot_center.x - width * 0.5 - 1.3, 0, lot_center.y + depth * 0.5 + 1.7)
 				_build_street_light("street_light_d%d_l%d" % [district, lot], light_at, clampf(height * 0.55, 3.4, 5.2))
+	_cull_past_the_fog()
+
+
+## Greg's playtest (frame rate): 1547 district meshes drew at any distance.
+## Past 170 m the Hunt's fog (0.012) has already swallowed them, so they stop
+## drawing and casting there. Roads and anything that big stay.
+const FOG_CULL := 170.0
+
+
+func _cull_past_the_fog() -> void:
+	var stack: Array[Node] = [self]
+	while not stack.is_empty():
+		var node: Node = stack.pop_back()
+		stack.append_array(node.get_children())
+		if node is GeometryInstance3D and (node as GeometryInstance3D).visibility_range_end <= 0.0:
+			# Range is measured to the centre: a road a region long would vanish
+			# under your feet, so anything over 60 m across is left alone.
+			var span := (node as GeometryInstance3D).get_aabb().size
+			if maxf(span.x, span.z) < 60.0:
+				(node as GeometryInstance3D).visibility_range_end = FOG_CULL
 
 
 ## Local work has to change the walked place, not merely its dossier. These

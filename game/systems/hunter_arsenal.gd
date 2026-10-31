@@ -19,6 +19,29 @@ const WEAPONS := {
 		"impulse": 28.0, "reach": 3.7, "cooldown": 0.58,
 		"windup": 0.28, "stamina": 20.0, "damage_type": "cut",
 	},
+	# Greg, 28 September: the shiv from the den is a real weapon. Fast, it
+	# opens wounds that bleed (puncture), short reach, and armour stops most
+	# of it (low impulse, low damage per hit).
+	"shiv": {
+		"label": "SHIV", "kind": "melee", "damage": 20.0,
+		"impulse": 8.0, "reach": 2.2, "cooldown": 0.3,
+		"windup": 0.12, "stamina": 9.0, "damage_type": "puncture",
+	},
+	# v0.1 Brawler (job 3). Greg, 5 Oct 02:20: weapons carry industrial
+	# product names in the CellOutz catalogue style; HOTLINE CLEAVER and
+	# PRODSTAFF are his working names. Move timings live in
+	# `SwordMoveset.WEAPON_TABLES`, hit feel (hitstop, heat, shock) in
+	# `MeleeDriver.FEEL`; these are the per-hit numbers the arsenal hands out.
+	"cleaver": {
+		"label": "HOTLINE CLEAVER", "kind": "melee", "damage": 38.0,
+		"impulse": 26.0, "reach": 2.5, "cooldown": 0.46,
+		"windup": 0.20, "stamina": 16.0, "damage_type": "cut",
+	},
+	"staff": {
+		"label": "PRODSTAFF", "kind": "melee", "damage": 24.0,
+		"impulse": 32.0, "reach": 3.5, "cooldown": 0.58,
+		"windup": 0.24, "stamina": 18.0, "damage_type": "blunt",
+	},
 	"shotgun": {
 		"label": "BONE YARD 12G", "kind": "firearm", "damage": 16.0,
 		"impulse": 34.0, "range": 42.0, "cooldown": 0.92,
@@ -67,7 +90,10 @@ const WEAPONS := {
 ## `facility_sidearm` is not: it is a weapon you come into possession of, and
 ## a rifle that reaches across the whole bone yard is not something the game
 ## should hand you at spawn.
-const SLOT_ORDER := ["sword", "shotgun", "sidearm"]
+## imp-64, Greg 5 Oct ~19:00: the Hunt must stop giving the old sword; the
+## HOTLINE CLEAVER is the issued blade. `sword` stays in `WEAPONS` for the
+## rooms and tests that still name it.
+const SLOT_ORDER := ["cleaver", "shotgun", "sidearm"]
 ## AF10.10. These are attachment points on the object, not perks on its
 ## holder. The future crafting screen may decide where a part comes from, but
 ## it must install through this vocabulary so the Hunt, range and cab all read
@@ -85,7 +111,7 @@ const CUSTOMIZATION_SCALES := {
 	"reload_scale": Vector2(0.5, 2.0),
 }
 
-var current_id := "sword"
+var current_id := "cleaver"
 var cooldown := 0.0
 var reload_remaining := 0.0
 var shot_serial := 0
@@ -110,6 +136,11 @@ var condition: Dictionary = {}
 ## weapon it actually has. Part records remain data (id, label, provenance and
 ## modifiers) so a later crafting/persistence layer can move them intact.
 var customization: Dictionary = {}
+## Greg, 24 September: weapons evolve through fighting, not shops. What a
+## style's blood tree has unlocked for one weapon, as the same scale vocabulary
+## a fitted part uses (`BloodLedger` writes it; nothing else should). Kept apart
+## from `customization` so removing a part never strips a learned skill.
+var blood_modifiers: Dictionary = {}
 var models: Dictionary = {}
 var hand: Node3D
 
@@ -155,6 +186,38 @@ func configure(rig: BaselineHuman) -> void:
 			_magazine_nodes[weapon_id] = magazine
 			_magazine_rest[weapon_id] = magazine.position
 	_update_models()
+
+
+## Paint each held model with the skin applied to it (`SkinLoadout`), or its
+## own finish when none is. Called on arrival and whenever a skin changes or
+## wears.
+func apply_skins() -> void:
+	for weapon_id: String in models:
+		var model := models[weapon_id] as Node3D
+		if model == null or not is_instance_valid(model):
+			continue
+		var item := SkinLoadout.applied(weapon_id)
+		var original: Dictionary = _unskinned.get(weapon_id, {})
+		if original.is_empty():
+			original = _collect_materials(model, {})
+			_unskinned[weapon_id] = original
+		if item.is_empty():
+			for node: MeshInstance3D in original:
+				if is_instance_valid(node):
+					node.material_override = original[node]
+		else:
+			WeaponSkins.apply_to(model, item)
+
+
+var _unskinned: Dictionary = {}
+
+
+func _collect_materials(node: Node, found: Dictionary) -> Dictionary:
+	if node is MeshInstance3D:
+		found[node] = (node as MeshInstance3D).material_override
+	for child in node.get_children():
+		found = _collect_materials(child, found)
+	return found
 
 
 func tick(delta: float) -> void:
@@ -278,7 +341,28 @@ func weapon_definition(weapon_id: String) -> Dictionary:
 			var property_name := str(scale_name).trim_suffix("_scale")
 			if result.has(property_name):
 				result[property_name] = float(result[property_name]) * float(modifiers[scale_name])
+	var learned := blood_modifiers.get(weapon_id, {}) as Dictionary
+	for scale_name in learned:
+		var property_name := str(scale_name).trim_suffix("_scale")
+		if result.has(property_name):
+			result[property_name] = float(result[property_name]) * float(learned[scale_name])
 	return result
+
+
+## The blood tree's side of `install_customization`: same scale names, same
+## clamp, one dictionary per weapon, replaced whole each time.
+func set_blood_modifiers(weapon_id: String, modifiers: Dictionary) -> void:
+	if not WEAPONS.has(weapon_id):
+		return
+	var clamped: Dictionary = {}
+	for scale_name in modifiers:
+		if CUSTOMIZATION_SCALES.has(scale_name):
+			var bounds: Vector2 = CUSTOMIZATION_SCALES[scale_name]
+			clamped[scale_name] = clampf(float(modifiers[scale_name]), bounds.x, bounds.y)
+	if clamped.is_empty():
+		blood_modifiers.erase(weapon_id)
+	else:
+		blood_modifiers[weapon_id] = clamped
 
 
 func weapon_customization(weapon_id: String = "") -> Dictionary:
@@ -339,6 +423,19 @@ func acquire_sniper(rounds_left: int = -1) -> bool:
 			_magazine_rest[current_id] = magazine_node.position
 	_update_models()
 	equipped.emit(current_id)
+	return true
+
+
+## A melee weapon you came by (the den's shiv): carried from now on.
+func acquire_melee(weapon_id: String) -> bool:
+	if not WEAPONS.has(weapon_id) or str(WEAPONS[weapon_id].kind) != "melee":
+		return false
+	acquired[weapon_id] = true
+	if hand != null and not models.has(weapon_id):
+		var model := _build_weapon_model(weapon_id)
+		hand.add_child(model)
+		models[weapon_id] = model
+		model.visible = weapon_id == current_id
 	return true
 
 
@@ -616,7 +713,7 @@ func apply_grip(grip_name: String) -> bool:
 ## parented to that arm inherits the pitch a second time unless it is cancelled;
 ## read from the constant rather than copied, so retuning the pose does not
 ## quietly lay the blade down across the view again.
-func _build_weapon_model(weapon_id: String) -> Node3D:
+static func _build_weapon_model(weapon_id: String) -> Node3D:
 	var root := Node3D.new()
 	root.name = "%s_mount" % weapon_id
 	root.position = Vector3(0.098, -0.232, -0.706)
@@ -632,7 +729,9 @@ func _build_weapon_model(weapon_id: String) -> Node3D:
 	# groping toward while the real rotation was being thrown away.
 	root.rotation = Vector3(-HUNTER_BODY_MOTION.FIRST_PERSON_ARM_RAISE, -0.34, 0.32)
 	var visual_id := "sidearm" if weapon_id == "facility_sidearm" else weapon_id
-	var gear := HeldGear.build_weapon(visual_id)
+	# The BREACH NINE has its own model; every rule below still treats it as
+	# a sidearm (`visual_id`), which is what poses the hands.
+	var gear := HeldGear.build_weapon("breach_nine" if weapon_id == "facility_sidearm" else visual_id)
 	# Hung off its grip rather than its origin. `HeldGear` builds each weapon
 	# around the shape of the object, so a sword's origin is where the guard
 	# meets the blade and not where a hand closes; mounted at the origin that
@@ -660,7 +759,8 @@ func _build_weapon_model(weapon_id: String) -> Node3D:
 	root.add_child(right)
 	var off_anchor_name := "forend" if visual_id == "shotgun" else ("grip_support" if visual_id == "sidearm" else "grip_low")
 	var off_anchor := gear.get_node_or_null("anchor_%s" % off_anchor_name) as Node3D
-	if off_anchor != null:
+	# The cleaver is a one-hand tool; the off hand stays free.
+	if off_anchor != null and visual_id != "cleaver":
 		var left := HeldGear.build_humiliation_hand(-1)
 		left.name = "LeftGripHand"
 		HeldGear.set_pose(left, "cup" if visual_id == "sidearm" else "wrap")
@@ -672,4 +772,60 @@ func _build_weapon_model(weapon_id: String) -> Node3D:
 		left.set_meta("grip_rest_rotation", left.rotation)
 		left.set_meta("forearm_entry", Vector3(-0.47, -0.53, -0.31))
 		root.add_child(left)
+	if visual_id in ["sidearm", "shotgun"]:
+		_seat_gun_hands(visual_id, gear, right, root.get_node_or_null("LeftGripHand") as Node3D)
 	return root
+
+
+## Fix-56. The generic mount stood both hands upright behind each gun, knuckles
+## at receiver height, so the trigger finger, the support fingers and the
+## cuffs rose past the rear sight and filled the aimed view. A firing hand
+## holds with its palm on the grip's right side, the knuckle line down the
+## grip (index on top) and the fingers running forward into the guard; a
+## pistol's support hand mirrors it on the left, and a shotgun's cradles the
+## pump from below with the fingers closing up its far side. The wrists and
+## cuffs then sit under the sight picture. Built in the gun's own authored
+## frame (muzzle +Z, up +Y) from its anchors, so the MERCY NINE and the BREACH
+## NINE share the pistol seat.
+const GRIP_HAND_TILT := 0.15
+const GRIP_KNUCKLES := {
+	"sidearm": {1: Vector3(-0.031, 0.002, 0.032), -1: Vector3(0.033, -0.008, 0.038)},
+	"shotgun": {1: Vector3(-0.035, -0.005, 0.004)},
+}
+## Where the shotgun's support knuckles sit off `anchor_forend`, and how far
+## the wrist drops toward the left elbow.
+const PUMP_KNUCKLES := Vector3(-0.016, -0.036, 0.030)
+const PUMP_HAND_TILT := 0.35
+
+
+static func _seat_gun_hands(visual_id: String, gear: Node3D, right: Node3D, left: Node3D) -> void:
+	var knuckle_table: Dictionary = GRIP_KNUCKLES[visual_id]
+	for hand: Node3D in [right, left]:
+		if hand == null:
+			continue
+		var side := 1 if hand == right else -1
+		var x_axis: Vector3
+		var y_axis: Vector3
+		var knuckles: Vector3
+		# Hand space: fingers along +Z, curling toward +Y (the palm), index at
+		# -X on a right hand and +X on a left.
+		if knuckle_table.has(side):
+			var grip := gear.get_node_or_null("anchor_grip") as Node3D
+			if grip == null:
+				continue
+			x_axis = Vector3(0.0, -cos(GRIP_HAND_TILT), -sin(GRIP_HAND_TILT)) * float(side)
+			y_axis = Vector3(float(side), 0.0, 0.0)
+			knuckles = grip.position + (knuckle_table[side] as Vector3)
+		else:
+			var forend := gear.get_node_or_null("anchor_forend") as Node3D
+			if forend == null:
+				continue
+			x_axis = Vector3(0.0, 0.0, 1.0)
+			y_axis = Vector3(sin(PUMP_HAND_TILT), cos(PUMP_HAND_TILT), 0.0)
+			knuckles = forend.position + PUMP_KNUCKLES
+		var z_axis := x_axis.cross(y_axis)
+		var reach := 0.086 * hand.scale.x
+		var seat := Transform3D(Basis(x_axis, y_axis, z_axis).scaled_local(hand.scale), knuckles - z_axis * reach)
+		hand.transform = gear.transform * seat
+		hand.set_meta("grip_rest_position", hand.position)
+		hand.set_meta("grip_rest_rotation", hand.rotation)

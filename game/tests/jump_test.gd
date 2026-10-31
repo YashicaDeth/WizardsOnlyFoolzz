@@ -74,6 +74,7 @@ func _ready() -> void:
 	check(hunt.player_body.is_on_floor(), "settled back on the floor before testing the dodge branch")
 	var event := InputEventKey.new()
 	event.keycode = KEY_SPACE
+	event.physical_keycode = KEY_SPACE
 	event.pressed = true
 	var dodges_before := PlayerActionLedger.count("player_dodged")
 	Input.action_press("move_forward")

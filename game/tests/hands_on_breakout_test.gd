@@ -1,0 +1,134 @@
+extends Node
+
+## Greg's breakout, in his order (DESIGN/ESCAPE_ROUTES.md, "The opening,
+## continued"), driven the way a player does it: the wires, the cord in your
+## mouth (E), the authored blows to the glass (click), down on your knees while the
+## implant boots the HUD one piece at a time, SPACE to get up facing his door,
+## and only then GET REVENGE.
+
+const VAT := preload("res://vat_chamber.tscn")
+
+var failures: Array[String] = []
+
+
+func check(condition: bool, label: String) -> void:
+	print("PASS " if condition else "FAIL ", label)
+	if not condition:
+		failures.append(label)
+
+
+func _key(code: Key) -> InputEventKey:
+	var event := InputEventKey.new()
+	event.keycode = code
+	event.physical_keycode = code
+	event.pressed = true
+	return event
+
+
+func _click() -> InputEventMouseButton:
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.pressed = true
+	return event
+
+
+func finish() -> void:
+	print("HANDS_ON_BREAKOUT_TEST_RESULT failures=", failures.size())
+	get_tree().quit(0 if failures.is_empty() else 1)
+
+
+func _ready() -> void:
+	if OS.get_environment("ATG_TEST_MODE") != "1":
+		get_tree().quit(2)
+		return
+	WorldHistory.clear_history()
+	var vat = VAT.instantiate()
+	vat.hands_on_breakout = true
+	add_child(vat)
+	await get_tree().process_frame
+	check(vat.intake != null, "the intake loads before the breakout is driven")
+	if vat.intake == null:
+		finish()
+		return
+	vat.intake._finish_filing()
+	await get_tree().process_frame
+	vat.departure_clock = vat.DEPARTURE_SECONDS
+	vat._update_departure(0.0)
+	vat.clock = vat.DRAINED_AT
+	vat.phase = "voiding"
+	vat._update_sequence(0.05)
+	var wire_count: int = vat.umbilicals.size()
+	check(wire_count == 4, "all four umbilicals are present")
+	for _wire in wire_count:
+		if vat.umbilicals.is_empty():
+			break
+		var cable: Node3D = vat.umbilicals[0]
+		var aim: Vector3 = ((cable.get_child(3) as Node3D).global_position - vat.camera.global_position).normalized()
+		vat.yaw = atan2(-aim.x, -aim.z)
+		vat.pitch = asin(aim.y)
+		vat._update_wired(0.0)
+		for _tug in vat.WIRE_TUGS:
+			vat._unhandled_input(_key(KEY_E))
+		check(not vat.umbilicals.has(cable), "aimed E pulls this wire free")
+	check(vat.phase == "cord" and vat.mouth_cord != null, "with the wires out, the cord in your mouth is left")
+	if vat.phase != "cord" or vat.mouth_cord == null:
+		finish()
+		return
+	check(WorldHistory.event_count("mission_card_shown") == 1, "GET REVENGE has not come yet (only END ALL SUFFERING)")
+	vat._update_hud()
+	check(vat.prompt.text.contains("CORD"), "the prompt says to tear the cord out (%s)" % vat.prompt.text)
+	for _pull in vat.CORD_TUGS:
+		vat._unhandled_input(_key(KEY_E))
+	check(vat.phase == "smash" and WorldHistory.event_count("opening_mouth_cord_torn") == 1, "the authored E pulls tear the cord out once")
+	vat._physics_process(5.0)
+	check(vat.phase == "smash" and not vat.breakout_complete, "the glass does not break by itself")
+	for blow in range(1, vat.GLASS_BLOWS):
+		var previous_cracks: int = vat.glass_cracks.size()
+		vat._unhandled_input(_click())
+		check(not vat.glass_tank.broken and vat.glass_tank.crack_stage() == blow and not vat.breakout_complete and vat.glass_cracks.size() > previous_cracks,
+			"blow %d cracks the real glass (stage %d) but it still holds" % [blow, vat.glass_tank.crack_stage()])
+	vat._unhandled_input(_click())
+	check(vat.breakout_complete and vat.glass_tank.broken and not vat.glass_tank.shards.is_empty(), "the final authored blow bursts the glass into shards")
+	check(WorldHistory.event_count("opening_glass_struck") == vat.GLASS_BLOWS, "every blow is recorded exactly once")
+	# Greg, 4 Oct: "actual liquid with physics". The medium pours out of the
+	# broken wall into a FluidBody that pools on the floor and stays.
+	check(vat.spill != null and (vat.spill.blob_count() > 0 or vat.spill.volume() > 0.0), "the medium floods out as real fluid (%d blobs)" % (vat.spill.blob_count() if vat.spill != null else -1))
+	check(vat.phase == "knees" and not vat.can_move, "you come out on your knees, not moving yet")
+	for _tick in 20:
+		vat._physics_process(0.05)
+	check(vat.camera.position.y + vat.player.position.y < 1.0, "thrown out with it, the eye is down at the puddle")
+	vat.spill.simulate(3.0)
+	check(vat.spill.wet_cells() > 20 and vat.spill.volume() > 0.01, "the flood pools across the floor (%d wet cells, %.3f m3)" % [vat.spill.wet_cells(), vat.spill.volume()])
+	check(vat.boot_hud != null and vat.boot_hud.running, "the implant boots the HUD while you're down")
+	if vat.boot_hud == null:
+		finish()
+		return
+	check(not vat.osd.pieces.vitals and not vat.osd.pieces.prompt, "nothing is on the HUD until the implant puts it there")
+	vat._unhandled_input(_key(KEY_SPACE))
+	check(vat.phase == "knees", "you can't get up before the HUD is up")
+	var order: Array[String] = []
+	for _tick in 60:
+		vat._physics_process(0.05)
+		for piece in ["rec", "vitals", "objective", "prompt"]:
+			if vat.boot_hud.revealed(piece) and not order.has(piece):
+				order.append(piece)
+	check(order == ["rec", "vitals", "objective", "prompt"], "REC, then vitals, then the objective, then the prompt (%s)" % [order])
+	check(vat.boot_hud.done and vat.osd.pieces.vitals and vat.osd.pieces.prompt, "the HUD holds once booted")
+	check(WorldHistory.event_count("opening_implant_booted") == 1, "the boot is recorded")
+	vat._update_hud()
+	check(vat.prompt.text.contains("GET UP"), "then SPACE gets you up (%s)" % vat.prompt.text)
+	vat._unhandled_input(_key(KEY_SPACE))
+	check(vat.phase == "rising", "SPACE starts you up off your knees")
+	for _tick in ceili((vat.RISE_SECONDS + 0.2) / 0.05):
+		if vat.can_move:
+			break
+		vat._physics_process(0.05)
+	check(vat.can_move, "standing, you can move")
+	var forward: Vector3 = -vat.camera.global_transform.basis.z
+	forward.y = 0.0
+	var to_door: Vector3 = DoctorRoute.DOOR_AT - vat.player.global_position
+	to_door.y = 0.0
+	check(forward.normalized().dot(to_door.normalized()) > 0.95, "you come up looking at his door")
+	check(WorldHistory.event_count("mission_card_shown") == 2, "and GET REVENGE flashes")
+	check(OpeningDirector.reached("broke_free"), "the opening records the breakout")
+	finish()

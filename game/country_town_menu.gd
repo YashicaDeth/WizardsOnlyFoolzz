@@ -6,6 +6,20 @@ const MENU_PLATE := preload("res://systems/menu_plate.gd")
 const DECANTING_PROLOGUE := preload("res://systems/decanting_prologue.gd")
 const SPLASH_BACKDROP := preload("res://systems/splash_backdrop.gd")
 const REGAL_FRAME := preload("res://systems/regal_frame.gd")
+const LOGO_FX := preload("res://shaders/logo_fx.gdshader")
+const BOOT_SPLASH := preload("res://boot_splash.gd")
+const LOGO_EMBERS := preload("res://systems/logo_embers.gd")
+const MENU_BLOOD := preload("res://systems/menu_blood.gd")
+## Seconds each menu line takes to type on, and the gap between lines.
+const TYPE_SECONDS := 0.28
+const TYPE_STAGGER := 0.07
+## How far the options you're not on step back while you hover one.
+const DIM_OTHERS := 0.42
+var menu_blood: Control
+var title_embers: Control
+## Seconds between the title logo's short glitch tears.
+const TITLE_GLITCH_EVERY := 5.5
+var title_fx: ShaderMaterial
 const CRT_GLASS := preload("res://systems/crt_glass.gd")
 const EYE_GLARE := preload("res://systems/eye_glare.gd")
 
@@ -89,6 +103,7 @@ func _ready() -> void:
 	# out loud about a game they are about to start.
 	$HUD/Play.text = "START GAME"
 	_build_gore_setting()
+	_build_support_row()
 	_build_run_doors()
 	_build_front_door()
 	_play_title_sequence()
@@ -168,6 +183,26 @@ func _play_title_sequence() -> void:
 	splash_glass.name = "SplashGlass"
 	splash_glass_layer.add_child(splash_glass)
 	_use_canvas_background()
+	# Greg, 24 September: the real logo re-animated, here calmer than in the
+	# splash: it burns in, then breathes behind the menu, bleeding down its
+	# drips and glitching now and then.
+	title_fx = ShaderMaterial.new()
+	title_fx.shader = LOGO_FX
+	title_fx.set_shader_parameter("calm", 0.6)
+	title_fx.set_shader_parameter("drips_on", 0.0)
+	title_fx.set_shader_parameter("drip_flow", 1.0)
+	title_fx.set_shader_parameter("drip_top", 0.62)
+	title_fx.set_shader_parameter("reveal", 0.0)
+	$HUD/TitleLogo.material = title_fx
+	title_embers = LOGO_EMBERS.new()
+	title_embers.name = "Embers"
+	title_embers.amount = 0.45
+	$HUD/TitleLogo.add_child(title_embers)
+	# The front door is deliberately silent. World ambience begins only after
+	# START GAME; hover and the periodic logo tear remain visual feedback.
+	menu_blood = MENU_BLOOD.new()
+	menu_blood.name = "MenuBlood"
+	$HUD.add_child(menu_blood)
 	$HUD/TitleLogo.modulate.a = 0.0
 	$HUD/Algiz.modulate.a = 0.0
 	$HUD/TitleLogo.scale = Vector2(0.90, 0.90)
@@ -192,12 +227,23 @@ func _play_title_sequence() -> void:
 	tween.tween_property($HUD/Algiz, "modulate:a", 1.0, 0.18)
 	tween.parallel().tween_property($HUD/TitleLogo, "modulate:a", 1.0, 0.36)
 	tween.parallel().tween_property($HUD/TitleLogo, "scale", Vector2.ONE, 0.52).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_method(func(value: float) -> void: title_fx.set_shader_parameter("reveal", value), 0.0, 1.0, 0.95)
 	tween.tween_property(intro_veil, "color:a", 0.0, 0.72)
-	for button in menu_buttons:
+	var typing := OS.get_environment("ATG_TEST_MODE") != "1"
+	for index in menu_buttons.size():
+		var button: Button = menu_buttons[index]
 		tween.parallel().tween_property(button, "modulate:a", 1.0, 0.32)
+		# The menu types on after the logo lands, one line after another.
+		# Tests read the labels straight away, so they get them whole.
+		if typing:
+			var full := button.text
+			button.text = ""
+			tween.parallel().tween_method(func(shown: float) -> void: button.text = typed(full, shown), 0.0, 1.0, TYPE_SECONDS).set_delay(TYPE_STAGGER * float(index))
 	tween.tween_callback(func() -> void:
 		if is_instance_valid(intro_veil):
-			intro_veil.queue_free())
+			intro_veil.queue_free()
+		if not settings_panel.visible:
+			$HUD/Play.grab_focus())
 
 
 
@@ -244,7 +290,20 @@ func _build_run_doors() -> void:
 	sandbox.pressed.connect(_open_gore_sandbox)
 	sandbox.mouse_entered.connect(_focus_button.bind(sandbox))
 	sandbox.mouse_exited.connect(_unfocus_button.bind(sandbox))
-	menu_buttons = [play, full_game, sandbox, $HUD/Settings, $HUD/Quit, $HUD/CellOutzSite]
+	# QUIT belongs at the bottom of the column, under everything else.
+	var quit: Button = $HUD/Quit
+	var site: Button = $HUD/CellOutzSite
+	var q_top := quit.offset_top
+	var q_bottom := quit.offset_bottom
+	quit.offset_top = site.offset_top
+	quit.offset_bottom = site.offset_bottom
+	site.offset_top = q_top
+	site.offset_bottom = q_bottom
+	menu_buttons = [play, full_game, sandbox, $HUD/Settings, site, quit]
+	# Controller: the keyboard/pad focus drives the same highlight the mouse does.
+	for button in menu_buttons:
+		button.focus_entered.connect(_focus_button.bind(button))
+		button.focus_exited.connect(_unfocus_button.bind(button))
 	# The column is set in the house type from here on. The buttons keep hit
 	# testing, focus, the tween and every signal; they just stop drawing their
 	# own text in the engine's fallback UI font.
@@ -294,7 +353,76 @@ func _open_new_game() -> void:
 
 ## P2.5. No slot picker and no configuration fork: DEMO selects its isolated
 ## ledger and enters the same `_start_game()` used by PLAY.
+## START opens a one-step input chooser first: CONTROLLER or KEYBOARD + MOUSE.
+## Focus lands on the one that matches what is plugged in, so a pad player only
+## presses confirm. Tests skip it (ATG_TEST_MODE).
 func _start_demo() -> void:
+	if menu_departing:
+		return
+	if OS.get_environment("ATG_TEST_MODE") == "1" or $HUD.has_node("InputChooser"):
+		_begin_demo()
+		return
+	var box := PanelContainer.new()
+	box.name = "InputChooser"
+	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	box.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	box.grow_vertical = Control.GROW_DIRECTION_BOTH
+	box.z_index = 30
+	# bughunt-79: the default panel was see-through, so the menu column read
+	# through the choices; an opaque plate in the menu's copper.
+	var plate := StyleBoxFlat.new()
+	plate.bg_color = Color(0.03, 0.012, 0.012, 0.97)
+	plate.border_color = Color("a85b43")
+	plate.set_border_width_all(1)
+	plate.set_content_margin_all(18.0)
+	box.add_theme_stylebox_override("panel", plate)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 10)
+	box.add_child(col)
+	var title := Label.new()
+	title.text = "HOW ARE YOU PLAYING?"
+	col.add_child(title)
+	var pad := Button.new()
+	pad.text = "CONTROLLER   (PS4 / PS5)"
+	var kb := Button.new()
+	kb.text = "KEYBOARD + MOUSE"
+	var back := Button.new()
+	back.text = "BACK"
+	for b in [pad, kb, back]:
+		b.custom_minimum_size = Vector2(360, 48)
+		col.add_child(b)
+	var hint := Label.new()
+	hint.text = "controller: L-stick move  R-stick look  R1 light  R2 heavy/fire  L1 block  L2 parry/aim  L2+R2 X-ray  CROSS jump  SQUARE use"
+	hint.add_theme_font_size_override("font_size", 12)
+	hint.modulate = Color(1, 1, 1, 0.6)
+	# It ran past the plate's edge on one line.
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.custom_minimum_size = Vector2(360, 0)
+	col.add_child(hint)
+	$HUD.add_child(box)
+	pad.pressed.connect(func() -> void: _choose_input(true))
+	kb.pressed.connect(func() -> void: _choose_input(false))
+	back.pressed.connect(func() -> void:
+		box.queue_free()
+		$HUD/Play.grab_focus())
+	# Keep the pad inside the three choices: down from BACK used to walk onto
+	# the menu column behind the plate.
+	pad.focus_neighbor_top = pad.get_path_to(back)
+	back.focus_neighbor_bottom = back.get_path_to(pad)
+	for b in [pad, kb, back]:
+		b.focus_neighbor_left = b.get_path()
+		b.focus_neighbor_right = b.get_path()
+	(pad if not Input.get_connected_joypads().is_empty() else kb).grab_focus()
+
+
+func _choose_input(use_pad: bool) -> void:
+	var bridge := get_node_or_null("/root/PadBridge")
+	if bridge != null:
+		bridge.using_pad = use_pad
+	_begin_demo()
+
+
+func _begin_demo() -> void:
 	if menu_departing:
 		return
 	WorldHistory.begin_demo()
@@ -441,6 +569,9 @@ func _build_support_row() -> void:
 	result.text = SupportMail.ADDRESS
 	result.modulate = Color(1, 1, 1, 0.45)
 	result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var result_inset := StyleBoxEmpty.new()
+	result_inset.content_margin_left = 14.0
+	result.add_theme_stylebox_override("normal", result_inset)
 	box.add_child(result)
 	box.move_child(result, back.get_index())
 
@@ -494,13 +625,30 @@ func _build_gore_setting() -> void:
 	gore_index = maxi(0, gore_modes.find(str(WorldHistory.subject("settings").get("gore", "FULL"))))
 	var button := Button.new()
 	button.name = "Gore"
-	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	# Centred like every other settings row (bughunt-79: these two sat left).
 	button.text = "GORE: %s" % gore_modes[gore_index]
 	var box := $HUD/SettingsPanel/VBox
 	box.add_child(button)
 	box.move_child(button, box.get_child_count() - 2)
 	button.pressed.connect(_cycle_gore.bind(button))
 	gore_button = button
+	# Greg, 24 September: nudity is censored by a body-cam glitch, on by
+	# default; this is where it turns off. `AnatomyPresentation` holds it.
+	var censor := Button.new()
+	censor.name = "Censor"
+	censor.text = _censor_label()
+	box.add_child(censor)
+	box.move_child(censor, box.get_child_count() - 2)
+	censor.pressed.connect(_toggle_censor.bind(censor))
+
+
+func _censor_label() -> String:
+	return "CENSOR: %s" % ("OFF" if AnatomyPresentation.is_explicit() else "ON (BODY-CAM GLITCH)")
+
+
+func _toggle_censor(button: Button) -> void:
+	AnatomyPresentation.set_mode("MOSAIC" if AnatomyPresentation.is_explicit() else "EXPLICIT")
+	button.text = _censor_label()
 
 
 func _cycle_gore(button: Button) -> void:
@@ -515,21 +663,46 @@ func _process(delta: float) -> void:
 		wreck.rotate_y(delta * 0.28)
 		wreck.position.y = 4.4 + sin(Time.get_ticks_msec() * 0.0014) * 0.22
 	$HUD/TitleLogo.position.y = sin(ui_time * 0.72) * 2.0
+	if title_fx != null:
+		title_fx.set_shader_parameter("beat", BOOT_SPLASH.heartbeat(ui_time) * 0.6)
+		# A short tear every few seconds, so the name keeps reading between.
+		var burst := fmod(ui_time, TITLE_GLITCH_EVERY) < 0.22 and ui_time > 2.0
+		title_fx.set_shader_parameter("glitch", 0.75 if burst else 0.05)
 	$HUD/Algiz.modulate.a = 0.72 + sin(ui_time * 2.1) * 0.18
 
 
+## `full` with the first `shown` (0..1) of its characters typed, and a
+## block cursor while it types.
+static func typed(full: String, shown: float) -> String:
+	var count := roundi(clampf(shown, 0.0, 1.0) * float(full.length()))
+	if count >= full.length():
+		return full
+	return full.left(count) + "█"
+
+
 func _focus_button(button: Button) -> void:
+	if menu_blood != null:
+		menu_blood.point_at(button)
 	var tween := create_tween().set_parallel(true)
 	tween.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
 	tween.tween_property(button, "position:x", 72.0, 0.18)
 	tween.tween_property(button, "modulate", Color("ff7138"), 0.18)
+	# The rest step back, so the one you're on is the only one lit.
+	for other in menu_buttons:
+		if is_instance_valid(other):
+			tween.tween_property(other, "self_modulate", Color(1, 1, 1, 1.0 if other == button else DIM_OTHERS), 0.18)
 
 
 func _unfocus_button(button: Button) -> void:
+	if menu_blood != null:
+		menu_blood.release(button)
 	var tween := create_tween().set_parallel(true)
 	tween.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
 	tween.tween_property(button, "position:x", 50.0, 0.22)
 	tween.tween_property(button, "modulate", Color.WHITE, 0.22)
+	for other in menu_buttons:
+		if is_instance_valid(other):
+			tween.tween_property(other, "self_modulate", Color.WHITE, 0.22)
 
 
 func _start_game() -> void:
@@ -628,6 +801,8 @@ func _dress_settings_panel() -> void:
 	settings_panel.offset_right = 196.0
 	settings_panel.offset_bottom = 150.0
 	settings_panel.z_index = 25
+	settings_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	settings_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	# The same skin the quantum branch picker already uses, so the two panels on
 	# this screen are recognisably the same object.
 	var skin := StyleBoxFlat.new()
@@ -647,7 +822,10 @@ func _dress_settings_panel() -> void:
 	settings_panel.add_theme_stylebox_override("panel", skin)
 	var rows: Array = []
 	for child in $HUD/SettingsPanel/VBox.get_children():
-		rows.append(child)
+		# The support line is wrapped prose with an "@" in it; CellOutzType has
+		# no wrapping and no "@", so it keeps its real font.
+		if child.name != "SupportResult":
+			rows.append(child)
 	settings_plate = MENU_PLATE.new()
 	settings_plate.name = "SettingsPlate"
 	settings_plate.compact = true
@@ -660,10 +838,25 @@ func _open_settings() -> void:
 		return
 	_dress_settings_panel()
 	settings_panel.visible = true
+	effects_button.grab_focus()
 
 
 func _close_settings() -> void:
 	settings_panel.visible = false
+	$HUD/Settings.grab_focus()
+
+
+## B / Escape backs out of settings.
+func _unhandled_input(event: InputEvent) -> void:
+	var chooser := $HUD.get_node_or_null("InputChooser")
+	if chooser != null and not chooser.is_queued_for_deletion() and event.is_action_pressed("ui_cancel") and not menu_departing:
+		get_viewport().set_input_as_handled()
+		chooser.queue_free()
+		$HUD/Play.grab_focus()
+		return
+	if settings_panel.visible and event.is_action_pressed("ui_cancel"):
+		get_viewport().set_input_as_handled()
+		_close_settings()
 
 
 func _toggle_effects() -> void:

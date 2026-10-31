@@ -597,6 +597,12 @@ func view_state() -> Dictionary:
 
 
 func _process(delta: float) -> void:
+	# X10.6: a whole 3D render a frame is only worth it while the panel that
+	# shows it is open. Closed, it stops drawing and stops turning.
+	var shown := _shown()
+	render_target_update_mode = SubViewport.UPDATE_ALWAYS if shown else SubViewport.UPDATE_DISABLED
+	if not shown:
+		return
 	elapsed += delta
 	_pivot.rotation.y = elapsed * spin_speed + view_rotation.x
 	var cough_jolt := sin(elapsed * 34.0) * _pulmonary_cough * 0.035 if _pulmonary_mode else 0.0
@@ -605,3 +611,13 @@ func _process(delta: float) -> void:
 		var breath := 1.0 + sin(elapsed * (2.8 if _pulmonary_fill > 0.08 else 1.2)) * (0.018 + _pulmonary_fill * 0.025)
 		_pivot.scale = Vector3.ONE * _base_fit * zoom * breath
 		_update_smoke_volumes()
+
+
+## The panel that shows this viewport: the nearest CanvasItem above it.
+func _shown() -> bool:
+	var at := get_parent()
+	while at != null:
+		if at is CanvasItem:
+			return (at as CanvasItem).is_visible_in_tree()
+		at = at.get_parent()
+	return true

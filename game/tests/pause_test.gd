@@ -66,6 +66,23 @@ func _ready() -> void:
 	gate._set_fullscreen(fullscreen)
 	check(WorldHistory.event_count("screen_setting_changed") == screen_events + 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0,
 		"an explicit fullscreen choice still persists once and closes its transaction")
+	# Ctrl+F11 is reserved for the performance dump. It must pass through the
+	# pause gate instead of accidentally toggling the screen while a player is
+	# trying to report a slow scene.
+	var dump_key := InputEventKey.new()
+	dump_key.keycode = KEY_F11
+	dump_key.physical_keycode = KEY_F11
+	dump_key.pressed = true
+	dump_key.ctrl_pressed = true
+	gate._unhandled_key_input(dump_key)
+	check(bool(gate._fullscreen()) == fullscreen, "Ctrl+F11 leaves fullscreen alone for the performance dump")
+	var fullscreen_key := InputEventKey.new()
+	fullscreen_key.keycode = KEY_F11
+	fullscreen_key.physical_keycode = KEY_F11
+	fullscreen_key.pressed = true
+	gate._unhandled_key_input(fullscreen_key)
+	check(bool(gate._fullscreen()) != fullscreen, "plain F11 still toggles fullscreen")
+	gate._set_fullscreen(fullscreen)
 
 	# Rows are the menu; settings has to be reachable from root.
 	gate.page = "root"
@@ -83,6 +100,32 @@ func _ready() -> void:
 	for row in gate._rows:
 		settings_ids.append(str(row.id))
 	check(settings_ids.has("controls"), "settings offers a way into controls")
+	check(settings_ids.has("subtitles") and settings_ids.has("censor") and settings_ids.has("graphics"),
+		"settings includes subtitles, the body censor and a graphics preset")
+
+	WorldHistory.amend_subject("settings", {"subtitles": true})
+	var subtitle := Label.new()
+	subtitle.name = "Subtitle"
+	add_child(subtitle)
+	gate.highlighted = settings_ids.find("subtitles")
+	gate._nudge(1)
+	check(not bool(WorldHistory.subject("settings").get("subtitles", true)) and not subtitle.visible,
+		"turning subtitles off persists and hides the live subtitle layer")
+	gate._nudge(1)
+
+	var censor_before := AnatomyPresentation.mode()
+	gate.highlighted = settings_ids.find("censor")
+	gate._nudge(1)
+	check(AnatomyPresentation.mode() != censor_before, "the pause censor uses the shared anatomy presentation setting")
+	gate._nudge(1)
+
+	WorldLook.set_quality_name("PERFORMANCE")
+	gate.highlighted = settings_ids.find("graphics")
+	gate._nudge(1)
+	check(WorldLook.quality_name() == "HIGH" and str(WorldHistory.subject("settings").get("graphics_preset", "")) == "HIGH",
+		"the graphics preset applies to the live renderer and persists")
+	WorldLook.set_quality_name("PERFORMANCE")
+	WorldHistory.amend_subject("settings", {"graphics_preset": "PERFORMANCE"})
 
 	gate.page = "controls"
 	gate._build_rows()

@@ -2,7 +2,8 @@
 # Run this project's test scenes and report them the same way, whatever they
 # print.
 #
-# There are 495 test scenes. 268 of them end with `<NAME>_RESULT failures=N`;
+# There are 498 `*_test.tscn` test scenes. 268 of them end with
+# `<NAME>_RESULT failures=N`;
 # the rest do not. Some print `failures: N`, some print a sentence, and some --
 # handheld_satellite_test is the one that caught me -- print only `ok` and
 # `PASS` lines with no summary at all. So grepping the suite for failures finds
@@ -16,8 +17,10 @@
 # Usage:
 #   tools/run_tests.sh npc_ gore          run every scene matching either
 #   tools/run_tests.sh --core             the ones worth running before a commit
-#   tools/run_tests.sh --all              all 495, which takes hours
+#   tools/run_tests.sh --all              all 498, which takes hours
 #   tools/run_tests.sh --list npc_        show what would run, run nothing
+#   tools/run_tests.sh --perf             windowed frame budget over the route
+#                                         (X10.11; headless draws nothing)
 
 set -uo pipefail
 
@@ -31,12 +34,100 @@ export ATG_TEST_MODE=1
 # this is generous; it exists to stop one hung scene eating the whole run.
 TIMEOUT="${ATG_TEST_TIMEOUT:-200}"
 
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) IS_WINDOWS=1 ;;
+  *)                    IS_WINDOWS=0 ;;
+esac
+
+RUN_LOG_DIR="$TEMP/atg-run-tests"
+mkdir -p "$RUN_LOG_DIR" 2>/dev/null
+
+# Killing a timed-out suite is not as simple as killing what we started.
+#
+# `timeout` signals only the process it launched, and that is the *console
+# wrapper*. The wrapper starts the real engine detached: `ps -W` reports it as
+# Godot_v4.7.2-stable_win64.exe with PPID 0 and PGID 0, so there is no parent
+# chain for `taskkill /T` to walk. Killing the wrapper therefore leaves a live
+# headless engine holding game/.godot, and every later suite in the run fails
+# against a locked project instead of only the one that hung.
+#
+# So the engine is found by identity -- its own command line -- and the scene
+# path is what makes that safe: only a Godot process handed this exact scene is
+# ours. The name is filtered too, because the bash and powershell processes
+# running this very query carry the same string and would match themselves.
+kill_headless_engine() {
+  local scene="$1"
+  [ "$IS_WINDOWS" = "1" ] || return 0
+  ATG_KILL_SCENE="res://tests/$scene.tscn" powershell -NoProfile -Command '
+    Get-CimInstance Win32_Process |
+      Where-Object { $_.Name -like "Godot*" -and $_.CommandLine -like ("*" + $env:ATG_KILL_SCENE + "*") } |
+      ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+  ' >/dev/null 2>&1 || true
+}
+
+# The suite in flight, so an abort can kill exactly what the timeout would have.
+CURRENT_SCENE=""
+CURRENT_WRAPPER=""
+CURRENT_WATCHDOG=""
+
+# Run one scene under a hard ceiling. Combined output lands in $2; returns the
+# suite's own exit code, or 124 when the ceiling was reached and the engine was
+# killed. A watchdog subshell replaces `timeout` because the process worth
+# killing is not the one `timeout` would have signalled.
+run_suite() {
+  local name="$1" log="$2"
+  local flag="$RUN_LOG_DIR/$name.timed-out"
+  rm -f "$flag" "$log"
+  if [ "$windowed" = "1" ]; then
+    "$GODOT" --path "$ROOT/game" "res://tests/$name.tscn" >"$log" 2>&1 &
+  else
+    "$GODOT" --headless --path "$ROOT/game" "res://tests/$name.tscn" >"$log" 2>&1 &
+  fi
+  local wrapper=$!
+  CURRENT_SCENE="$name"
+  CURRENT_WRAPPER="$wrapper"
+  # The flag file is what separates a hang from a suite that exits non-zero;
+  # both leave wait reporting a failure, and only one of them is a timeout.
+  ( sleep "$TIMEOUT"; : >"$flag"; kill_headless_engine "$name"; kill -KILL "$wrapper" 2>/dev/null ) >/dev/null 2>&1 &
+  local watchdog=$!
+  CURRENT_WATCHDOG="$watchdog"
+  wait "$wrapper"
+  local status=$?
+  kill "$watchdog" 2>/dev/null
+  wait "$watchdog" 2>/dev/null
+  CURRENT_SCENE=""
+  CURRENT_WRAPPER=""
+  CURRENT_WATCHDOG=""
+  if [ -f "$flag" ]; then
+    return 124
+  fi
+  return $status
+}
+
+# The same orphan appears when the run is *aborted* -- Ctrl+C, an editor
+# stopping it, or a harness killing this script -- because the engine outlives
+# the wrapper either way. A timeout alone would not cover that, so the suite in
+# flight is cleaned up on the way out.
+stop_in_flight() {
+  [ -n "$CURRENT_WATCHDOG" ] && kill "$CURRENT_WATCHDOG" 2>/dev/null
+  [ -n "$CURRENT_SCENE" ] && kill_headless_engine "$CURRENT_SCENE"
+  [ -n "$CURRENT_WRAPPER" ] && kill -KILL "$CURRENT_WRAPPER" 2>/dev/null
+  CURRENT_SCENE=""
+  CURRENT_WRAPPER=""
+  CURRENT_WATCHDOG=""
+  return 0
+}
+
+trap 'stop_in_flight' EXIT
+trap 'stop_in_flight; exit 130' INT
+trap 'stop_in_flight; exit 143' TERM
+
 # What to run before committing: the spine of the game plus whatever has been
 # touched most. Not a substitute for --all, just the set worth the wait.
 CORE=(
   baseline_human_test body_slice_test body_cut_test cavity_test
   bone_fragment_test chunk_test gore_demo_test lab_dressing_test gore_sandbox_systems_parity_test
-  combat_stance_test blade_read_test climb_test lower_works_gantry_test
+  combat_stance_test blade_read_test melee_grip_clearance_test climb_test lower_works_gantry_test
   npc_conversation_test npc_relationship_test npc_async_turn_test
   npc_voice_test spoken_contact_test standing_contact_test npc_ruling_test facility_characters_test kill_shot_test sniper_killcam_test
   skull_burst_test
@@ -45,19 +136,21 @@ CORE=(
 )
 
 list_only=0
+windowed=0
 patterns=()
 for arg in "$@"; do
   case "$arg" in
     --list) list_only=1 ;;
     --core) patterns+=("${CORE[@]}") ;;
     --all)  patterns+=("") ;;
+    --perf) patterns+=("route_frame_budget_test"); windowed=1 ;;
     *)      patterns+=("$arg") ;;
   esac
 done
 
 if [ ${#patterns[@]} -eq 0 ]; then
   echo "usage: tools/run_tests.sh [--core|--all|--list] [pattern ...]" >&2
-  echo "       refusing to guess; --all runs all 495 and takes hours" >&2
+  echo "       refusing to guess; --all runs all 498 and takes hours" >&2
   exit 2
 fi
 
@@ -65,6 +158,10 @@ fi
 # run the same suite twice.
 scenes=()
 for pattern in "${patterns[@]}"; do
+  candidates=("$ROOT"/game/tests/*.tscn)
+  # `--all` means all tests, not capture/gallery/manual scenes that happen to
+  # live beside them and intentionally wait for input instead of quitting.
+  [ -z "$pattern" ] && candidates=("$ROOT"/game/tests/*_test.tscn)
   while IFS= read -r scene; do
     name="$(basename "$scene" .tscn)"
     found=0
@@ -72,7 +169,7 @@ for pattern in "${patterns[@]}"; do
       [ "$seen" = "$name" ] && found=1 && break
     done
     [ $found -eq 0 ] && scenes+=("$name")
-  done < <(ls "$ROOT"/game/tests/*.tscn | grep -- "$pattern" || true)
+  done < <(printf '%s\n' "${candidates[@]}" | grep -- "$pattern" || true)
 done
 
 if [ ${#scenes[@]} -eq 0 ]; then
@@ -86,14 +183,29 @@ if [ $list_only -eq 1 ]; then
   exit 0
 fi
 
+# A class_name the editor has never scanned is missing from .godot's class
+# cache, and running a scene does not rescan: every script naming it fails to
+# compile and the route hangs to the timeout with no FAIL line. A merge that
+# adds a class (RiggedBody) did exactly that to the post-merge gate, so import
+# once whenever the cache is missing a declared class.
+cache="$ROOT/game/.godot/global_script_class_cache.cfg"
+missing="$(comm -23 \
+  <(grep -rhoE --include='*.gd' --exclude-dir=addons --exclude-dir=.godot '^class_name +[A-Za-z_][A-Za-z0-9_]*' "$ROOT/game" | awk '{print $2}' | sort -u) \
+  <(grep -oE '"class": &"[A-Za-z0-9_]+"' "$cache" 2>/dev/null | sed -E 's/.*&"(.*)"/\1/' | sort -u) | head -3)"
+if [ -n "$missing" ]; then
+  echo "class cache is missing $(echo $missing); importing once" >&2
+  timeout 900 "$GODOT" --headless --path "$ROOT/game" --import >/dev/null 2>&1
+fi
+
 printf '%-34s %6s %6s  %s\n' "SUITE" "EXIT" "FAILS" "REPORTED"
 printf '%.0s-' {1..78}; echo
 
 broken=0
 ran=0
 for name in "${scenes[@]}"; do
-  output="$(timeout "$TIMEOUT" "$GODOT" --headless --path "$ROOT/game" "res://tests/$name.tscn" 2>&1)"
+  run_suite "$name" "$RUN_LOG_DIR/$name.log"
   code=$?
+  output="$(cat "$RUN_LOG_DIR/$name.log" 2>/dev/null)"
   fails="$(printf '%s' "$output" | grep -c '^FAIL' || true)"
   # Whatever it chose to say about itself, if it said anything.
   marker="$(printf '%s' "$output" | grep -oE '([A-Z0-9_]+_RESULT failures=[0-9]+|failures: [0-9]+)' | tail -1)"

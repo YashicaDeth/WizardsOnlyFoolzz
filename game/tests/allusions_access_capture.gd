@@ -16,6 +16,7 @@ func _ready() -> void:
 		await get_tree().process_frame
 	var j_key := InputEventKey.new()
 	j_key.keycode = KEY_J
+	j_key.physical_keycode = KEY_J
 	j_key.pressed = true
 	hunt._unhandled_input(j_key)
 	for _settle in 18:

@@ -30,6 +30,7 @@ func _ready() -> void:
 	# The actual key branch, not a private helper call.
 	var six := InputEventKey.new()
 	six.keycode = KEY_6
+	six.physical_keycode = KEY_6
 	six.pressed = true
 	hunt.call("_unhandled_input", six)
 	var held := hunt.get("smoke_model") as Node3D
@@ -86,6 +87,7 @@ func _ready() -> void:
 	# it there before leaving the frame; the same RMB draw then works hands-free.
 	var lip_toggle := InputEventKey.new()
 	lip_toggle.keycode = KEY_Y
+	lip_toggle.physical_keycode = KEY_Y
 	lip_toggle.pressed = true
 	hunt.call("_unhandled_input", lip_toggle)
 	for _transfer in 20:
@@ -111,6 +113,7 @@ func _ready() -> void:
 		"the armed posture restores the weapon and its hands without duplicating the smoking hand")
 	var armed_inspect := InputEventKey.new()
 	armed_inspect.keycode = KEY_I
+	armed_inspect.physical_keycode = KEY_I
 	armed_inspect.pressed = true
 	hunt.call("_unhandled_input", armed_inspect)
 	for _armed_inspect_frame in 14:
@@ -125,6 +128,7 @@ func _ready() -> void:
 		hunt.call("_update_held_inspection", 1.0 / 60.0)
 	var alt_draw := InputEventKey.new()
 	alt_draw.keycode = KEY_ALT
+	alt_draw.physical_keycode = KEY_ALT
 	alt_draw.pressed = true
 	hunt.call("_unhandled_input", alt_draw)
 	check(bool(hunt.get("smoke_drawing")), "holding Alt inhales from a lip-held cigarette while armed")
@@ -202,6 +206,13 @@ func _ready() -> void:
 			"the exhale layers long wisps instead of bright round beads")
 		check(wisp_material.shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED,
 			"the close lighter cannot bleach the smoke plume in daylight")
+	# drug-70: the breath is drawn by the simulated volume; the puffs above stay
+	# for the air's bookkeeping but are hidden while the volume is on.
+	var volume: SmokeVolume = hunt.get("smoke_volume")
+	if volume != null:
+		volume.step(1.0)
+	check(volume != null and volume.count() > 10 and cigarette_plume != null and not cigarette_plume.visible,
+		"the exhale is a simulated smoke volume, not sprite puffs")
 	var herb_tint: Color = hunt.call("_smoke_tint", "joint")
 	check(herb_tint.g > herb_tint.r + 0.04 and herb_tint.g > herb_tint.b,
 		"joint, spliff and bong smoke receive only a subtle green bias")
@@ -289,6 +300,7 @@ func _ready() -> void:
 	# Inspection is the same live hand-and-object assembly, not a separate icon.
 	var inspect_press := InputEventKey.new()
 	inspect_press.keycode = KEY_I
+	inspect_press.physical_keycode = KEY_I
 	inspect_press.pressed = true
 	hunt.call("_unhandled_input", inspect_press)
 	for _inspect_frame in 18:
@@ -297,6 +309,7 @@ func _ready() -> void:
 	check(float(hunt.get("inspect_blend")) > 0.9, "holding I raises the equipped bong into inspection")
 	var inspect_release := InputEventKey.new()
 	inspect_release.keycode = KEY_I
+	inspect_release.physical_keycode = KEY_I
 	inspect_release.pressed = false
 	hunt.call("_unhandled_input", inspect_release)
 
@@ -334,15 +347,19 @@ func _ready() -> void:
 	check(pistol_left.position.y > pistol_left_rest.y + 0.05,
 		"the pistol support hand leaves its cup and pinches the slide for a press-check")
 
-	# The sword presents its edge and opens the off hand toward the forte.
+	# The issued blade is the cleaver, not the retired sword. It presents its
+	# edge with the one hand that holds it; there is no off hand to open.
 	hunt.call("_equip_weapon", 0)
 	hunt.call("_advance_arm", 1.0 / 60.0)
-	var sword := arsenal.models.get("sword") as Node3D
-	var sword_left := sword.get_node("LeftGripHand") as Node3D
-	var sword_left_rest: Vector3 = sword_left.position
-	hunt.call("_update_held_inspection", 0.0)
-	check(sword_left.position.z < sword_left_rest.z - 0.05,
-		"the sword inspection releases the off hand to read the edge instead of mimicking a firearm")
+	var cleaver := arsenal.models.get("cleaver") as Node3D
+	check(cleaver != null and cleaver.visible, "the issued blade is the cleaver the arsenal actually builds")
+	if cleaver != null:
+		check(cleaver.get_node_or_null("LeftGripHand") == null,
+			"the cleaver is one-handed, so inspection does not invent an off hand")
+		var cleaver_rest: Vector3 = cleaver.rotation
+		hunt.call("_update_held_inspection", 0.0)
+		check(cleaver.rotation.y > cleaver_rest.y + 0.15,
+			"inspecting the cleaver turns its edge to the light instead of mimicking a firearm")
 	hunt.set("inspect_held", false)
 
 	# The help card must teach every bind this added.
@@ -358,11 +375,13 @@ func _ready() -> void:
 	check(rows.any(func(row): return row[0] == "HOLD V"), "and teaches the held 3D lung diagnostic")
 	var pulmonary_press := InputEventKey.new()
 	pulmonary_press.keycode = KEY_V
+	pulmonary_press.physical_keycode = KEY_V
 	pulmonary_press.pressed = true
 	hunt.call("_unhandled_input", pulmonary_press)
 	check(bool(hunt.get("pulmonary_held")), "holding V outside a grapple raises the pulmonary reliquary")
 	var pulmonary_release := InputEventKey.new()
 	pulmonary_release.keycode = KEY_V
+	pulmonary_release.physical_keycode = KEY_V
 	pulmonary_release.pressed = false
 	hunt.call("_unhandled_input", pulmonary_release)
 	check(not bool(hunt.get("pulmonary_held")), "releasing V lowers it without leaving a modal screen")

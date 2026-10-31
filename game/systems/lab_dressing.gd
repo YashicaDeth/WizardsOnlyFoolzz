@@ -24,8 +24,6 @@ extends RefCounted
 ## Nothing here is gameplay. It never adds a collider, so the district's
 ## movement and combat stay exactly as testable as they were.
 
-const TANK_GLASS := Color(0.16, 0.30, 0.26, 0.30)
-const TANK_FLUID := Color("143a2e")
 const LAB_STEEL := Color("2b3230")
 const LAB_ENAMEL := Color("4a4c42")
 const DRIED_BLOOD := Color("2a0806")
@@ -88,7 +86,7 @@ static func dress(host: Node3D, from_z: float, to_z: float, half_width: float, c
 ## both walls, which is what stops a flat slab reading as a grey box.
 static func _panel_the_walls(host: Node3D, near: float, far: float, half_width: float, rng: RandomNumberGenerator, built: Dictionary) -> void:
 	var panel := BoxMesh.new()
-	panel.size = Vector3(0.09, 2.3, 2.6)
+	panel.size = Vector3(0.09, 1.12, 2.6)
 	panel.material = WorldLook.surface(LAB_ENAMEL, "metal", 4100)
 	var rivet := SphereMesh.new()
 	rivet.radius = 0.035
@@ -102,15 +100,18 @@ static func _panel_the_walls(host: Node3D, near: float, far: float, half_width: 
 	var run := near
 	while run < far:
 		for side in [-1.0, 1.0]:
-			# Two courses, so the wall has a waist rather than one flat face.
-			for course in 2:
-				var height := 1.35 + float(course) * 2.35
+			# Greg's playtest: two courses of 2.3 m panels read as doors that
+			# never opened. Four short courses, each set half a panel along
+			# from the one below like brickwork, so no seams frame a doorway.
+			for course in 4:
+				var height := 0.8 + float(course) * 1.17
+				var along := run + 1.3 + (1.35 if course % 2 == 1 else 0.0)
+				if along + 1.3 > far:
+					continue
 				var jitter := rng.randf_range(-0.03, 0.03)
-				panels.append(Transform3D(Basis.IDENTITY, Vector3(side * (half_width - 0.12), height + jitter, run + 1.3)))
-				for stud in 4:
-					var stud_y := height - 1.0 + float(stud) * 0.66
-					rivets.append(Transform3D(Basis.IDENTITY, Vector3(side * (half_width - 0.19), stud_y, run + 0.15)))
-					rivets.append(Transform3D(Basis.IDENTITY, Vector3(side * (half_width - 0.19), stud_y, run + 2.45)))
+				panels.append(Transform3D(Basis.IDENTITY, Vector3(side * (half_width - 0.12), height + jitter, along)))
+				for end in [-1.15, 1.15]:
+					rivets.append(Transform3D(Basis.IDENTITY, Vector3(side * (half_width - 0.19), height, along + end)))
 		run += 2.7
 
 	_count(built, scatter(host, panel, panels, "WallPanels"), panels.size())
@@ -256,35 +257,8 @@ static func _stand_the_tanks(host: Node3D, near: float, far: float, half_width: 
 		var side := -1.0 if rng.randf() < 0.5 else 1.0
 		var at := Vector3(side * (half_width - 2.1), 0.0, run)
 
-		var glass := MeshInstance3D.new()
-		var glass_mesh := CylinderMesh.new()
-		glass_mesh.top_radius = 0.62
-		glass_mesh.bottom_radius = 0.62
-		glass_mesh.height = 2.7
-		glass_mesh.radial_segments = 14
-		var glass_material := StandardMaterial3D.new()
-		glass_material.albedo_color = TANK_GLASS
-		glass_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		glass_material.emission_enabled = true
-		glass_material.emission = TANK_FLUID
-		glass_material.emission_energy_multiplier = 1.1
-		glass_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-		glass_mesh.material = glass_material
-		glass.mesh = glass_mesh
-		glass.position = at + Vector3(0, 1.75, 0)
-		host.add_child(glass)
-
-		for cap_index in 2:
-			var cap := MeshInstance3D.new()
-			var cap_mesh := CylinderMesh.new()
-			cap_mesh.top_radius = 0.70
-			cap_mesh.bottom_radius = 0.70
-			cap_mesh.height = 0.28
-			cap_mesh.radial_segments = 12
-			cap_mesh.material = WorldLook.surface(LAB_STEEL, "metal", 4500 + cap_index)
-			cap.mesh = cap_mesh
-			cap.position = at + Vector3(0, 0.34 + float(cap_index) * 2.82, 0)
-			host.add_child(cap)
+		# LabVat is the hardware; this tank holds a part rather than a body.
+		LabVat.build(host, at, int(run * 10.0), 2.5, 0.62, false, false, false)
 
 		# Something in it. `BodyMesh` is already this project's vocabulary for
 		# parts of people, so a tank holds an actual one rather than a blob.

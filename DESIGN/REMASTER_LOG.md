@@ -1,0 +1,801 @@
+# Remaster log
+
+One entry per remaster pass (see the dispatcher's remaster loop). Newest last.
+Each entry: date, job, pass, the three gaps seen, what changed, PNG paths, what is still weak.
+
+## 2026-10-05, Job 1 (mechanics lab), look before pass 1 (Claude, Opus)
+Rendered with `tests/mechanics_lab_capture.tscn`, PNGs in `P:/GameDev/Temp/mechanics_lab/`.
+- Works: all five stations load; the tank breaks and pools (16 pools); rain, wind, etch and the covered/open acid test run; ground holes and broken crates show.
+- Weak: the liquid is a flat red decal plus loose red beads, not liquid (no surface, no flow, no splash; SPLASHES 0); no visible glass tank after the break; the weather shot reads as white streaks on a dark box; the yard is an untextured brown tray; placeholder text HUD in the corner; the held weapon is not visible; the melee is a camera ray, not the moveset (job 3 replaces it).
+
+## Manager notes, 2026-10-05 02:18
+
+- Merged since last entry: nothing. Running: 0. Every Claude account parked until 03:04 (alt2 04:54); codex-allusions-team 04:42, -plus 07:51, sircuteskingdom-team 07:14 (out of credits).
+- Weak spot: `codex-sircuteskingdom-plus` shows "ready" in `hub.py status`, but its job5 log (01:14) says its usage limit lasts until **Oct 11, 12:21 PM**. The hub has handed job5 to it three times; the limit text ("Oct 11th, 2026 12:21 PM") seems not to be parsed into a park. Greg: check the park-time parser in hub.py (manager does not edit hub.py).
+- Failures: `job2-rigged-bodies` superseded by pending `job2b-land-rigged-bodies` (priority 100). `lane-exit-routes` is an old lane task, left alone.
+- Priority headers match the order (job2b 100 > lab-46 99 > lab-48 98 > lab-47 97 > job3 96 > job4/job5 95 > job6 94 > job9 93 > job7 92 > art-49 85 > backlog 40-46). No new task queued: pending already covers every account.
+- Top three: (1) land job2b first when Claude accounts unpark at 03:04; (2) fix the codex park parser so job5 stops burning attempts; (3) job5/job7 are the only codex work, so with codex mostly parked until ~07:00 the facility map may slip; consider flipping job5 to `agent: any` if still pending at 07:00.
+
+## 2026-10-05, Job 3 (moving and fighting), build pass (Claude, Opus)
+Not rendered: `render_one.cmd` is not on this machine. `tests/v01_weapons_capture.tscn` is ready (writes held_*.png, cleaver_swing_NN, cleaver_hot, staff_shock_NN, pistol_ads, sparring_NN into `--shots=`).
+- Built: HOTLINE CLEAVER and PRODSTAFF (Greg's working names) in `HunterArsenal`, `SwordMoveset` and `HeldGear`; `MeleeDriver` (buffer, hitstop, kick, stagger, heat, shock, block/parry); `SoulsMover` (tilt walk/run, sprint, crouch, roll); lab ADS and R3 lock-on; a sparring partner; the Growing Floor's fire axe is the cleaver.
+- Dials (Greg's to decide, defaults mine): `MeleeDriver.heat_cost = "none"` ("overheat" built); `MeleeDriver.world_hitstop = true`; staff running/roll moves; parry window 0.24 s. Questions: `AgentHub/queue/questions/moving-and-fighting-01.md`, `-02.md`.
+- Still weak: models are built in code, not CC0 downloads; the Hunt still issues the old `sword` (labelled ASHLINE CLEAVER) in its slot; the facility route has the cleaver in hand for the door but no melee fight wired yet (jobs 5/6 own those rooms; `MeleeDriver` is the piece to use); no sound on swings or hits; first-person swing is a pose offset, not an animated arm.
+- Wired (second pass): a carried HOTLINE CLEAVER is now the Service Arcade's melee weapon through `MeleeDriver` (R1/R2/L1/L2); it cuts the numbered guard via `FacilityGuardPost.land_blow` (same history as the ram, event `facility_guard_cut`). The breach ram moves to the off hand beside it and still forces the gate. Arcade movement is still the arcade's own (sprint, slide), not `SoulsMover`. Test: `arcade_cleaver_test`.
+
+## Manager notes, 2026-10-05 05:33
+
+- Merged since last entry: nothing. Running: 0. Claude default/alt parked to 08:04; codex team 07:14, allusions-plus 07:51, allusions-team 09:56, sircuteskingdom-plus to 10-11 (park parser now works). claude-alt2 ready.
+- Blocker found: `job2b-land-rigged-bodies` passed its Jolt gate (7/7, hub/job2b at 4d8900c2) but the merge was deferred every retry because `DESIGN/GAME_PLAN.html` was dirty in this worktree (01:48 edit of the Destruction card). The edit restates Greg's 10-05 decision (Teardown voxels, diggable ground, five tiers, melee 1-2 / guns 1-3 / explosives 1-4), so the manager committed it as is rather than discard it. Greg: revert that commit if the wording is not yours.
+- Failures: `job2b-land-rigged-bodies` requeued to pending (cause: merge deferred, dirty worktree, now fixed). `job2-rigged-bodies` superseded; `lane-exit-routes` old lane task, left alone.
+- Still open from the job2b run: `gore_range_reset_test` crashed on exit (139) in 2 of 12 Jolt runs after failures=0; full `--core`/`--all` not yet run on Jolt (vehicles, doors unchecked); nothing rendered.
+- Top three: (1) land job2b on the next tick (claude-alt2) and render bodies on Jolt; (2) a follow-up task for the Jolt exit crash and full-suite run on Jolt, queued below; (3) lab-46 liquid and glass next when Claude accounts unpark at 08:04.
+
+## 2026-10-05, Job 2b retry (rigged bodies on Jolt), look after landing (Claude, Opus)
+Rendered once with `tests/mechanics_lab_capture.tscn` (one window, `--position 2240,320`, 1600x900), PNGs in `P:/GameDev/Temp/job2b_retry_shots/`: `bodies_rigged.png` (new: four untouched rigged dummies up close), `bodies.png` (arm cut, one shot dead into its ragdoll, X-ray on), `bodies_wounded.png` (new: same, X-ray off, close). The other station shots were rendered too and not reviewed for this job.
+- Works: all four dummies stand on the mannequin skeleton with heads and ordinary shoulders; the cut arm lies on the floor wearing its skin; the shot dummy is down as a jointed ragdoll by the plinth, not loose boxes; blood marks on floor and back wall. X-ray under a skin is now tested (`rigged_body_test`: skin hides, zones go see-through, organs show, skin returns).
+- Weak: the skin texture reads as a fine checker/crosshatch at mid range, not flesh; heads read as helmets with goggle eyes; the idle is a hunched zombie crouch, arms hanging; dark gaps at the ankles/soles on every dummy; at 5 m the X-ray shot looks almost the same as X-ray off (organs too small to read at that framing); the station's "BODIES / X-RAY ON / OFF" sign is huge and covers the bodies in every close shot; placeholder HUD text in the corner.
+
+## 2026-10-05, lab-46 real fluid and glass (Claude, Opus)
+Greg: "it shouldn't instantly dissipate and it should be an actual fluid as well as an actual glass."
+- New shared pair for the lab and the opening vat (Job 4): `systems/glass_tank.gd` (refracting tinted glass with fresnel edge and two skins for thickness; cracks in stages per blow; burst at the last blow into 48 runtime-split thick shards thrown out by the fluid's head; shards physics, shared cap 96, oldest recycled, kickable; tank surface sloshes on hits and bumps, ripples, drains Torricelli-style to the jagged stub; a floater bobs in it) and `systems/fluid_body.gd` (CPU SPH-lite pour of up to 260 blobs, ray-colliding, drawn as stretched overlapping spheres; a depth-grid pool that keeps a 3 mm film, creeps to a floor grate and drains; ripples; wading splashes and prints via Footprints; floaters drift; shock floods the connected wet cells and hits whoever stands in them, with arcs and a flash).
+- Dials: GlassTank blows/pour_seconds/pressure/spill_volume; FluidBody viscosity/drain_rate/film/shock_damage/shock_impulse/shock_seconds. Defaults: 4 blows, 6 s pour, 60 L to the floor, ~8 L to the grate per minute, shock 14.
+- Shards: runtime split, not Blender cells: fits any tank size with no asset, and the break line is shared exactly with the standing stub.
+- Measured headless: fluid sim worst 1.2 ms a frame at ~110 airborne blobs (CPU only).
+- Not looked at: no render_one.cmd exists, so the PNG sequence (`tests/fluid_glass_capture.tscn`) and the real-GPU fps are not taken. Shaders are not compiled by the headless dummy renderer, so a shader error would only show in a windowed run.
+- Weak: the pour is overlapping spheres, not a screen-space surface; the pool sheet ignores obstacles (flows under the plinth); no sound yet.
+
+## Manager notes, 2026-10-05 06:54
+
+- Merged since last entry: `job2b-land-rigged-bodies-retry` (8bef1102, bodies on Jolt, gate green) and `lab-46-real-fluid-and-glass` (adf305a3, GlassTank + FluidBody, ran 06:37-06:52). Running: `lab-48-organs-cybernetics-xray` on claude-alt2 since 06:52. Every other account parked (Claude default/alt 08:04; codex team 07:14, allusions-plus 07:51, allusions-team 09:56, sircuteskingdom-plus to 10-11).
+- Not rendered this run: a windowed Godot (plain editor/project manager, PID 28648, no args) is already open, so the lab-46 capture was skipped. lab-46 itself never took its PNGs, so its look is still unverified.
+- Weak (from the job2b retry shots): the skin reads as a fine checker, not flesh; heads read as helmets with goggle eyes; hunched zombie idle; dark gaps at the ankles; the station sign covers the bodies; X-ray at 5 m is almost the same as X-ray off. lab-46 (from its own log): the pour is overlapping spheres, the pool flows under the plinth, no sound.
+- Failures: `job2b-land-rigged-bodies` superseded by the landed retry; `job2-rigged-bodies` superseded; `lane-exit-routes` old lane task, left alone. Nothing new.
+- Top three: (1) fix the body look (queued `fix-job2-body-look`, priority 70, claude, Job 2); (2) lab-46 remaster pass 1 with its first real render (queued `remaster-lab-46-p1`, priority 60, a fast finisher); (3) once Claude accounts unpark at 08:04, keep lab-47 (97) and job3 (96) flowing; still owed: a full `--all` run on Jolt (vehicles, doors).
+
+## Manager notes, 2026-10-05 07:33
+
+- Merged since last entry: nothing. Running: `job5-facility-one-map` on codex-sircuteskingdom-team since 07:22. Claude default/alt parked to 08:04; allusions-plus 07:51, allusions-team 09:56, sircuteskingdom-plus to 10-11. claude-alt2 ready.
+- Lost run: `lab-48-organs-cybernetics-xray` on claude-alt2 (06:52) exited after "Still running; I'll be notified" — the agent backgrounded a command and the headless session ended with it. Hub put it back in pending; the manager appended a foreground-only run note to its prompt so the retry (next tick, claude-alt2) does not repeat it.
+- `lab-52-duelist-shade` (codex team) wrote a final report but sits in pending again; its own note: no PNGs because `render_one.cmd` does not exist. Dials left provisional (1.0 s riposte, x2 damage, 2.15 m takedown, 8 s darkness, 13 m/s throw).
+- Repeated gap: lab-46 and lab-52 both looked for a missing `render_one.cmd`, so neither verified its look. Briefs should name the capture command directly: `Godot_v4.7.2-stable_win64.exe --path game --position 2240,320 res://tests/<name>_capture.tscn`.
+- Failures: unchanged (job2/job2b superseded, lane-exit-routes old). Nothing new.
+- Top three: (1) lab-48 retry lands on claude-alt2 next tick; (2) at 08:04 Claude default/alt pick up lab-47 (97), job3 (96), then `fix-job2-body-look` and `remaster-lab-46-p1`, which must take the first real fluid/glass PNGs; (3) a full `--all` run on Jolt is still owed.
+
+## Manager notes, 2026-10-05 08:35
+
+- Merged since last entry: `job3-moving-and-fighting` (f4a4f790, merge d2edfaa2, gate green, ~25 min). The HOTLINE CLEAVER now fights in the Service Arcade (R1/R2/L1/L2, blows land on the numbered guard). Its own verdict: PARTIAL.
+- Weak (concrete): no PNG taken, so held weapon, swing and hit feedback are unseen; the arcade keeps its own walk/sprint/slide instead of SoulsMover (no roll in the route); PRODSTAFF and MERCY NINE are lab-only; The Hunt still issues the old `sword`; no swing/hit sounds; weapon meshes built in code with no CREDITS lines.
+- Not rendered by the manager this run: a Godot Project Manager window was already open (one-window rule).
+- Fixed the repeated gap: `P:/GameDev/AgentHub/render_one.cmd` did not exist although the hub's builder rules point at it (lab-46, lab-52, job3 all skipped their looks). Added it: `render_one.cmd <capture_name> [args]`, one window at a time via a lock dir in P:/GameDev/Temp, `RENDER_REPO` picks the worktree.
+- lab-47 (claude-default) wrote a full report (voxel tiers, diggable patch, timings) but was requeued by the hub; branch hub/lab-47-teardown-destruction holds 2 commits and the retry resumes it. Running: job4 and lab-48 on claude-alt.
+- Failures: unchanged (job2, job2b superseded; lane-exit-routes old). `hidden_cache_test` fails 2 checks on trunk before job3 (stash registry, 9 hidden things vs 5-8): pre-existing.
+- Top three: (1) queued `remaster-job3-p1` (70, claude): render via render_one.cmd, SoulsMover in the arcade, staff and pistol in the route, Hunt sword to cleaver; (2) lab-47 retry must take its first PNGs now that render_one.cmd exists, and fix the old `Wall_*` lookup in mechanics_lab_capture.gd; (3) a small codex fix for `hidden_cache_test` once a codex account unparks.
+
+## Manager notes, 2026-10-05 08:54
+
+- Merged since last entry: `job4-waking-in-the-vat` (cc588c60, merge 7795e103, gate + post-merge gate green, ~34 min). Vat opens on the pad, real GlassTank/FluidBody glass and flood, brain screen, no belt, eyes open slowly on the hand-over.
+- Weak (concrete, from its report): no PNG taken; the broken tank stub has no collision (walk-through); brief item 7 (declutter/enlarge the room) not done; vat-room fps unmeasured; Hunt does not start in third person; old "THE WATER'S GOING" line gone. Questions filed for Greg: `waking-vat-01` (mismatched discipline pair, default no effect, dial `PAIR_RULES`), `waking-vat-02` (his own lines per beat).
+- Not rendered by the manager: windowed Godot PID 28648 still open (one-window rule).
+- Every account parked: Claude default/alt to 13:04 (session limit hit by lab-47, lab-48), claude-alt2 to 10:04, codex allusions-team 09:56, sircuteskingdom-team 13:34, allusions-plus 14:03, sircuteskingdom-plus to 10-11. lab-47 and lab-48 were cut off and sit in pending to resume.
+- Failures: unchanged (job2, job2b superseded; lane-exit-routes old).
+- Top three: (1) queued `remaster-job4-p1` (70, claude): render the vat, collide the stub, declutter the room; (2) lab-48 (98) and lab-47 (97) resume first when claude-alt2 unparks at 10:04; (3) a codex fix for `hidden_cache_test` when allusions-team unparks at 09:56.
+
+## Manager notes, 2026-10-05 09:05
+
+- **Merged since last entry:** nothing. Running: 0. Every account is parked: claude-alt2 until 10:04, Claude default/alt until 13:04; codex allusions-team 09:56, sircuteskingdom-team 13:34, allusions-plus 14:03, sircuteskingdom-plus until 10-11.
+- **Unmerged work waiting to resume:**
+  - lab-47: 2 commits plus PNGs in `P:/GameDev/Temp/lab47/`.
+  - lab-48: 1 commit.
+  - job5: 2 commits, `--core` 30/30. Codex ran out of credits mid-run.
+  - lab-52: a WIP commit.
+- **Weak (lab-47 PNGs):**
+  - After the charge the HUD still reads `BROKEN 0/11`.
+  - The charge only notches the brick wall.
+  - The dug ground is flat beige.
+  - The "DESTRUCTION REBUILD" sign covers the shot.
+  - The `ACID ON YOU` line shows although acid is meant to be off.
+  - These notes were appended to the pending lab-47 task.
+- **Not rendered:** windowed Godot PID 28648 is still open (one-window rule).
+- **Failures:** unchanged. job2 and job2b are superseded; lane-exit-routes is an old task.
+- **Morning report:** written to `P:/GameDev/AgentHub/MORNING_REPORT.md`. Game plan v2 skipped: 4 of 10 v0.1 jobs have landed.
+- **Top three:**
+  1. Queued `fix-hidden-cache-test` (70, codex) for when codex unparks.
+  2. lab-48, then lab-47 with the PNG notes, on claude-alt2 from 10:04.
+  3. job5 lands on codex-allusions-team at 09:56. Then job6, job9 and job7 at 13:04.
+
+## Manager notes, 2026-10-05 10:03
+- Nothing has merged since 09:05. No builders are running. All Claude accounts are parked (alt2 frees at 10:04, the others at 13:04). codex-allusions-team is ready and job5 is pending at priority 95, so no new task was queued.
+- No new merge, so nothing was rendered. The 09:05 recommendations still stand: lab-48 next, fix-hidden-cache-test, then remaster passes on job3 and job4.
+- Failed queue is unchanged (job2, job2b originals, lane-exit-routes). All of them were superseded by tasks that later landed.
+- v0.1 landed 4 of 10, so the game plan v2 draft waits.
+
+## Manager notes, 2026-10-05 10:33
+- Merged: fix-hidden-cache-test (e93bc8d0, fec30a43). The test now accepts the ninth hidden route item, so trunk's pre-existing hidden_cache failure is gone. This was a test-only change, so nothing was rendered.
+- job5 restarted on codex-allusions-team at 10:07 and hit the Codex limit again. That account is parked until 15:11 and job5 stays pending. lab-48 has been running on claude-alt2 since 10:07. Every other account is parked (Claude until 13:04, Codex 13:34 and later), so no new task was queued.
+- Failed queue is unchanged. v0.1 is still 4 of 10 landed, so the v2 draft waits.
+- Top three: (1) lab-48 lands on alt2; (2) at 13:04 lab-47 (with the PNG notes) and job6 go to the Claude accounts; (3) job5 resumes on the first Codex account to unpark (sircuteskingdom-team at 13:34).
+
+## lab-48: organs, cybernetics and the X-ray as one system (2026-10-05)
+
+Spec: Greg 5 Oct ~02:05 in `AgentHub/data/greg_playtest_b_2026-10-05.md`. Code: `game/systems/organ_system.gd`.
+Proven at the mechanics lab's bodies station. Proof PNGs are in `P:/GameDev/Temp/lab48/` (`tests/organ_system_capture.tscn`).
+
+Defaults set behind dials, all in `OrganSystem` unless named. None of these is Greg's decision.
+- `HEART_DEATH_SECONDS` 6. A burst heart with nothing pumping for it kills in 6 s.
+- `SLOW_BLEED_FLOOR` 6 ml/s. This is the lowest internal bleed for a burst liver, gut, stomach or kidney. The rupture itself already bleeds ~13-25 ml/s, so death takes about 2-3 minutes.
+- Lungs: one burst lung with nothing breathing for it means breathless (pace 0.6) and no sprint (`SoulsMover.winded`).
+- Brain: the existing fatal rupture drops the body (for the undying player, the body fails).
+- `SHORT_SECONDS` 6 and `SHORT_WEAR` 0.12. A second shock while an implant is shorted overloads it and burns it out for good. Plates (sternum, spine cage, clavicle rail) conduct but never short.
+- Implant roles:
+  - lung bellows breathes for a lung.
+  - Regulator and pulse cage keep a burst heart going.
+  - Blackbox liver covers a burst liver.
+  - A shorted part stops doing its job, and limb hardware loses its capabilities while shorted.
+- Rip:
+  - `RIP_SECONDS` 1.5 at full grip, pulled in tugs at `TUG_RATE` 2.2/s. If you let go it slips back at `RIP_SLIP_PER_SECOND` 0.7.
+  - Bare hands cost `HAND_DAMAGE` 0.1 condition.
+  - Reach is `RIP_REACH` 2.4 m.
+  - Allowed only on a downed or dead body through an opening: `Cavity` OPEN_MARK, or a wound cut to the organ layer. X-ray visibility is not an opening.
+  - A burst organ is refused ("BURST"), because it already spilled out.
+  - A heart or brain ripped from a living downed body kills it (the finisher). Any other organ adds an internal bleed.
+- Chest opening: a cut, puncture, shear or ballistic torso hit opens the chest once the zone is cut to bone (`OPEN_AT_LAYER`) and is at or under 75% health (`OPEN_AT_HEALTH`).
+- X-ray look:
+  - Skin becomes `xray_shell.gdshader`.
+  - Organs glow at `XRAY_ORGAN_GLOW` 0.85, and hot when damaged.
+  - Hardware is 40% see-through.
+  - The chest and buttock censors and forms hide under the X-ray (`XRAY_HIDES_CHEST_CENSOR`). The groin censor stays.
+  - An opened chest loses its chest censor.
+- Scan loot estimate: `Carry.sale_value()`'s base (organ 12, cybernetic 24) × condition. The scan has no market, buyer or spoil clock.
+- Lab controls (assistant default):
+  - Hold USE (E / pad X) on an organ you can see to rip it.
+  - With an organ in hand, RELOAD (R / Y) installs it into you and DRESS WOUND (4 / d-pad left) sells it.
+- Station dummies carry hardware from the catalogue (`BodiesStation.LOADOUTS`). The lab player carries the decanting loadout.
+- Anatomy fix: the organ layout and skeleton had the spine in front of the heart. The rig faces -Z, as `BodyForms` says. They have been turned round.
+- New organs: stomach and two kidneys.
+- Open question: `AgentHub/queue/questions/lab48_reflex_booster.md`.
+
+## lab-47 teardown destruction, 2026-10-05
+
+- Built: Greg's five tiers as one table (`systems/material_toughness.gd`), 15 cm voxel walls/crates/bunker that break where hit and drop unsupported pieces as their own breakable bodies (`voxel_structure.gd`), a 6 x 6 x 3 m diggable dirt patch (SDF + naive surface nets, chunked, cuts replayable from a save: `dig_terrain.gd`), one explosion for voxels, soil, props and bodies (`blast.gd`). WorldBreak routes every existing weapon into them. Lab: brick and concrete voxel walls replace the panel wall; breach corner (tier 4 bunker front, tier 5 shell, lit crate inside; buried tier 3 hatch over a pocket); NEXT now steps on to grenade, charge, thermal drill, shovel.
+- Library: in-house GDScript, not Voxel Tools. Its GDExtension (1.7, MIT) would be a native binary loaded by every lane's headless suite and is marked less tested than the module build; the lab patch costs 17 ms for a grenade crater remesh in GDScript, which is fine here and not for kilometres of map. Voxel Tools stays the upgrade path for the real map.
+- Dials (defaults, for Greg): per-material hp per voxel (brick 18, concrete 30, bunker 60, sealed 120); loose cubes 96 and falling pieces 16, oldest recycled; grenade r 1.1 m / 260, charge r 0.85 m / 520 (fuses 2.2 s / 3 s); drill 55 hp/s r 0.3 m (about 12 s through 60 cm of bunker); ramming 35 kJ per tier (a 1.2 t car at 50 km/h beats tier 3); chaos magick tiers per metre of altitude 0 (off until the spell exists).
+- Measured headless (CPU only): 17 pistol rounds 1.7 ms total; charge on brick 8 ms (203 cells); grenade crater 17 ms; drill 0.16 ms a frame; debris settled with 83 cubes: physics 1.0 ms, process 2.2 ms a frame.
+- Not looked at: no render_one.cmd, so no PNGs (`tests/destruction_capture.tscn -- --shots=DIR` takes all six) and no real-GPU fps.
+- Weak: falling pieces collide as their convex hull; voxel faces are not greedy-merged; the dig patch draws one vertex colour, no texture; explosions are a light flash and the debris, no smoke or sparks yet.
+
+## Manager notes, 2026-10-05 15:10
+
+- **Merged since 10:33:**
+  - lab-48 organs, cybernetics and X-ray (248ea0c9)
+  - lab-47 Teardown destruction (c73a2e0e)
+  - fix-58 execution on a downed body (61c323f3)
+  - fix-55 examiner on the rigged base (c75be73a)
+- **Landed so far:** 6 of 10 v0.1 jobs.
+- **Running:** job5 (the facility map) on claude-alt2 since 15:07. Every other account is parked: Claude default and alt until 18:04; codex until 15:11, 20:30 and 20:33, and sircuteskingdom-plus until 10-11.
+- **Rendering:** not done. Two Godot processes are running under the job5 builder, so the one-window rule applies. I reviewed the existing PNGs instead.
+- **Weak in the lab-48 PNGs** (`P:/GameDev/Temp/lab48/contact_sheet.png`):
+  - The whole lab is one flat brown-red wash.
+  - Every lab HUD line is printed red, which breaks Greg's "red only on danger" rule.
+  - The `ACID ON YOU` line still shows, although acid is off.
+  - Debug text overlaps the X-ray scan panel.
+  - Blood pools are flat red squares.
+  - What reads well: the heart in hand, the X-ray scan panel, and the shorted-implant sparks.
+- **Weak in the fix-55 PNGs** (`P:/GameDev/Temp/examiner_*.png`): the green mood is right. But a blurred grid of squares covers the whole office frame, the head reads as stacked boxes, and one arm is bare white.
+- **Priorities:** lab-53 (98) and v02-51 (90) sit above the v0.1 jobs. Greg bumped them at midday, so I left them.
+- **Failures:** none new. job2 and job2b are superseded. lane-exit-routes is an old task.
+- **Game plan v2:** the draft is started at `DESIGN/GAME_PLAN_V2_DRAFT.md`, because 6 of 10 jobs have landed. Nothing was queued from it.
+- **Top three:**
+  1. Queued `remaster-lab-47-p1` (70, claude). It covers the GPU render, explosion smoke and sparks, soil texture, a lab HUD that keeps red for danger only, and hiding the acid line.
+  2. job5 lands, then the examiner office overlay blur goes into job6.
+  3. Get a real-GPU fps number for lab-46, lab-47 and lab-48. None exists yet against the 144 fps target.
+
+## Manager notes, 2026-10-05 16:10
+
+- **Merged since 15:10:** job5 the facility, one map (d5a224af, merged 70430fe8); fix-57 wizard eyes in the house palette (1e344b86).
+- **Landed so far:** 7 of 10 v0.1 jobs. Still to land: job6 examiner, job9 enemies, job7 death/saves/HUD (all pending; job7 bounced off a codex limit at 15:37).
+- **Running:** fix-56 ADS sights and VATS killcam on claude-alt2 since 15:37. Every other account is parked (Claude until 18:04, codex until 20:16-20:33, sircuteskingdom-plus until 10-11).
+- **Rendering:** skipped; the fix-56 builder has Godot running. Reviewed job5's own PNGs (`P:/GameDev/Temp/job5_sheet5.png`, `P:/GameDev/Temp/job5-facility-one-map/`).
+- **Good in job5:** the green-white pools on the floor are the right mood; the zone stamp in the body-cam OSD and objective box read well; capture runs 330-357 fps at 1280x720.
+- **Weak in job5:**
+  - Arcade and Lower Works are black voids: floor pools only, no walls, ceiling or props visible between them. The story-prop frames show one or two dark boxes.
+  - Bright unlit white rectangles float in mid-air (arcade right edge, transit, surface gate).
+  - Lift rides show a flat white bar and red "DOWN"/"UP" lettering clipped off the frame; red is not danger there.
+  - A flat green guide stripe runs down every floor and reads as a debug line.
+- **Failures:** none new.
+- **Top three:**
+  1. Queued `remaster-job5-p1` (70, claude): walls and story props, the floating quads and lift signage, the guide stripe behind a dial.
+  2. job6 must fix the examiner-office overlay blur when it runs (carried from 15:10).
+  3. A real-GPU fps number for lab-46, lab-47 and lab-48 (carried).
+
+## Manager notes, 2026-10-05 17:08
+
+- **Merged since 16:10:** fix-56 ADS sights small and centred, hands seated on the pistol and 12G (8532801d); RoundCam: the killing round replayed slowed into the X-ray (15c3a1f0); merged 267b2107, gate green.
+- **Running:** lab-53 BeamNG-style vehicles on claude-alt2 since 16:47 (priority 98, Greg's bump). Claude accounts parked until 18:04, codex until 20:16-20:33, sircuteskingdom-plus until 10-11.
+- **Rendering:** skipped; lab-53 has Godot running. The ADS check is `res://tests/aim_down_sights_capture.tscn`; render it next run.
+- **Queue order fix:** Greg said at midday that the facility map is the top priority, but `remaster-job5-p1` was at 70, behind job6/job9/job7/v02-51/art-49. Raised it to 96, so the first Claude account to unpark at 18:04 gets it. lab-53 stays at 98 (Greg's number).
+- **Covered from Greg's midday notes:** examiner reskin (fix-55 done), ADS/VATS (fix-56 done), eyes (fix-57 done), execution (fix-58 done), Black Mirror and depth map (in v02-51 pending).
+- **Open question for Greg:** `queue/questions/execution-58-01.md`. Should executed bodies in the Hunt and the arcade ragdoll? Default for now: no change, so they stay in the stiff downed pose.
+- **Failures:** none new.
+- **Top three:**
+  1. remaster-job5-p1 at 18:04 (walls, story props, floating quads, lift signage).
+  2. job6 must fix the examiner-office overlay blur (carried).
+  3. Render the fix-56 ADS capture and check that the sights no longer fill the screen.
+
+## remaster-job5-p1, 2026-10-05: the facility halls show their walls
+
+- **Walls and props:** the Service Arcade (6 rows) and Lower Works (8 rows) get a caged wall lamp on each long wall at every pool row, washing the wall face, plus one service prop in that wash on alternating sides: the kit's pipe runs and vent, drum clusters, crate stacks, a fuse cabinet with conduit to the ceiling (`facility.gd` `_dress_walls`). Nothing named or written on. Tanks, consoles, ducts, drums and crates now wear the kit's ambientCG painted-metal / metal-plate grime instead of flat colour.
+- **Floating quads:** the "white rectangles" in the arcade and Lower Works were the service-monitor screens (1.8x emission) seen at the frame edge; now a dim banded CRT (0.12x) with a close, low spill on its cabinet. The surface-gate white-out moved to just past the threshold (no shadow) so it fills the doorway to the floor instead of hanging over a dark strip; a daylight spill lights the jambs.
+- **Lift rides:** shaft strips 5x -> 0.6x, thinner, so they read as lit tubes rather than a flat white bar; floor indicators in the house bone/amber (`c8a070`), about half the size, plus a readout over each side slot so a rider watching the shaft reads the floor in frame. The lintel indicator still runs off the top edge when you look out of the slot (it is above the door).
+- **Dials (Greg can flip):** `facility.gd` `ROUTE_LINE` = `"worn"` (default: broken, scuffed painted dashes on the concrete texture, muted) or `"off"`; `WALL_WASH_ENERGY` = 7.0 (0 turns the wall lamps off).
+- **Proof:** `render_one.cmd facility_one_map_capture`, before `P:/GameDev/Temp/job5-p1-before/`, after `P:/GameDev/Temp/job5-p1-after/` (sheet `job5_p1_after_sheet.png`). fps 1280x720: average 313, min 5 (first-frame shader compile).
+
+## Manager notes, 2026-10-05 19:08
+
+- **Merged since 17:08:** remaster-job5-p1. The facility halls now show walls, caged wall lamps, service props and grimy materials. The floating white quads are gone. Merged e7fd15dd (18:38), gate green.
+- **Running:** nothing. Every account is parked: claude-default and claude-alt until 23:04, claude-alt2 until 20:04, codex until 20:16-20:33, sircuteskingdom-plus until 10-11. 14 tasks are pending, so no idle fills were needed.
+- **Rendering:** I didn't launch a render. I opened the builder's after-shots in `P:/GameDev/Temp/job5-p1-after/` instead.
+- **Still weak (job5):** in the lift ride (04), the floor readout is a big curved "DOWN 0C SERVICE ARCADE" floating in the black. The lintel text overlaps the HUD objective box, and the shaft strip is still one flat green bar. The arcade (03b) is mostly empty floor and black, with one drum and one pipe run as its whole story. The `worn` route dashes still read as a debug stripe.
+- **Failures:** none new (job2, job2b and lane-exit-routes are old ones).
+- **Top three:**
+  1. Queued `remaster-job5-p2` (70, claude) to fix the lift readout and HUD overlap, add story clusters and pool light in the arcade, and default the route line to "off" (dial kept).
+  2. job6 must fix the examiner-office overlay blur (carried).
+  3. Render the fix-56 ADS capture, and get a real-GPU fps number for lab-46/47/48 (carried).
+
+## lab-53: BeamNG-style vehicles on the lab's vehicle pad (2026-10-05)
+
+- **Built:** two drivable cars on the mechanics lab's vehicle pad (Kenney CC0 sedan and SUV, regraded to rust/bone/old blood), a 1.2 m ramp, and a concrete voxel crash wall. `game/systems/vehicle_damage.gd` + `game/lab/stations/vehicle_station.gd`.
+- **Why not a real soft body:** BeamNG-style node-beam (mass-spring lattice at ~2 kHz) needs native code; two cars of it in GDScript cannot hold 144 fps and there is no maintained Godot 4 port. Jolt's SoftBody3D is cloth-like and cannot carry a suspension. So the existing raycast chassis (`arcade_vehicle.gd`: per-wheel springs, load-based grip, real weight transfer) drives, and damage is applied where each impact lands: the body mesh's vertices are pushed in (one ~1k-vertex pass per impact, never per frame), parts come off as rigid bodies, and the engine loses power.
+- **Toughness tiers:** parts carry `MaterialToughness` materials (bodywork `steel_sheet` tier 3, new `glass` tier 1). A part comes off only when the blow's source beats its tier. For a ram the tier comes from kinetic energy (`ram_joules_per_tier`), so a 1.1 t car bends on a slow knock and sheds steel from about 14 m/s (50 km/h). Melee dents a car and breaks its glass but cannot take a steel door off; guns can. A car ramming a voxel wall hits the wall with the `vehicle` source.
+- **Bodies inside:** a seated `BaselineHuman` takes each crash in the zone nearest the contact, with the derby's rule: once the bumper and hood are gone, a fast front hit lands on the chest as shear.
+- **Dials (defaults I chose; Greg has not set these):** `VehicleDamage.crumple` 1.0 (global crumple strength); `DENT_PER_MS` 0.045 m per m/s, `MAX_CRUSH` 0.6 m; `ENGINE_PER_MS` 0.04 with a floor of 0.25 (a wrecked engine limps at ~6 m/s rather than stopping); `PART_DAMAGE` 2.5. Crush is shared about equally in a car-to-car hit (0.7 + 0.3 x own share of the closing speed). The derby is unchanged: its cars do not use `VehicleDamage`.
+- **Controls:** R2 throttle, L2 brake then reverse, left stick steers; W/S/A/D on keyboard. USE on the plinth or beside a car gets in; USE gets out (refused above 5 m/s).
+- **Measured (lab-53 capture, RTX 2060 SUPER, vsync off, ~7 other Godot processes running):** 282 fps mean and 236 minimum, per-second averages, over the wall hit and the SUV ram with both cars moving. One crumple pass costs 2.9-3.5 ms on the impact frame (the kit body is split once into 4x faces so creases show). That fits inside a 144 fps frame, but it is a one-frame spike the per-second counter hides. PNGs: `P:/GameDev/Temp/lab53/1_before.png`, `2_after_wall.png`, `3_after_ram.png`, `4_pad_wide.png`, `fps.txt`.
+- **Limits:** the crumple reads as a flattened, shortened nose with a wrinkle, not BeamNG's folded metal. The pad gives a 13 m run-up, too short to reach steel's ram tier, so the capture starts each car at 15 m/s. In play, take a lap of the yard first. **lab53b:** the pad is now a ~24 m lane on the yard's east side (start line by the south wall, crash wall under the roof); full throttle from parked reaches the wall at 15.5 m/s (steel needs 13.8 for the sedan) and the front bumper comes off (`mechanics_lab_test`). The menu teleport now takes you out of the car at any speed, and melee on a car counts as melee (dents, breaks glass, never takes steel off). Doors only come off from side hits or gunfire.
+
+## job6: the examiner, a real boss; his keycard always drops and opens the staff door (2026-10-05)
+
+- **Fight** (`systems/examiner_fight.gd`): about 30 s for a human with the cleaver. A LimboAI behaviour tree picks his moves when the plugin is on disk (built in code by name, as `rival_tactics.gd`), and the same five-branch selector runs in GDScript when it is not (`ExaminerFight.decide`). The scalpel wind-up glints bone-white and can be parried (PARRY: X / L2) into a 1.6 s opening with one double-damage riposte. The syringe glints sick green, lunges from 2.6 m, slows you 6 s and cannot be parried, only stepped out of. Poise is 3 calm / 4 desperate; a reel only interrupts a calm scalpel wind-up. Every third blow that catches him at rest is turned aside (20% damage) and answered with a quick parryable cut, so spamming him is punished. Under half health he is DESPERATE: quicker wind-ups, a follow-up cut, shorter rests, and the bar says so. A cold overhead pool lights his room during the fight. His rig takes every wound but never drops before the fight is won.
+- **Head breaking after two hits:** the screenshot (`greg_playtest_c_screenshot_2026-10-04`) shows the old Higgsfield ModelSkin coming apart zone by zone. fix-55 removed that skin; `examiner_keycard_test` asserts his head stays on through every seeded fight (three by default since land-job6; `--runs=10` for the full sweep).
+- **Click-spam kill:** blows at him skipped the weapon cooldown, so a fast clicker killed him in about a second. They now keep the weapon's own rhythm (axe 0.7 s), and they go through the InputMap actions, so R1 / L2 / R2 work on the pad.
+- **Keycard:** falls to his floor beside him as a lit pickup (use it, or walk over it once you have stepped clear), and is restored there on reload until taken. `ExaminerFight.has_keycard()` is the one check, and the staff door uses it. The door's prompt names the card and where it is (his office, or his office floor).
+- **Staff door (one map):** the shut leaf was a 1.4 m plate with no collision in a 3 m opening, so you could walk round it, and the old 1.55 m frame box stood in the middle of the opened doorway. The leaf now fills the opening with collision and a red reader that goes pale when it opens. The frame is two jambs and a head. His cupboard (2 field dressings, 8 rounds) stands on the artery wall instead of across the doorway. With the card in hand, the objective now says the staff door, not the sealed pit door.
+- **"Examiner office overlay blur" (carried in the manager notes):** that fix-55 shot was taken with the player still in the tank, so the blurred squares and bubbles are the in-tank medium seen through a separate capture camera. From the player's own view in his office there is no blur (`P:/GameDev/Temp/job6/shots/`).
+- **Dials (defaults I chose; Greg has not set these):** `HEALTH` 260; `PARRY_WINDOW` 0.3 s; `PARRIED_STAGGER` 1.6 s; `RIPOSTE` x2; `POISE` [3, 4]; `GUARD_EVERY` 3 at `GUARDED_SHARE` 0.2; `PHASE_TWO_AT` 0.5; wind-ups scalpel [0.6, 0.45] s, syringe [0.95, 0.75] s, follow-up 0.38 s; `COOLDOWN` [1.1, 0.7] s; `ARENA_LIGHT_ENERGY` 2.4 (0 turns it off). His lines and his final model stay OPEN (Greg's).
+- **Proof:** `render_one.cmd examiner_boss_capture --out=P:/GameDev/Temp/job6/shots`: 1 scalpel telegraph, 2 syringe telegraph, 3 desperate, 4 keycard on floor, 5 staff door shut, 6 staff door open onto the artery, 7 cupboard.
+
+## land-job6: the examiner merged onto claude/launch-latest (2026-10-06)
+
+- **Conflicts:** only this log (job6's section and the 21:08 / 23:10 manager notes; both kept). `vat_chamber.gd` auto-merged: job7's field inventory, rebirth site and facility checkpoints sit beside job6's staff door, keycard and cupboard.
+- **Fixed, caused by job6 (also red on hub/job6-the-examiner alone, green on the base):** `first_run_walk_test` still expected the card to go straight into the inventory and the pit door to be the way on. It now takes the card off his floor and opens the staff door (pit door kept for the two-map cut).
+- **Gate time:** `examiner_keycard_test` ran ten ~40 s fights (about 7 min), over `run_tests.sh`'s 200 s ceiling, so the gate timed it out. It now runs three by default; `--runs=10` (after `--`) gives the full sweep, which passed in 6 min 54 s on the merged tree.
+- **Tests (merged tree, headless, own APPDATA, `tools/run_tests.sh`):** all green: baseline_human, body_cut, opening_handoff, first_run_walk, first_thirty_route, examiner_fight, examiner_keycard (3 runs), examiner_feed, death_save_screen.
+- **Proof:** `render_one.cmd examiner_boss_capture --out=P:/GameDev/Temp/land-job6/shots` (7 PNGs, same framing as job6's `P:/GameDev/Temp/job6/shots`). Opened them all: rigged low-poly BaselineHuman body with the doctor's coat (no Higgsfield skin), wind-ups readable, DESPERATE on the bar under half health, the card lit on his floor, staff door shut then open onto the Service Artery, cupboard on the artery wall. His office from the player's view is sharp, no overlay blur. Lighting is dark with green-white pools.
+- **Limits:** his head still reads as stacked boxes (placeholder; his model and lines are Greg's). A warm red lamp washes the floor and left wall at the staff door (shots 5 and 6), which is not a danger cue; I left it alone. Shot 4 shows "CALL THE LIFT" because the capture camera stands on the lift landing; the card prompt wins in reach (`examiner_keycard_test`). No fps number. The glints are small at the capture distance, so the telegraph is judged from the test, not the PNG.
+
+## Manager notes, 2026-10-05 21:08
+
+- **Merged since 19:08:** lab53b-land-vehicles (9a2df731: 24 m run-up lane, car exits on menu teleport, melee counts as melee) and job7-death-saves-screen (8c6c3e45: persisted subtitles/censor/graphics settings, device-aware inventory hints, blood-sigil capture; blood-fragment spending made a dial in e1031994). Both gates green.
+- **Running:** job6-the-examiner on claude-alt2 (since 20:32). Every other account is parked (claude-default and claude-alt until 23:04, codex until 10-06 02:51 or later). 12 tasks pending, so no idle fills were needed.
+- **Rendering:** a windowed Godot ("Current Version") is already open, so I didn't launch one. I opened the builder's `P:/GameDev/Temp/job7-death-saves-screen/blood_sigil.png` instead.
+- **Still weak (job7):** the bloodstain is a glowing, translucent orange ghost body with two floating red discs and an orange ring. It sits on a bare plane under warm brown fog, which is off-palette and doesn't read as a bloodstain. A floating "YOUR OLD BODY" label hangs over it like debug text. The capture isn't in facility light.
+- **Failures:** none new (job2, job2b and lane-exit-routes are old ones).
+- **Top three:**
+  1. Queued `remaster-job7-p1` (70, claude) to make the sigil a dark pooled blood decal, swap the floating label for an in-reach prompt (or a dial that defaults to off), and re-render it in facility light.
+  2. job6 must fix the examiner-office overlay blur and use the low-poly base for the examiner, not the Higgsfield skin (carried; it's running now).
+  3. Render the fix-56 ADS capture, and get a real-GPU fps number for lab-46/47/48 (carried).
+
+## Manager notes, 2026-10-05 23:10
+
+- **Merged since 21:08:** nothing (76f8f0c1 is only a brief tweak).
+- **job6 built but did not land:** hub/job6-the-examiner has the finished boss (d212548a, 448141ec), but its merge into claude/launch-latest conflicted, and the hub put the full job back in pending to be rebuilt. I moved that rebuild to `queue/held/job6-the-examiner.md` and queued `land-job6-examiner` (priority 101, claude): merge the base into the kept branch, resolve the conflicts, rerun the gate, and render once. The builder's own notes say his head still reads as stacked boxes (a placeholder until Greg draws him), there's no fps number yet, and `blood_pool.gd` prints "cast a freed object" when a second test world loads.
+- **Priority order was broken:** imp-64/67/60/68 (98-95) were outranking job6 (94) and job9 (93), and those four are now running on claude-default and claude-alt. Pending headers are now job9 99; imp-61 90, 62 89, 63 88, 66 87, 65 86; art-69 85, art-49 84; v02-51 dropped to 40 (backlog).
+- **Rendering:** skipped. Nothing new merged, and every Claude slot is building.
+- **Failures:** job6, a merge conflict (see above). job2, job2b and lane-exit-routes are old.
+- **Top three:**
+  1. Land job6 (queued, 101).
+  2. job9 enemies next (99).
+  3. Render the fix-56 ADS capture, and get a real-GPU fps number for lab-46/47/48 and for job6 (carried).
+
+## Manager notes, 2026-10-06 02:10
+- **Merged:** land-job6 (793c8dcc, merge 39782473, gate green). The examiner boss, the keycard drop and the staff door are now on claude/launch-latest. 8 of 10 v0.1 jobs have landed; job9 enemies is building on claude-alt2 (since 01:42). Every other account is parked until 04:04 or later.
+- **Looked at** `P:/GameDev/Temp/examiner_boss_2_syringe_telegraph.png` and `_6_staff_door_open.png`.
+  - The telegraph reads: his hand flares white before the syringe. But the syringe itself can't be seen.
+  - Weak: the "open" staff door shot is a flat dark slab with a warm smear on it. It doesn't read as an opening onto the Service Artery.
+  - Weak: red lamps wash the walls and the floor near the door. Greg's rule is "red only on danger".
+  - Weak: the objective says "HIS CARD OPENS THE PIT DOOR" (`game/vat_chamber.gd:1651`), but the caption says "STAFF DOOR". The player is told two different door names for one door.
+  - Still Greg's: the examiner's box head and his lines.
+- **Top 3:**
+  1. Make the staff door read as a real opening, take the non-danger red out at the door, and use one door name in the objective. Queued as `fix-72-staff-door-read`.
+  2. Make the syringe and scalpel visible in his hand during the telegraph (job6 remaster pass).
+  3. Measure fps in the examiner office on the RTX 2060 SUPER (none measured yet).
+- **Failures:** no new ones (job2, job2b and lane-exit-routes are old ones, already handled).
+
+## Job 9 (v0.1 enemies), 2026-10-06: dials and defaults
+
+None of these are Greg's decisions; all are defaults behind constants, tuned so the headless duel bots (careful play) win with each weapon and mashing loses.
+- **Guards** (`systems/v01_guard.gd`): health staff 230 / pistol 170; staff pattern light, light_2, heavy, light, shock; blood share per hit 7% light, 11% heavy, 14% shock, 9% shot; block 3 stamina, regenerates every 3 s; he parries after 2 lights in a row; pistol aim 1.05 s, locks at 72%, 5-round magazine, 1.7 s reload.
+- **Freed subject** (`systems/v01_freed_subject.gd`): health 130; pounce windup 0.62 s (red); claw flurry of 3 (copper, 4% each); dazed 1.8 s after breaking out.
+- **Sentinel** (`systems/v01_sentinel.gd`): health 320; ram windup 1.0 s (red), 17%, then 2 s vent; slam 0.85 s (copper, blockable), 11%; light blows chip plates x0.35, heavies x1.2; core x2.0 melee, x2.5 shot; staff shock stuns 2.6 s; an eye shot blinds 3 s.
+- **Measured** (render_one, RTX 2060 SUPER, 1280x720, vsync off, across three runs): growing floor with the subject loose 110-125 fps; service arcade with three guards awake 116-142; lower works with the sentinel awake 111-200. One 72 ms spike on the growing floor in one run.
+
+## Manager notes, 2026-10-06 05:10
+- **Merged:** job9 enemies (a607fd89, merge 2efeed7b, gate green). The guards, the freed subject and the sentinel are on the one map. 9 of 10 v0.1 jobs have landed; only job7 is left. Every account is parked (Claude until 09:04, alt2 until 06:04, Codex 05:38-10-11).
+- **Looked at** the job9 proof PNGs from the merged run (`P:/GameDev/Temp/job9_shots/v01_guard_2_staff_shock_telegraph.png`, `v01_sentinel_1_ram_telegraph.png`, `v01_subject_1_pounce_telegraph.png`). I didn't do a fresh render because these came from the merged commit.
+  - Weak: in the shock wind-up the guard has his back to the player. The red glint is on the staff tip, low on the floor, and his body tells you nothing.
+  - Weak: from range, the sentinel's ram telegraph is a small orange square and one red dot. The machine is a dark box on wheels that blends into the floor.
+  - Weak: "CELLOUTZ 47 IS DOWN" (from the arcade) is still on screen in the Lower Works. The subtitle never clears.
+  - Weak: in the red-lit growing floor the freed subject is a small crouched figure, red on red. Its pounce telegraph is red too, so it gets lost. The room's red is not a danger cue.
+  - Weak: the guards are still mannequins with a red blob head (imp-60 body look is pending).
+  - Unknown: `v01_weapons_test` has 6 failures ("back round to the cleaver"). The job9 builder thinks lab-53 caused them. Nobody has checked on trunk.
+- **Top 3:**
+  1. Fix the enemy reads (guard faces the player while winding up, a sentinel telegraph you can see from range, the subtitle clears, the subject stands out in the vat room) and find out what is failing in v01_weapons_test. Queued as `fix-73-enemy-reads` (priority 70, claude).
+  2. job7 death, saves and HUD is the last v0.1 job (remaster-job7-p1 pending, keep it next).
+  3. imp-60 body look: the mannequin guards undercut every enemy telegraph.
+- **Failures:** no new ones.
+
+## car-71: GTA-style car door entry (2026-10-05)
+
+- **Wired:** the mechanics-lab cars now prompt only at a driver or passenger handle. USE walks the real lab body to the handle, swings the damage part on its hinge, turns and seats the body, closes the same door, and eases the live first-person camera into the existing cab. Exit reverses that route and resolves beside the door. A detached door skips the swing but not entry; a damaged/jammed door takes three pulls, ending in a kick. Taking damage interrupts entry.
+- **Driving:** R2/L2 throttle/brake, left stick steer, R1 handbrake, Triangle cab/chase toggle, Cross horn (keyboard W/S/A/D, Space, F, H). Exiting over `VehicleDriver.GET_OUT_SPEED` (5 m/s) is a moving bail with inherited velocity, outward shove and roll request rather than a refusal.
+- **Dials (defaults chosen here; Greg has not set them):** `VehicleDriver.ENTRY_SECONDS = 1.18`, `EXIT_SECONDS = 1.05`, `GET_OUT_SPEED = 5.0`, `REACH_TO_GET_IN = 1.05`; `VehicleDamage.door_jammed()` begins below 68% door HP and clears on pull 3. `VehicleStation.ALLOW_SEAT_DRAG = false`: enemy/sparring-partner dragging remains a stretch dial because its combat ownership and reactions are not yet authored. Passenger entry/exit is available through `VehicleDriver.DOOR_RIGHT`.
+- **Animation source:** procedural body/camera interpolation plus the project's existing Quaternius CC0 `Interact` clip for the handle and exit-brace beats, credited in `CREDITS.md`; no uncredited Mixamo download was added.
+- **Follow-up (2026-10-06):** a moving exit is now a `bail` phase: the body keeps the car's speed, the eyes roll through a full turn and then stumble, and control returns where the body lands (`VehicleDriver.BAIL_ROLL_SECONDS = 0.45`, `BAIL_SECONDS = 0.85`, defaults chosen here). Its clock advances once per physics frame, so that dial is the real duration. The lab offers whichever handle is nearest, driver or passenger; a third pull kicks a bent latch permanently free without repairing the door's hp. The hinged panels now cover real apertures cut from the kit's baked shell instead of opening onto a second painted door. The player's own body (walking and seated) is drawn on visual layer `VehicleDriver.OWN_BODY_LAYER = 5`, which the first-person eyes and the cab camera skip; before this the cab view rendered the inside of the seated body's head. Proof PNGs: `P:/GameDev/Temp/car-71-gta-door-entry/01..08`, with `03a_seated_body_at_wheel.png` isolating the live cab/body layers so the seated anatomy can be inspected.
+
+## 2026-10-06, imp-64 first-person arms (Claude, Opus)
+Greg, 5 Oct ~19:00: *"The first person needs a lot of work": animated first-person arms for swings, swing and hit sounds, and the Hunt must stop giving the old sword.*
+Rendered with `render_one.cmd fp_arms_capture --shots=P:/GameDev/Temp/imp64/run5` (128 PNGs; sheets `P:/GameDev/Temp/imp64/R_*.png`). Before: `P:/GameDev/Temp/imp64/before/sheet_cleaver.png` (blade floating in view, no hands). fps 175.9 holding the cleaver (RTX 2060 SUPER, vsync off).
+- Built: `systems/first_person_arms.gd` (procedural: gloved hands seated on the arsenal's grip anchors, forearm stretched to an off-screen elbow; idle breath, walk bob, look lag; wind-up/strike/follow-through/recovery read from `MeleeDriver`'s `SwordMoveset` phase; heavy charge tremble, block, parry flick, hit flinch, contact bounce, pistol recoil, reload with magazine drop, ADS, inspect; bare hands jab/hook/shove). `systems/fp_combat_audio.gd`: whoosh per weapon and weight, hit sound per surface (flesh, bone, metal, concrete, glass), 9 CC0 Freesound clips credited in `CREDITS.md`.
+- Wired: mechanics lab, Service Arcade cleaver, Growing Floor cleaver (doctor route), support unit. The Hunt issues the HOTLINE CLEAVER (`HunterArsenal.SLOT_ORDER`, `BloodTrees.starting_weapon`); `sword` stays defined for rooms and tests that name it.
+- Dials (defaults mine): `FirstPersonArms.REST/ARCS/GUARD/PARRY/INSPECT/RELOAD` key poses, `BACKHAND` 0.6, `INSPECT_SECONDS` 2.4; `FpCombatAudio.WHOOSH` pitch per weapon, `NAME_HINTS` for surfaces; `WeaponBody` cleaver mass 1.40 reach 0.80. Assistant proposal: the non-firearm styles start the Hunt on the cleaver.
+- Still weak: the Hunt's own first-person hands (`bone_yard_hunt.gd`) are not yet `FirstPersonArms`, so the Hunt cleaver has the older hold, not these arcs; the arms are procedural on code-built gloves and sleeves (the sleeves read as a purple checker), not the rigged body's arms or a Mixamo set; the heavy capture ends at the top of the wind-up; the magazine drop is hard to see; bone vs flesh is guessed from heavy blunt blows, not the anatomy's fracture report.
+
+## 2026-10-06, imp-67 facility zone identity (Claude, Opus)
+Greg, 5 Oct ~19:00: *"Facility zones: give each zone identity with props, textures and landmarks WITHOUT making it cluttered."*
+Rendered with `render_one.cmd facility_one_map_capture`: before `P:/GameDev/Temp/imp67-final-before/` (same build, dial off), after `P:/GameDev/Temp/imp67-final-after4/` (sheets `sheet.png` in each). fps at 1280x720, vsync off, RTX 2060 SUPER: before average 289, after average 285; every shot after the first frame 190-467 (the first frame is the shader compile).
+- Built: `systems/facility_zone_identity.gd`, one node `facility.gd` adds before building and applies after. Per zone, its own ambientCG surface set (world triplanar on the kit's 2 m tile), one landmark seen from its entry, and 3-6 Poly Haven CC0 props, each the one hero in a pool, with empty slots left empty on purpose:
+  - Service artery: cast concrete over steel walkway grate; a caged lamp hung low over the crossroads; power box and utility box.
+  - Service Arcade: peeling plaster over small grimy tile; three roller-shuttered stalls on the west wall under one blank blade sign that fails and recovers (fixed pattern); shelves, storage cart, hand truck, utility box in the wall pools. Its three kit tanks are gone under the dial: the first stood in front of the stalls, and vessels now belong to the Lower Works.
+  - Transit lift: corrugated shaft, diamond-plate landings; a caged floodlight over the lift mouth on each level.
+  - Lower Works: riveted plate over diamond plate; the overhead crane straddling the route mid-hall, lit from its trolley; copper heat bands at the foot of the process vessels; compressor, drill press, welding cart, generator, tool chest in the wall pools.
+  - Heat lift: scorched plate; a copper vent grille breathing heat over its mouth; a tool cart, and drums at the top.
+  - Growing Floor and examiner office: not changed. `vat_chamber.gd` already gives them their own place (the vat rows, bone arches, the checker-tiled office), and this pass does not touch that file.
+- Wired: the production vat scene embeds the one-map facility, so this is on the real route (`facility_zone_identity_test` loads `vat_chamber.tscn`). The kit's generic drums, crates, pipes, vent and junction no longer repeat in both halls.
+- Fixed after the first look: the heat colour `b5521d` rendered as four red bars over the heat lift (red is for danger only) and is now copper `b0782e` at a lower glow; the worn route line, still painted on kit concrete, became a lit stripe on the darker tile and plate, so it now wears each hall's own floor set; the stall lightbox lay flat on the wall and showed only its edge from the entry, so it is now a blade sign facing down the hall; the first pass reskinned the moving lift cars with world-triplanar steel (it would swim as the car rides; `facility_tunnel_network_test` caught it), so the cars keep the kit's steel.
+- Dials (defaults mine; Greg has not set them): `facility.gd` `ZONE_IDENTITY` true (false = the shared kit look and the arcade tanks back); `FacilityZoneIdentity.HEAT_GLOW_ENERGY` 1.4 (0 = no heat glow), `HEAT_COLOR` `b0782e`, `SIGN_FLICKER` true, `ROUTE_PAINT` 0.3 (how much paint colour shows over each floor); `SURFACES` and `WALL_SLOTS` tables pick each zone's set and which wall pools hold a prop.
+- Still weak: the halls are still mostly dark between pools, so the crane and the stalls read at the entry but small (16-25 m away); the shutters and props are Poly Haven's clean industrial look dimmed, not authored for this place; the surface head-house keeps the kit concrete; nothing here was checked on a pad walk, only the scripted capture walk.
+
+## Manager notes, 2026-10-06 07:15
+- **Merged since 05:10:** car-71 GTA door entry (25bb9561, merge 2a0b750a), imp-64 first-person arms (merge 66650270), imp-67 facility zone identity (a9ea21fe, merge fef433f0). All gates were green. imp-60 body look is running on claude-alt2. Every other account is parked (Claude until 09:04, Codex 11:52 to 10-11).
+- **Looked at** the builders' sheets from the merged commits: `P:/GameDev/Temp/imp67-final-after4/sheet.png` and `P:/GameDev/Temp/imp64/R_cleaver_combo.png`. I didn't do a fresh render, and no Godot window was open.
+  - imp-67: the artery and the arcade read better (each has its own tile and grime, the stalls and the route stripe). The Lower Works, the heat lift and the surface head-house are almost black: the crane and the vessels are only silhouettes between pools.
+  - imp-67 (and job9): the HUD prompt "RED GLINT // STEP OUT OR DODGE" stays up across every zone with no enemy nearby. I added it to `fix-73-enemy-reads`.
+  - imp-64: the sleeves are a purple checker, the gloves are blocky, and the cleaver is a flat slab with an orange edge. The Hunt still uses the old hands.
+- **Top 3:**
+  1. A second imp-64 pass: Hunt hands onto FirstPersonArms, a real sleeve and glove material, and the heated-cleaver glow. Queued as `remaster-imp-64-p1` (priority 70, claude).
+  2. fix-73 enemy reads and stale prompts (pending, 70).
+  3. Lower Works fill light. The 0.3-1 lux between pools hides imp-67's landmarks. Leave it to imp-62 lab look or a later imp-67 pass.
+- **Failures:** no new ones.
+
+## 2026-10-06, imp-60 body look: flesh, faces, posture (Claude, Opus)
+Greg, 5 Oct ~19:00: *"Improve the bodies further (checker skin, helmet heads, hunched idle, ankle gaps)."* Follows the job2b retry entry's "Weak" list; `fix-job2-body-look` never ran, so this covers it too.
+Rendered with `render_one.cmd body_look_capture --out=DIR` (new capture: player base bare and dressed, guard 07, freed subject, examiner; front, side and face each). Before: `P:/GameDev/Temp/imp60/before/` (sheet `before_sheet.png`). After: `P:/GameDev/Temp/imp60/final/` (sheet `final_sheet.png`); the same capture with the dials off: `P:/GameDev/Temp/imp60/perf_off/` (`perf_off_sheet.png`); intermediate passes `after1`..`after6`.
+- Built: every rigged body now wears a real low-poly human (Quaternius' Universal Base Characters, CC0, credited) on the UAL mannequin's own skeleton and clips. One continuous body with a face, eyes and brows: no joint balls, so no ankle or joint gaps (`body_look_test` checks the leg's skin is unbroken from sole to knee). The mesh is re-bound to the mannequin's rest, so clips, hit leans, X-ray hand-back, severing and the ragdoll drive it unchanged. Male base, female below `frame_factor` 0.35.
+- Flesh: `systems/flesh_skin.gdshader` replaces the world grain (the checker) on bare skin. It uses the base's painted detail re-toned to the body's own flesh colour (bruising carried over from BaselineHuman's tint), with blotchy tone, grime toward the hands and feet, sweat sheen on brow, chest and back, and a few old scars. All of it is laid out in rest space (CUSTOM0) so it rides the limb.
+- Cloth: `systems/cloth_skin.gdshader` for garments on the skin. It has a weave that fades out at range, folds, hem grime, ClothingShell's blood soak drawn as dried stains (it used to tint the whole garment, which turned the examiner's white coat flesh pink), a level waist line, and painted boots. The plain garment material was double-sided and dotted itself with its own shadow on a closed mesh; this one culls back faces.
+- Faces: HunterAppearance's box eyes, pupils, nose, mouth, teeth, jaw and brow ridge, the box hands, the coat-front/collar/strap slabs and the boot boxes hide while a zone shows the skin. They come back with the rig's own body when the zone is hurt (tested). Mutations (growths, third eye) and piercings stay. The examiner keeps his surgical mask and loupes, now placed on the human face.
+- Posture: the library's Idle/Walk carried the chest ~16 degrees and the head ~14 degrees forward (measured at the bones). That is baked out of Idle, Idle_Talking, Idle_Torch, Walk, Walk_Formal and Pistol_Idle once at load, at no per-frame cost. Idle now measures spine_03 3 degrees and Head under 1 degree.
+- Guards: the flak vest, front and back trauma plates and belt from `FacilityGuardPost.dress_security` are painted onto the fitted uniform (`RiggedBody.wear_kit`) instead of a slab standing off the chest. The holster and the number stencils on the plates stay as geometry. Colours are unchanged (vest `3a3d2c`, plates darker, belt `1c1612`).
+- Dials (defaults mine; Greg has not set them): `RiggedBody.HUMAN_SKIN` true (false = the jointed mannequin and the box faces back), `FEMALE_FRAME_BELOW` 0.35, `BROW_COLOUR` `2b211b`, `POSTURE_LIFT` 1.0 (0 = the clips as they came) and the per-bone `POSTURE` table, `HUMAN_FACE_PIECES` (what hides on a skinned zone); flesh shader `grime` 0.55, `sweat` 0.5, `scars` 0.5, `pallor`, `detail_strength` 0.85; cloth shader `body_shape` 0.12, `weave` 0.5, `folds` 0.6, `grime` 0.5, `waist_line` 0.93, `boot_top` 0.16; `FacilityGuardPost.FITTED_HOLSTER` / `FITTED_STENCIL`; `ExaminerLook.HUMAN_LOUPES` / `HUMAN_MASK_UP` / `HUMAN_MASK_DOWN`.
+- Open for Greg: `AgentHub/queue/questions/imp-60-face-sliders-on-human-skin.md`. The intake face sliders no longer visibly shape a healthy head, and there are only two base faces.
+- Measured (`body_look_capture` line-up, 5 rigged people on screen, 1280x720, vsync off, RTX 2060 SUPER): 470 fps with the human skin (render CPU 0.67 ms, GPU 0.72 ms) against 393 fps for the same five on the jointed mannequin (`HUMAN_SKIN` off: render CPU 0.99 ms, GPU 0.66 ms). The skin's per-sync GDScript is cached per zone (`_zone_look`): 62 us per body per sync against 55 us on the mannequin. `fps.txt` sits beside the PNGs.
+- Tests (headless, own APPDATA): new `body_look_test` (28 checks: skin and face per zone, flesh not grain, rest coordinates, face boxes hidden but mutations kept, Idle/Walk upright, leg skin unbroken sole to knee, female base, guard kit fitted, examiner loupes and coat stains, a cut head gives back the rig's own head and face). Also green: rigged_body, rigged_body_hunt, model_skin, ragdoll_body, world_xray, examiner_feed/fight/keycard, v01_guard_duel, v01_weapons, facility_guard_post, fp_arms, first_thirty_route, first_run_walk, car_entry, and `--core` (`chunk_test` exits 139 after failures=0, known). `v01_creature_duel_test` failed once in a batch run ("the sidearm beats the sentinel", 13 of 13 rounds used) and then passed 3 of 3 with these changes and 1 of 1 on base, so it looks intermittent. The Jolt "Failed to correctly scale body right_arm_severed" line in `rigged_body_test` predates this change; base prints it too.
+- Still weak: the base characters are stylised and heroically built, so every subject has a gym body (the grime, pallor and dark tones pull them toward the facility but not all the way); there are only two faces; the guard's vest reads from the front but is dark on dark from the side; the examiner's coat is skin-tight cloth, not a hanging coat; the mask and loupes are still box placeholders; the player's jester outfit (cap and collar balls) is unchanged; a faint shading seam at the shoulder in close-ups (likely a normal-map UV seam); faces are static (no blinks or mouth movement on the skin; `set_mouth` moves the hidden box mouth only). Not checked on a pad walk or in the live route rooms, only in the capture room and headless tests.
+
+## Manager notes, 2026-10-06 09:10
+
+- **Merged since 07:15:** imp-60 body look (2bd20958): rigged bodies now wear a low-poly human with flesh and cloth shaders; body_look_test 28/28.
+- **Rendered:** `body_look_capture` -> P:/GameDev/Temp/body_look/ (lineup_front.png, guard_face.png).
+- **Weak (concrete):** faces are a smeared, mirrored, tiled texture with no readable features (guard_face.png); the cloth neckline is a jagged sawtooth; the guard vest is a box floating in front of the chest; the examiner mask and loupes are still boxes (imp-60's own risk list). At lineup distance the bodies read as people, a big step up from the checker mannequins.
+- **Running now:** imp-61 liquid, imp-68 HUD face/vials (claude-default), imp-62 lab look, drug-70 (claude-alt). Codex and claude-alt2 parked. Failed queue unchanged (job2, job2b, lane-exit-routes, all superseded by later landings).
+- **Top three:** (1) fix the face UV/grime and neckline -> queued `fix-74-face-uv-and-neckline` (priority 70, claude); (2) check the bodies in the live route rooms, not only the capture room; (3) examiner mask/coat into real geometry during the job6 remaster.
+- Moved the stale `fix-job2-body-look` (pre-imp-60, its three points are done) to queue/held.
+- Note for the hub: `render_one.cmd NAME` with no extra args fails (empty `$Rest` to Start-Process); passing any dummy arg works.
+
+## 2026-10-06, imp-68 HUD face and vials (Claude, Opus)
+Greg, 5 Oct ~19:00: *"HUD: rework the look, especially the FACE portrait (the round frowning face "looks dumb") and the 3 VIALS at the bottom."*
+Rendered with `render_one.cmd hud_face_capture --shots=DIR` (Hunt, gore range lab, facility aisle with the field HUD laid over it, plus a four-state sheet per look). Before: `P:/GameDev/Temp/imp68/before/`. After: `P:/GameDev/Temp/imp68/after5/` (`sheet.png` = xray whole/winded/hurt/dying + bodycam plate hurt; `*_crop.png` = the right-hand column).
+- Face: the jester mask is now a third CRT (`systems/face_monitor.gd`), bolted under the heart and EEG monitors in the rig's copper/bone/phosphor. Three looks behind one dial, `GothicFieldHud.face_style` (Pause > DISPLAY / HUD > HUD FACE, saved as settings `hud_face`):
+  - `xray` (default): your own skull on a phosphor plate. Eyes narrow with pain and drift as consciousness goes, the jaw gasps when stamina runs out and locks in agony, the plate dims with blood loss, a head wound cracks the vault and tears the picture, below 35 health it goes alarm red, and near blackout the vertical hold rolls.
+  - `bodycam`: a live 112 px feed (24 fps) of your own rigged head from a rig held 0.5 m in front of the face, with the same phosphor tint, a pain flush and shake, blood-loss dimming and rolling. In first person the Hunt keeps the head visible and moves it to render layer 20 (`FaceMonitor.HEAD_LAYER`), which the eye camera leaves out, and a ring light lights only that layer. With the dial off this path, the Hunt hides the head exactly as before. Rooms without a player body (gore range, facility HUD) show the skull plate.
+  - `mask`: the old jester mask and the bottle rack.
+- Vials: with `xray`/`bodycam` the three bottles are gone. Each filled pocket hangs off the sacrum as a specimen tag with a mark for what it holds (meat, pill, bone, chip, other; `NerveRig.pocket_glyph`) and the item's first word. An empty pocket is a bare hook. `NerveRig.pocket_style` follows the face dial (`spine` / `rack`).
+- Dials (defaults mine; Greg has not set them): `FaceMonitor.DEFAULT_STYLE` `xray`; `FEED_PIXELS` 112, `FEED_RATE` 24, `FEED_REACH` 0.5, `FEED_FOV` 38, feed shader `gain` 1.0; `ANCHOR_X`/`BOX` place the CRT.
+- Open for Greg: `AgentHub/queue/questions/imp-68-hud-face-default.md`.
+- Tests (headless, own APPDATA): new `hud_face_test` (11 checks: default, dial swaps face and pockets together, pause row reaches the HUD, tag glyph/name, head layer swap and restore). Also green: nerve_rig, hud_settings, hud_transience, hunt_hold_walk, hunt_execution, rigged_body_hunt, fp_arms, first_thirty_route.
+- Still weak: the bodycam feed is small and soft, and the jester cap and collar fill most of it (the face sits behind the collar balls). The feed was only checked in the scripted Hunt capture, not on a pad walk, and the head's layer swap was not checked while moving or in third person. The facility shot is the field HUD laid over the aisle; the facility route itself runs BodyCamOSD, which this pass did not change. Nothing was measured on the GPU (the feed costs an extra small 3D render at 24 fps while `bodycam` is on).
+
+## Manager notes, 2026-10-06 10:15
+- **Merged:** imp-68 HUD face and vials (merge ffe07171). Re-rendered `hud_face_capture` into `P:/GameDev/Temp/imp68/` (hunt_*, lab_*, facility_*, state_*).
+- **Weak (concrete):** (1) the `bodycam` feed in the Hunt is a soft, dark square where the jester cap and collar fill the frame, so you can't read a face. The face there is also hit by the imp-60 face bug (fix-74). (2) On the right, the wound label "TIB-C04 LOST" is drawn over "BLEED 62%" (state_*_hurt.png). (3) The pocket tags ("KIDNEY", "BENZO") replace the three vials but sit small and loose under the spine. Nothing in the rack says "these are your 3 slots", and empty hooks barely show. Greg asked for the vials to be reworked, not removed.
+- **Also:** `AgentHub/render_one.ps1` failed when given no extra args (a null `$Rest` reached Start-Process). Now fixed with a one-line filter.
+- **All accounts parked** (Claude until about 11:04 and 14:04, Codex until 11:52 and 12:27, two until 11 Oct). 22 pending tasks, so no idle task was written.
+- **Top three:** 1. queued `remaster-imp-68-p1` (bodycam framing, label overlap, readable 3-slot pocket rack). 2. fix-74 must land first or the bodycam films a smeared face. 3. Squash the auto WIP commit 331ad71f only if a later rebase touches it anyway. Don't rewrite history just for this.
+
+## 2026-10-06, imp-61 liquid surface and sound (Claude, Opus)
+Greg, 5 Oct ~19:00: *"Fix and improve the pour (a real liquid surface, not spheres) and add sound."* Follows lab-46 (did not redo its sim, pool, glass or shock); fixes the three "weak" items it logged.
+Rendered with `render_one.cmd fluid_glass_capture --shots=DIR` (the capture now also writes a six-frame pour sequence `05_pour_1..6` and GPU ms per viewport into `fps.txt`; `--surface=0` gives the old spheres for A/B). Before: `P:/GameDev/Temp/imp61/before/` (sheet `before_sheet.png`). After: `P:/GameDev/Temp/imp61/after3/` (sheet `after3_sheet.png`; first pass `after1_sheet.png`, second `after2_sheet.png`). Spheres on the same build: `P:/GameDev/Temp/imp61/spheres3/`.
+- Pour: `systems/fluid_surface.gd` + `shaders/fluid_splat.gdshader` / `fluid_surface.gdshader`, screen-space fluid. The blobs are splatted as additive kernels (density, weighted depth, thickness) into a half-res float SubViewport with its own world, so no game camera sees raw blobs. A full-screen quad thresholds that into one surface. Its normal comes from the smoothed depth plus the density gradient, and it is lit by the scene's own lights, glossy, refracting the floor, with Beer-Lambert red absorption by thickness. It writes depth, so props hide it. Both passes sleep when nothing is in the air. Looked at three times: pass 1 still showed separate jelly-beans and white speckle; then the kernel went to 2.8× blob radius, depth was stored relative to the pour (half-float precision), and normals lean on the density gradient. The tank now pours mostly out of the struck face (75% within ±0.7 rad, was 60% within ±1 rad).
+- Splash: a landing faster than 2 m/s throws a crown of 2–5 small droplets (12% of its volume each) that join the same surface and land a moment later.
+- Pool: the first landing scans the floor grid for static bodies (box probe 2–7 cm above the floor, layer 1). Those cells stay dry, flow skips them, and fluid landing on them moves to the nearest open cell. In the lab it flows round the plinth and the button pedestal instead of under them. If more than 60% of cells read as solid (a raised floor), the scan is ignored with a warning.
+- Sound: `systems/fluid_sound.gd` plays positional SFX-bus one-shots. Cracks per stage 1–3 (each longer), glass burst + gush on the last blow, a looping pour that follows the Torricelli flow and stops when the head is gone, splash (onto the pool) or splat (dry floor) at landings (at most ~14/s), and wade 1–3 per stride. The files are synthesised by `tools/synth_fluid_sounds.py` (noise, Minnaert bubble chirps, inharmonic pings), so there is no licence to carry. The MP3s an earlier, cut-off attempt left in `Temp/imp61snd` had no recorded source and were not used.
+- Perf: `BloodPool.keep` rebuilt a pool mesh on every landing. The stain is now batched per cell every 0.1 s. GPU at 1280×720 on the RTX 2060 SUPER, same moment of the pour (118 blobs): game view 4.73 ms + splat buffer 0.10 ms with the surface, 3.90 ms with spheres. So the surface costs about 0.9 ms. Both held the 60 fps vsync cap. Earlier 29–34 fps readings came from other render windows sharing the GPU. CPU sim worst 2.0 ms/frame at 257 blobs (headless).
+- Dials (defaults mine; Greg has not set them): `FluidBody.surface` true, `surface_resolution` 0.5, `crown` 1.0; global `FluidBody.surface_allowed` (a graphics switch back to spheres); `FluidSurface.iso` 0.28, `blend` 2.8, `absorb` 26; shader `refraction` 0.035, `bulge_scale` 2.5; `FluidSound.volume` 1.0.
+- Tests (headless, own APPDATA): new `fluid_surface_sound_test` (21 checks: obstacle flow-around with no volume lost, sphere fallback, station wiring, a sound per crack stage, burst/gush/pour loop, crowns, splash sounds, pour sound stops, nothing under the plinth, wading heard). Also green: fluid_glass_test, mechanics_lab_test, opening_direction_test, hands_on_breakout_test (the vat route uses the same FluidBody), and `--core` (32 suites).
+- Still weak: nobody has listened to the sounds (I could not), so the glass may be too hissy (centroid ~7.4 kHz). The surface still reads lumpy and gloopy rather than a smooth sheet where blobs are sparse, and lone droplets still look like stretched beads. It was not looked at in the vat room (the vat route was tested headless only). The pool on the floor still shows the flat BloodPool stain under the sheet (imp-62's "flat red-square blood pools"). Surface cost was measured at 720p only; at 1080p the full-screen pass scales with pixels.
+
+## Manager notes, 2026-10-06 12:20
+- **Merged:** imp-61 liquid surface and sound (merge ee4668d9). I re-rendered `fluid_glass_capture` into `P:/GameDev/Temp/fluid_glass/` (01–09, pour 1–6, fps.txt). GPU: 1.89 ms intact, 3.29 ms pouring, 4.63 ms pooled. All three hold the 60 fps vsync cap on the RTX 2060 SUPER.
+- **Weak (concrete):** (1) `06_pouring.png`: the pour still reads as dozens of separate red beads around the plinth, not one sheet. (2) `07_pooled.png`: the pool is a flat, matte red polygon with jagged triangle edges, with no gloss or light reflection, so it reads as paint. (3) `08_waded.png`: SPLASH 5 is logged, but no ripple or footprint is visible. The black occluder box next to the plinth is unlit and solid black. That belongs to imp-62's lab lighting.
+- **Accounts:** both Claude accounts are parked until 14:04. Codex: one account until 12:27, one until 17:57, two until 11 Oct. claude-alt2 is running drug-70. lab-52 (Codex) was cut off by "workspace out of credits" and went back to pending. Its log also says `render_one.cmd` "does not exist", which is a Codex sandbox view of P:/GameDev/AgentHub. So Codex passes can't render. Keep visual work on Claude.
+- **Top three:** 1. queued `remaster-imp-61-p1` (merge the pour into one sheet, a glossy pool with a soaked edge, visible wade ripples and footprints). 2. imp-62 (pending) must keep the blood-decal shape work and light the lab's black props. 3. A human has to listen to the imp-61 sounds. The glass may be too hissy (~7.4 kHz). This is for Greg.
+
+## 2026-10-06, drug-70 materia VFX and smoking (Claude, Opus)
+Greg, 5 Oct 23:10: *"making the drug pass VFX and game mechanics, smoking physics, and then using TouchDesigner to make interesting drug sequences."*
+Station 7 in the mechanics lab (after lab-52's disciplines), MATERIA: the existing `SubstanceStation` table (cigarette, joint, spliff, vape, bong, Marrow Dust, Choir Bloom, Static Hymn), a shelf of the nine class samples, a dummy and a wall for the smoke, the plane ladder on the back wall, the trip, and the OSC link. Pad first: D-pad left/right choose, USE takes; with a smokeable in hand L1 draws, release exhales, R1 flicks ash (or blows a ring just after an exhale), Y puts it away; D-pad up opens the wizard eyes.
+Rendered with `render_one.cmd materia_capture --shots=DIR` -> `P:/GameDev/Temp/drug70c/` (sheets: `sheet_classes.png`, `sheet_smoke.png`, `sheet_ember_trip.png`; `fps.txt`). First look `drug70/`, second `drug70b/`.
+- Picture: one shader, `psychedelic.gdshader`, 22 dials all at rest by default (LUT palette + cycling, kaleidoscope + clear centre, mirror fold, SubViewport feedback, chromatic, flow warp, melt, beat pulse from the Master bus, cuts, saturation, darkness, tunnel, edge figures). Each class in `systems/materia.gd` is a preset of those dials with onset/peak/comedown in world minutes and per-class-per-day tolerance. Deliriant: dark `ash` palette, none of the decorative dials, figures at the edge, lost time (the clock jumps and you face somewhere else), Da'ath, no altitude.
+- Fixed after looking: the psychedelic peak folded the whole frame, so you could not see what you aimed at. New `kaleidoscope_clear` keeps the middle unfolded. Smoke plumes vanished within a second (alpha was linear in a density that the simulation thins as it mixes). The parcel shader now reads density through `density_gamma`. The ash flick capture now holds one view.
+- Feel (behind `Materia.feel_scale`): sway on the camera, a shakier or steadier aim (stimulant steadies), stamina regen up or down, pain relief, perception (shows the plane ladder up to your altitude). X-ray reach and the wizard eyes' reach and strain time follow the class (psychedelic 1.6x, deliriant 0.4x).
+- Cost (behind `Materia.cost_scale`): body (consciousness) at the dose, lungs (stain per draw, cough from harsh draws, shown in the pulmonary panel and under the X-ray), standing recorded on the `materia_dose` event.
+- Smoke: `systems/smoke_volume.gd`, simulated parcels (breath momentum, wind from the weather station, buoyancy and cooling, drag, curls round body capsules, slides along walls by ray, grows and thins, vortex rings), one MultiMesh draw. Cigarette, joint, spliff, vape and bong differ in count, speed, spread, size, density, buoyancy, life and tint. `systems/smoke_ember.gd`: the coal brightens on the draw and over-pulls to white, ash builds and droops, and it falls when flicked, on a hard move or at length, as a rigid body that crumbles.
+- In the Hunt (the real route): the breath is now `SmokeVolume` too (`bone_yard_hunt._exhale_smoke`, wind from storm severity). ContaminatedAir's puff node is still made for the air's bookkeeping but hidden. Dial `smoke_volume_enabled` (true). Rendered: `render_one.cmd hunt_smoke_capture` -> `P:/GameDev/Temp/drug70_hunt/sheet_hunt_smoke.png` (volume vs the old puffs, first person and side).
+- TouchDesigner: `DESIGN/TOUCHDESIGNER_PIPELINE.md` (OSC address list, a TD graph per effect with the matching dial, baking LUT/flow/flipbook into `game/art/materia/`, the trip as bake + live layer). `systems/materia_bakes.gd` picks bakes up (none exist yet; with none nothing changes). `tools/touchdesigner/build_psy_dials.py` and `tools/psy_dials.py` now carry all 22 dials; `tools/touchdesigner/pack_flipbook.py` packs a TD image sequence.
+- Trip: `lab/stations/materia_trip.gd`, 40 s, USE or cancel skips (0.6 s fade). Greg's plate `covermeinmoss.png` (or a baked flipbook) under the live dial track.
+- Perf (`fps.txt`, 1280x720, vsync off, this machine): 162 fps empty station, 157 with a psychedelic peak, 157 with 220 smoke parcels, 153.6 with both (GPU 2.0 ms).
+- Dials (defaults mine; Greg has not set them): `Materia.visual_scale` 1, `feel_scale` 1, `cost_scale` 1, `tolerance_falloff` 0.55 (second dose of a class in a world day at 55%, third 30%); station `osc_enabled` **false**, `osc_port` 9000, `clock_rate` 6 (the world clock runs 6x while a dose is live in the lab), `lost_time_enabled` true, `wind_per_weather` 2.4 m/s; shader `kaleidoscope_clear` 0 (psychedelic preset 0.42); smoke shader `opacity` 0.42, `density_gamma` 0.6; `SmokeVolume` cap 220/360/480 by quality, `air_coupling` 1.6, `buoyancy` 0.55, `turbulence` 0.18; `SmokeEmber.ash_grip` 1; `SignalSight.reach_scale` 1 (unchanged everywhere except the station).
+- Open for Greg: `AgentHub/queue/questions/drug-70-01-materia-classes.md` (which real class the three authored substances read as; who notices the standing cost).
+- Tests (headless, own APPDATA): `materia_test` (curve, tolerance, deliriant never gets the fun palette or decorative dials and a bright baked LUT is caught, OSC off by default and maps by name, presets, smoke physics, station by pad, wizard eyes, bakes, trip skip, lost time). Also green: mechanics_lab, psychedelic_rig, psychedelic_osc, osc_bridge, substance_experience, substance_station, smokeables, altered_perception, signal_sight, smoking_lung_ui, smoke_release, player_action_ledger. `--core` 32 suites green except chunk_test exit 139 with failures=0 (known pre-existing crash on exit). `smoking_act_test` passes its new volume check, then stops on a pre-existing script error at its line 346 (the arsenal has no `sword` model) and times out.
+- Still weak: the classes, their screen and their feel only live in the lab. Nothing on the route doses you through `Materia` yet: the Hunt's smoking still begins `SubstanceExperience`, so tolerance, class costs, the X-ray and wizard-eye reach do not apply there. Hunt smoke tricks (O, DOUBLE O, GHOST) are still the old particles. In first person the Hunt plume is mostly ahead of you and faint. Nobody has looked at it on a pad walk or in motion (stills only). The ash fall reads small in its frame. The ring is faint against the lit yard. The TD operator names in the doc were not checked against an installed TouchDesigner. The OSC link was proven by message injection in the test, not by a real TD patch over UDP.
+
+## 2026-10-06, lab-52 Duelist and Shade disciplines (Codex)
+
+- Wired only into the mechanics lab as its sixth station, cycling `OFF -> DUELIST -> SHADE -> OFF`; no facility or opening scene references it, and OFF remains the default.
+- Duelist layers R1 strike, R2 heavy, L1 block and L2 parry over the job3 combat base; the shared R3 lock and Circle roll stay intact, and a successful parry opens one target-specific riposte.
+- Shade layers R1 rear-only takedown, R2 physical throwable, L1 booth darkness and held L2 stalking crouch. The takedown uses the real rig/anatomy hit path and the throwable resolves physical collision before damage.
+- Provisional dials, all centralized in `discipline_station.gd`: 1.0 s riposte, x2.0 damage, 2.15 m takedown reach, -0.55 rear dot, 8 s darkness, 13 m/s throw. Greg has not balanced these.
+- Reconciled onto `claude/launch-latest` at `11770436` rather than handing the merger the previous stale-base patch. The vehicle station stays at menu index 4; Disciplines is appended at index 5.
+- Headless, isolated APPDATA: `discipline_lab_test` (18 checks), `mechanics_lab_test`, `sparring_test`, `pad_bridge_test`, `souls_roll_test` and `combat_stance_test` pass. `discipline_lab_capture` also loads and exits cleanly headless. Current-base regressions outside this delta remain red on repeat: `v01_weapons_test` misses the PRODSTAFF stagger assertion; `souls_pad_test` misses five sandbox attack/parry timing assertions. Lab-52 does not change those paths or the Souls base mappings.
+- Visual proof: `render_one.cmd discipline_lab_capture --shots=P:/GameDev/Temp/lab-52-duelist-shade-current`, both PNGs opened. `duelist.png` shows the real first-person arms crossing the glowing cleaver into the parry pose while the locked partner winds up inside the cyan lock rings. `shade_darkness.png` is from the lowered player eye inside the blacked-out booth; the target remains readable as a dark red silhouette.
+- Still weak: Shade keeps the currently held cleaver in view because this station remaps verbs rather than inventing a loadout; the proof does not show the rear takedown animation or projectile in flight. No GPU frame-cost number was taken for this small lab-only station.
+
+## Manager notes, 2026-10-06 13:15
+- **Merged:** lab-52 Duelist and Shade (ef93a996). I re-rendered `discipline_lab_capture` into `P:/GameDev/Temp/lab-52-duelist-shade/` (`duelist.png`, `shade_darkness.png`) and opened both.
+- **Weak (concrete):** (1) Neither discipline has a look of its own yet. Duelist is the Brawler view plus teal lock rings, and the cleaver crosses the whole screen diagonally as a flat orange stripe. Shade is the same arms and cleaver in a dark booth. (2) The first-person arms are still patchy magenta/brown checker blocks, and the target dummy's chest is a checker square. (3) The lab HUD is eleven lines of red text, and red is supposed to mean danger only. Also, by the lab-52 report, `v01_weapons_test` (PRODSTAFF stagger) and `souls_pad_test` (5 sandbox attack/parry timings) are red on the current base.
+- **Accounts:** both Claude accounts are parked until 14:04 and every Codex account is parked (17:57, 18:52, 11 Oct). claude-alt2 is running drug-70. No idle account, so no remaster was seeded.
+- **Top three:** 1. queued `fix-76-red-combat-tests` (claude, priority 70): get `v01_weapons_test` and `souls_pad_test` green on the base. 2. imp-65 (pending) now builds on the merged station instead of a WIP branch (prompt updated). 3. imp-62 must recolour the lab HUD text to neutral and keep red for danger; remaster-imp-64-p1 must replace the checker arm skin.
+
+## Manager notes, 2026-10-06 14:15
+- Merged: intake-29 controller-first NEURAL INTAKE (f2d34343, merge 42fdbd02). Rendered intake_pad_capture: P:/GameDev/Temp/intake_pad_route.png, intake_pad_body.png, intake_pad_race.png, intake_pad_think.png. Pad hints read well (CROSS/SQUARE/TRIANGLE/L1 R1/HOLD R3), focus bar is clear, no keyboard text left on pad.
+- Weak: the subtitle line overlaps the first tab row; "FILED UNSPECIFIED / GROWER" runs off the form and the dialogue status line is cut off; the red clamp cords cross row text; the SUBJECT preview is still the checker block body with a stray grey quad on its chest (Greg: flesh skin, real faces). Control strip text is small at 1280x720. Not yet tried on a real pad.
+- Running: v01-75-ending, imp-62, imp-63, imp-66. Codex accounts all parked (earliest 17:57). No failures new since 13:15.
+- Recommendations: 1) fix-77 intake layout and subject preview (queued, priority 70); 2) fix-76 red combat suites still waiting for a Claude slot; 3) after imp-60/fix-74, have the intake preview use the shared rigged base body.
+
+## Manager notes, 2026-10-06 15:10
+- Merged: v01-75 the v0.1 ending (9cf16860, a55efba2, merge 8d4089fd). Opened the builder's fresh render P:/GameDev/Temp/v01_ending/sheet.png (1_gate … 8_card_late) instead of spending a render window: gate, whiteout, eyes adjust, logo burns in over the world, fades, TO BE CONTINUED with the SURFACED run card. Matches Greg's sequence.
+- Weak (concrete): (1) the held weapon (bottom right) stays on screen through the whiteout and the title drop, so the "first view of the world" reads as gameplay, not a reveal; (2) the first view is bare tan pillars and discs on a flat dark plain under a flat sky, nothing to look at; (3) the run card is tiny 720p text in a narrow box with large empty black around it; gamepad Start on the card is not tested; wind audio checked only in code.
+- Accounts: claude-alt running imp-62 and imp-63; claude-default unparks 15:09 and has 21 pending; claude-alt2 parked to 16:04; all Codex parked (earliest 17:57). No idle account. No new failures (failed/ still job2, job2b, lane-exit-routes, already handled).
+- Top three: 1) queued `fix-78-ending-first-view` (claude, 70): hide the view model during the ending, bigger card, pad Start test. 2) fix-76 red combat suites and fix-77 intake layout still waiting for a Claude slot. 3) a later pass on the surface vista itself (skyline, light shafts) belongs to v0.2 planning; logged only.
+
+## Manager notes, 2026-10-06 17:15
+- Merged: bughunt-79-a stability pass (375ed0e9 … cc5e83c7, merge d0707aef, gate green). DESIGN/BUGS.md now lists the route bugs: subtitles expire, ending card names the button, START chooser pad focus, freed-node error floods from blood pools and glass shards, film shader error on travel, settings rows centred. Rendered menu_capture: settings rows are centred and readable (P:/GameDev/Temp/menu_01_settings_support.png).
+- Weak (concrete): (1) menu_00_the_column.png shows no menu column or buttons, only the dark background and the sigil panel; (2) the Support row is still missing from settings (empty space under BACK); (3) BUGS.md still has open text overlaps on the route (GET REVENGE prompt over the title, SERVICE ARCADE sign over the subtitle, Hollis's line too small), left to bughunt-79-b (running) and 79-c.
+- Not landed: imp-63 destruction FX finished, but its merge conflicted (branch hub/imp-63-destruction-fx kept). Queued `land-imp-63-destruction-fx` (claude, 93). imp-62 and imp-65 were cut off by limits and are back in pending.
+- Accounts: claude-alt2 running bughunt-79-b; claude-default and claude-alt parked to 19:04; Codex parked (earliest 17:57). No idle account. failed/ unchanged (job2, job2b, lane-exit-routes, already handled).
+- Top three: 1) queued `fix-82-menu-column-and-support` (claude, 70, after bughunt-79-c): find out why the column is missing from the capture and restore the support row. 2) land imp-63 before any more destruction work. 3) the bughunt-79 6 s subtitle timer applies to every route line; any future long line needs its own display.
+
+## Manager notes, 2026-10-06 18:20
+- Merged: bughunt-79-b (3b2ff2fe, bcf4f6a1, 83db5666, 09f779a2, 373213df, 8e89a65e; merge e0357f9d, gate green): intake text stays on the paper, key hints wait out mission cards, hall titles fade before you walk under them, the guard's line reads at range, v01_weapons_test fixed. Rendered intake_pad_capture (P:/GameDev/Temp/intake_pad_body.png, intake_pad_route.png): row text now stays inside the paper.
+- Weak (concrete): (1) red cords still cross the tab labels and the SKELETON/CHART rows; (2) the subtitle under NEURAL INTAKE still touches the first tab row, and an empty red plate sits above the title; (3) the subject preview is a blocky checker-noise mannequin with a static panel on the chest. Items 1-2 are in pending fix-77, item 3 in player-81. Open risk from 79-b: key hints now appear a few seconds late after every mission card.
+- Accounts: all seven parked (Claude to 19:04 and 21:04, codex-allusions-plus to 18:52, the rest later). bughunt-79-c was cut off by a limit and is back in pending. polish-50 hit "out of credits" on codex-sircuteskingdom-team. No idle account. failed/ unchanged.
+- Top three: 1) queued `fix-83-doctor-chase-test` (codex, 70): move the stale test to the keycard path so the suite stops failing 8 assertions. 2) after 79-c, run tidy-80 then player-81. The preview mannequin is the worst-looking thing on the intake screen. 3) find the 12 "Lambda capture freed" errors at quit with a `--verbose` bisect; give it to whoever lands next in GoreChunks/BaselineHuman.
+## 2026-10-06, polish-50 v0.1 sound route (Codex)
+Greg, 5 Oct: a sound pass when the v0.1 jobs are busy: footsteps, hits, ambience and an examiner voice placeholder. This pass wires the already-built sound systems into the current one-map route instead of replacing them.
+- `Facility.update_soundscape` changes the continuous room bed and footstep surface from position: Growing Floor wet bare feet over tile, Service Arcade concrete, both lift cabs metal, Lower Works concrete. The room bed no longer remains the vat pumps all the way to daylight; `AmbientBed.set_profile` changes only its quiet room layers and preserves the low music/heartbeat voices.
+- `ExaminerVoice` is an original narrow-band formant placeholder. Intake lines and the examiner fight's one authored spoken line feed it; it invents no dialogue. Dials (assistant defaults, Greg has not set them): `ExaminerVoice.level` 0.34 in the tank / 0.42 in the fight, 12 kHz synthesis, 5.2 s maximum phrase. Replace the component with recorded performance later without changing sequence calls.
+- Reused without changes: CC0 Freesound weapon whooshes/material impacts in `FpCombatAudio`, synthesized bone/wet body sounds in `AmbientAudio`, synthesized crack/burst/pour/splash/wade files in `FluidSound`, and the existing procedural lift hum. The near-silence mix remains: room beds and music stay under breath, pulse, steps, screams and action sounds.
+- Visual regression: `render_one.cmd intake_pad_capture` wrote `P:/GameDev/Temp/intake_pad_{route,body,race,think}.png` and `intake_keyboard_race.png`. Looked at route/body/race: the live examiner, typed line, intake paper and tank body all remain present and readable; the known red cable crosses BODY/SKELETON text and the checker body remains rough (already queued as fix-77/player-81). Open risk: no human listened to this pass, so the synthesized examiner timbre and final mix still need Greg's ears.
+## Manager notes, 2026-10-06 19:10
+- Merged: fix-83 (d68c1ca6, merge 1d528089, gate green): doctor_chase_route_test now takes the dropped keycard instead of smashing the door. polish-50 (64ea2977, merge 34c244f4, gate green): room beds and footstep surfaces follow your position, examiner voice placeholder (dials 0.34/0.42 level), existing CC0 hits reused. Not rendered by me: it is sound; the builder re-rendered intake_pad_capture and saw no visual regression.
+- Weak (concrete): nobody has listened to the sound mix (examiner timbre and levels need Greg's ears); key hints still arrive a few seconds late after every mission card (79-b side effect); the floating "YOUR OLD BODY" label and orange ghost body in the arcade still look like debug.
+- Plan check: v02-51 Black Mirror (priority 40, agent any) is v0.2 work. It stays parked below the v0.1 fixes; do not let a Codex account take it while the cohesion work is open.
+- Accounts: claude-default on bughunt-79-c + map-84, claude-alt on tidy-80 + land-imp-63, claude-alt2 parked to 21:04, three Codex parked (00:02 / 10-11). codex-allusions-plus was idle. failed/ unchanged (job2, job2b, lane-exit-routes).
+- Top three: 1) queued `fix-85-old-body-label` (codex, 70): drop the floating label, keep the body, sigil and close-range prompt. 2) after 79-c lands, player-81 next (the intake mannequin is still the worst thing on screen). 3) make key hints show right after the mission card fades, not a few seconds later; give it to bughunt-79-c's follow-up if it has no owner.
+
+## 2026-10-06, imp-63 destruction FX: smoke, sparks, dust, scorch, layered ground (Claude, Opus)
+
+- Source: Greg, 5 Oct ~19:00: "Improve and refine destruction: smoke, sparks, dust, ground texture, check it on the GPU." remaster-lab-47-p1 never ran, so this builds on lab-47 (c73a2e0e) as merged.
+- Wired, not rebuilt: blast smoke and material dust go into drug-70's `SmokeVolume` (new public `billow()`), so they rise, take the wind, slide along walls and thin out like the cigarette smoke. New `systems/blast_fx.gd` (one per scene, `BlastFx.of`) is the only new system. `Blast.explode` calls it instead of its old 0.35 s light, and `VoxelStructure.damage_sphere` and `DigTerrain.carve_sphere` call it on every break, so a pistol round into concrete puffs dust too.
+- Blast: a white-hot fireball card (`shaders/blast_flash.gdshader`, 0.16 s), a pale shock ring racing over the floor (0.45 s), a 14-energy light that dies over 0.4 s, 70 sparks with gravity, and a dark column of smoke thrown out of the charge's face (`Blast.explode` takes the face normal now; the station passes the charge's).
+- Debris by material (`BlastFx.DEBRIS`): brick throws half-brick chunks, concrete/bunker throw small grit (fewer pieces, heavy pale dust), wood throws splinters, steel and vault throw flat shiny shards with sparks and no dust, glass throws clear shards, drywall throws flakes and white dust. The collider is the piece's own box, and pieces share one mesh and one material per kind (before, every cube made its own material).
+- Lasting marks: voxel cells keep soot (`VoxelStructure.soot`, black at the edge of the blast's hole and fading out to 3.2x its radius; it goes with a piece that breaks off). The floor under a blast gets a scorch over a coat of the material's dust (decals, layer 1 only, so debris and bodies don't take them).
+- Ground: `grimy_dirt.gdshader` now draws layers by depth below the untouched surface: grimy topsoil with roots, then banded clay, then grey rock cracked into blocks. The seams wobble. Spoil clods and dig dust take the colour of the layer the cut reached (`DigTerrain.layer_at`). Looks only: soil keeps its tier.
+- Fixed in passing: `destruction_station.broken_count()` read 0 after the brick charge (a typed lambda errored on a freed wall), so `destruction_toughness_test` was red on the base. It is a plain loop now, and the test is green.
+- Rendered (`render_one.cmd destruction_capture --shots=...`, RTX 2060 SUPER, 1280x720). Before: `P:/GameDev/Temp/imp63/before/` (sheet `before_sheet.png`). After: `P:/GameDev/Temp/imp63/after4/`, with sheets `after4_charge.png` (charge on brick at 0.03/0.12/0.35/1/2.5/6 s plus `charge_7_marks`) and `after4_dig.png` (terraced pit at 0.6/1.4/2.4/2.8 m). Three fix passes after looking. Pass 1: the fireball was skipped by the blast's own long frame, smoke was thin, the soot was too faint, and the pit test dug past the shovel's reach in one stage. Pass 2: the dust coat washed out the scorch, soil dust read as white smoke, and the clay was too orange. Pass 3: the first charge cost 61-87 ms on the CPU (vs 19 before). Soot made the neighbouring walls rebuild their trimesh colliders, and the decal textures and FX were built on the blast's own frame. Now a soot-only change rebuilds just the mesh, and `BlastFx` is made and warmed when the station is built.
+- fps (vsync off, `perf.txt`): debris settled 241 (212 before this pass, same scene); during a charge plus a grenade, 210 average over 2 s with a worst frame of 9.3 ms and 145 smoke parcels; settled after that, 229. The charge call is 22 ms on the first blast (19 before) and 10.8 ms on a later one. All above the 144 target.
+- Dials (defaults mine, for Greg): `BlastFx.enabled` true, `smoke_parcels` 64 (at a 520 charge, scales with damage), `smoke_opacity` 0.8 (cigarettes stay 0.42), `dust_cap` 40 a break, `blast_sparks` 70, `decal_budget` 24, `scorch_scale` 3.2x radius; the per-material table `BlastFx.DEBRIS` (pieces, dust colour and amount, sparks); `VoxelStructure.SOOT_REACH` 3.2; `DigTerrain.topsoil_depth` 0.4 m, `clay_depth` 1.6 m.
+- Tests (headless, own APPDATA): new `destruction_fx_test` (17 checks); `--core` 32/32 green. Also green: destruction_toughness, destruction_cost, mechanics_lab, smokeables, smoke_release, vehicle_damage, materia, breakable_props, world_break, ballistics, gore_range_ballistics.
+- Still weak: the pit sits in the lab's shadow, so the rock layer only reads in a brightened crop (lab lighting is imp-62's). Soot on brick is a darker brown, not black, at the hole's rim. No camera shake on a blast. Smoke and sparks have no sound beyond the existing break voice. Destruction still lives only in the mechanics lab; nothing on the route has voxel walls or diggable ground yet.
+
+## 2026-10-06, land-imp-63 destruction FX onto claude/launch-latest (Claude, Opus, attempt 2)
+- Attempt 1 (merge 301530c5 plus log 9b50a241) merged onto 34c244f4. Then the 19:10 manager notes (1a11355e) were appended to the end of this log at the same spot as its land entry, so the land conflicted again. This attempt merges hub/imp-63-destruction-fx (a1590bca) straight onto 1a11355e as 47f86fbb. Not rebuilt.
+- The only conflict was this log, where both sides had appended. I kept the base notes (15:10, 17:15, 18:20, polish-50, 19:10) first and the imp-63 section after them. Outside this log, the merged tree is byte-identical to 301530c5. No code file was changed by both sides since 8d4089fd, so the bughunt-79, fix-83 and polish-50 fixes are untouched. `Blast.explode(..., normal := Vector3.UP)` is a trailing default, so old callers still work.
+- Tests (headless, own APPDATA, after `--import`; all exit 0, failures=0): baseline_human, body_cut, opening_handoff, first_run_walk, destruction_fx, destruction_toughness, destruction_cost, mechanics_lab, smoke_release, smokeables, breakable_props, world_break. baseline_human still logs the known "Lambda capture freed" errors at quit. That is a base issue, already in the 18:20 notes.
+- Rendered `render_one.cmd destruction_capture --shots=P:/GameDev/Temp/land63b` (RTX 2060 SUPER) and opened charge_1_0.03s.png, charge_3_0.35s.png and charge_7_marks.png.
+  - At 0.03 s: a white-orange fireball, spark streaks, the floor shock ring and flying half-bricks.
+  - At 0.35 s: brown smoke fills the breach and the ring fades.
+  - Marks: a dark scorch on the floor, half-brick debris, the hole.
+- perf.txt: blast 189 fps (worst frame 8.9 ms), settled 256, settled after the blast 210. The first charge took 23.5 ms and the second 11.4 ms. All are over the 144 target.
+- Cohesion: the FX stay inside the existing mechanics-lab destruction bay, with no new menu or text. They are not on the v0.1 route yet, because the route has no voxel walls or diggable ground.
+
+## 2026-10-06, tidy-80 mechanics lab declutter (Claude, Opus)
+Greg: the lab is "so cluttered". Rendered with `tests/mechanics_lab_capture.tscn` via `render_one.cmd`, PNGs in `P:/GameDev/Temp/tidy80/shots3/` (overview, plan, bay_0..7, walkway_south, readouts).
+- Seen before: stations overlapped (the 29 m car lane ran through the disciplines booth and past the bodies; weather puddles and scrub spread across the yard middle); seven status lines plus HP/body lines in red, top left, all the time.
+- Changed: one 76 x 40 m hall with eight lined, signed bays (liquid, bodies, disciplines under the roof; destruction, drugs + smoke, weapons in the open; weather across the roof edge; vehicles on their own apron). Signs face the walkway, single-sided, so the rows never stack. START/TAB menu lists the bays. HUD: one neutral line, red only for danger, pad hints, every readout behind SELECT/TOUCHPAD (G). `lab_layout_test` keeps bays apart and every station inside its lines. Removed the dead `lab/stations/lab_liquid.gdshader`.
+- Still weak: the hall is greybox; the covered row is dim from the open half; signs are Label3D in the default font, not CellOutzType.
+- Attempt 2: attempt 1 branched from 34c244f4 and conflicted only in this log with the imp-63 land entries. I cherry-picked it onto f210a29d and put this entry after them. No code file overlaps imp-63. Headless green: lab_layout, mechanics_lab, discipline_lab, execution_beat, fluid_glass, fluid_surface_sound, fp_arms, materia, organ_system, v01_weapons, destruction_toughness, destruction_fx, destruction_cost, smoke_release, smokeables. Re-rendered in `P:/GameDev/Temp/tidy80/shots4/`.
+
+## Manager notes, 2026-10-06 20:10
+- Merged since 19:10, all gate green: land-imp-63 destruction FX (f210a29d, lab destruction bay only), bughunt-79-c (8803c4d8: gore sound freed-body errors 12 -> 0, Support row back, guard speech over the room, impact_feel_test on a fixed clock; route suites green, no SCRIPT ERROR), tidy-80 lab declutter (84c8a9cb: one 76 x 40 m hall, eight lined and signed bays, one HUD line, readouts behind G/SELECT).
+- Looked at (builder renders after the rebase, `P:/GameDev/Temp/tidy80/shots4/`: overview, bay_1_bodies, readouts). I did not re-render, because no Godot window or account was free and the tree is the same. The overview reads as one tidy hall now, a real before/after win. Still weak: (1) bay_1_bodies has a black box with arms at the front-centre of the bay, which looks like a broken or unlit mesh (player or dummy) and needs checking; (2) with readouts on, the nine lines sit straight on the world with no backing and collide with the BODIES sign; (3) the bodies are still flat green skin, not flesh. That is player-81's and imp-60's look.
+- Plan check: nothing that merged strays from the plan. The FX stay in the lab destruction bay, and the declutter cut content rather than adding it. map-84, imp-66, imp-62 and imp-65 were cut by account limits at 19:37-19:47 and are back in pending (the hub resumes them).
+- Accounts: all seven parked (claude-alt2 until 21:04, claude-default and claude-alt until 00:04, codex 00:02 / 01:47 / 10-11). failed/ is unchanged (job2, job2b, lane-exit-routes; all superseded).
+- Top three: 1) queued `fix-86-hint-during-card` (claude, 95): the key hint stays up during a mission card in the lower third instead of hiding for its whole 5.2 s. 2) Order after it: map-84 (96), player-81 (94); then hand the bodies-bay black box and the readout backing to imp-62 (lab look and HUD) when it resumes. 3) fix-85 (old-body label) waits for a Codex account at 00:02.
+
+## 2026-10-06, map-84 route readable and alive (Claude, attempt 2)
+Manager look at the map sheet: one dark green corridor over and over. Attempt 1 (281772d3) conflicted with the base only in this log and BUGS.md. Its four code commits were cherry-picked unchanged onto 4123ed41, and the docs were rewritten here. Before: `P:/GameDev/Temp/map-84/before_sheet.png`. After: `after_sheet_attempt2.png` (shots in `after7/`). Both are facility_one_map_capture, rendered and opened.
+- Root cause of the black Lower Works and shafts: the zone surface sets were at full metalness with no reflection probe. Fix: `METAL_SHARE` 0.3 (dial in `facility_zone_identity.gd`), plus high-bay floods and a flood over the heat-lift mouth.
+- Arcade: stalls, a booth and two barriers as real cover. Guards walk round them (`ARCADE_COVER`), and guard 49 waits behind the barrier. Two wide floods now light the far half to the transit lift.
+- Surface gate: a yard, open gate leaves, wall stubs and fence posts against a far daylight backdrop. Lab floor tile grimed.
+- Lifts: the readout sits on a lit panel on the door jamb, not the lintel. The side-slot readouts are gone, and the shaft strips are housed. Attempt 1's panel never showed because `FacilityTunnelKit.dress_lift` treated the Cab (an AnimatableBody3D, so also a StaticBody3D) as shaft wall and re-skinned the panel as corrugated steel. Meshes tagged `own_material` are now skipped. Both lifts now show the panel.
+- fps, windowed capture on the RTX 2060 SUPER: minimum 174, average 285 over 13 shots (attempt 1 saw a 118 at 03b).
+- Still weak: the arcade is still dim overhead. The lab floor is still a checker under the grime (art call). Guard paths were checked by the route suites, not in a watched fight.
+
+## 2026-10-06, fix-86 key hint during a mission card (Claude, Opus)
+- Before: after bughunt-79-b, `KeyHints` hid its box for the whole of any mission card, so standing up under GET REVENGE gave no E USE prompt until the card ended.
+- Changed: `MissionCard.title_rect()` / `playing_title_rect()` report the area the title letters (and their darker drips) can reach. While a card plays, `KeyHints._layout` drops the box under that area, still above the screen's bottom edge, and puts it back when the card ends. It holds the hint only when there is no room under the title. The card's look and timing are unchanged.
+- Looked at: `hands_on_breakout_capture` now also shoots `bo_6_revenge_hint.png` about 1 s into GET REVENGE (`P:/GameDev/Temp/fix86/`). The hint is readable under REVENGE, and the faint drip tails end above it.
+- Still weak: four-word cards (BRAIN HACKED SOUL OVERTAKEN) fill the screen at 720p, so a hint still waits those out.
+
+## Manager notes, 2026-10-06 22:10
+- Merged since 20:10, gate green: map-84 route readable and alive (5c18d817: Lower Works no longer black, arcade stalls/booth/barriers as cover with guards pathing round them, lift readout panels, gate yard; min 174 fps on the 2060 SUPER) and fix-86 key hint under the mission card (4a25d0a2). Running: v02-51 Black Mirror pickup on claude-alt2. All other accounts parked until 00:02-01:47 (two Codex until 10-11).
+- Looked at the builders' renders (no re-render; tree unchanged since): `P:/GameDev/Temp/map-84/after_sheet_attempt2.png` and `P:/GameDev/Temp/fix86/bo_6_revenge_hint.png`. Lower Works now reads as a large space; arcade has cover and a far-half light. Weak: (1) both lift-cab rides (04, 07) are still almost black, with only the jamb panel lit, so the two "real lift" moments read as a black screen; (2) arcade and Lower Works still look like one green-tile room repeated (zone identity, imp-67 territory); (3) on GET REVENGE the thought line "HE WENT THROUGH THAT DOOR." sits across the card letters.
+- Plan check: both merges serve listed plan items (one facility map, HUD readability); nothing strays, no clutter added.
+- Top three: 1) queued `fix-92-thought-under-card` (codex, 70): move the thought line off the playing card, reusing fix-86's `playing_title_rect`. 2) Next map pass: a cab light in each lift (one warm-white fixture moving with the cab) so rides read; fold into the next remaster of map-84. 3) player-81 (94) and imp-66 vat room stay next when claude-default/alt unpark at 00:04.
+
+## 2026-10-06, v02-51 Black Mirror pickup, one device (Claude, Opus)
+Greg, 5-6 Oct: "still does not cohesively work"; "we gotta make the black mirror like work", in the route.
+- In the route: the phone lies on the examiner's desk (`doctor_route.gd`). Square takes it, and the handheld record turns possessed. `systems/black_mirror_phone.gd` (new, no new app) wraps the existing BlackMirrorCamera and HandheldDevice. CREATE/G raises and lowers it. D-left/right step through CAMERA / MAP / CARRY. D-up/down is each page's own verb (night/depth, bag selection). Cross on CARRY opens the Brain Index. One page rail and one palette (bone, copper, moss, CellOutzType) cover every page.
+- **Hidden in the facility** (no data underground, so each would have been half-working): INDEX, WIRE, RADIO, RITUAL, FIELD, through `HandheldDevice.available_modes`. The handheld's DELETE drop is off in the facility, because nothing there can hold a dropped phone.
+- MAP underground: LivingMap plan mode draws `facility.gd`'s own room, corridor and lift footprints in a 60 m window, with you on it and NEXT from `objective_for`. It writes no surface survey.
+- Depth camera rebuilt as a TD chain: LiDAR ramp, Sobel depth edges, normals from depth, contours, halftone points, a radial scan wave, a scan line, and a track mask. BlockTracker draws tagged boxes on guards, the sentinel, the examiner, vat subjects, the cleaver, his door and story props. The Hunt picks up the same shader.
+- **Dials:** `BlackMirrorCamera.DEPTH_TRACKS_THROUGH_WALLS = false` (boxes only what it sees); `BlackMirrorPhone.NIGHT_GRADE = 3.0`. Question for Greg: `AgentHub/queue/questions/black-mirror-01.md` (Hunt phone, through-walls, pickup line).
+- Fixed from the look: D-up also toggled the route X-ray, and SignalSight's lens pass smeared the depth image. MAP first fitted the whole 140 m level into a strip.
+- Looked at (render_one, opened): `P:/GameDev/Temp/v02-51/after_facility/` (00-10: pickup, dark naked eye, night, depth, depth across the vat floor, handheld rising, MAP, CARRY, Brain Index, lowering, lowered); `hunt_before_after_sheet.png` (before: flat grey silhouette; after: edges, form, points).
+- fps, windowed 1280x720 with vsync off on the RTX 2060 SUPER, in his dark office: phone down 130, night 110, depth 107, MAP 113, CARRY 110. The first pass ran at 85/80/59/55, because stroke type was redrawn every frame; it now renders into cached viewports. **Not 144:** the room is at 130 even with the phone down.
+- Still weak: the Hunt keeps the old Tab + L phone. Plan room labels are small at 720p. The night camera in a room with zero light shows only what the lens grade lifts.
+
+## Manager notes, 2026-10-07 00:10
+- Merged since 22:10, gate green: v02-51 Black Mirror pickup (4a68600c): the phone on the examiner's desk, one device with night/depth camera, MAP and CARRY underground, other modes hidden in the facility. Serves plan item v2-1; no new menus. Checklist line already ticked by the builder.
+- Looked at (render_one on trunk, opened): `P:/GameDev/Temp/v02-51/00-10*.png` overwritten at 00:10. All 11 shots show the WETWIRE // DISCIPLINES brain screen; the capture no longer gets past the discipline pick on trunk, so the merged phone is unproven on trunk. Same shots show real clutter: the opening subtitle, a hall/thought line and a "TEAR THE CORD" key hint draw over and under the brain screen. fps 86-96 (4 builders busy on the GPU).
+- Running: dec-89 (claude-default; changes the brain screen to all 4 disciplines, so it touches the same screen), inv-90, feel-86, feel-87. codex-sircuteskingdom-team is ready but waits for a free slot (4/4 used); fix-85 and fix-92 are its next jobs. claude-alt2 parked until 02:04 with player-81 next.
+- Top three: 1) queued `fix-93-mirror-capture-and-brain-overlay` (claude, 70): capture picks 2 disciplines through pad input, and the brain screen hides foreign subtitles/thoughts/hints in one place. 2) Hunt still uses the old Tab + L phone: leave for Greg (question black-mirror-01). 3) After fix-92 and fix-93, one pass checking every route screen (intake, brain, card, death) for text stacking, since three bugs of that family have landed in two days.
+
+## 2026-10-07, player-81 (player model redo), build pass (Claude, Opus)
+Greg, 6 Oct: "i genuinely hate the look of the player model". Before/after PNGs side by side in `P:/GameDev/Temp/player-81/compare_*.png`; gallery in `P:/GameDev/Temp/player-81/after/looks3/` (`tests/player_look_capture.tscn`).
+- Gaps seen (before): the player wore Quaternius' superhero base as it came (traps to the ears, deltoids, painted abs, boxers, claw hands); first-person sleeves were purple/green/orange squares (world grain at arm's length); the intake SUBJECT specimen was still the boxed checker rig; hardware bands and the jester cap floated off the human skin (cap brim across the eyes).
+- Changed: `PlayerLook` (new) slims the base mesh toward its bones once per model (skeleton, clips, ragdoll, hitboxes, cut unchanged; player only). Garment painted on `flesh_skin.gdshader` in rest space, so fitted and riding the clips. Fingers relax on empty-handed clips. FP hands wear the look (bare forearms under the smock) unless `gloved`; jester glove grain 15x finer. Intake preview is the rigged player body (`VatBodyPreview.RIGGED`).
+- Dial for Greg (defaults mine): Pause > DISPLAY / HUD > PLAYER LOOK = PATIENT SMOCK (default) / VAT BODYSUIT / BANDAGE WRAPS. The jester set (Greg's design, worn in the Hunt) still covers the look where it is worn.
+- Still weak: FP hands are the old procedural low-poly hands (skin-toned now, not the human mesh); garment is painted on, so no loose cloth silhouette; the face sliders do not visibly move the human face in the intake preview (procedural face pieces hide on the skin; cust-91's shape keys); a wounded zone still hands back to the boxed rig body (existing behaviour); the Hunt over-the-shoulder view of the player was not captured (the existing capture frames an NPC).
+
+## 2026-10-07, dec-89 Greg's 6 Oct night answers (Claude, Opus)
+- Brain screen: all four disciplines on the chip, pick 2 (`BrainScreen.OFFER_LAB_DISCIPLINES` true). Cards narrower; a long kit line shrinks to its card. The pair lights its lobe on every HUD brain and the Hunt arms it (first slot in hand). Duelist/Shade *verbs* in the route are route-88's, not done here. Renders: `P:/GameDev/Temp/dec89/brain_screen_four_{empty,duelist_shade}.png`.
+- Death on the route: 3 s regrowth in the tank, then out at the last checkpoint filed (arcade west door, Lower Works floor, each lift, examiner door, vat). No checkpoint on file = the old tank escape. The bloodstain stays where you died (`RebirthSite`), old bodies now lie in every v0.1 place.
+- Ragdoll on every death and execution: dials `RAGDOLL_DEATHS` (V01Encounters, FacilityGuardPost, BoneYardHunt).
+- HUD face default BODYCAM (`FaceMonitor.DEFAULT_STYLE`); XRAY and MASK stay in Pause.
+- Kept as Greg said: guards drop their weapons (sidearm = first gun), the freed subject breaks its own glass.
+- Fixed in passing: keyboard hints for Godot's own ui_* keys read "(UNSET)" on the brain screen (`InputProfile.glyph`).
+- Weak: the regrowth to a checkpoint was not looked at windowed (no capture; headless test only). `arcade_execution_test` exits 139 on quit in about 2 runs of 7 with ragdoll on, after every check passes. The WIP commit carries imp-66's `DisciplineLobes` (hub/imp-66-vat-room is unmerged): merge one, not both.
+
+## Manager notes, 2026-10-07 02:10
+- Merged since 00:10, gate green: fix-85 old-body label (6b27f6b2/f16f24c3, Codex): the "YOUR OLD BODY" billboard is gone; corpse, blood sigil and the gear prompt stay. Serves Job 7 death/rebirth; no clutter added.
+- Looked at (render_one rebirth_capture on trunk, opened): `P:/GameDev/Temp/rebirth_old_body.png`. Label gone, guard line readable in full. Weak: (1) the old body is still a glowing orange ghost on a red ring (BUGS.md open, Greg's art call); (2) the guard's BlockTracker "SEEN 100%" tag draws over and under his speech line; (3) "E USE / OPEN / TEAR" hint is generic at the gear spot when the objective says recover gear.
+- Capacity: claude-default and claude-alt hit limits mid-run (dec-89, feel-86 and siblings back in pending) and are parked until 10-10 19:04; codex-sircuteskingdom-plus and codex-allusions-team until 10-11, codex-sircuteskingdom-team until 06:17 (out of credits). Building now: player-81 (claude-alt2), fix-92 (codex-allusions-plus). No idle account.
+- Top three: 1) queued `fix-94-awareness-tag-under-speech` (codex, 70): move/hide the tag text while a guard speaks. 2) fix-93 (brain-screen overlay, capture) is the most important pending Claude job; with only claude-alt2 free it runs after player-81. 3) Old-body look stays for Greg (no invented art direction).
+
+## Manager notes, 2026-10-07 03:10
+- Merged since 02:10, gate green: player-81 player model redo (443aadb9..e98c9457, claude-alt2): slimmed human base, painted garments, 3 looks behind Pause > DISPLAY / HUD > PLAYER LOOK (default PATIENT SMOCK), intake SUBJECT is the rigged body, FP hands skin-toned. Serves Greg's 6 Oct "hate the player model"; wired into the route and intake, no new pages. FEATURE_CHECKLIST line ticked [~] (Greg judges).
+- Looked at (render_one player_look_capture on trunk, opened lineup_front, patient_face, patient_hand in `P:/GameDev/Temp/player-81/after/looks/`): real face, lean build, much better than the bodybuilder base. Weak: (1) the smock reads as a tight green T-shirt on a nude body: crotch/glute bulge and pecs show through; (2) a dark brown patch floats off the left upper arm; (3) halftone dot grain on garment and forearm at close range; idle hands still a little clawed.
+- Capacity: claude-default, claude-alt parked to 10-10 19:04; codex-sircuteskingdom-team to 06:17, codex-allusions-plus to 08:17, the other two Codex to 10-11. claude-alt2 is building dec-89. No idle account.
+- Top three: 1) queued `remaster-player-81-p1` (claude, 70): fixes 1-3 above, before/after renders. 2) fix-93 (brain-screen overlay) stays the most important pending Claude job after dec-89 (both touch the brain screen; dec-89 first is right). 3) FP hands are still the old procedural hands; leave that to remaster-imp-64-p1 (first-person arms) rather than a parallel version.
+
+
+## Manager notes, 2026-10-07 04:10
+- Merged: dec-89 Greg's 6 Oct answers (23c53034, gate green): brain screen offers all 4 disciplines, route death regrows in the vat 3 s then resumes at the last checkpoint, ragdoll on every route death and execution, BODYCAM default HUD face. Checklist lines already ticked by the builder.
+- Looked at P:/GameDev/Temp/dec89/brain_screen_four_duelist_shade.png. Weak: (1) with both slots filled it still reads "SLOT 2 OF 2" and the button says "ENTER LOCK IN" (keyboard word on a pad-first screen) plus "THIRD PERSON ON", which is noise; (2) Shade's card says "SHIV // DARKNESS": no shiv is in Greg's weapon list (cleaver, staff, MERCY NINE), so flag as a possible stray name for Greg; (3) ragdoll teardown crashes on quit (exit 139, 2 of 7 arcade_execution runs) and no window check of regrowth exists.
+- Plan risk: dec-89's WIP carries imp-66's DisciplineLobes while hub/imp-66-vat-room is unmerged; whoever lands imp-66 must keep one copy, not two.
+- Top three: fix-95 ragdoll quit crash (queued, claude, 70); brain screen pad glyph + done state (add to fix-93 or a follow-up); a regrowth capture for render_one.
+- All 7 accounts parked (claude-alt2 until 07:04, codex-allusions-plus 08:17, codex-sircuteskingdom-team 06:17); nothing to spawn until then.
+
+## 2026-10-07, fix-92 thought clear of mission card
+- The vat thought now reads the live mission-card title bounds each frame, moves above GET REVENGE when their rectangles meet, and returns to its authored 196-226 strip when the card clears. If a title leaves no room above, the thought uses the gap below it and above the visible key hint. Card timing, wording, type and key hints are unchanged.
+
+## Manager notes, 2026-10-07 09:10
+- Merged: fix-92 (c3be708b, vat thought clear of mission card), fix-94 (b2274035, guard speech clear of awareness tag). Looked at P:/GameDev/Temp/rebirth_old_body.png: the guard's line now reads in full with no tag text over it.
+- Weak (same shot): the old body is still a pale glowing figure on a red disc, not a corpse with a bloodstain (BUGS.md "Rebirth, old body", OPEN); the floor is a bright checker that pulls the eye away from it.
+- Accounts: both main Claude accounts and claude-alt2 are parked until 10-10/10-11; three Codex accounts are parked; codex-allusions-plus was ready but idle for 4 ticks (every pending task said agent claude).
+- Recommendations: 1) old-body read (corpse plus bloodstain, no glow); already in remaster-job7-p1's scope, so no duplicate queued. 2) fix-95 ragdoll quit crash stays first among the fixes when a Claude account frees up. 3) Give Codex small, mechanical BUGS.md items so it does not sit idle.
+- Queued for Codex: fix-82 narrowed to the one thing left (the support address line's ~12 px inset in country_town_menu.gd `_build_support_row`); bughunt-79-c already restored the row.
+- Failures: none new (job2, job2b, lane-exit-routes are old).
+
+## Manager notes, 2026-10-07 10:10
+- Merged: fix-82 (4e1d39b6, merge f6b6e851), the menu support address now uses the same left inset as the settings rows. Re-rendered menu_capture and looked at P:/GameDev/Temp/menu_01_settings_support.png: the address lines up with BLOOM/SUPPORT/BACK, it is in a readable font and inside the panel.
+- Weak (same shot): the address is grey sans-serif among copper pixel-font rows. That is on purpose (the pixel font has no "@"), so it stays.
+- Accounts: Claude main/alt are parked until 10-10 19:04, claude-alt2 until 10-11, three Codex accounts parked; codex-allusions-plus is the only builder ready.
+- Recommendations: 1) Keep Codex fed. fix-78 (ending: hide the view model during the whiteout/title drop, scale up the TO BE CONTINUED card, Start-on-pad test) is specific enough, so it moves to agent codex at priority 72. 2) fix-95 ragdoll quit crash is still the first Claude fix when an account frees up. 3) remaster-job7-p1 (old body reads as a ghost) after that.
+
+## 7 October 2026 — fix-78 ending first view
+
+- The v0.1 ending now hides the Hunt's physical first-person body (including every weapon, smokeable, carried limb, hand and forearm) together with the held-item HUD from whiteout through the card. The `hide_view_model_in_ending` dial defaults true; teardown restores the body's prior visibility before returning to play or changing to the title.
+- The centred SURFACED run card uses a 1.55 presentation scale in the ending; its existing text, colours and sequence are unchanged. Ordinary in-world run cards remain at their original scale.
+- `v01_ending_test` now drives a real `JOY_BUTTON_START` press on the card and verifies the enlarged card and hidden view model.
+- Failures: none new (job2, job2b, lane-exit-routes are old).
+
+## Manager notes, 2026-10-07 17:10
+- Merged: fix-78 (9ca8c869, merge 722f3f37, gate green). Looked at P:/GameDev/Temp/v01_ending/5_title.png and 7_to_be_continued.png (16:21 renders): no weapon or hands over the title drop; the TO BE CONTINUED card now fills the middle of the screen and reads at 720p; the prompt already switches ENTER/CROSS with the pad.
+- Weak: (1) on the title shot the bottom half of the frame is flat black ground, so the "first view of the world" is mostly a dark floor under the logo; the camera could look a little higher at the horizon. (2) The card's area times read 0:00/0:00/0:05 in the capture (a capture shortcut, not a bug to chase). (3) A faint ghost of other text shows behind the logo letters.
+- Accounts: only codex-allusions-plus is ready; nothing pending was for Codex, so it sat idle since 16:22.
+- Recommendations: 1) Keep Codex busy: fix-76 is now narrowed to `souls_pad_test` only (v01_weapons_test was fixed by bughunt-79-b) and moved to agent codex. 2) fix-95 ragdoll quit crash stays the first Claude fix when an account frees up (10-10 19:04). 3) Ending camera: tilt up toward the horizon for the title drop (a later Codex job, behind a dial).
+
+## 7 October 2026 - fix-76 red combat tests
+
+- fix-76: `souls_pad_test` green at `d655948c`; all 29 sandbox pad, attack and built Souls parry-timing assertions pass unchanged.
+
+## Manager notes, 2026-10-07 18:10
+- Merged: fix-76 (27638d36, merge e2589594, gate green). Documentation only: `souls_pad_test` was already green at d655948c (29/29), plus souls_roll, combat_stance, pad_bridge, sparring green. No render needed (no behaviour change).
+- Weak: combat_stance_test and sparring_test still print quit-time leak lines (exit 0; same family as BUGS.md "Exit-time noise").
+- Accounts: all Claude accounts parked to 10-10/10-11; only codex-allusions-plus ready and no Codex work was pending.
+- Recommendations: 1) Keep Codex busy: queued fix-96-ending-horizon-tilt (Codex, priority 70): one dial `TITLE_LOOK_UP_DEG` (default 8, 0 = old) eases the camera up at the title drop so the first outside view is horizon, not black floor. 2) fix-95 ragdoll quit crash stays the first Claude fix when an account frees up. 3) Next Codex candidate: lower the first-person hands while aiming down the sights (BUGS.md "The Hunt, aiming down the sights"), behind a dial.
+
+## 7 October 2026 — fix-96 ending horizon tilt
+
+- The v0.1 ending now eases the active camera 8 degrees upward while the white adjusts, putting more sky and horizon behind the title without moving the player or changing the ending timings. `TITLE_LOOK_UP_DEG` is the presentation dial; 0 restores the old composition.
+
+## Manager notes, 2026-10-07 19:10
+- Merged: fix-96 (7a760832, merge 07ce3953, gate green). Checked P:/GameDev/Temp/v01_ending/5_title.png: horizon, pillars and sky now sit behind the logo; the lower ~45% is still dark foreground ground, acceptable for now.
+- Weak: ADS grip hands still cover the lower third (BUGS.md, OPEN); combat_stance/sparring tests print quit-time leak lines.
+- Accounts: Claude accounts parked to 10-10/10-11; two Codex accounts ready (allusions-plus, sircuteskingdom-team), no Codex work was pending.
+- Recommendations: 1) Queued fix-97-ads-hands-lower (Codex, priority 70): dial `ADS_HAND_DROP` (0.035 m, 0 = old) lowers the grip hands while aimed, sights untouched. 2) Queued fix-98-test-quit-leaks (Codex, 65): free test scenes before quit in combat_stance/sparring tests. 3) fix-95 ragdoll quit crash stays the first Claude fix when an account frees up.
+2026-10-07 — fix-98: combat stance and sparring tests release spawned nodes before quit; stance leak noise is gone, while sparring still exposes BoneYardHunt's system-owned shutdown leaks.
+
+## Manager notes, 2026-10-07 20:10
+- Merged: fix-98 (c32d60e9, merge e334ce63, gate green). Test-only: combat_stance_test leak lines 1 -> 0; sparring_test still 5 (BoneYardHunt shutdown leaks, system-owned). No render needed.
+- fix-97 (ADS hands lower) did not run: both Codex tries hit limits/out of credits; still pending.
+- Accounts: all parked (Codex team/allusions-plus free ~01:40 8 Oct; Claude 10-10/10-11).
+- Recommendations: 1) Queued fix-99-boneyard-quit-leaks (Codex, 66): free BoneYardHunt runtime RIDs/streams on exit so sparring/exit_reveal logs go quiet. 2) fix-97 stays next for Codex. 3) fix-95 ragdoll quit crash stays the first Claude fix when an account frees up.
+
+## Manager notes, 2026-10-07 21:10
+- Merged since 20:10: nothing. Every account is parked (Codex until about 01:40 on 8 Oct, Claude until 10 Oct 19:04). No new tasks are queued, because fix-97 and fix-99 are already waiting for Codex.
+- The daily refresh is done: GAME_PLAN_V2_DRAFT.md section 0 is updated for 7 Oct, and MORNING_REPORT.md has today's summary.
+- Top three, all already queued: fix-95 (ragdoll quit crash), fix-93 (Black Mirror on trunk), feel-86 (combat feel).
+
+## 7 October 2026 - fix-97 ADS grip-hand clearance
+
+- The Hunt and the facility/lab arm mount now share a non-accumulating 0.035 m camera-local grip-hand drop after ADS poses the gun. `P:/GameDev/Temp/ads01/ads_sidearm_stage2.png` keeps the sights centred while the hands occupy roughly the lower 24% of the 720p frame instead of the lower third; zero aim restores their cached rest.
+
+## Manager notes, 2026-10-08 02:10
+- Merged since 21:10: fix-97 ADS hands lower (2e4b900f, merge 96c3dc0d, gate green). Checked the builder's render P:/GameDev/Temp/ads01/ads_sidearm_stage2.png: the sights are centred and clear, and the hands now sit in the bottom of the frame. Dial: `ADS_HAND_DROP` = 0.035 m.
+- Weak: the grip hands still look like checker-textured balls rather than hands (remaster-imp-64-p1 already covers this). While aiming, the three hanging monitors (HRT/EEG/CAM) stay fully opaque and crowd the top right, which adds clutter.
+- Failures: fix-99 (Bone Yard quit leaks) did not run; both Codex tries hit "workspace out of credits". It is still pending.
+- Accounts: all parked (Codex team ~08:07 and allusions-plus ~07:59 on 8 Oct; Claude 10 Oct 19:04, alt2 11 Oct).
+- Recommendations: 1) Queued fix-100-ads-quiet-monitors (Codex, 70): fade the hanging monitors to 25% while aiming (dial `ADS_MONITOR_ALPHA`), Job 3. 2) remaster-imp-64-p1: make the grip hands read as hands. 3) fix-99 stays next for Codex after fix-100.
+- fix-100: MERCY NINE ADS now fades only the HRT, EEG and CAM hanging monitors to 25%, restoring them exactly at zero aim.
+
+## Manager notes, 2026-10-08 09:10
+- Merged since 02:10: fix-100 ADS quiet monitors (11c3389f, merge 7ed7f5d0, gate green). Checked the builder's renders P:/GameDev/Temp/ads100-final/ads_sidearm_hip.png vs ads_sidearm_stage2.png: HRT and EEG recede to 25% while aiming, as asked. Dial: `ADS_MONITOR_ALPHA` = 0.25.
+- Weak: the CAM monitor's inner face feed stays fully bright while aiming (its frame fades, the image does not), so the top right is still busy. At hip the MERCY NINE arm reads as a dark checker cylinder and the hand as a checker ball (remaster-imp-64-p1 covers it). The capture target's name plate sits right over the sight line; capture-only, not a game bug.
+- Failures: none new. fix-99 still pending (Codex was out of credits).
+- Accounts: all parked (Codex team 14:19 and allusions-plus 14:29 today; others 10-11 Oct). 29 pending, no idle account.
+- Recommendations: 1) Queued fix-101-cam-feed-fade (Codex, 70): make the CAM feed follow the monitor alpha, Job 3. 2) remaster-imp-64-p1: hands and forearm that read as hands. 3) fix-99 quit leaks next for Codex.
+- fix-101: the CAM monitor's inner live face feed now preserves its inherited alpha, fading with the frame during MERCY NINE ADS and restoring exactly at zero aim.
+
+## Manager notes, 2026-10-08 15:10
+- Merged since 09:10: fix-101 CAM feed fade (2e14056b, merge f4afeeaf, gate green). Checked the builder's render P:/GameDev/Temp/ads101-final/ads_sidearm_stage2.png: the teal face feed now recedes with its CAM frame while aiming; the sight line is clear.
+- Weak: the grip hands are still two orange checker spheres filling the bottom centre of the ADS frame, which is the biggest thing wrong in this shot. The capture's "SIGHT PROBE" plate is capture-only.
+- Failures: fix-99 (Bone Yard quit leaks) failed 3 more times at 14:32-14:57, each time "workspace out of credits" on both Codex workspaces. It is not a code fault, so it stays pending as is.
+- Accounts: all parked (Codex team 20:52 and allusions-plus 21:08 today; Claude 10 Oct 19:04, alt2 11 Oct). 29 pending, no idle account, so no new task was queued.
+- Recommendations: 1) remaster-imp-64-p1 (claude, 70, already queued): make the hands and forearm read as hands, Job 3. 2) fix-99 next for Codex at 20:52. 3) fix-95 ragdoll quit crash is the first Claude fix after imp-64.
+
+## Manager notes, 2026-10-08 21:10
+- Merged since 15:10: nothing. fix-99 (Bone Yard quit leaks) is running on codex-sircuteskingdom-team since 20:57. No render needed.
+- Idle: codex-allusions-plus was ready with no Codex work, so I queued fix-102-examiner-fist-dial (Codex, 70, Job 6): bare-fist damage on the examiner goes from 9 to 15 (~29 -> ~18 blows) behind the `DAMAGE` dial. This answers the BUGS.md Open "bare-handed" line with a default; Greg to confirm.
+- fix-102: examiner bare-fist damage is now 15 instead of 9 (~18 blows), behind the `DAMAGE` dial pending Greg's confirmation.
+- The daily refresh is done: GAME_PLAN_V2_DRAFT.md section 0 is updated for 8 Oct, and MORNING_REPORT.md has the daily summary.
+- Top three: 1) remaster-imp-64-p1: make the hands read as hands (the biggest flaw in the ADS frame). 2) fix-95 ragdoll quit crash. 3) fix-93 Black Mirror on trunk. All are queued for Claude accounts, which return 10 Oct 19:04.
+
+### Manager notes, 2026-10-08 22:10
+- Merged: fix-102 examiner fist dial (e4d9d9d5, merged 0ba5b005, gate green). It only changes a number, so there was nothing to render.
+- fix-99 boneyard quit leaks: codex-allusions-plus ran out of workspace credits partway through (out of credits, not the usual usage limit). The hub put it back in pending, and it resumes when an account returns (Codex accounts from 09 Oct 03:25).
+- Every account is parked. 28 tasks are pending, so nothing new is queued, and the top three from 21:10 still hold.
+- fix-99: Hunt teardown now frees its unparented dialogue brain, clears generated scene audio, and breaks the nested native-voice script cycle; `sparring_test` and `exit_reveal_test` keep exit 0 with RID/ObjectDB leak summaries 5 -> 0, while the four-Hunt `first_thirty_route_test` stays green.
+
+## Manager notes, 2026-10-09 04:10
+- Merged since 22:10: fix-99 Bone Yard quit leaks (53ef3c63, merged a9328b05, gate green): sparring/exit_reveal leak summaries 5 -> 0. It only changes teardown, so there was nothing to render.
+- Weak: full route runs still leak at quit (~11868 ObjectDB in demo_route), and a Jolt "maximum number of jobs" warning is still open (BUGS.md "Exit-time noise").
+- Idle: codex-sircuteskingdom-team and codex-allusions-plus were ready with no Codex work. I queued fix-103-demo-route-quit-leaks (Codex, 70) and fix-104-jolt-max-jobs-warning (Codex, 69), both Job 7 stability.
+- Failures: none new. The Claude accounts return 10 Oct 19:04 and alt2 returns 11 Oct.
+- Top three: 1) fix-103/104 quit-time stability (queued). 2) remaster-imp-64-p1: hands that read as hands. 3) fix-95 ragdoll quit crash.
+- fix-103: a fresh verbose `demo_route` run after fix-99 has 0 RID, 0 ObjectDB and 0 resource leak summaries (reported before: 11868 ObjectDB); the Hunt owner teardown and native-voice cycle fix already closed the route leak, so no shared cache or gameplay code changed. Separate opening handoff / first-run walk shutdown summaries remain at 25 ObjectDB, 15 renderer RIDs and 6 resources each.
+
+## Manager notes, 2026-10-09 05:10
+- Merged since 04:10: fix-103 demo-route quit leaks (4e2c230d, merged fae225ad, gate green). It only touched docs, because demo_route already quit at 0 leaks after fix-99. Nothing to render.
+- Weak: opening_handoff/first_run_walk still leak 25 ObjectDB, 15 RID and 6 resources each at quit. fix-104 (Jolt max-jobs warning) hit a limit twice and is still pending.
+- Accounts: all parked (Codex team 10:27, allusions-plus 10:36, Claude 10 Oct 19:04, alt2 11 Oct). 30 pending.
+- Top three: 1) Queued fix-105-opening-quit-leaks (Codex, 68, Job 7). 2) remaster-imp-64-p1: hands that read as hands. 3) fix-95 ragdoll quit crash.
+- fix-104: route-test teardown now gives Jolt a physics step to reclaim completed jobs between whole-map frees; the historical max-jobs warning count is 1 -> 0, and both route suites exit 0 without disabling any physics content.
+
+## Manager notes, 2026-10-09 11:10
+- Merged since 05:10: fix-104 Jolt max-jobs warning (5f745ac9, merged 0b0a608d, gate green). Route teardown now gives Jolt a physics step between map frees; max-jobs warnings 1 -> 0, no physics content disabled. Headless-only change, nothing to render.
+- Weak: fix-105 (opening quit leaks) ran out of Codex workspace credits on both codex-allusions-plus and codex-sircuteskingdom-team and is back in pending. first_thirty_route_test still reports 41 ObjectDB at exit (folds into fix-105).
+- Accounts: all parked (Codex 16:42 / 16:55 today, Claude 10 Oct 19:04, alt2 11 Oct 17:04). 28 pending, none idle, so no new task.
+- Top three: 1) fix-105 stays first for Codex at 16:42. 2) remaster-imp-64-p1: hands that read as hands. 3) fix-95 ragdoll quit crash.
+
+## 2026-10-24, player-82: back to the vat's own body (Buffy, desktop)
+- Greg, 23 Oct: *"i really hate the new player models can we go back to earlier versions like the models used in the vat kind of thing"*, and to the follow-up, the plain base body and normal-sized bare hands.
+- Changed: `PlayerLook.DEFAULT` is `base` — the player wears the same rigged base the vat's tank and intake subjects wear, with none of the player-81 slim build (`lean: 0`, so `lean_mesh` is not applied at all) and none of its garment (`mode: 0`), with the painted muscle relief left at full. The three player-81 looks (smock, bodysuit, wraps) stay in Pause > DISPLAY / HUD > PLAYER LOOK for the galleries; a new settings key (`player_look_v2`) means a save that picked a look under the old key comes back as the base body.
+- First person: `restyle_hand` no longer keeps the fool's glove scale, and the hand skips the pose's forced 1.16. The bare hand is `BARE_HAND_SCALE` (0.86) of the model, the padded palm is slimmed (0.86 across, 0.84 through) and given the knuckle ridge and thenar mound it never had. Found on the way: `HeldGear._build_finger` turned each finger pad's sweep about Y, so the tube ran `across` the finger instead of along its bones — the pads stacked into a ladder of bricks, which is most of what read as fists of rock. It turns the sweep onto Z now.
+- Looked at: `P:/GameDev/Temp/player-82/body_final.jpg` (player-81's smock/bodysuit/wraps against the marked base body and the unmarked base, front views) and `hands_final.jpg` (the office-glass desk view before and after, same camera, 13:00). The marked player in the row is the same man as the unmarked base at the same size. The hands are bare, cuffless and smaller, with fingers that curl over the palm instead of lying across it.
+- Tests: `player_look_test` green (it now asserts the default is the base body, that the player's arm and chest are the base's to within 5 mm, that the smock look is still slim, and that the bare hand is smaller than the glove). `skin_case_test` and `held_weapon_sights_test` green, `player_look_capture` renders (exit 2 headless is by design).
+- Still weak: the hands are still code-built — the bare palm is the glove's slab slimmed and dressed up, not a hand modelled as a hand, so from some angles it still reads as a mitten. Weapon grips were tuned against the 1.16 hand and have not been re-checked in each weapon's first-person rest pose. `smoking_act_test` and `two_handing_test` hang at quit in this tree (the former passes every assertion first); `weapon_condition_test` fails its two stiffness assertions — all three reproduce with this lane's files stashed, so they belong to other lanes' in-flight work on `bone_yard_hunt.gd`.
+
+## 2026-10-24, player-82 second pass: the bare hand is a model, not a glove (Buffy, desktop)
+- Greg: *"Replace the slimmed-glove first-person hand with a proper modelled bare hand, and show it on the office-glass camera."*
+- Changed: the bare first-person hand is now `HeldGear.build_hand`'s modelled hand — swept palm, four fingers of different lengths and girths with three joints each, a thumb off the side of the palm — moved onto the hand root the first-person rig already poses (`PlayerLook.model_bare`). Same node names, so `HeldGear.set_pose`, every weapon anchor and `stretch_forearm` are untouched. The pose the costume hand was wearing (fist, grip, half a swing) is carried across joint by joint; without that every bare hand was rebuilt open and weapons sat in open palms. `sculpt_bare` (the slimmed slab plus knuckle lumps) is gone.
+- In the model itself, for every first-person hand, not just the player's: the palm is swept at 0.85 rounding with smooth normals (a flat-shaded slab read as a block with bevels), the wrist runs back toward the forearm instead of across the palm (it was turned about Z, which read as a seam through the hand), the thenar muscle sits on the palm side, finger segments overlap the joint they end at and end in a round tip instead of a cut tube's cap, and the "fist" pose closes all three joints (1.42/1.80/1.62) rather than arching the fingers over the palm.
+- Found on the way: the pose transplant copied only the first knuckle per finger, because it looked for `bone1` as a child of the finger root (bones nest). Every bare hand therefore showed one bend and straight fingers — the "hand held up to stop traffic" in the first renders.
+- Looked at: `P:/GameDev/Temp/player-82/hand_model.jpg` (before: the restyled glove; after: the modelled hand, same office camera, `--skip-vat` start), `Temp/player-82/office/office_glass_bare_rest_view.jpg`, `_swing_*.png`, and three study cameras inside the hand's own space (`study_fist_back/thumb/palm`).
+- Tests: `player_look_test` green — it now checks a swept palm, four different finger lengths, no knuckle lumps, and that a restyled hand keeps all three joints of the grip it was closed in. `held_weapon_sights_test`, `arsenal_test`, `v01_weapons_test`, `weapon_body_test`, `aim_down_sights_test` green. Same pre-existing failures as above (`smoking_act_test`, `two_handing_test` hang at quit; `weapon_condition_test` stiffness).
+- Still weak: the fist is readable at gameplay distance but the palm is still a procedural slab — no skin folds, no nails, and the thumb reads as a bar across the fist at some angles. The sleeve leaves a visible step at the wrist. No fingers animate during a bare punch; the hand stays however it was posed until the next `take`.
+
+## 2026-10-24, player-82 third pass: every weapon's first-person rest, against the smaller hand (Buffy, desktop)
+- Closes the note above ("weapon grips ... not re-checked in each weapon's first-person rest pose"). Rendered each held thing's rest pose — bare, cleaver, staff, sidearm — at the same camera and looked at them.
+- Changed (`first_person_arms.gd`): the cleaver's rest was turned 0.95 rad nose-up, so the blade stood on end in the middle of the screen; it now lies along the forearm's line at 0.16, angled out to the right, with the bite edge toward the viewer. The staff (1.6 m, carried 0.36 m from the eye) pointed left across the centre of the frame; it is now carried further out and down (0.30, -0.34, -0.56) and turned to leave the picture to the right, so it crosses only the lower right corner. Bare hands and the sidearm are unchanged — they were already framed well. The left hand's forced 1.16 scale is gone with them (it goes to whatever the hand was built at).
+- Looked at: `P:/GameDev/Temp/fp_arms_p4/` (before: `Temp/fp_arms_now/`, then `p2` and `p3` as the cleaver and staff were turned) — cleaver rest, staff rest, and both combo frames 4 and 5.
+- Tests: `fp_arms_test` green (0 failures).
+- Still weak: the staff still crosses the lower right corner, which is how a polearm is carried in first person, but the butt end is cut by the frame in a way a real carry would not be; the sleeve still steps at the wrist.
+
+## 2026-10-24, brief 1 `ladder-seats`: the ladder has seats, and they refill at dawn (Buffy, desktop)
+- `DESIGN/PROMPT_ROADMAP.md` brief 1. `PyramidSociety` was a sorting rule — a death did not leave a hole, the next person slid up the same frame — and it was called by no scene. This gives it seats.
+- New `game/systems/ladder_seats.gd` (`LadderSeats`): forty seats (1 + 3 + 9 + 27, OUTSIDE has none), each with one occupant or none. `register()` seats a person at the highest band with a free seat, using `PyramidSociety._eligible_band` read rather than copied. A death empties the seat at once and stamps the dawn it fills; `catch_up()` fills every seat whose dawn has passed, one band per dawn, from the longest-serving person in the band beneath (`THE_LADDER.md` §5's own fallback while the sponsor question is unanswered; ties go to the pyramid's order). The promotion is a nemesis event on both subjects — `promoted` on the one who took the seat, `seat_taken` on the one whose death made it worth taking — and a `ladder_promotion` event in `WorldHistory`. A seat with nobody beneath it stands empty and says so at each dawn instead of inventing a promotion. `snapshot()`/`restore()` carry the seats, the dead and the society together, because a board whose society disagreed with its seats would seat the wrong person at the next death.
+- The card is `THE_CAST.md` §7's, minus what the board cannot honestly fill yet: three traits as words (highest dimensions, never the numbers), side, band, seat. No total, no level, no percentage. `scar_line`, `aim` and `retinue` are present and empty — brief 2 and Greg's `THE_LADDER.md` §5 answers own those.
+- `register_facility()` seats the two people the facility already names, with standing authored to the gates: `guard_celloutz_47` is office-eligible and takes an office seat, `guard_hollis` is the junior and sits in the network band below him. Nothing is invented; the ids and names are `FacilityGuardPost`'s own constants.
+- Looked at: `P:/GameDev/Temp/ladder_seats/ladder_before.png`, `_vacant.png`, `_after.png` (from `game/tests/ladder_board_capture.gd`). Before: 47 seated in OFFICE, Hollis seated in NETWORK below him, 38 seats empty and never held. Vacant: 47's office seat empty, `FILLS DAY 2 · 06:30 · WAS CELLOUTZ SECURITY 47 (DIED)`, and 47 in FALLEN. After the sleep: Hollis in 47's office seat marked `promoted into CELLOUTZ SECURITY 47's seat`, his own network seat empty `FILLS DAY 3 · 06:30 · WAS HOLLIS (PROMOTED AWAY)`, and the board's next fill moved to day 3.
+- Tests: new `ladder_seats_test` (46 checks) green — the forty seats, seating by the gates, idempotent registration, a death's vacancy and its dawn, no fill before dawn, one promotion at one dawn, no cascade in the same dawn, seniority over rank, the crowd taking the lowest capped seat from OUTSIDE, a seat nobody below can hold standing empty without spinning, five band rows in order with OUTSIDE drawing no seats, FALLEN, and the whole board through JSON. `pyramid_society_test`, `world_clock_test` and `--core` (32 suites) green.
+- Still weak: the wall screen is brief 3 — this is data, and the capture draws it flat to be read, not to be shipped. The board is in no scene on the route yet (the brief forbids editing `vat_chamber.gd`), so nothing calls `register_facility()` in play until brief 11 puts people on the route. Two people is a thin board: with the facility populated, an office seat will fill from the network band at every dawn, but today most promotions round the crowd path. The sponsor and retinue fields wait on Greg.
+
+## 2026-10-24, brief 2 `scar-ledger`: a blow leaves a line on the body (Buffy, desktop)
+- `DESIGN/PROMPT_ROADMAP.md` brief 2. `BaselineHuman._record_wound()` has kept the impact point, the depth and whether a round crossed the body since AN6.5, but `WoundMarks` caps a limb at `MAX_PER_ZONE` marks and drops the oldest, so the shape of what happened to a body fogs over after a dozen blows. This is the part that does not fog.
+- New `game/systems/scar_ledger.gd` (`ScarLedger`): one small record per landed blow — zone, cause as a word (BLADE / ROUND / BLUNT / BURN / SHOCK / CHEM / SEVER / GRAFT), the impact point in the limb's own space, the bone it had to cross to be that deep (`BONE_AT` 0.62, the same threshold `RoundTrails` reads), which round into this body it was (counted off the rounds already recorded, so the count cannot disagree with the record), and the world hour. Nothing in it is a new damage number.
+- Wired in `baseline_human.gd`, additively: `var scars` on the body beside `wound_marks`, one line in `_record_wound` where the hit is still in hand, in `snapshot()`/restore, and in `SCAR_KEYS` — a scar is a mark, so it crosses a quantum restart with the holes and the hardware, and it is capped at 24 per body so a save cannot grow without limit.
+- Read back in `xray_scan_overlay.gd`: every scar is a cross at the impact point in bone white when it reached a bone and scar-pink when it did not, with its own line beside it (`#2 · ROUND · LEFT ARM · 1 ASHWAKE`). Six labels at a time; the rest are still in the ledger.
+- Looked at: `P:/GameDev/Temp/scar_ledger/scar_xray.png` (from `game/tests/scar_xray_capture.gd`): a body shot twice in the left forearm and cut once in the right, read through the X-ray. Two round lines on the left arm — `1 · ROUND` and `2 · ROUND`, both reaching the HUMERUS, because a forearm is thin enough that even the shallow shot crossed it — and one blade line on the right arm marked FLESH. The organ column and the scan header are unchanged beside them.
+- Tests: new `scar_ledger_test` (25 checks) green — causes, the bone only when reached, round counting including that a blade gets none, the line's wording and the world's own month name, the cap dropping the oldest, two real `hit_at()` blows on a real body writing two scars whose stored point still resolves to where the round went in, the ledger and its round count through a JSON save and a rebuilt body, `scars_of()` carrying them across a restart, and an unhit body reading empty. `baseline_human_test`, `xray_structures_test`, `world_clock_test` and `--core` (31 of 32) green.
+- Still weak, and it is not this brief's: `standing_contact_test` exits 139 on quit (SIGSEGV) after all 51 checks pass and it reports failures=0, reproducibly with this change in the tree and not at all on `claude/launch-latest` as it stands (10 of 10 clean there). `--verbose` names `PipedVoice._play` (`npc_speech_output.gd`) and `~Thread` as it goes: `PipedVoice._synthesise()` runs on a worker `Thread` and calls `Object.call_deferred()` from it, which is not thread-safe, so the queued call can be torn down if the tree quits while a line is still being synthesised. My scar work is heavier per blow, which is enough to land that race far more often. I did not fix it: the correct fix is to stop calling `call_deferred` from the worker (poll `Thread.is_alive()` from the main thread or use a mutex), and `call_deferred_thread_group` is not in this engine build — trying it fixed the crash and hung `npc_voice_test`, so I reverted it. What I did add to `npc_speech_output.gd` is a `NOTIFICATION_PREDELETE` guard that joins the worker, which removes the "Thread object is being destroyed without its completion" warning and is harmless, but does not stop the crash.
+
+## 2026-10-24, the speech worker stops being poked from the wrong thread (Buffy, desktop)
+- Closes the `standing_contact_test` exit 139 left open in the brief 2 entry above. Two faults, both in `PipedVoice`, and the second one only shows itself once the first is gone.
+- First: `_synthesise()` runs on a worker `Thread` and called `Object.call_deferred("_play", ...)` from it, which posts to the main thread's message queue from the wrong thread. Now the worker only writes files and runs `OS.execute()`; what it learned goes into `_posted` behind a `Mutex`, and the main thread collects it in `_collect()`, which the speaker node calls from `_process` only while a worker is out. Nothing on the tree is touched from off-thread any more.
+- Second: the crash was not only the deferred call. Instrumenting the exit showed `PipedVoice` reaching only `init` and `speak` -- no `_play`, no `NOTIFICATION_PREDELETE` -- because something still holds the voice at exit, so the `Thread` is never joined and the engine tears the process down while the worker is inside `OS.execute()`. A voice now hooks `tree.root.tree_exiting` when its host enters the tree and waits for the worker there. That is the only blocking wait in the class, and it happens on the way out. Instrumented runs caught a live worker at shutdown on every single run, so this was not a corner: it was the normal case.
+- Correcting the note above: this is not something the scar work introduced. Measured on the pre-brief `npc_speech_output.gd` (the file as it was before 4f3fade0) with everything else as it stands, `standing_contact_test` crashed 5 of 6 runs, and with `NPCSpeechOutput.make()` forced to return `SilentVoice` -- so no `PipedVoice` exists at all -- it was 7 of 7 clean. The 10-of-10 clean result recorded earlier was luck; the race was always there, and the briefs only changed the odds.
+- Tests (headless): `standing_contact_test` 8 of 8 runs exit 0 with no "Thread object is being destroyed" warning, before the fix it was 2 of 5 and 6 of 6 crashing depending on the run. Green in the same batch: `npc_voice_test`, `spoken_contact_test`, `npc_conversation_test`, `npc_ruling_test`, `npc_async_turn_test`, `facility_characters_test` (7 suites, all green through `tools/run_tests.sh`). A throwaway probe confirmed the polled path still reaches the speaker rather than just writing the wav: `is_speaking()` true about 0.9 s after `speak()`, `last_error` empty, 3 of 3 runs.
+- Still weak: a line asked for while a worker is already running is still dropped rather than queued (unchanged, deliberate). The join at shutdown blocks for the length of one synthesis -- up to a second -- if the game quits mid-line. Nothing here fixes the `chunk_test` 139 recorded earlier, which is separate and still open.

@@ -17,6 +17,9 @@ extends CanvasLayer
 const SETTINGS_ID := "settings"
 const Grunge := preload("res://systems/celloutz_grunge.gd")
 const Motion := preload("res://systems/celloutz_motion.gd")
+const BOOT_SPLASH := preload("res://boot_splash.gd")
+const LOOK := preload("res://systems/look_settings.gd")
+const QUALITY_ORDER := ["PERFORMANCE", "HIGH", "ULTRA"]
 
 const VOID := Color("060b09")
 const SMOKE := Color(0.03, 0.045, 0.038, 0.86)
@@ -32,9 +35,10 @@ const BUSES := ["Master", "Music", "SFX", "Ambience"]
 
 ## Y1.1. The only actions actually read by name elsewhere — `bone_yard_hunt.gd`,
 ## `rift_derby.gd` and `vat_chamber.gd` all call `Input.get_vector`/`get_axis`
-## with these four, plus the two held modifiers. Jump and the rest of combat
-## are still hardcoded keys in Lane 1's files and are not rebindable from here.
-const CONTROL_ACTIONS := ["move_forward", "move_back", "move_left", "move_right", "sprint", "crouch"]
+## with these four, plus the two held modifiers. The Hunt's dodge, interact,
+## device and guard keys read their actions too (`_action_key`); strike and
+## heavy stay on the mouse buttons.
+const CONTROL_ACTIONS := ["move_forward", "move_back", "move_left", "move_right", "sprint", "crouch", "dodge", "interact", "device", "guard"]
 const CONTROL_LABELS := {
 	"move_forward": "FORWARD",
 	"move_back": "BACK",
@@ -42,6 +46,10 @@ const CONTROL_LABELS := {
 	"move_right": "RIGHT",
 	"sprint": "SPRINT",
 	"crouch": "CROUCH",
+	"dodge": "DODGE",
+	"interact": "USE",
+	"device": "DEVICE",
+	"guard": "BLOCK",
 }
 
 var open := false
@@ -55,8 +63,30 @@ var rebinding_action := ""
 ## project.godot's own bindings, captured once before any stored rebind is
 ## applied — what RESET TO DEFAULT puts back.
 var _default_binds: Dictionary = {}
+## The dummy display server cannot change modes. Keep the requested mode so
+## headless verification can still exercise the real settings path.
+var _headless_fullscreen := false
 
 var _rows: Array[Dictionary] = []
+## Greg, 24 September: the menus match the re-animated logo. The row you're on
+## gets blood poured under it with drips; opening or changing page tears the
+## rows sideways for a moment; the live seal sits in the corner; moving ticks.
+const LOGO_FX := preload("res://shaders/logo_fx.gdshader")
+const LOGO_AUDIO := preload("res://systems/logo_audio.gd")
+const SEAL_PATH := "res://art/brand/wof_seal.png"
+const POUR_SECONDS := 0.2
+const TEAR_SECONDS := 0.18
+var pour := 0.0
+var tear := 0.0
+var seal: TextureRect
+var sounds: Node
+var _poured_row := -1
+## The KEYS page: every key the current scene binds, read off its own keys
+## card (or its `keys_groups()`), so one sheet serves every scene and can't
+## drift from what that scene actually does.
+const KEY_LINES_PER_PAGE := 13
+var keys_page := 0
+var _poured_page := ""
 var _factor := 1.0
 var _origin := Vector2.ZERO
 
@@ -71,16 +101,37 @@ func _ready() -> void:
 	screen.draw.connect(_draw_plate)
 	add_child(screen)
 	screen.visible = false
+	seal = TextureRect.new()
+	seal.name = "Seal"
+	seal.texture = load(SEAL_PATH) as Texture2D
+	seal.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	seal.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	seal.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var seal_fx := ShaderMaterial.new()
+	seal_fx.shader = LOGO_FX
+	seal_fx.set_shader_parameter("is_seal", true)
+	seal_fx.set_shader_parameter("drips_on", 0.0)
+	seal_fx.set_shader_parameter("calm", 0.8)
+	seal.material = seal_fx
+	screen.add_child(seal)
+	sounds = LOGO_AUDIO.new()
+	sounds.name = "PauseSounds"
+	add_child(sounds)
 	WorldHistory.register_subject(SETTINGS_ID, {
 		"hud_opacity": 0.9,
 		"hud_style": "rails",
 		"reduced_glitch": false,
+		"subtitles": true,
+		"anatomy_presentation": AnatomyPresentation.DEFAULT_MODE,
+		"graphics_preset": WorldLook.quality_name(),
 	})
 	_ensure_buses()
 	_restore_screen()
 	_capture_default_binds()
 	_restore_keybinds()
+	WorldLook.set_quality_name(str(WorldHistory.subject(SETTINGS_ID).get("graphics_preset", WorldLook.quality_name())))
 	_apply_mix()
+	get_tree().node_added.connect(_apply_new_node_settings)
 	set_process(true)
 
 
@@ -136,18 +187,52 @@ func _cycle_gore() -> void:
 	BaselineHuman.apply_gore_setting()
 
 
+func _subtitles_enabled() -> bool:
+	return bool(WorldHistory.subject(SETTINGS_ID).get("subtitles", true))
+
+
+## Existing dialogue systems all name their presentation node Subtitle. Apply
+## the setting to the live scene without asking each speaker to grow a second
+## preference store; the node-added hook applies it as newly loaded scenes
+## build their subtitle controls.
+func _apply_subtitle_visibility(node: Node) -> void:
+	if node is CanvasItem and str(node.name).to_lower().contains("subtitle"):
+		(node as CanvasItem).visible = _subtitles_enabled()
+	for child in node.get_children():
+		_apply_subtitle_visibility(child)
+
+
+func _apply_new_node_settings(node: Node) -> void:
+	if node is CanvasItem and str(node.name).to_lower().contains("subtitle"):
+		(node as CanvasItem).visible = _subtitles_enabled()
+
+
+## Censor is a presentation dial over the same anatomy. Refresh live rigs so
+## changing it in pause is immediate; future rigs already read the persisted
+## AnatomyPresentation mode while they build.
+func _refresh_body_censors(node: Node) -> void:
+	if node is BaselineHuman:
+		BodyForms.refresh(node as BaselineHuman)
+	for child in node.get_children():
+		_refresh_body_censors(child)
+
+
 ## AG1.4. Whether the window is filling the screen. Read from the window rather
 ## than from the saved value, so the row tells the truth even if something else
 ## changed it — a settings screen that disagrees with the window is worse than
 ## none.
 func _fullscreen() -> bool:
+	if DisplayServer.get_name() == "headless":
+		return _headless_fullscreen
 	return DisplayServer.window_get_mode() in [DisplayServer.WINDOW_MODE_FULLSCREEN, DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN]
 
 
 func _set_fullscreen(on: bool, persist := true) -> void:
 	# Headless verification has no window to resize; the preference still needs
 	# to be testable and persist without asking the dummy display server to wait.
-	if DisplayServer.get_name() != "headless":
+	if DisplayServer.get_name() == "headless":
+		_headless_fullscreen = on
+	else:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if on else DisplayServer.WINDOW_MODE_WINDOWED)
 	if persist:
 		WorldHistory.update_subject(SETTINGS_ID, {"fullscreen": on}, "screen_setting_changed")
@@ -181,6 +266,19 @@ func _set_hud_opacity(value: float) -> void:
 
 func _cycle_hud_style() -> void:
 	WorldHistory.update_subject(SETTINGS_ID, {"hud_style": "arcs" if _hud_style() == "rails" else "rails"}, "hud_setting_changed")
+
+
+## imp-68. The field HUD's face (and the pockets that follow it). Empty means
+## the HUD's own default; see `gothic_field_hud.gd` FACE_STYLES.
+func _hud_face() -> String:
+	var chosen := str(WorldHistory.subject(SETTINGS_ID).get("hud_face", ""))
+	return chosen if chosen in FaceMonitor.STYLES else FaceMonitor.DEFAULT_STYLE
+
+
+func _cycle_hud_face(direction := 1) -> void:
+	var at := FaceMonitor.STYLES.find(_hud_face())
+	var next: String = FaceMonitor.STYLES[posmod(at + direction, FaceMonitor.STYLES.size())]
+	WorldHistory.update_subject(SETTINGS_ID, {"hud_face": next}, "hud_setting_changed")
 
 
 func _toggle_reduced_glitch() -> void:
@@ -236,6 +334,11 @@ func _key_label(action: String) -> String:
 	return (events[0] as InputEventKey).as_text_physical_keycode()
 
 
+func _using_pad() -> bool:
+	var bridge := get_node_or_null("/root/PadBridge")
+	return bridge != null and bool(bridge.using_pad)
+
+
 ## Rows are rebuilt each frame the plate is open, because their labels carry
 ## live values. The row list is the menu — there is no scene to keep in sync.
 func _build_rows() -> void:
@@ -243,15 +346,37 @@ func _build_rows() -> void:
 	if page == "root":
 		_rows.append({"id": "resume", "label": "RESUME", "value": ""})
 		_rows.append({"id": "settings", "label": "SETTINGS", "value": ""})
+		_rows.append({"id": "keys", "label": "KEYS", "value": ""})
 		_rows.append({"id": "menu", "label": "LEAVE TO THE FRONT DOOR", "value": ""})
+		return
+	if page == "camera":
+		_rows.append({"id": "look_sensitivity", "label": "MOUSE SENSITIVITY", "value": "%.2f" % LOOK.sensitivity(), "slider": true})
+		_rows.append({"id": "invert_y", "label": "INVERT Y", "value": "ON" if LOOK.invert_y() else "OFF"})
+		_rows.append({"id": "fov_offset", "label": "FIELD OF VIEW", "value": "%+d" % roundi(LOOK.fov_offset()), "slider": true})
+		_rows.append({"id": "camera_back", "label": "BACK", "value": ""})
+		return
+	if page == "keys":
+		var pages := key_page_count()
+		_rows.append({"id": "keys_back", "label": "BACK", "value": "%d / %d  L/R" % [keys_page + 1, pages] if pages > 1 else ""})
 		return
 	if page == "hud":
 		_rows.append({"id": "hud_opacity", "label": "HUD OPACITY", "value": "%03d" % roundi(_hud_opacity() * 100.0), "slider": true})
 		_rows.append({"id": "hud_style", "label": "HUD STYLE", "value": _hud_style().to_upper()})
 		_rows.append({"id": "reduced_glitch", "label": "REDUCED GLITCH", "value": "ON" if _reduced_glitch() else "OFF"})
+		_rows.append({"id": "hud_face", "label": "HUD FACE", "value": _hud_face().to_upper()})
+		# player-81: Greg picks the player's look (live on the body).
+		_rows.append({"id": "player_look", "label": "PLAYER LOOK", "value": PlayerLook.label()})
 		_rows.append({"id": "settings_back", "label": "BACK", "value": ""})
 		return
 	if page == "controls":
+		if _using_pad():
+			_rows.append({"id": "pad_r1", "label": "R1", "value": "LIGHT"})
+			_rows.append({"id": "pad_r2", "label": "R2", "value": "HEAVY / FIREARM FIRE"})
+			_rows.append({"id": "pad_l1", "label": "L1", "value": "BLOCK"})
+			_rows.append({"id": "pad_l2", "label": "L2", "value": "PARRY / FIREARM AIM"})
+			_rows.append({"id": "pad_vats", "label": "L2 + R2", "value": "AIMED X-RAY / VATS"})
+			_rows.append({"id": "ctrl_back", "label": "BACK", "value": "SOULS BASE // DISCIPLINES REMAP VERBS"})
+			return
 		for action in CONTROL_ACTIONS:
 			var label: String = str(CONTROL_LABELS.get(action, action.to_upper()))
 			var value := "PRESS KEY" if rebinding_action == action else _key_label(action)
@@ -262,19 +387,25 @@ func _build_rows() -> void:
 	for bus_name in BUSES:
 		_rows.append({"id": "vol_%s" % bus_name, "label": bus_name.to_upper(), "value": "%03d" % roundi(_volume(bus_name) * 100.0), "slider": true})
 	_rows.append({"id": "gore", "label": "VIOLENCE", "value": _gore_mode()})
+	_rows.append({"id": "subtitles", "label": "SUBTITLES", "value": "ON" if _subtitles_enabled() else "OFF"})
+	_rows.append({"id": "censor", "label": "CENSOR", "value": "OFF" if AnatomyPresentation.is_explicit() else "ON"})
+	_rows.append({"id": "graphics", "label": "GRAPHICS", "value": WorldLook.quality_name()})
 	# AG1.4, from the first playtest: "idk if there's a full screen option." There
 	# was not. It belongs beside the other settings rather than in a key nobody
 	# is told about, and it persists like everything else here.
 	_rows.append({"id": "screen", "label": "SCREEN", "value": "FULL" if _fullscreen() else "WINDOWED"})
 	_rows.append({"id": "hud", "label": "DISPLAY / HUD", "value": ">"})
+	_rows.append({"id": "camera", "label": "CAMERA / MOUSE", "value": ">"})
 	# Y1.1. Controls had no door on them anywhere in the project.
 	_rows.append({"id": "controls", "label": "CONTROLS", "value": ""})
 	_rows.append({"id": "back", "label": "BACK", "value": ""})
 
 
 ## F11 is the key every player already tries before looking for a setting.
+## Ctrl+F11 belongs to PerfProbe's file dump, so this intentional play key does
+## not consume the diagnostic chord before its autoload can receive it.
 func _unhandled_key_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo and (event as InputEventKey).keycode == KEY_F11:
+	if event is InputEventKey and event.pressed and not event.echo and not (event as InputEventKey).ctrl_pressed and (event as InputEventKey).keycode == KEY_F11:
 		_set_fullscreen(not _fullscreen())
 		get_viewport().set_input_as_handled()
 
@@ -295,6 +426,9 @@ func open_gate() -> void:
 	clock = 0.0
 	rebinding_action = ""
 	screen.visible = true
+	tear = TEAR_SECONDS
+	if sounds != null:
+		sounds.cue("tear")
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	get_tree().paused = true
 
@@ -308,6 +442,29 @@ func close() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("pause"):
+		toggle()
+		get_viewport().set_input_as_handled()
+		return
+	if open and (event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down") or event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right") or event.is_action_pressed("ui_accept") or event.is_action_pressed("ui_cancel")):
+		_build_rows()
+		if event.is_action_pressed("ui_cancel"):
+			if page == "root": close()
+			else:
+				page = "root"
+				highlighted = 0
+		elif event.is_action_pressed("ui_up"):
+			highlighted = (highlighted + _rows.size() - 1) % _rows.size()
+		elif event.is_action_pressed("ui_down"):
+			highlighted = (highlighted + 1) % _rows.size()
+		elif event.is_action_pressed("ui_left"):
+			_nudge(-1)
+		elif event.is_action_pressed("ui_right"):
+			_nudge(1)
+		else:
+			_activate()
+		get_viewport().set_input_as_handled()
+		return
 	if not (event is InputEventKey and event.pressed and not event.echo):
 		return
 	if rebinding_action != "":
@@ -344,11 +501,25 @@ func _unhandled_input(event: InputEvent) -> void:
 func _nudge(direction: int) -> void:
 	var row: Dictionary = _rows[highlighted]
 	var id := str(row.id)
+	if page == "keys":
+		keys_page = clampi(keys_page + direction, 0, key_page_count() - 1)
+		return
 	if id.begins_with("vol_"):
 		var bus_name := id.trim_prefix("vol_")
 		_set_volume(bus_name, _volume(bus_name) + 0.1 * float(direction))
 	elif id == "gore":
 		_cycle_gore()
+	elif id == "subtitles":
+		WorldHistory.update_subject(SETTINGS_ID, {"subtitles": not _subtitles_enabled()}, "subtitle_setting_changed")
+		_apply_subtitle_visibility(get_tree().root)
+	elif id == "censor":
+		AnatomyPresentation.set_mode("MOSAIC" if AnatomyPresentation.is_explicit() else "EXPLICIT")
+		_refresh_body_censors(get_tree().root)
+	elif id == "graphics":
+		var current := QUALITY_ORDER.find(WorldLook.quality_name())
+		var next: String = QUALITY_ORDER[posmod(current + direction, QUALITY_ORDER.size())]
+		WorldLook.set_quality_name(next)
+		WorldHistory.update_subject(SETTINGS_ID, {"graphics_preset": next}, "graphics_setting_changed")
 	elif id == "screen":
 		_set_fullscreen(not _fullscreen())
 	elif id == "hud_opacity":
@@ -357,6 +528,16 @@ func _nudge(direction: int) -> void:
 		_cycle_hud_style()
 	elif id == "reduced_glitch":
 		_toggle_reduced_glitch()
+	elif id == "hud_face":
+		_cycle_hud_face(direction)
+	elif id == "player_look":
+		PlayerLook.cycle(direction)
+	elif id == "look_sensitivity":
+		LOOK.set_value("look_sensitivity", clampf(snappedf(LOOK.sensitivity() + 0.1 * float(direction), 0.05), LOOK.SENSITIVITY_RANGE.x, LOOK.SENSITIVITY_RANGE.y))
+	elif id == "invert_y":
+		LOOK.set_value("invert_y", not LOOK.invert_y())
+	elif id == "fov_offset":
+		LOOK.set_value("fov_offset", clampf(LOOK.fov_offset() + 5.0 * float(direction), LOOK.FOV_RANGE.x, LOOK.FOV_RANGE.y))
 
 
 func _activate() -> void:
@@ -370,14 +551,29 @@ func _activate() -> void:
 		"hud":
 			page = "hud"
 			highlighted = 0
+		"camera":
+			page = "camera"
+			highlighted = 0
+		"camera_back":
+			page = "settings"
+			highlighted = 0
+		"look_sensitivity", "invert_y", "fov_offset":
+			_nudge(1)
 		"back":
 			page = "root"
 			highlighted = 0
-		"gore", "screen", "hud_opacity", "hud_style", "reduced_glitch":
+		"gore", "subtitles", "censor", "graphics", "screen", "hud_opacity", "hud_style", "reduced_glitch", "hud_face", "player_look":
 			_nudge(1)
 		"controls":
 			page = "controls"
 			highlighted = 0
+		"keys":
+			page = "keys"
+			keys_page = 0
+			highlighted = 0
+		"keys_back":
+			page = "root"
+			highlighted = 2
 		"ctrl_back":
 			page = "settings"
 			highlighted = 0
@@ -395,6 +591,17 @@ func _activate() -> void:
 
 func _process(delta: float) -> void:
 	clock += delta
+	# A new row (or a new page) starts a fresh pour; a new page also tears.
+	if highlighted != _poured_row or page != _poured_page:
+		if page != _poured_page and not _poured_page.is_empty():
+			tear = TEAR_SECONDS
+		elif _poured_row >= 0 and open and sounds != null:
+			sounds.cue("drip")
+		_poured_row = highlighted
+		_poured_page = page
+		pour = 0.0
+	pour = minf(1.0, pour + delta / POUR_SECONDS)
+	tear = maxf(0.0, tear - delta)
 	blend = float(Motion.blend(blend, delta, 7.0, open))
 	if blend <= 0.001 and not open:
 		screen.visible = false
@@ -432,7 +639,7 @@ func _draw_plate() -> void:
 	screen.draw_polyline(outline, COPPER * Color(1, 1, 1, 0.62 * eased), 2.0)
 
 	CellOutzType.draw_stamped(screen, Vector2(30, 26), "STOPPED", 30.0, ACID * Color(1, 1, 1, eased), ARTERIAL * Color(1, 1, 1, 0.3 * eased), 4.0)
-	var subtitle := "DISPLAY / HUD" if page == "hud" else "SETTINGS" if page == "settings" else "CELLOUTZ / THE YARD IS STILL THERE"
+	var subtitle := "CONTROLS // SOULS BASE" if page == "controls" and _using_pad() else "CONTROLS // KEYBOARD" if page == "controls" else "CAMERA / MOUSE" if page == "camera" else "DISPLAY / HUD" if page == "hud" else "SETTINGS" if page == "settings" else "KEYS // WHAT THIS PLACE ANSWERS TO" if page == "keys" else "CELLOUTZ / THE YARD IS STILL THERE"
 	CellOutzType.draw_text(screen, Vector2(30, 68), subtitle, 10.0, INK * Color(1, 1, 1, 0.45 * eased), 1.4)
 	screen.draw_line(Vector2(30, 84), Vector2(DESIGN.x - 30, 84), COPPER * Color(1, 1, 1, 0.4 * eased), 1.0)
 
@@ -442,15 +649,21 @@ func _draw_plate() -> void:
 		var top := 112.0 + index * row_pitch
 		var lit := index == highlighted
 		var accent := ACID if lit else INK
+		# The tear: rows jump sideways for a moment on opening or a new page.
+		var shove := 0.0
+		if tear > 0.0:
+			shove = (fmod(float(index) * 37.7 + clock * 91.0, 1.0) - 0.5) * 40.0 * (tear / TEAR_SECONDS)
+		screen.draw_set_transform(_origin + Vector2(shove * _factor, (1.0 - eased) * 26.0), 0.0, Vector2(_factor, _factor))
 		if lit:
-			screen.draw_rect(Rect2(24, top - 12, DESIGN.x - 48, minf(40.0, row_pitch - 4.0)), accent * Color(1, 1, 1, 0.12 * eased))
+			screen.draw_rect(Rect2(24, top - 12, DESIGN.x - 48, minf(40.0, row_pitch - 4.0)), accent * Color(1, 1, 1, 0.08 * eased))
+			_draw_blood_under(top + minf(22.0, row_pitch * 0.62), eased, maxf(3.0, row_pitch * 0.28))
 			var slide := 4.0 + sin(clock * 6.0) * 2.0
 			screen.draw_colored_polygon(PackedVector2Array([
 				Vector2(14 - slide, top - 2), Vector2(24 - slide, top + 7), Vector2(14 - slide, top + 16),
 			]), accent * Color(1, 1, 1, eased))
 		CellOutzType.draw_text(screen, Vector2(34, top), str(row.label), 17.0, accent * Color(1, 1, 1, (1.0 if lit else 0.7) * eased), 2.2)
 		if bool(row.get("slider", false)):
-			var level := _hud_opacity() if str(row.id) == "hud_opacity" else _volume(str(row.id).trim_prefix("vol_"))
+			var level := _slider_level(str(row.id))
 			var bar := Rect2(DESIGN.x - 210, top + 4, 130, 8)
 			screen.draw_rect(bar, Color(0, 0, 0, 0.5 * eased))
 			screen.draw_rect(Rect2(bar.position, Vector2(bar.size.x * level, bar.size.y)), accent * Color(1, 1, 1, 0.75 * eased))
@@ -459,8 +672,94 @@ func _draw_plate() -> void:
 			var value_x := DESIGN.x - 34.0 - CellOutzType.width(str(row.value), 15.0, 1.6)
 			CellOutzType.draw_text(screen, Vector2(value_x, top), str(row.value), 15.0, accent * Color(1, 1, 1, 0.9 * eased), 1.6)
 
+	screen.draw_set_transform(_origin + Vector2(0, (1.0 - eased) * 26.0), 0.0, Vector2(_factor, _factor))
+	if page == "keys":
+		_draw_key_sheet(eased)
 	if page == "hud":
 		CellOutzType.draw_text(screen, Vector2(34, 348), "OPACITY 25-100% / SAVED AUTOMATICALLY", 10.0, INK * Color(1, 1, 1, 0.5 * eased), 1.0)
 		CellOutzType.draw_text(screen, Vector2(34, 374), "REDUCED GLITCH CALMS CAMERA GRAIN", 10.0, INK * Color(1, 1, 1, 0.5 * eased), 1.0)
-	CellOutzType.draw_text(screen, Vector2(30, DESIGN.y - 28), "ESC RESUME  UP/DOWN MOVE  L/R ADJUST  ENTER SELECT", 9.0, INK * Color(1, 1, 1, 0.4 * eased), 1.0)
+	var footer := "OPTIONS/B BACK  STICK/D-PAD MOVE  CROSS/A SELECT" if _using_pad() else "ESC RESUME  UP/DOWN MOVE  L/R ADJUST  ENTER SELECT"
+	CellOutzType.draw_text(screen, Vector2(30, DESIGN.y - 28), footer, 9.0, INK * Color(1, 1, 1, 0.4 * eased), 1.0)
 	screen.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	# The live seal in the plate's corner, sized with it.
+	if seal != null:
+		var side := 78.0 * _factor
+		seal.size = Vector2(side, side)
+		seal.position = _origin + Vector2((DESIGN.x - 96.0) * _factor, 10.0 * _factor + (1.0 - eased) * 26.0)
+		seal.modulate.a = eased
+		(seal.material as ShaderMaterial).set_shader_parameter("beat", BOOT_SPLASH.heartbeat(clock) * 0.5)
+
+
+## How full a slider row's bar is, 0..1.
+func _slider_level(id: String) -> float:
+	match id:
+		"hud_opacity":
+			return _hud_opacity()
+		"look_sensitivity":
+			return inverse_lerp(LOOK.SENSITIVITY_RANGE.x, LOOK.SENSITIVITY_RANGE.y, LOOK.sensitivity())
+		"fov_offset":
+			return inverse_lerp(LOOK.FOV_RANGE.x, LOOK.FOV_RANGE.y, LOOK.fov_offset())
+	return _volume(id.trim_prefix("vol_"))
+
+
+## Where the current scene's keys come from: its keys card if it has one,
+## else its own `keys_groups()`, else the few keys every scene shares.
+func key_groups() -> Array:
+	var scene := get_tree().current_scene
+	if scene != null:
+		var card = scene.get("keys_card")
+		if card != null and is_instance_valid(card) and not (card.groups as Array).is_empty():
+			return card.groups
+		if scene.has_method("keys_groups"):
+			return scene.keys_groups()
+	return [{"group": "EVERYWHERE", "rows": [["WASD", "MOVE"], ["MOUSE", "LOOK"], ["E", "INTERACT"], ["ESC", "PAUSE"], ["F11", "FULLSCREEN"]]}]
+
+
+## The sheet as lines: a group's name, then its keys.
+func key_lines() -> Array:
+	var lines: Array = []
+	for group in key_groups():
+		lines.append({"header": str(group.get("group", ""))})
+		for row in group.get("rows", []):
+			lines.append({"key": str(row[0]), "action": str(row[1])})
+	return lines
+
+
+func key_page_count() -> int:
+	return maxi(1, ceili(float(key_lines().size()) / float(KEY_LINES_PER_PAGE)))
+
+
+func _draw_key_sheet(eased: float) -> void:
+	var lines := key_lines()
+	var first := keys_page * KEY_LINES_PER_PAGE
+	var y := 156.0
+	for index in range(first, mini(first + KEY_LINES_PER_PAGE, lines.size())):
+		var line: Dictionary = lines[index]
+		if line.has("header"):
+			CellOutzType.draw_text(screen, Vector2(34, y), str(line.header), 11.0, ARTERIAL * Color(1, 1, 1, eased), 1.6)
+		else:
+			var cap := str(line.key)
+			var bridge := get_node_or_null("/root/PadBridge")
+			if bridge != null:
+				cap = bridge.hint(cap, str(line.action), "firearm" if str(line.action).to_upper().contains("FIREARM") else "melee")
+			var cap_width := CellOutzType.width_condensed(cap, 10.0, 0.8) + 12.0
+			screen.draw_rect(Rect2(34, y - 4, cap_width, 17), INK * Color(1, 1, 1, 0.1 * eased))
+			screen.draw_rect(Rect2(34, y - 4, cap_width, 17), COPPER * Color(1, 1, 1, 0.7 * eased), false, 1.0)
+			CellOutzType.draw_condensed(screen, Vector2(40, y), cap, 10.0, ACID * Color(1, 1, 1, eased), 0.8)
+			CellOutzType.draw_condensed(screen, Vector2(34 + maxf(cap_width, 120.0) + 12.0, y), CellOutzType.fit_condensed(str(line.action), DESIGN.x - 230.0, 10.0, 0.8), 10.0, INK * Color(1, 1, 1, 0.85 * eased), 0.8)
+		y += 19.0
+
+
+## Blood poured under the row you're on, left to right, with three drips.
+func _draw_blood_under(y: float, eased: float, drip_room := 14.0) -> void:
+	var width := (DESIGN.x - 48.0) * ease(pour, 0.4)
+	var blood := ARTERIAL * Color(1, 1, 1, 0.9 * eased)
+	screen.draw_rect(Rect2(24, y, width, 3.0), blood)
+	for drip in 3:
+		var x := 24.0 + (DESIGN.x - 48.0) * (0.2 + 0.3 * float(drip))
+		if x > 24.0 + width:
+			continue
+		# Never long enough to run into the row below.
+		var length := minf(drip_room, (pour - (0.2 + 0.3 * float(drip))) * 60.0 + sin(clock * 2.0 + float(drip)) * 1.5 + drip_room * 0.4)
+		screen.draw_line(Vector2(x, y + 2.0), Vector2(x, y + 2.0 + length), blood, 2.0)
+		screen.draw_circle(Vector2(x, y + 3.0 + length), 2.2, blood)

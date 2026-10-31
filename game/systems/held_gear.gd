@@ -66,6 +66,18 @@ const GRIPS := {
 		"rest": {"at": Vector3(0.205, -0.255, -0.225), "turn": Vector3(0.52, 0.34, 0.30)},
 		"reach": 1.0, "damage_type": "cut", "control": 0.82,
 	},
+	# A cleaver has a second honest grip: the working hand chokes up the handle
+	# to the bolster, taking the mass off the end of the arm. It is the same
+	# trade a half-sword makes in miniature — less reach, more control — and it
+	# keeps the hand on the insulated handle. On this weapon that last part is
+	# not a nicety: the edge is a heating element. The off hand stays free; this
+	# is still a one-hand tool.
+	"choke_up": {
+		"right": {"anchor": "choke", "pose": "wrap"},
+		"left": {"anchor": "", "pose": "open"},
+		"rest": {"at": Vector3(0.185, -0.240, -0.235), "turn": Vector3(0.44, 0.30, 0.30)},
+		"reach": 0.86, "damage_type": "cut", "control": 1.05,
+	},
 	"two_hand": {
 		"right": {"anchor": "grip", "pose": "wrap"},
 		"left": {"anchor": "grip_low", "pose": "wrap"},
@@ -211,7 +223,7 @@ static func build_humiliation_hand(side: int) -> Node3D:
 	hand.scale = Vector3.ONE * 1.16
 	hand.set_meta("screen_entry_side", side)
 	for child in hand.find_children("*", "MeshInstance3D", true, false):
-		(child as MeshInstance3D).material_override = _leather(Color("28151e"), 70 + side)
+		(child as MeshInstance3D).material_override = _glove(Color("28151e"), 70 + side)
 
 	var cuff := Node3D.new()
 	cuff.name = "HumiliationCuff"
@@ -232,7 +244,7 @@ static func build_humiliation_hand(side: int) -> Node3D:
 		puff.mesh = puff_mesh
 		puff.position = Vector3(cos(angle) * 0.037, sin(angle) * 0.037, 0.0)
 		puff.scale = Vector3(1.0, 1.0, 0.82)
-		puff.material_override = _leather(Color("651d2a") if index % 2 == 0 else Color("c6ae7a"), 90 + index)
+		puff.material_override = _glove(Color("651d2a") if index % 2 == 0 else Color("c6ae7a"), 90 + index)
 		cuff.add_child(puff)
 
 	var shackle := MeshInstance3D.new()
@@ -277,7 +289,7 @@ static func build_humiliation_hand(side: int) -> Node3D:
 	# Authored along +Y so the live view can stretch it exactly from a lower
 	# screen edge to the wrist without guessing through the prop's rotations.
 	sleeve.position = Vector3(0.0, 0.18, 0.0)
-	sleeve.material_override = _leather(Color("40121e"), 140 + side)
+	sleeve.material_override = _glove(Color("40121e"), 140 + side)
 	forearm.add_child(sleeve)
 	# A broad entry puff hides the far cap at the screen edge and makes the arm
 	# widen toward the unseen elbow instead of ending as a cut-off tube.
@@ -292,7 +304,7 @@ static func build_humiliation_hand(side: int) -> Node3D:
 		entry_mesh.rings = 6
 		entry_puff.mesh = entry_mesh
 		entry_puff.position = Vector3(cos(angle) * 0.040, 0.018, sin(angle) * 0.040)
-		entry_puff.material_override = _leather(Color("651d2a") if index % 2 == 0 else Color("c6ae7a"), 150 + index)
+		entry_puff.material_override = _glove(Color("651d2a") if index % 2 == 0 else Color("c6ae7a"), 150 + index)
 		forearm.add_child(entry_puff)
 	return hand
 
@@ -405,7 +417,11 @@ static func build_weapon(weapon_id: String) -> Node3D:
 		"sword": _build_sword(root)
 		"shotgun": _build_shotgun(root)
 		"sidearm": _build_sidearm(root)
+		"breach_nine": _build_breach_nine(root)
 		"launcher": _build_launcher(root)
+		"shiv": _build_shiv(root)
+		"cleaver": _build_hotline_cleaver(root)
+		"staff": _build_prodstaff(root)
 		_: _build_sword(root)
 	# Every part above is authored muzzle-forward along +Z because that is the
 	# readable way to write a sweep, and a Godot node's forward is -Z. Turning
@@ -460,88 +476,122 @@ static func _build_launcher(root: Node3D) -> void:
 ## The Ashline Cleaver. Single-edged, heavy at the front, a blade that is a
 ## wedge in section rather than a plank — the spine carries the mass and the
 ## edge is where it runs out.
-static func _build_sword(root: Node3D) -> void:
-	var steel := Color("9aa0a4")
+## The shiv from the den (Greg, 28 September): a short scrap blade bound to a
+## rag-wrapped handle. Built along +Z like the others.
+##
+## It is the generated model now (art/generated/items/shiv.glb, placed from
+## measured axes by GeneratedModel), with the grip where the drawn one had it
+## so nothing that reads the anchor moves. The drawn shiv below is the
+## fallback for a checkout without the media.
+const GENERATED_MODEL := preload("res://systems/generated_model.gd")
+
+
+static func _build_shiv(root: Node3D) -> void:
+	var model := GENERATED_MODEL.make("shiv")
+	if model == null:
+		_build_shiv_drawn(root)
+		return
+	model.position = Vector3(0, 0, -0.07)
+	root.add_child(model)
+	_anchor(root, "grip", Vector3(0, 0, -0.07), Vector3.ZERO)
+
+
+static func _build_shiv_drawn(root: Node3D) -> void:
 	var blade := MeshInstance3D.new()
 	blade.name = "blade"
-	blade.mesh = _blade(0.86, 0.078, 0.0135)
-	blade.position = Vector3(0, 0, -0.10)
-	blade.material_override = _metal(steel, 0.22, 11)
+	blade.mesh = _blade(0.2, 0.034, 0.008)
+	blade.position = Vector3(0, 0, 0.02)
+	blade.material_override = _metal(Color("8c8f86"), 0.4, 23)
 	root.add_child(blade)
-
-	# A fuller: the groove down a blade that takes weight out of it without
-	# taking stiffness out. Two of them, inset, reading as a dark line.
-	for side in [-1.0, 1.0]:
-		var fuller := MeshInstance3D.new()
-		fuller.name = "fuller%d" % int(side)
-		fuller.mesh = _sweep([
-			{"at": 0.0, "width": 0.019, "depth": 0.002},
-			{"at": 0.52, "width": 0.016, "depth": 0.002},
-			{"at": 0.60, "width": 0.0, "depth": 0.001},
-		], 0.0)
-		fuller.position = Vector3(0, side * 0.0064, -0.06)
-		fuller.material_override = _metal(steel.darkened(0.45), 0.35, 4)
-		root.add_child(fuller)
-
-	var guard := MeshInstance3D.new()
-	guard.name = "guard"
-	guard.mesh = _sweep([
-		{"at": -0.115, "width": 0.016, "depth": 0.014},
-		{"at": -0.060, "width": 0.022, "depth": 0.019},
-		{"at": 0.0, "width": 0.040, "depth": 0.026},
-		{"at": 0.060, "width": 0.022, "depth": 0.019},
-		{"at": 0.115, "width": 0.016, "depth": 0.014},
-	], 0.5)
-	guard.rotation = Vector3(0, PI * 0.5, 0)
-	guard.position = Vector3(0, 0, -0.10)
-	guard.material_override = _metal(Color("8b6040"), 0.34, 21)
-	root.add_child(guard)
-
 	var handle := MeshInstance3D.new()
-	handle.name = "grip"
-	handle.mesh = BodyMesh.revolve([
+	handle.name = "handle"
+	var wrap := BoxMesh.new()
+	wrap.size = Vector3(0.03, 0.03, 0.12)
+	var rag := StandardMaterial3D.new()
+	rag.albedo_color = Color("5b4a36")
+	rag.roughness = 0.95
+	wrap.material = rag
+	handle.mesh = wrap
+	handle.position = Vector3(0, 0, -0.07)
+	root.add_child(handle)
+	_anchor(root, "grip", Vector3(0, 0, -0.07), Vector3.ZERO)
+
+
+## Remade 4 October (Greg: *"fix the god awful gun and sword models"*). Low,
+## readable and faceted, the way a PS2 prop reads at arm's length: every part
+## a player can name from the first-person view — blade, fuller, langet,
+## recurved guard, wrapped grip with ferrules, a faceted pommel — and nothing
+## smaller. Anchors are where they were, so the grips table still fits.
+static func _build_sword(root: Node3D) -> void:
+	var steel := Color("9aa0a4")
+	var copper := Color("8b6040")
+	# The cleaver's blade starts just ahead of the guard and widens towards a
+	# clipped point: the spine carries the mass, the front is where it bites.
+	_part(root, "blade", _cleaver_blade(0.84), Vector3(0, 0, -0.095), _metal(steel, 0.22, 11))
+	# A fuller each face, near the spine, as a dark inset strip that dies out
+	# two thirds of the way up. Flat faces are ±Y, the edge is +X.
+	for side in [-1.0, 1.0]:
+		_part(root, "fuller%d" % int(side), _sweep([
+			{"at": 0.0, "width": 0.011, "depth": 0.0012},
+			{"at": 0.44, "width": 0.010, "depth": 0.0012},
+			{"at": 0.50, "width": 0.0, "depth": 0.0006},
+		], 0.0, 8), Vector3(-0.014, side * 0.0063, -0.035), _metal(steel.darkened(0.55), 0.40, 4))
+
+	# The guard: a block, a copper langet tongue down the blade, and two
+	# quillons recurved towards the edge with a knob on each end.
+	_part(root, "guard", _box(Vector3(0.078, 0.026, 0.020)), Vector3(0, 0, -0.100), _metal(copper, 0.34, 21))
+	_part(root, "langet", _box(Vector3(0.024, 0.0165, 0.026)), Vector3(0, 0, -0.080), _metal(copper, 0.30, 22))
+	for side in [-1.0, 1.0]:
+		var quillon := _part(root, "quillon%d" % int(side), _sweep([
+			{"at": 0.0, "width": 0.017, "depth": 0.015},
+			{"at": 0.070, "width": 0.010, "depth": 0.011},
+		], 0.3, 8), Vector3(side * 0.035, 0, -0.100), _metal(copper, 0.34, 23))
+		quillon.rotation.y = side * (PI * 0.5 - 0.25)
+		var knob := MeshInstance3D.new()
+		knob.name = "knob"
+		var ball := SphereMesh.new()
+		ball.radius = 0.0095
+		ball.height = 0.019
+		ball.radial_segments = 8
+		ball.rings = 4
+		knob.mesh = ball
+		knob.position = Vector3(0, 0, 0.072)
+		knob.material_override = quillon.material_override
+		quillon.add_child(knob)
+
+	var handle := _part(root, "grip", BodyMesh.revolve([
 		Vector3(0.0, 0.0165, 0.0125),
 		Vector3(0.045, 0.0185, 0.0140),
 		Vector3(0.110, 0.0170, 0.0130),
 		Vector3(0.170, 0.0150, 0.0118),
-	], 10)
-	# M4.4. Same fix as the shotgun barrel: `revolve()` extends along local Y,
-	# so only a rotation on X actually lays it down the blade's own axis.
-	# Negative here because the grip runs *back* from the guard (towards -Z)
-	# rather than forward like a barrel does.
+	], 10), Vector3(0, 0, -0.10), _leather(Color("35261e"), 5))
+	# `revolve()` extends along local Y; tipping it on X lays it down the
+	# blade's axis, negative because the grip runs back from the guard.
 	handle.rotation.x = -PI * 0.5
-	handle.position = Vector3(0, 0, -0.10)
-	handle.material_override = _leather(Color("35261e"), 5)
-	root.add_child(handle)
-
-	# Wrap, so the grip is not a smooth dowel. Rings of cord down its length.
+	# Cord wrap, then a metal ferrule each end so the grip reads as fitted.
 	for index in 7:
-		var cord := MeshInstance3D.new()
-		cord.name = "wrap%d" % index
-		cord.mesh = BodyMesh.revolve([
+		var cord := _part(root, "wrap%d" % index, BodyMesh.revolve([
 			Vector3(-0.005, 0.0195, 0.0150),
 			Vector3(0.005, 0.0195, 0.0150),
-		], 10)
+		], 10), Vector3(0, 0, -0.130 - float(index) * 0.0195), _leather(Color("241a14"), index))
 		cord.rotation.x = -PI * 0.5
-		cord.position = Vector3(0, 0, -0.122 - float(index) * 0.0205)
-		cord.material_override = _leather(Color("241a14"), index)
-		root.add_child(cord)
+	for index in 2:
+		var ferrule := _part(root, "ferrule%d" % index, BodyMesh.revolve([
+			Vector3(-0.005, 0.0200, 0.0158),
+			Vector3(0.005, 0.0200, 0.0158),
+		], 8), Vector3(0, 0, [-0.115, -0.264][index]), _metal(copper, 0.30, 31 + index))
+		ferrule.rotation.x = -PI * 0.5
 
-	var pommel := MeshInstance3D.new()
-	pommel.name = "pommel"
 	# A mass, not a cap: a pommel is a counterweight, and it is the head of the
-	# hammer when the sword is held the other way up.
-	pommel.mesh = BodyMesh.revolve([
+	# hammer when the sword is held the other way up. Six facets, on purpose.
+	var pommel := _part(root, "pommel", BodyMesh.revolve([
 		Vector3(0.0, 0.014, 0.014),
 		Vector3(0.012, 0.030, 0.027),
 		Vector3(0.030, 0.033, 0.029),
 		Vector3(0.048, 0.022, 0.020),
 		Vector3(0.056, 0.010, 0.010),
-	], 10)
+	], 6), Vector3(0, 0, -0.272), _metal(copper, 0.30, 33))
 	pommel.rotation.x = -PI * 0.5
-	pommel.position = Vector3(0, 0, -0.272)
-	pommel.material_override = _metal(Color("8b6040"), 0.30, 33)
-	root.add_child(pommel)
 
 	_anchor(root, "grip", Vector3(0, 0, -0.158), Vector3.ZERO)
 	_anchor(root, "grip_low", Vector3(0, 0, -0.226), Vector3.ZERO)
@@ -549,237 +599,465 @@ static func _build_sword(root: Node3D) -> void:
 	# being the answer.
 	_anchor(root, "blade_grip", Vector3(0, 0, 0.230), Vector3.ZERO)
 	_anchor(root, "blade_high", Vector3(0, 0, 0.430), Vector3.ZERO)
-	_anchor(root, "muzzle", Vector3(0, 0, 0.760), Vector3.ZERO)
+	_anchor(root, "muzzle", Vector3(0, 0, 0.740), Vector3.ZERO)
 
 
+## v0.1 Brawler (job 3). Greg, 5 Oct: "200 years in the future, why would they
+## just have an axe" -- a meat-processing cleaver with a heating element down
+## the edge, working name HOTLINE CLEAVER. Same axis convention as the sword
+## (along +Z, flat faces +-Y, edge +X). The edge strip is its own mesh with
+## its own material, named `heat_edge`, so `MeleeDriver` can brighten it as the
+## blade takes heat from hits.
+static func _build_hotline_cleaver(root: Node3D) -> void:
+	var steel := Color("6f7376")
+	var housing := _metal(Color("1d1f1e"), 0.55, 61)
+	# A wide, square-nosed slab: most of the mass is in the blade, as on a
+	# butcher's cleaver, so a light swing still lands heavy.
+	_part(root, "blade", _box(Vector3(0.112, 0.006, 0.290)), Vector3(0.026, 0, 0.175), _metal(steel, 0.38, 62))
+	# The element housing along the spine, with a cable run back to the grip.
+	_part(root, "element_housing", _box(Vector3(0.020, 0.013, 0.270)), Vector3(-0.036, 0, 0.170), housing)
+	for index in 6:
+		_part(root, "element_rib%d" % index, _box(Vector3(0.022, 0.015, 0.006)),
+			Vector3(-0.036, 0, 0.060 + float(index) * 0.044), _metal(Color("3a2b20"), 0.5, 63 + index))
+	# The heated edge: a thin strip proud of the blade, lit from inside.
+	var edge := _part(root, "heat_edge", _box(Vector3(0.010, 0.0068, 0.284)), Vector3(0.086, 0, 0.175), heat_edge_material())
+	edge.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# The hang hole a cleaver has near its nose, punched through as a dark plug.
+	var hole := _part(root, "hang_hole", BodyMesh.revolve([Vector3(-0.004, 0.009, 0.009), Vector3(0.004, 0.009, 0.009)], 10),
+		Vector3(0.0, 0, 0.292), _bore())
+	# Bolster and an industrial grip: hazard-yellow over black rubber, a
+	# battery block for a pommel and a short cable between them.
+	_part(root, "bolster", _box(Vector3(0.060, 0.022, 0.026)), Vector3(-0.004, 0, 0.018), _metal(Color("4a4b48"), 0.42, 70))
+	var grip := _part(root, "grip", BodyMesh.revolve([
+		Vector3(0.0, 0.0175, 0.0135),
+		Vector3(0.060, 0.0190, 0.0145),
+		Vector3(0.130, 0.0180, 0.0140),
+	], 10), Vector3(0, 0, 0.004), _leather(Color("1a1816"), 71))
+	grip.rotation.x = -PI * 0.5
+	for index in 3:
+		var band := _part(root, "band%d" % index, BodyMesh.revolve([
+			Vector3(-0.006, 0.0197, 0.0152), Vector3(0.006, 0.0197, 0.0152),
+		], 10), Vector3(0, 0, -0.020 - float(index) * 0.042), _leather(Color("b88a1c"), 72 + index))
+		band.rotation.x = -PI * 0.5
+	_part(root, "battery", _box(Vector3(0.042, 0.034, 0.050)), Vector3(0, 0, -0.152), housing)
+	_part(root, "battery_lamp", _box(Vector3(0.010, 0.036, 0.010)), Vector3(0.012, 0, -0.140), _glow(Color("d24a1e")))
+	_part(root, "cable", _box(Vector3(0.007, 0.007, 0.170)), Vector3(-0.026, 0.004, -0.050), housing)
+
+	_anchor(root, "grip", Vector3(0, 0, -0.060), Vector3.ZERO)
+	# Where the working hand goes when it chokes up: forward on the handle,
+	# against the bolster. Not on the blade — the edge is a heating element.
+	_anchor(root, "choke", Vector3(0, 0, -0.010), Vector3.ZERO)
+	_anchor(root, "grip_low", Vector3(0, 0, -0.110), Vector3.ZERO)
+	_anchor(root, "muzzle", Vector3(0.030, 0, 0.320), Vector3.ZERO)
+
+
+## v0.1 Brawler (job 3): a guard's shock staff, working name PRODSTAFF. Reach
+## over a sword's, two hands, a forked head that carries the charge. The head
+## glow is its own mesh, `shock_tip`, for `MeleeDriver` to flare on a charged
+## blow. Most of the length is ahead of the hands; little sits behind them,
+## because in first person what is behind the hand is behind the eye.
+static func _build_prodstaff(root: Node3D) -> void:
+	var shaft_metal := _metal(Color("3c403e"), 0.48, 80)
+	var wrap := _leather(Color("1c1a18"), 81)
+	var shaft := _part(root, "shaft", BodyMesh.revolve([
+		Vector3(-0.52, 0.0150, 0.0150),
+		Vector3(1.10, 0.0140, 0.0140),
+	], 10), Vector3.ZERO, shaft_metal)
+	shaft.rotation.x = PI * 0.5
+	# Two rubber grip sleeves where the hands go, and a hazard band between.
+	for entry in [[-0.10, 0.20], [-0.46, 0.14]]:
+		var sleeve := _part(root, "sleeve", BodyMesh.revolve([
+			Vector3(0.0, 0.0185, 0.0185), Vector3(float(entry[1]), 0.0185, 0.0185),
+		], 10), Vector3(0, 0, float(entry[0]) - float(entry[1]) * 0.5), wrap)
+		sleeve.rotation.x = PI * 0.5
+	var band := _part(root, "hazard_band", BodyMesh.revolve([
+		Vector3(0.0, 0.0175, 0.0175), Vector3(0.05, 0.0175, 0.0175),
+	], 10), Vector3(0, 0, 0.08), _leather(Color("b88a1c"), 82))
+	band.rotation.x = PI * 0.5
+	# The power collar under the head and its status lamp.
+	_part(root, "collar", _box(Vector3(0.050, 0.050, 0.110)), Vector3(0, 0, 0.96), _metal(Color("1d1f1e"), 0.55, 83))
+	_part(root, "collar_lamp", _box(Vector3(0.008, 0.052, 0.012)), Vector3(0.022, 0, 0.94), _glow(Color("7fd6e8")))
+	# The fork: two prongs either side, a tip between them that lights.
+	for side in [-1.0, 1.0]:
+		_part(root, "prong", _box(Vector3(0.012, 0.012, 0.150)), Vector3(side * 0.030, 0, 1.085), shaft_metal)
+	var tip := MeshInstance3D.new()
+	tip.name = "shock_tip"
+	var ball := SphereMesh.new()
+	ball.radius = 0.016
+	ball.height = 0.032
+	ball.radial_segments = 10
+	ball.rings = 5
+	tip.mesh = ball
+	tip.position = Vector3(0, 0, 1.13)
+	tip.material_override = shock_tip_material()
+	tip.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(tip)
+	_part(root, "butt_cap", _box(Vector3(0.036, 0.036, 0.040)), Vector3(0, 0, -0.53), _metal(Color("1d1f1e"), 0.55, 84))
+
+	_anchor(root, "grip", Vector3(0, 0, -0.10), Vector3.ZERO)
+	_anchor(root, "grip_low", Vector3(0, 0, -0.46), Vector3.ZERO)
+	_anchor(root, "muzzle", Vector3(0, 0, 1.15), Vector3.ZERO)
+
+
+## Shared so a fresh model and a driver-brightened one start from one look.
+static func heat_edge_material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color("5a2010")
+	material.roughness = 0.4
+	material.metallic = 0.6
+	material.emission_enabled = true
+	material.emission = Color("ff5a1a")
+	material.emission_energy_multiplier = 0.6
+	return material
+
+
+static func shock_tip_material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color("9fe8ff")
+	material.emission_enabled = true
+	material.emission = Color("7fd6e8")
+	material.emission_energy_multiplier = 1.2
+	return material
+
+
+## The BONE YARD 12G. Pump, box-fed, with a vent rib and a brass bead you can
+## actually put on a target: the rear notch sits on the receiver and the bead
+## top sits level with it, so `sight_rear` -> `sight_front` is a real line.
 static func _build_shotgun(root: Node3D) -> void:
 	var gunmetal := Color("53585a")
-	var receiver := MeshInstance3D.new()
-	receiver.name = "receiver"
-	receiver.mesh = _sweep([
-		{"at": 0.0, "width": 0.052, "depth": 0.062},
-		{"at": 0.055, "width": 0.055, "depth": 0.070},
-		{"at": 0.200, "width": 0.055, "depth": 0.070},
-		{"at": 0.245, "width": 0.048, "depth": 0.058},
-	], 0.35)
-	receiver.position = Vector3(0, 0, -0.02)
-	receiver.material_override = _metal(gunmetal, 0.30, 13)
-	root.add_child(receiver)
+	var receiver_metal := _metal(gunmetal, 0.30, 13)
+	_part(root, "receiver", _sweep([
+		{"at": -0.020, "width": 0.048, "depth": 0.064},
+		{"at": 0.215, "width": 0.048, "depth": 0.064},
+		{"at": 0.228, "width": 0.044, "depth": 0.056},
+	], 0.14, 8), Vector3.ZERO, receiver_metal)
+	_part(root, "loading_port", _box(Vector3(0.002, 0.022, 0.064)), Vector3(0.0245, 0.004, 0.118), _metal(Color("121413"), 0.5, 14))
+	# A copper eye on the left of the receiver: the facility's mark, struck
+	# into the steel. The only ornament, and it is on the side you never aim.
+	var mark := _part(root, "receiver_mark", BodyMesh.revolve([
+		Vector3(0.0, 0.0115, 0.0115), Vector3(0.002, 0.0115, 0.0115), Vector3(0.002, 0.004, 0.004),
+	], 8), Vector3(-0.024, 0.0, 0.088), _metal(Color("8b6040"), 0.3, 15))
+	mark.rotation.z = PI * 0.5
 
-	var barrel := MeshInstance3D.new()
-	barrel.name = "barrel"
-	barrel.mesh = BodyMesh.revolve([
+	# `revolve()` extends along local Y; tipping it on X lays it along +Z.
+	var barrel := _part(root, "barrel", BodyMesh.revolve([
 		Vector3(0.0, 0.0125, 0.0125),
-		Vector3(0.40, 0.0112, 0.0112),
-		Vector3(0.52, 0.0118, 0.0118),
-	], 12)
-	# M4.4. `BodyMesh.revolve()` extends along its own local Y, not Z like
-	# `_sweep()` — a rotation around Y cannot retarget a shape that is already
-	# aligned with Y, which is why this read as a barrel pointed at the sky
-	# rather than downrange. Tipping it over on X is what actually lays a
-	# Y-extending tube along +Z, matching every `_sweep()` part's own
-	# muzzle-forward convention.
+		Vector3(0.500, 0.0115, 0.0115),
+		Vector3(0.500, 0.0135, 0.0135),
+		Vector3(0.515, 0.0135, 0.0135),
+	], 12), Vector3(0, 0.014, 0.225), _metal(gunmetal.darkened(0.2), 0.24, 17))
 	barrel.rotation.x = PI * 0.5
-	barrel.position = Vector3(0, 0.016, 0.225)
-	barrel.material_override = _metal(gunmetal.darkened(0.2), 0.24, 17)
-	root.add_child(barrel)
+	var bore := _part(root, "bore", BodyMesh.revolve([Vector3(0, 0, 0), Vector3(0, 0.0095, 0.0095)], 12),
+		Vector3(0, 0.014, 0.7405), _bore())
+	bore.rotation.x = PI * 0.5
+	_part(root, "vent_rib", _box(Vector3(0.008, 0.003, 0.490)), Vector3(0, 0.0280, 0.478), _metal(gunmetal.darkened(0.35), 0.4, 18))
 
-	var magazine := MeshInstance3D.new()
-	magazine.name = "tube"
-	magazine.mesh = BodyMesh.revolve([
-		Vector3(0.0, 0.0115, 0.0115),
-		Vector3(0.40, 0.0115, 0.0115),
-	], 10)
-	magazine.rotation.x = PI * 0.5
-	magazine.position = Vector3(0, -0.014, 0.225)
-	magazine.material_override = _metal(gunmetal.darkened(0.3), 0.30, 19)
-	root.add_child(magazine)
+	var tube := _part(root, "tube", BodyMesh.revolve([
+		Vector3(0.0, 0.0110, 0.0110),
+		Vector3(0.400, 0.0110, 0.0110),
+		Vector3(0.400, 0.0122, 0.0122),
+		Vector3(0.414, 0.0122, 0.0122),
+	], 10), Vector3(0, -0.016, 0.225), _metal(gunmetal.darkened(0.3), 0.30, 19))
+	tube.rotation.x = PI * 0.5
+	_part(root, "barrel_band", _box(Vector3(0.030, 0.052, 0.010)), Vector3(0, -0.001, 0.612), receiver_metal)
 
-	var forend := MeshInstance3D.new()
-	forend.name = "forend"
-	forend.mesh = _sweep([
+	_part(root, "forend", _sweep([
 		{"at": 0.0, "width": 0.036, "depth": 0.040},
-		{"at": 0.030, "width": 0.042, "depth": 0.047},
-		{"at": 0.150, "width": 0.042, "depth": 0.047},
-		{"at": 0.182, "width": 0.035, "depth": 0.039},
-	], 0.45)
-	forend.position = Vector3(0, -0.006, 0.250)
-	forend.material_override = _wood(Color("4a3325"), 23)
-	root.add_child(forend)
-
+		{"at": 0.025, "width": 0.040, "depth": 0.044},
+		{"at": 0.155, "width": 0.040, "depth": 0.044},
+		{"at": 0.180, "width": 0.035, "depth": 0.039},
+	], 0.8, 12), Vector3(0, -0.012, 0.250), _wood(Color("4a3325"), 23))
 	# Ribs on the pump, because the one part of a shotgun a player looks at in
 	# first person is the part their off hand is on.
 	for index in 6:
-		var rib := MeshInstance3D.new()
-		rib.name = "rib%d" % index
-		rib.mesh = BodyMesh.revolve([
-			Vector3(-0.004, 0.0235, 0.0255),
-			Vector3(0.004, 0.0235, 0.0255),
-		], 10)
+		var rib := _part(root, "rib%d" % index, BodyMesh.revolve([
+			Vector3(-0.003, 0.0225, 0.0245),
+			Vector3(0.003, 0.0225, 0.0245),
+		], 12), Vector3(0, -0.012, 0.282 + float(index) * 0.0225), _wood(Color("2c1d14"), index + 40))
 		rib.rotation.x = PI * 0.5
-		rib.position = Vector3(0, -0.006, 0.272 + float(index) * 0.0225)
-		rib.material_override = _wood(Color("35241a"), index + 40)
-		root.add_child(rib)
 
-	var grip_mesh := MeshInstance3D.new()
-	grip_mesh.name = "grip"
-	grip_mesh.mesh = _sweep([
-		{"at": 0.0, "width": 0.038, "depth": 0.046},
-		{"at": 0.060, "width": 0.036, "depth": 0.050},
-		{"at": 0.125, "width": 0.034, "depth": 0.044},
-	], 0.5)
-	grip_mesh.rotation = Vector3(PI * 0.5 + 0.42, 0, 0)
-	grip_mesh.position = Vector3(0, -0.052, -0.030)
-	grip_mesh.material_override = _wood(Color("3d2a1e"), 29)
-	root.add_child(grip_mesh)
+	var grip := _part(root, "grip", _sweep([
+		{"at": -0.025, "width": 0.036, "depth": 0.044},
+		{"at": 0.060, "width": 0.037, "depth": 0.050},
+		{"at": 0.125, "width": 0.034, "depth": 0.045},
+	], 0.5), Vector3(0, -0.052, -0.030), _wood(Color("3d2a1e"), 29))
+	grip.rotation.x = PI * 0.5 + 0.42
 
-	var stock := MeshInstance3D.new()
-	stock.name = "stock"
-	stock.mesh = _sweep([
-		{"at": 0.0, "width": 0.044, "depth": 0.058},
-		{"at": 0.110, "width": 0.048, "depth": 0.076},
-		{"at": 0.215, "width": 0.046, "depth": 0.092},
-	], 0.4)
-	stock.rotation = Vector3(0.10, PI, 0)
-	stock.position = Vector3(0, -0.030, -0.110)
-	stock.material_override = _wood(Color("4a3325"), 31)
-	root.add_child(stock)
+	# The stock runs straight back off the receiver and drops to a butt with
+	# a dark recoil pad, instead of starting a hand's width behind the gun.
+	var stock := _part(root, "stock", _sweep([
+		{"at": 0.0, "width": 0.040, "depth": 0.050},
+		{"at": 0.100, "width": 0.042, "depth": 0.066},
+		{"at": 0.250, "width": 0.044, "depth": 0.104},
+	], 0.4), Vector3(0, -0.006, -0.016), _wood(Color("4a3325"), 31))
+	stock.rotation = Vector3(0.12, PI, 0)
+	_part(stock, "butt_pad", _box(Vector3(0.045, 0.106, 0.012)), Vector3(0, 0, 0.256), _leather(Color("1c1715"), 32))
 
-	var guard := MeshInstance3D.new()
-	guard.name = "trigger_guard"
-	guard.mesh = BodyMesh.arc_tube(0.052, 0.030, 0.006, PI, TAU, 10)
-	guard.position = Vector3(0, -0.036, -0.012)
-	guard.material_override = _metal(gunmetal, 0.34, 37)
-	root.add_child(guard)
+	_trigger_guard(root, Vector3(0, -0.032, -0.012), 0.026, 0.027, gunmetal, 37)
 
-	# AF1.4. The BONE YARD 12G is built box-fed rather than tube-fed — a
-	# quick-load cassette ahead of the guard, not the fixed `tube` above, which
-	# is why it is the only part of this weapon named "magazine": that is the
-	# name `HunterArsenal` looks for to ride the reload timer.
-	var cassette := MeshInstance3D.new()
-	cassette.name = "magazine"
-	cassette.mesh = _sweep([
-		{"at": 0.0, "width": 0.034, "depth": 0.020},
-		{"at": 0.070, "width": 0.034, "depth": 0.020},
-		{"at": 0.080, "width": 0.026, "depth": 0.016},
-	], 0.25)
-	cassette.rotation = Vector3(PI * 0.5 + 0.10, 0, 0)
-	cassette.position = Vector3(0, -0.058, 0.028)
-	cassette.material_override = _metal(gunmetal.darkened(0.1), 0.32, 61)
-	root.add_child(cassette)
+	# AF1.4. The BONE YARD 12G is box-fed rather than tube-fed: a quick-load
+	# cassette ahead of the guard, which is why it is the only part named
+	# "magazine" — the name `HunterArsenal` looks for to ride the reload timer.
+	var cassette := _part(root, "magazine", _sweep([
+		{"at": -0.030, "width": 0.026, "depth": 0.040},
+		{"at": 0.042, "width": 0.026, "depth": 0.040},
+		{"at": 0.050, "width": 0.030, "depth": 0.046},
+		{"at": 0.058, "width": 0.030, "depth": 0.046},
+	], 0.2, 8), Vector3(0, -0.058, 0.036), _metal(gunmetal.darkened(0.1), 0.32, 61))
+	cassette.rotation.x = PI * 0.5 + 0.10
+
+	# Sights. Rear notch on the receiver, bead on a post at the muzzle; the
+	# bead's top and the notch's centre are both at y = 0.041.
+	_notch_sight(root, Vector3(0, 0.032, 0.010), 0.006, 0.014, gunmetal.darkened(0.4))
+	_part(root, "bead_post", _box(Vector3(0.003, 0.006, 0.004)), Vector3(0, 0.0325, 0.722), _metal(gunmetal, 0.3, 63))
+	var bead := MeshInstance3D.new()
+	bead.name = "front_bead"
+	var ball := SphereMesh.new()
+	ball.radius = 0.0035
+	ball.height = 0.007
+	ball.radial_segments = 8
+	ball.rings = 4
+	bead.mesh = ball
+	bead.position = Vector3(0, 0.0375, 0.722)
+	bead.material_override = _glow(Color("c9a45a"))
+	root.add_child(bead)
+	_sights(root, Vector3(0, 0.041, 0.010), Vector3(0, 0.041, 0.722), Vector3(0, 0.014, 0.742))
 
 	_anchor(root, "grip", Vector3(0, -0.070, -0.044), Vector3(0.42, 0, 0))
 	_anchor(root, "forend", Vector3(0, -0.020, 0.300), Vector3(0.10, 0, 0))
-	_anchor(root, "muzzle", Vector3(0, 0.016, 0.745), Vector3.ZERO)
+	_anchor(root, "muzzle", Vector3(0, 0.014, 0.742), Vector3.ZERO)
 
 
+## The BREACH NINE, from the generated model (art/generated/items/
+## breach_nine.glb: Tripo, from a house-style image, 29 September). It keeps
+## the contract every weapon here keeps: muzzle along +Z (the assembly turns
+## it once at the end) and the anchors the hands and the arsenal read. The
+## model's own muzzle is -Z with the grip at +Z, and it is one unit long, so
+## it is turned a half revolution and scaled to a pistol. Measured on the
+## model in its unit box: grip centre (0, -0.234, 0.365), muzzle
+## (0, 0.232, -0.48). It has no separate magazine node, so the reload's
+## magazine drop simply has nothing to move; the reload timer, ammo and the
+## jam logic are unaffected. Falls back to the drawn pistol if the file is
+## not there (an LFS checkout without media still plays).
+const BREACH_NINE_MODEL := "res://art/generated/items/breach_nine.glb"
+const BREACH_NINE_SCALE := 0.23
+
+
+static func _build_breach_nine(root: Node3D) -> void:
+	var scene: PackedScene = load(BREACH_NINE_MODEL) as PackedScene if ResourceLoader.exists(BREACH_NINE_MODEL) else null
+	if scene == null:
+		_build_sidearm(root)
+		return
+	var model := scene.instantiate() as Node3D
+	model.name = "generated_breach_nine"
+	GENERATED_MODEL.tame_metal(model)
+	model.scale = Vector3.ONE * BREACH_NINE_SCALE
+	model.rotation.y = PI
+	root.add_child(model)
+	# In the assembly's convention, after the half turn and the scale.
+	_anchor(root, "grip", Vector3(0.001, -0.054, -0.084), Vector3(0.30, 0, 0))
+	_anchor(root, "grip_support", Vector3(0.031, -0.054, -0.064), Vector3(0.30, 0, -0.5))
+	_anchor(root, "muzzle", Vector3(0.0, 0.053, 0.111), Vector3.ZERO)
+	# Measured off the model's own vertices in this frame: the rear sight
+	# block tops out at 0.081 around z -0.078, the front post at 0.0816
+	# around z 0.098, both centred on x = 0.
+	_sights(root, Vector3(0.0, 0.0812, -0.078), Vector3(0.0, 0.0816, 0.098), Vector3(0.0, 0.053, 0.111))
+
+
+## The MERCY NINE, remade 4 October. A service pistol a player can name from
+## the back: slide with serrations and an ejection port, a barrel crown with a
+## bore you can see, hammer, beavertail, a vertical trigger guard and trigger,
+## bone grip panels, and real sights — a two-post rear notch and a front post
+## whose top is level with the posts, bone dots on both, so the ADS line
+## `sight_rear` -> `sight_front` is the picture you see.
 static func _build_sidearm(root: Node3D) -> void:
-	var gunmetal := Color("6a6f6c")
-	var slide := MeshInstance3D.new()
-	slide.name = "slide"
-	slide.mesh = _sweep([
-		{"at": 0.0, "width": 0.030, "depth": 0.034},
-		{"at": 0.020, "width": 0.032, "depth": 0.038},
-		{"at": 0.175, "width": 0.032, "depth": 0.036},
-		{"at": 0.198, "width": 0.028, "depth": 0.030},
-	], 0.40)
-	slide.position = Vector3(0, 0.014, -0.020)
-	slide.material_override = _metal(gunmetal, 0.26, 41)
-	root.add_child(slide)
-
-	# The sidearm used to have the right mass but no landmarks: at first-person
-	# distance it read as a short metal rectangle.  These are the three details
-	# a player can identify without inspecting a high-poly asset — the open port,
-	# rear notch and front blade — all kept as real geometry so they catch the
-	# same world light as the rest of the held weapon.
-	var port := MeshInstance3D.new()
-	port.name = "ejection_port"
-	var port_mesh := BoxMesh.new()
-	port_mesh.size = Vector3(0.004, 0.016, 0.056)
-	port.mesh = port_mesh
-	port.position = Vector3(0.033, 0.019, 0.096)
-	port.material_override = _metal(Color("171a19"), 0.48, 45)
-	root.add_child(port)
-	for side in [-1.0, 1.0]:
-		var rear_sight := MeshInstance3D.new()
-		rear_sight.name = "rear_sight_l" if side < 0.0 else "rear_sight_r"
-		var rear_mesh := BoxMesh.new()
-		rear_mesh.size = Vector3(0.010, 0.020, 0.012)
-		rear_sight.mesh = rear_mesh
-		rear_sight.position = Vector3(side * 0.016, 0.048, 0.010)
-		rear_sight.material_override = _metal(gunmetal.darkened(0.34), 0.38, 46 + int(side))
-		root.add_child(rear_sight)
-	var front_sight := MeshInstance3D.new()
-	front_sight.name = "front_sight"
-	var front_mesh := BoxMesh.new()
-	front_mesh.size = Vector3(0.012, 0.021, 0.008)
-	front_sight.mesh = front_mesh
-	front_sight.position = Vector3(0, 0.048, 0.178)
-	front_sight.material_override = _metal(gunmetal.lightened(0.08), 0.32, 49)
-	root.add_child(front_sight)
-
+	var gunmetal := Color("5d625f")
+	var dark := _metal(Color("151716"), 0.5, 40)
+	_part(root, "slide", _sweep([
+		{"at": -0.030, "width": 0.028, "depth": 0.032},
+		{"at": 0.150, "width": 0.028, "depth": 0.032},
+		{"at": 0.166, "width": 0.025, "depth": 0.027},
+	], 0.18, 8), Vector3(0, 0.017, 0), _metal(gunmetal, 0.26, 41))
+	var crown := _part(root, "barrel_crown", BodyMesh.revolve([
+		Vector3(0.0, 0.0072, 0.0072), Vector3(0.008, 0.0072, 0.0072),
+	], 10), Vector3(0, 0.017, 0.164), _metal(gunmetal.darkened(0.3), 0.3, 42))
+	crown.rotation.x = PI * 0.5
+	var bore := _part(root, "bore", BodyMesh.revolve([Vector3(0, 0, 0), Vector3(0, 0.0048, 0.0048)], 10),
+		Vector3(0, 0.017, 0.1722), _bore())
+	bore.rotation.x = PI * 0.5
+	_part(root, "ejection_port", _box(Vector3(0.002, 0.010, 0.034)), Vector3(0.0141, 0.025, 0.060), dark)
 	# Serrations at the back of the slide, the detail that says "gun" faster
 	# than the silhouette does.
-	for index in 5:
-		var cut := MeshInstance3D.new()
-		cut.name = "serration%d" % index
-		cut.mesh = _sweep([
-			{"at": 0.0, "width": 0.0035, "depth": 0.030},
-			{"at": 0.006, "width": 0.0035, "depth": 0.030},
-		], 0.1)
-		cut.position = Vector3(0, 0.014, -0.012 + float(index) * 0.0085)
-		cut.material_override = _metal(gunmetal.darkened(0.4), 0.4, index + 50)
-		root.add_child(cut)
+	for side in [-1.0, 1.0]:
+		for index in 5:
+			_part(root, "serration%d_%d" % [int(side), index], _box(Vector3(0.0015, 0.024, 0.0028)),
+				Vector3(side * 0.0141, 0.017, -0.024 + float(index) * 0.007), dark)
+	var hammer := _part(root, "hammer", _box(Vector3(0.009, 0.014, 0.006)), Vector3(0, 0.024, -0.034), dark)
+	hammer.rotation.x = -0.45
 
-	var frame := MeshInstance3D.new()
-	frame.name = "frame"
-	frame.mesh = _sweep([
-		{"at": 0.0, "width": 0.026, "depth": 0.022},
-		{"at": 0.130, "width": 0.026, "depth": 0.024},
-	], 0.3)
-	frame.position = Vector3(0, -0.010, -0.012)
-	frame.material_override = _metal(gunmetal.darkened(0.25), 0.30, 43)
-	root.add_child(frame)
+	_part(root, "frame", _box(Vector3(0.024, 0.018, 0.172)), Vector3(0, -0.009, 0.064), _metal(gunmetal.darkened(0.25), 0.30, 43))
+	var beavertail := _part(root, "beavertail", _box(Vector3(0.026, 0.006, 0.022)), Vector3(0, -0.006, -0.036), _metal(gunmetal.darkened(0.25), 0.30, 44))
+	beavertail.rotation.x = 0.3
+	var pin := _part(root, "frame_mark", BodyMesh.revolve([
+		Vector3(0.0, 0.0045, 0.0045), Vector3(0.002, 0.0045, 0.0045), Vector3(0.002, 0.0, 0.0),
+	], 8), Vector3(-0.012, -0.008, 0.096), _metal(Color("8b6040"), 0.3, 45))
+	pin.rotation.z = PI * 0.5
 
-	var butt := MeshInstance3D.new()
-	butt.name = "grip"
-	butt.mesh = _sweep([
-		{"at": 0.0, "width": 0.030, "depth": 0.036},
-		{"at": 0.050, "width": 0.031, "depth": 0.040},
-		{"at": 0.108, "width": 0.030, "depth": 0.036},
-	], 0.45)
-	# The rake of a pistol grip is most of what makes it read as a pistol.
-	butt.rotation = Vector3(PI * 0.5 + 0.38, 0, 0)
-	butt.position = Vector3(0, -0.052, -0.036)
-	butt.material_override = _leather(Color("2b2422"), 47)
-	root.add_child(butt)
+	# The rake of a pistol grip is most of what makes it read as a pistol. It
+	# starts inside the frame so there is no gap between grip and slide.
+	var grip := _part(root, "grip", _sweep([
+		{"at": -0.040, "width": 0.027, "depth": 0.042},
+		{"at": 0.0, "width": 0.029, "depth": 0.045},
+		{"at": 0.060, "width": 0.030, "depth": 0.046},
+		{"at": 0.105, "width": 0.029, "depth": 0.043},
+	], 0.45), Vector3(0, -0.052, -0.036), _leather(Color("2b2422"), 47))
+	grip.rotation.x = PI * 0.5 + 0.38
+	var panels := _part(root, "grip_panels", _sweep([
+		{"at": 0.004, "width": 0.0322, "depth": 0.032},
+		{"at": 0.088, "width": 0.0322, "depth": 0.032},
+	], 0.6), Vector3(0, -0.052, -0.036), _wood(Color("8a7a5c"), 48))
+	panels.rotation.x = PI * 0.5 + 0.38
 
-	var guard := MeshInstance3D.new()
-	guard.name = "trigger_guard"
-	guard.mesh = BodyMesh.arc_tube(0.044, 0.026, 0.005, PI, TAU, 10)
-	guard.position = Vector3(0, -0.030, -0.004)
-	guard.material_override = _metal(gunmetal, 0.32, 53)
-	root.add_child(guard)
+	_trigger_guard(root, Vector3(0, -0.018, 0.012), 0.024, 0.026, gunmetal, 53)
 
 	# AF1.4. Named "magazine" on purpose — `HunterArsenal` finds this node by
-	# that name and rides it through the reload timer, dropping it clear of the
-	# well and bringing a fresh one back up. It sits proud of the butt's heel
-	# so the well it leaves actually reads as empty mid-swap, not just shorter.
-	var magazine := MeshInstance3D.new()
-	magazine.name = "magazine"
-	magazine.mesh = _sweep([
+	# that name and rides it through the reload timer. It sits proud of the
+	# butt's heel so the well it leaves actually reads as empty mid-swap.
+	var magazine := _part(root, "magazine", _sweep([
 		{"at": 0.0, "width": 0.024, "depth": 0.014},
 		{"at": 0.062, "width": 0.024, "depth": 0.014},
-		{"at": 0.070, "width": 0.019, "depth": 0.011},
-	], 0.25)
-	magazine.rotation = Vector3(PI * 0.5 + 0.38, 0, 0)
-	magazine.position = Vector3(0, -0.096, -0.050)
-	magazine.material_override = _metal(gunmetal.darkened(0.15), 0.30, 59)
-	root.add_child(magazine)
+		{"at": 0.066, "width": 0.028, "depth": 0.020},
+		{"at": 0.072, "width": 0.028, "depth": 0.020},
+	], 0.25), Vector3(0, -0.096, -0.050), _metal(gunmetal.darkened(0.15), 0.30, 59))
+	magazine.rotation.x = PI * 0.5 + 0.38
+
+	# Rear posts and front post both top out at y = 0.043; the notch between
+	# the posts bottoms at 0.037.
+	_notch_sight(root, Vector3(0, 0.033, -0.020), 0.004, 0.010, gunmetal.darkened(0.4))
+	_part(root, "front_sight", _box(Vector3(0.0045, 0.010, 0.010)), Vector3(0, 0.038, 0.156), _metal(gunmetal.darkened(0.4), 0.32, 49))
+	_part(root, "front_dot", _box(Vector3(0.0028, 0.0028, 0.001)), Vector3(0, 0.040, 0.1505), _glow(Color("d8cfb4")))
+	_sights(root, Vector3(0, 0.043, -0.020), Vector3(0, 0.043, 0.156), Vector3(0, 0.017, 0.173))
 
 	_anchor(root, "grip", Vector3(0, -0.062, -0.048), Vector3(0.38, 0, 0))
 	_anchor(root, "grip_support", Vector3(0.030, -0.058, -0.030), Vector3(0.38, 0, -0.5))
-	_anchor(root, "muzzle", Vector3(0, 0.014, 0.190), Vector3.ZERO)
+	_anchor(root, "muzzle", Vector3(0, 0.017, 0.173), Vector3.ZERO)
+
+
+# ---------------------------------------------------------- weapon part helpers
+static func _part(parent: Node3D, part_name: String, mesh: Mesh, at: Vector3, material: Material) -> MeshInstance3D:
+	var part := MeshInstance3D.new()
+	part.name = part_name
+	part.mesh = mesh
+	part.position = at
+	part.material_override = material
+	parent.add_child(part)
+	return part
+
+
+static func _box(size: Vector3) -> BoxMesh:
+	var box := BoxMesh.new()
+	box.size = size
+	return box
+
+
+## A rear notch sight standing on `top_of` (where it meets the gun): a base
+## strip `base` high and two posts up to `post`, a bone dot on each post.
+static func _notch_sight(root: Node3D, top_of: Vector3, base: float, post: float, tint: Color) -> void:
+	var metal := _metal(tint, 0.34, 46)
+	_part(root, "rear_sight", _box(Vector3(0.026, base, 0.009)), top_of + Vector3(0, base * 0.5, 0), metal)
+	for side in [-1.0, 1.0]:
+		var name_side := "l" if side < 0.0 else "r"
+		_part(root, "rear_sight_" + name_side, _box(Vector3(0.009, post - base + 0.0005, 0.009)),
+			top_of + Vector3(side * 0.0085, (base + post) * 0.5, 0), metal)
+		_part(root, "rear_dot_" + name_side, _box(Vector3(0.0028, 0.0028, 0.001)),
+			top_of + Vector3(side * 0.0085, (base + post) * 0.5, -0.0048), _glow(Color("d8cfb4")))
+
+
+## A trigger guard hanging below the frame as a vertical loop, and the
+## trigger inside it. `under` is the middle of the loop's top.
+static func _trigger_guard(root: Node3D, under: Vector3, drop: float, half_length: float, tint: Color, seed_value: int) -> void:
+	# `arc_tube` draws in its own XZ plane; turned a quarter on Z its X
+	# becomes height, and the half from PI/2 to 3PI/2 is the half below.
+	var guard := _part(root, "trigger_guard", BodyMesh.arc_tube(drop, half_length, 0.0035, PI * 0.5, PI * 1.5, 10),
+		under, _metal(tint, 0.32, seed_value))
+	guard.rotation.z = PI * 0.5
+	var trigger := _part(root, "trigger", _box(Vector3(0.005, drop * 0.66, 0.004)),
+		under + Vector3(0, -drop * 0.33, -half_length * 0.15), _metal(tint.darkened(0.3), 0.32, seed_value + 1))
+	trigger.rotation.x = 0.3
+
+
+## The three points an aim-down-sights camera lines up on: the rear notch,
+## the top of the front sight, and the bore's exit. Marker3D and named, so
+## ADS finds them on any gun with `find_child`.
+static func _sights(root: Node3D, rear: Vector3, front: Vector3, muzzle: Vector3) -> void:
+	for entry in [["sight_rear", rear], ["sight_front", front], ["muzzle", muzzle]]:
+		var marker := Marker3D.new()
+		marker.name = entry[0]
+		marker.position = entry[1]
+		root.add_child(marker)
+
+
+static func _bore() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color("050505")
+	material.roughness = 1.0
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return material
+
+
+## Sight dots and the bead: faintly lit so they hold in the dark, which is
+## the one thing a sight has to do.
+static func _glow(tint: Color) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = tint
+	material.roughness = 0.5
+	material.emission_enabled = true
+	material.emission = tint
+	material.emission_energy_multiplier = 0.9
+	return material
+
+
+## The cleaver's blade, along +Z, flat faces ±Y, edge +X. The spine stays
+## put while the edge widens towards the front; near the end the spine drops
+## in a straight clip to the point. Flat-shaded so each bevel catches light
+## as one plane.
+static func _cleaver_blade(length: float) -> ArrayMesh:
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	surface.set_smooth_group(-1)
+	# [along, spine x, edge x, thickness]
+	var stations := [
+		[0.00, -0.030, 0.030, 0.0130],
+		[0.08, -0.030, 0.031, 0.0130],
+		[0.55, -0.030, 0.040, 0.0115],
+		[0.84, -0.030, 0.046, 0.0095],
+		[0.92, -0.012, 0.046, 0.0070],
+		[1.00, 0.040, 0.044, 0.0015],
+	]
+	var rings: Array = []
+	for station: Array in stations:
+		var along: float = length * float(station[0])
+		var spine: float = station[1]
+		var edge: float = station[2]
+		var half: float = float(station[3]) * 0.5
+		var shoulder := lerpf(spine, edge, 0.6)
+		rings.append([
+			Vector3(spine, -half, along),
+			Vector3(spine, half, along),
+			Vector3(shoulder, half * 0.86, along),
+			Vector3(edge, 0.0, along),
+			Vector3(shoulder, -half * 0.86, along),
+		])
+	for index in rings.size() - 1:
+		var here: Array = rings[index]
+		var there: Array = rings[index + 1]
+		for step in 5:
+			var next := (step + 1) % 5
+			_quad(surface, here[step], here[next], there[next], there[step])
+	_fan(surface, rings[0], Vector3(0, 0, 0), true)
+	_fan(surface, rings[rings.size() - 1], Vector3(0.042, 0, length), false)
+	surface.generate_normals()
+	return surface.commit()
 
 
 static func _anchor(root: Node3D, anchor_name: String, at: Vector3, turn: Vector3) -> void:
@@ -853,6 +1131,7 @@ func _default_grip(weapon_id: String) -> String:
 	match weapon_id:
 		"": return "fists"
 		"sword": return "two_hand"
+		"staff": return "two_hand"
 		"shotgun": return "long_gun"
 		"sidearm": return "pistol"
 		"launcher": return "long_gun"
@@ -1067,6 +1346,16 @@ static func _wood(tint: Color, seed_value: int) -> StandardMaterial3D:
 	material.emission_enabled = true
 	material.emission = tint
 	material.emission_energy_multiplier = 0.18
+	return material
+
+
+## player-81: the jester glove and sleeve. The world's grain is sized for a
+## wall seen across a room; forty centimetres from the lens its texels were
+## thumb-sized squares drifting purple, green and orange. Same surface, grain
+## fifteen times finer.
+static func _glove(tint: Color, seed_value: int) -> StandardMaterial3D:
+	var material := _leather(tint, seed_value)
+	material.uv1_scale *= 15.0
 	return material
 
 

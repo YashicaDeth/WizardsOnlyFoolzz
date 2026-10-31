@@ -52,6 +52,7 @@ func _ready() -> void:
 	for _press in 8:
 		var key := InputEventKey.new()
 		key.keycode = KEY_TAB
+		key.physical_keycode = KEY_TAB
 		key.pressed = true
 		index._unhandled_input(key)
 		await get_tree().physics_frame

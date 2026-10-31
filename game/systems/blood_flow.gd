@@ -71,6 +71,64 @@ static func drops_for(bleed_rate: float, delta: float) -> float:
 	return minf(bleed_rate * DROPS_PER_BLEED, MAX_DROPS_PER_SECOND) * delta
 
 
+## Arterial bleeding is not a rate, it is beats.
+##
+## Everything above is a trickle measured in millilitres a second, because a
+## wound in tissue leaks. A severed artery does not leak: the heart pushes a
+## bolus and it leaves all at once, so the honest clock for it is the one the
+## monitor already prints — `AnatomyComponent.pulse_bpm()`. A body keeps one
+## beat clock, because it has one heart however many stumps it has open, and
+## asks here how hard that beat throws.
+##
+## Nothing below decides that a body is losing blood. `AnatomyComponent.bleed_rate`
+## is still the number doing that, and `_sever_zone()` is what puts the stump's
+## share into it. This decides the shape the blood leaves in, so the spurts on
+## screen are the millilitres the anatomy is already spending.
+
+## Per beat from one stump, on a body with its full complement of blood. Six is
+## a visible handful, and stays inside the gore budget with two limbs off.
+const SPURT_DROPS := 6
+## A nearly empty body still throws on each beat; it just throws weakly. Never
+## zero, because a spurt that stops before the heart does reads as a bug rather
+## than as a body running out.
+const SPURT_MIN_DROPS := 1
+## Stroke volume at the last of the blood. It falls before the rate does — a
+## body down to a third of its blood beats faster than it did at rest and moves
+## less each time — which is why the pulse climbs while the spurts weaken.
+const STROKE_FLOOR := 0.28
+## The jet, metres per second. A femoral artery crosses a room and a wrist
+## artery marks the wall beside you; both are under the 1.9-5.5 m/s of
+## `_spray()`, because an arterial beat has no impact behind it.
+const SPURT_SPEED_MIN := 1.1
+const SPURT_SPEED_MAX := 2.6
+## Every few beats the jet is thick enough to mist as well as to drop. Not every
+## beat: sixty puffs a minute is a smoke machine, not a wound.
+const SPURT_MIST_EVERY := 3
+
+
+## How much of a full stroke one beat carries, 0 to 1.
+static func stroke_strength(volume_fraction: float) -> float:
+	return clampf(STROKE_FLOOR + (1.0 - STROKE_FLOOR) * clampf(volume_fraction, 0.0, 1.0), 0.0, 1.0)
+
+
+## Drops thrown by one beat. `detail` is the gore setting the rest of the rig
+## already scales its spray by, applied here so REDUCED is a sparser spurt
+## rather than the same spurt at a lower frame rate.
+static func spurt_drops(volume_fraction: float, detail := 1.0) -> int:
+	var full := roundi(float(SPURT_DROPS) * stroke_strength(volume_fraction) * clampf(detail, 0.0, 1.0))
+	return clampi(full, SPURT_MIN_DROPS, SPURT_DROPS)
+
+
+## One beat's jet, from the stump's direction away from the body: an arm throws
+## sideways and a leg throws down and out, rather than every stump in the game
+## throwing the same way up.
+static func spurt_velocity(outward: Vector3, volume_fraction: float) -> Vector3:
+	var away := outward.normalized() if outward.length_squared() > 0.0001 else Vector3.UP
+	var speed: float = lerpf(SPURT_SPEED_MIN, SPURT_SPEED_MAX, stroke_strength(volume_fraction))
+	var jet := (away + Vector3.UP * 0.22 + Vector3(randf_range(-0.22, 0.22), randf_range(-0.04, 0.22), randf_range(-0.22, 0.22))).normalized()
+	return jet * speed * randf_range(0.82, 1.12)
+
+
 ## A drip leaves the wound slowly and mostly downward — the difference between
 ## bleeding and being shot. `_spray()` throws blood outward at 1.9-5.5 m/s
 ## because something just hit it; this leaves at a fraction of that, so the two

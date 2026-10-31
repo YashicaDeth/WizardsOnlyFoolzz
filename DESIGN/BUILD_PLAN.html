@@ -1,0 +1,302 @@
+<title>Wizards Only Fools Build Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Stardos+Stencil:wght@400;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a works order. One column of build sheets, each a numbered job with
+   what it is, where the parts come from, and how we know it works.
+   Single dark world in the game's house palette. */
+:root{
+  color-scheme: dark;
+  --ground:#0b0908; --ground-2:#14100e; --ground-3:#1b1613;
+  --rule:#2c241e; --rule-soft:#1f1915;
+  --bone:#e6d4ac; --ink:#bcab8d; --ink-dim:#857660; --ink-faint:#5c5143;
+  --blood:#a8281a; --copper:#b0552a; --acid:#b4da48; --bile:#c9ad3c;
+  --display:"Stardos Stencil","Arial Black",Impact,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  --data:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --measure:70ch;
+}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6;margin:0;-webkit-font-smoothing:antialiased}
+.wrap{max-width:980px;margin:0 auto;padding-inline:clamp(16px,4vw,44px);padding-block:clamp(24px,5vw,56px);display:flex;flex-direction:column;gap:clamp(40px,6vw,64px)}
+.stamp{font-family:var(--data);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--blood);display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.stamp .bar{flex:1;min-width:24px;height:1px;background:var(--rule)}
+h1{font-family:var(--display);font-size:clamp(40px,8vw,84px);line-height:.92;color:var(--bone);margin:.25em 0 .25em;text-wrap:balance}
+.lede{max-width:var(--measure);font-size:clamp(16px,1.9vw,18.5px);margin:0}
+.lede b,p b,li b,td b{color:var(--bone);font-weight:600}
+section{display:flex;flex-direction:column;gap:16px}
+h2{font-family:var(--display);font-size:clamp(26px,4vw,38px);line-height:1;color:var(--bone);margin:0;display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;text-wrap:balance}
+h2 .no{font-family:var(--data);font-size:12px;letter-spacing:.2em;color:var(--copper)}
+h3{font-family:var(--data);font-size:12px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--bile);margin:8px 0 0}
+p{margin:0;max-width:var(--measure)}
+ul.plain{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:6px;max-width:var(--measure)}
+ul.plain li::marker{color:var(--copper)}
+.tbl{overflow-x:auto;border:1px solid var(--rule)}
+table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:560px}
+th{font-family:var(--data);font-size:10.5px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim);text-align:left;padding:9px 12px;border-bottom:1px solid var(--rule);background:var(--ground-2)}
+td{padding:9px 12px;border-bottom:1px solid var(--rule-soft);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.k{font-family:var(--data);color:var(--bone);font-size:13px;white-space:nowrap}
+.inout{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule)}
+.inout > div{background:var(--ground);padding:18px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.inout .tag{font-family:var(--data);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase}
+.in .tag{color:var(--acid)} .out .tag{color:var(--ink-faint)}
+.inout ul{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px;font-size:14.5px}
+.out ul{color:var(--ink-dim)}
+/* the jobs */
+.jobs{display:flex;flex-direction:column;border-top:1px solid var(--rule)}
+.job{display:grid;grid-template-columns:3.4rem minmax(0,1fr);gap:16px;padding:20px 0;border-bottom:1px solid var(--rule)}
+.job .n{font-family:var(--display);font-size:34px;line-height:1;color:var(--copper)}
+.job .b{display:flex;flex-direction:column;gap:10px;min-width:0}
+.job h4{margin:0;font-size:19px;color:var(--bone);font-weight:600}
+.job .when{font-family:var(--data);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim)}
+.kv{display:grid;grid-template-columns:7.5rem minmax(0,1fr);gap:6px 14px;font-size:14.5px}
+.kv dt{font-family:var(--data);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--bile);padding-top:3px}
+.kv dd{margin:0;min-width:0}
+@media (max-width:520px){.kv{grid-template-columns:minmax(0,1fr)} .kv dt{padding-top:6px} .job{grid-template-columns:2.4rem minmax(0,1fr)} .job .n{font-size:26px}}
+.done{border:1px solid var(--rule);background:var(--ground-2);padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+.done h3{margin:0}
+code{font-family:var(--data);font-size:12.5px;background:var(--ground-3);padding:1px 5px;color:var(--ink);overflow-wrap:anywhere}
+a{color:var(--copper)}
+footer{border-top:1px solid var(--rule);padding-top:16px;font-family:var(--data);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);display:flex;flex-wrap:wrap;gap:8px 24px}
+details.brief{border-bottom:1px solid var(--rule)}
+details.brief>summary{cursor:pointer;list-style:none;padding:12px 0;font-weight:600;color:var(--bone);font-size:17px}
+details.brief>summary::-webkit-details-marker{display:none}
+details.brief>summary::before{content:"+ ";color:var(--copper);font-family:var(--data)}
+details.brief[open]>summary::before{content:"2  "}
+details.brief>summary:focus-visible{outline:2px solid var(--copper);outline-offset:3px}
+.bb{display:flex;flex-direction:column;gap:10px;padding:0 0 20px;font-size:14.8px;min-width:0}
+.bb ol.bl,.bb ul.bl{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:5px;max-width:var(--measure)}
+.bb li::marker{color:var(--copper)}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="stamp"><span>Works order · v0.1 "Escape"</span><span class="bar"></span><span>4 Oct 2026</span></div>
+  <h1>Build Plan</h1>
+  <p class="lede">The game plan holds every idea. This page holds only what gets built next, so there is <b>an actual game that works</b>: about 20 minutes, from pressing START to stepping out on the surface, on a pad or keyboard. Everything else is switched off for this build, not deleted. Parts come from free low-poly libraries on the internet wherever they exist, so nobody hand-builds what someone already made.</p>
+</header>
+
+<section>
+  <h2><span class="no">01</span>What v0.1 is</h2>
+  <div class="inout">
+    <div class="in"><span class="tag">In this build</span><ul>
+      <li>Menu, intro cutscene, short torture load-in</li>
+      <li>Wake in the vat in real red liquid; quick intake (preset plus body and face)</li>
+      <li>Brain screen: pick 2 of 2 working disciplines</li>
+      <li>Breakout: tear cords, break glass, liquid floods out</li>
+      <li>One facility map: vat floor, examiner office, service arcade, Lower Works</li>
+      <li>Heated cleaver, shock staff, pistol; gore, sever, ragdoll on death</li>
+      <li>Examiner boss, his keycard, the staff door</li>
+      <li>A real elevator ride up; arrival on the surface ends the build</li>
+      <li>Death respawns you in the vat with your bloodstain where you fell</li>
+      <li>Simple inventory, one objective line, pause and settings, checkpoint saves</li>
+    </ul></div>
+    <div class="out"><span class="tag">Switched off until v0.2+</span><ul>
+      <li>The other four disciplines, chip heat, brain skill board</li>
+      <li>The Wire, the Board, the pyramid, territories, money</li>
+      <li>Derby, drains route, doctor-chase route</li>
+      <li>Drugs, cases and skins, voice NPCs, planes, Hornee</li>
+      <li>Support Unit and bingyangers (they come back in v0.2)</li>
+      <li>Text inspections, breach-tool puzzle, wall scan, fuse hunt, wound minigame</li>
+    </ul></div>
+  </div>
+  <p>Why two disciplines: <b>Brawler</b> (heated cleaver and shock staff, heavy directional swings) and <b>Marksman</b> (pistol with aim down sights and VATS). They cover melee and guns with code that mostly exists already. The other four come one at a time once these two feel good.</p>
+</section>
+
+<section>
+  <h2><span class="no">02</span>The big fix: real rigged bodies</h2>
+  <p>Most of what looks broken (no head, huge shoulders, floating arms, limbs coming apart in ragdolls) comes from the bodies being assembled from loose procedural pieces with no skeleton. The fix is to use a <b>proper rigged low-poly humanoid</b> for every person and keep our anatomy system underneath it: wounds, organs and severing stay ours, they just ride on real bones.</p>
+  <ul class="plain">
+    <li><b>Body:</b> a free CC0 rigged base character (Quaternius base characters, or a Mixamo-compatible low-poly human), with our PS1-style shader on top.</li>
+    <li><b>Animation:</b> Mixamo (free to use in games) and Quaternius animation sets for walk, run, attacks, hit reactions, deaths.</li>
+    <li><b>Ragdolls:</b> Godot's physical bones on that skeleton, with Jolt physics (built into Godot 4.4+). Tried in the mechanics lab first.</li>
+    <li><b>Gore:</b> each anatomy zone maps to a bone, so cuts, organs and severing follow the real skeleton.</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="no">03</span>Where the parts come from</h2>
+  <p>Free first, credited always, nothing ripped from commercial games. CC0 needs no credit but gets one anyway; CC-BY goes in <code>CREDITS.md</code> and the in-game credits.</p>
+  <div class="tbl"><table>
+    <tr><th>Need</th><th>Source</th><th>Licence</th></tr>
+    <tr><td class="k">People</td><td>Quaternius base characters; Mixamo characters</td><td>CC0 · free for games</td></tr>
+    <tr><td class="k">Animations</td><td>Mixamo; Quaternius animation library</td><td>Free for games · CC0</td></tr>
+    <tr><td class="k">Facility kit</td><td>Quaternius and Kenney modular sci-fi kits, our Higgsfield tunnel pieces, retextured grimy</td><td>CC0</td></tr>
+    <tr><td class="k">Weapons and props</td><td>Poly Pizza, Quaternius, Kenney, CC0 low-poly models on Sketchfab</td><td>CC0 · CC-BY</td></tr>
+    <tr><td class="k">Textures</td><td>ambientCG and Poly Haven (already in use)</td><td>CC0</td></tr>
+    <tr><td class="k">Anatomy</td><td>The CC-BY Sketchfab skeleton and organ models already listed for the X-ray</td><td>CC-BY</td></tr>
+    <tr><td class="k">Particles and VFX</td><td>Kenney particle pack, our own shaders</td><td>CC0</td></tr>
+    <tr><td class="k">Sound</td><td>Freesound (CC0/CC-BY), Sonniss GDC bundles</td><td>Royalty free</td></tr>
+    <tr><td class="k">Cutscenes, plates, decals</td><td>Higgsfield (video, X-ray plates, blood and glass decals, surface vista)</td><td>Ours</td></tr>
+  </table></div>
+  <h3>Godot plugins</h3>
+  <div class="tbl"><table>
+    <tr><th>Plugin</th><th>Job</th><th>State</th></tr>
+    <tr><td class="k">Jolt physics</td><td>Stable ragdolls, debris, physics props</td><td>Built into Godot; test in lab, then switch</td></tr>
+    <tr><td class="k">Phantom Camera</td><td>Souls over-shoulder camera and lock-on framing both fighters</td><td>Add</td></tr>
+    <tr><td class="k">LimboAI</td><td>Enemy and examiner behaviour trees</td><td>Installed</td></tr>
+    <tr><td class="k">Dialogue Manager</td><td>Examiner lines and intake questions</td><td>Installed</td></tr>
+    <tr><td class="k">Terrain3D</td><td>The surface at the end of the build</td><td>Installed</td></tr>
+    <tr><td class="k">GdUnit4</td><td>Tests</td><td>Installed</td></tr>
+  </table></div>
+  <p>Glass and walls break with pieces pre-cut in Blender's built-in Cell Fracture add-on, swapped in on the hit. Liquid is a shader surface inside the vat, GPU particles with collision for the pour, and pooling decals on the floor.</p>
+</section>
+
+<section>
+  <h2><span class="no">04</span>The jobs, in order</h2>
+  <p>Each job is one builder at a time on one piece. A job ends when the "done" line is true, not when the code compiles.</p>
+  <div class="jobs">
+    <div class="job"><div class="n">1</div><div class="b"><h4>Mechanics lab</h4><span class="when">First · Oct 5</span><dl class="kv"><dt>Build</dt><dd>One small test map inside the game: liquid tank, weather and acid rain, destruction wall, dummy row, vehicle pad.</dd><dt>Parts</dt><dd>Existing weather, blood pool, ground hole, breakable and vat-smash systems; CC0 props.</dd><dt>Done</dt><dd>Every station runs the same system the game uses, launched from <code>Start-MechanicsLab.cmd</code>.</dd></dl></div></div>
+    <div class="job"><div class="n">2</div><div class="b"><h4>Rigged bodies</h4><span class="when">Oct 5–6 · in the lab</span><dl class="kv"><dt>Build</dt><dd>Swap the player and enemies onto a rigged CC0 humanoid; map anatomy zones to bones; physical-bone ragdolls on Jolt.</dd><dt>Parts</dt><dd>Quaternius or Mixamo body and animations.</dd><dt>Done</dt><dd>Head on, normal shoulders, arms right, a death ragdoll that stays in one piece unless something is cut off.</dd></dl></div></div>
+    <div class="job"><div class="n">3</div><div class="b"><h4>Moving and fighting</h4><span class="when">Oct 6–7 · in the lab</span><dl class="kv"><dt>Build</dt><dd>Walk, sprint, crouch, jump, roll on the Souls pad layout; a heated vibro cleaver and a powered shock staff that hit, block and parry (the fire axe and sword are gone: 200 years on, nobody fights with a hardware-store axe); pistol with aim down sights; Phantom Camera lock-on.</dd><dt>Parts</dt><dd>Existing sword moveset, Souls roll, ADS; CC0 cleaver, staff and pistol models, retextured.</dd><dt>Done</dt><dd>You can kill a dummy and a fighting enemy with each weapon on the pad, and it feels weighty.</dd></dl></div></div>
+    <div class="job"><div class="n">4</div><div class="b"><h4>Waking in the vat</h4><span class="when">Oct 7–8</span><dl class="kv"><dt>Build</dt><dd>After the intro, open your eyes underwater in red liquid; look down at your body; short intake on the pad; brain screen picks Brawler and Marksman; brain hack; tear cords; glass breaks; liquid floods; stand up.</dd><dt>Parts</dt><dd>Existing intake and vat scene; Higgsfield brain-hack video and decals; Cell Fracture glass.</dd><dt>Done</dt><dd>Four minutes from load-in to standing, every step clear on screen, no keyboard needed.</dd></dl></div></div>
+    <div class="job"><div class="n">5</div><div class="b"><h4>The facility, one map</h4><span class="when">Oct 8–9</span><dl class="kv"><dt>Build</dt><dd>Vat floor, examiner office, service arcade and Lower Works joined by corridors on the facility grid, with the transit lift and the heat elevator as real rides.</dd><dt>Parts</dt><dd>Existing rooms; Higgsfield tunnel kit; CC0 modular sci-fi kit retextured with ambientCG grime.</dd><dt>Done</dt><dd>Walk from the vat to the elevator with zero loading screens and no invisible walls.</dd></dl></div></div>
+    <div class="job"><div class="n">6</div><div class="b"><h4>The examiner</h4><span class="when">Oct 9–10</span><dl class="kv"><dt>Build</dt><dd>A real boss in his office: telegraphed scalpel and syringe attacks, about a 30-second fight. He drops his keycard; it opens the staff door; the cupboard has real loot.</dd><dt>Parts</dt><dd>Existing examiner fight; LimboAI; rigged body from job 2.</dd><dt>Done</dt><dd>Beating him always gives the card, and the door always takes it.</dd></dl></div></div>
+    <div class="job"><div class="n">7</div><div class="b"><h4>Death, saves, the screen</h4><span class="when">Oct 10</span><dl class="kv"><dt>Build</dt><dd>Die and regrow in the vat; bloodstain at your corpse; checkpoint saves; simple inventory; one objective line; pause and settings; one-time button hints that match the pad.</dd><dt>Parts</dt><dd>Existing rebirth, field inventory, key hints and quantum saves.</dd><dt>Done</dt><dd>You can die, come back and carry on, and always know where to go.</dd></dl></div></div>
+    <div class="job"><div class="n">8</div><div class="b"><h4>Play it, fix it</h4><span class="when">Oct 10–11</span><dl class="kv"><dt>Build</dt><dd>Greg plays the whole build on the pad. The five worst problems get fixed. Repeat.</dd><dt>Done</dt><dd>v0.1 is tagged and playable from <code>PLAY.cmd</code> before the account limits reset on 11 October.</dd></dl></div></div>
+  </div>
+</section>
+
+<section>
+  <div class="done"><h3>A feature is done when</h3>
+  <ul class="plain">
+    <li>it works on the pad and on keyboard and mouse,</li>
+    <li>there are no placeholder boxes in it,</li>
+    <li>it holds 144 fps on Greg's machine,</li>
+    <li>someone looked at it running, not just at a test result,</li>
+    <li>and Greg played it and it felt right.</li>
+  </ul></div>
+</section>
+
+<section id="briefs"><h2><span class="no">06</span>Builder briefs</h2><p>The full prompt each builder agent gets. Same text as <code>DESIGN/BUILD_BRIEFS.md</code>. Open a job to read it.</p>
+<details class="brief" open><summary>Read before any job</summary><div class="bb"><ul class="bl">
+<li><code>DESIGN/BUILD_PLAN.html</code> (scope of v0.1: what is in, what is switched off).</li>
+<li><code>P:/GameDev/AgentHub/data/greg_direction_2026-10-04_controller_combat.md</code></li>
+</ul>
+<p>and <code>P:/GameDev/AgentHub/data/greg_playtest_b_2026-10-04.md</code>: Greg's newest words. They win over every older document, including this one.</p>
+<ul class="bl">
+<li>Skills to load by name: <code>wof-lane-hygiene</code>, <code>wof-wire-before-polish</code>,</li>
+</ul>
+<p><code>wof-verify-by-looking</code>, <code>running-headless-godot</code>, plus the ones named in your job.</p></div></details>
+<details class="brief" open><summary>Rules for every job</summary><div class="bb"><ol class="bl">
+<li><b>Wire before you build.</b> The repo has about 236 systems and many are finished but called by nothing. Before writing a new file, search for the one that already does it (<code>systems/</code>, scene scripts, <code>tests/</code>). Rebuilding an existing system is a failed job.</li>
+<li><b>Free parts from the internet first.</b> CC0 from Quaternius, Kenney, Poly Pizza, ambientCG, Poly Haven; free-for-games from Mixamo; CC-BY from Sketchfab or Freesound with credit. Every imported file is listed in <code>CREDITS.md</code> (source URL, author, licence). Never rip assets from commercial games. Generated art comes in only through <code>tools/import_generated_asset.py</code>.</li>
+<li><b>Pad first, keyboard equal.</b> Every action goes through real InputMap actions with joypad events (<code>systems/input_profile.gd</code>, Souls base layout: R1 light, R2 heavy, L1 block, L2 parry or aim, R2 fire with a gun). On-screen hints come from <code>systems/key_hints.gd</code> and follow the last device used.</li>
+<li><b>One game.</b> Work in your own worktree off <code>claude/launch-latest</code>; run <code>--headless --import</code> once before anything else. Merge happens through the hub gate. Commit small and often so a usage limit cannot lose work.</li>
+<li><b>Look at it.</b> A change that affects what the player sees is not done until you rendered it (capture harness under <code>game/tests/*_capture.tscn</code>, or one windowed run on the right monitor) and opened the PNG. Say which PNGs in the commit message.</li>
+<li><b>Performance.</b> 144 fps or better on Greg's RTX 2060 SUPER in every room you touch (<code>F10</code> counter or <code>game/tests/<i>perf</i></code> / frame-budget tests).</li>
+<li><b>Report back</b> in three parts: what is done (with PNG paths and tests run), what you could not verify, and any pre-existing failures you met.</li>
+</ol></div></details>
+<details class="brief"><summary>Job 1: Mechanics lab</summary><div class="bb"><p><b>GOAL.</b> Greg: <i>"a demo dev test area you can just walk around… here's how the liquid physics, here's how the weather works, how the weather interacts with the area, the rain, the storms, acid rain, how the destruction physics works with weapons… then we apply that to the actual full game."</i> One small walkable map inside the game where every world mechanic is shown working, using the same code the real map uses.</p>
+<p><b>EXISTS</b> (use, do not rebuild): <code>systems/world_weather.gd</code>, <code>systems/storm_weather.gd</code>, <code>systems/blood_pool.gd</code>, <code>systems/blood_flow.gd</code>, <code>systems/ground_hole.gd</code>, <code>systems/breakable_prop.gd</code>, <code>systems/world_break.gd</code>, <code>systems/breakable_door.gd</code>, <code>systems/vat_smash.gd</code>, <code>systems/ragdoll_body.gd</code>, <code>systems/baseline_human.gd</code>, <code>systems/penetration.gd</code>, <code>systems/world_xray.gd</code>. The combat sandbox <code>psy_lab.tscn</code> / <code>gore_demo.tscn</code> already has a weapon rack and dummies; reuse its pieces rather than copying them.</p>
+<p><b>OWNS.</b> New: <code>game/lab/mechanics_lab.tscn</code>, <code>game/lab/mechanics_lab.gd</code>, <code>game/lab/stations/*</code>, <code>P:/GameDev/Start-MechanicsLab.cmd</code>. Shared systems: fix bugs you find, but do not change their public behaviour.</p>
+<p><b>BUILD.</b> A 40 x 40 m greybox yard with a covered half and an open half (so weather can be compared under cover and in the open), lit so all five stations read at once. A station is a plinth with a short label and one pad button:</p>
+<ol class="bl">
+<li><i>Liquid.</i> A glass tank of red fluid (shader surface with depth tint and wobble). Break the glass: GPU particles with collision pour out, a pooling decal spreads on the floor, splashes when walked through or shot.</li>
+<li><i>Weather.</i> One button steps clear, rain, storm, acid rain. Wet surfaces darken and shine, puddles form in low spots, lightning flashes, cloth and foliage take wind. Acid rain visibly etches a metal prop over 30 s and hurts a dummy standing in the open but not one under cover.</li>
+<li><i>Destruction.</i> A wall, crates, glass panes, a pipe run and open ground. Every v0.1 weapon from job 3 breaks them in authored stages with debris; ground takes a hole sized by the round. Pre-fractured pieces made with Blender's Cell Fracture add-on are swapped in on the hit.</li>
+<li><i>Bodies.</i> A row of dummies for cuts, severing, ragdoll and the X-ray view.</li>
+<li><i>Vehicle pad.</i> An empty marked area for later driving work.</li>
+</ol>
+<p>Free-walk with the normal player controller; Start button opens a station menu that teleports you to each plinth.</p>
+<p><b>PROOF.</b> One PNG per station in its "after" state, plus one of the whole yard. <b>TESTS.</b> New <code>tests/mechanics_lab_test.tscn</code>: every station loads and its system answers one input. Existing weather, ground-hole, breakable and vat-smash tests stay green. <b>OPEN.</b> Which weather states the real map uses at launch. Whether acid rain damages the player at full strength. Do not decide; build the dials. <b>OUT.</b> Story, enemies that fight back, the derby itself. <b>Skills.</b> <code>create-game-vfx</code>, <code>godot-shaders</code>, <code>godot-physics</code>.</p></div></details>
+<details class="brief"><summary>Job 2: Rigged bodies</summary><div class="bb"><p><b>GOAL.</b> Fix what Greg saw: <i>"the body model in third person just has no head and for some reason the shoulders are massive"</i>, <i>"arms looking weird"</i>, and ragdolls whose limbs come apart. Every person becomes a proper rigged low-poly humanoid, with our anatomy riding on its bones.</p>
+<p><b>EXISTS.</b> <code>systems/baseline_human.gd</code> (zones, organs, wounds, severing), <code>systems/anatomy_component.gd</code>, <code>systems/ragdoll_body.gd</code>, <code>systems/model_skin.gd</code> (skins over BaselineHuman zones), <code>systems/clothing_shell.gd</code>, <code>systems/body_forms.gd</code>, <code>systems/world_xray.gd</code>. These are the contract: no gore, X-ray or severing feature may be lost.</p>
+<p><b>OWNS.</b> New <code>systems/rigged_body.gd</code> (+ scene), the imported character and animation files under <code>game/art/characters/</code>, <code>CREDITS.md</code>. In <code>baseline_human.gd</code> and <code>ragdoll_body.gd</code>, only the code that attaches zones to bones and builds ragdolls.</p>
+<p><b>BUILD.</b></p>
+<ol class="bl">
+<li>Import one CC0 rigged low-poly humanoid (Quaternius base characters, or a Mixamo-compatible low-poly body) and its animation set: idle, walk, run, crouch, jump, roll, hit reactions front/back/left/right, two deaths, plus the attack sets job 3 needs. Retarget to one skeleton.</li>
+<li>Map every BaselineHuman zone (head, neck, torso, each arm segment, hands, each leg segment) to a bone with a <code>BoneAttachment3D</code>, so wounds, organs and X-ray layers follow the animated skeleton.</li>
+<li>Severing: hide the cut limb's bones' mesh section (or swap a pre-cut stump mesh) and spawn the limb as its own physics body with the same zones.</li>
+<li>Death ragdoll from <code>PhysicalBone3D</code> on the same skeleton with joint limits and damping that fold and sprawl believably, weighty not floaty. Compare Godot Physics and Jolt (built in since Godot 4.4) in the mechanics lab and write the result into your report before proposing a project-wide switch.</li>
+<li>Apply the existing PS1-style material so it reads as the game.</li>
+</ol>
+<p><b>PROOF.</b> PNGs: front, side, first-person arms, third-person over the shoulder, a ragdoll at rest, a severed arm. Head present, shoulders normal. <b>TESTS.</b> <code>ragdoll_body_test</code>, <code>gore_sandbox_hit_reaction_test</code>, <code>baseline_human_test</code>, <code>body_cut_test</code> stay green (update with a stated reason if a test asserted the old pieces). New <code>rigged_body_test</code>: every zone has a bone; a death leaves all unsevered parts within joint reach. <b>OPEN.</b> The final character art (Greg's own later). Whether the player character uses the same base as enemies. <b>OUT.</b> Faces and character-creation sliders (job 4 hooks those up). <b>Skills.</b> <code>build-rigged-game-assets</code>, <code>godot-animation</code>, <code>godot-physics</code>, <code>godot-3d-essentials</code>.</p></div></details>
+<details class="brief"><summary>Job 3: Moving and fighting</summary><div class="bb"><p><b>GOAL.</b> The v0.1 weapons work on a pad and feel weighty. Greg replaced the fire axe (<i>"200 years in the future, why would they just have an axe"</i>) and the sword. v0.1 weapons are:</p>
+<ul class="bl">
+<li>a <b>heated / vibro cleaver</b>: an industrial meat-processing cleaver with a</li>
+</ul>
+<p>heating edge, light cyberpunk, still brutal;</p>
+<ul class="bl">
+<li>a <b>powered polearm / staff</b>: a guard's shock staff with reach;</li>
+<li>the <b>pistol</b> (MERCY NINE) with aim down the barrel.</li>
+</ul>
+<p>Disciplines in v0.1: <b>Brawler</b> (cleaver, staff) and <b>Marksman</b> (pistol).</p>
+<p><b>EXISTS.</b> <code>systems/hunter_arsenal.gd</code> (weapon table, MERCY NINE, slots), <code>systems/held_gear.gd</code> (hands and holding), <code>systems/sword_moveset.gd</code>, <code>systems/souls_roll.gd</code>, <code>systems/souls_pad.gd</code>, <code>systems/knockback.gd</code>, <code>systems/combat_stance.gd</code>, <code>systems/limb_momentum.gd</code> (the blow is performed), <code>systems/penetration.gd</code>, ADS on the sight line (merged 4 Oct, see <code>git log --grep "Aim down the barrel"</code>), <code>systems/lock_ring.gd</code>. The fire axe lives in <code>systems/doctor_route.gd</code> and <code>support_unit.gd</code>: replace its uses with the cleaver.</p>
+<p><b>OWNS.</b> Weapon entries and movesets in <code>hunter_arsenal.gd</code>, <code>sword_moveset.gd</code> (generalise to a melee moveset), new weapon model files and their <code>CREDITS.md</code> lines, the camera rig (add the Phantom Camera addon or use the existing third-person camera), and the axe-to-cleaver swaps.</p>
+<p><b>BUILD.</b></p>
+<ol class="bl">
+<li>Movement on the Souls pad base: walk/run on stick tilt, sprint (L3 or hold Circle), crouch, jump, roll with i-frames and stamina cost. Accelerate and stop quickly with a landing dip (Greg: grounded, quick stops).</li>
+<li>Melee: R1 light, R2 heavy (hold to charge), L1 block, L2 parry. Directional swings from stick or mouse direction. Hit windows, hitstop 60–90 ms on contact, camera kick, blood and spark from the existing FX, enemies stagger on heavy hits. Input buffer of about 150 ms so presses during an animation are not lost. The cleaver's heated edge glows brighter after hits and leaves a burn decal on wounds; the staff has reach and a charged shock that staggers. Numbers live in one table so they can be tuned.</li>
+<li>Pistol: L2 aims down the barrel, R2 fires, L3 steps zoom; rounds are objects (<code>penetration.gd</code>); casings stay.</li>
+<li>Lock-on (R3) that frames both fighters over the shoulder; target switch with the right stick.</li>
+<li>Models: free CC0/CC-BY low-poly cleaver, staff and pistol, retextured to the house palette, with sight and muzzle markers for ADS.</li>
+</ol>
+<p><b>PROOF.</b> A short capture (or PNG sequence) of each weapon killing a dummy and a fighting enemy in the mechanics lab, on the pad. PNGs of each weapon held in first person. <b>TESTS.</b> <code>combat_stance_test</code>, <code>souls_pad_test</code>, <code>souls_roll_test</code>, <code>sandbox_duel_test</code>, ADS test from the 4 Oct merge stay green. New <code>v01_weapons_test</code>: each weapon hits a dummy through real input actions. <b>OPEN.</b> The weapons' names. Whether the cleaver's heat costs anything (battery, overheat). The staff's exact moves beyond light, heavy, charged shock. Build sensible defaults behind dials and list them in the report. <b>OUT.</b> The other four disciplines, off-hand guns, grips, the weapon wheel. <b>Skills.</b> <code>design-action-combat</code>, <code>maximizing-game-feel</code>, <code>godot-animation</code>, <code>build-game-camera-controls</code>.</p></div></details>
+<details class="brief"><summary>Job 4: Waking in the vat</summary><div class="bb"><p><b>GOAL.</b> Greg's opening, in order: <i>"the cutscene happens after you press play… you slowly open your eyes, you're in a vat, it's in first person, there's liquid all around you… actual liquid with physics… it's red, a bloody vat"</i>. Then a short intake, the brain screen, the brain hack and the breakout. No belt, no handless crawl: <i>"why am I holding this stupid piece of a belt? I have no hands"</i>. Four minutes from load-in to standing.</p>
+<p><b>EXISTS.</b> <code>vat_chamber.tscn/.gd</code>, <code>systems/vat_intake.gd</code>, <code>systems/vat_body_preview.gd</code>, <code>systems/torture_load_in.gd</code>, <code>systems/doctor_examination.gd</code>, <code>systems/vat_smash.gd</code>, <code>systems/room_lights.gd</code>, <code>systems/character_presets.gd</code>. Greg likes the intro cutscene and the "get revenge" beat: do not change the cutscene.</p>
+<p><b>OWNS.</b> <code>vat_chamber.gd/.tscn</code>, <code>systems/vat_intake.gd</code>, the new brain-screen scene, the liquid shader and spill effect (shared with job 1: import job 1's liquid if it has landed).</p>
+<p><b>BUILD.</b></p>
+<ol class="bl">
+<li>Fix the intro cutscene playing too fast (find the time-scale or skip leak).</li>
+<li>Wake: black, then eyes open slowly underwater in first person; red fluid with depth tint, wobble and bubbles; muffled sound and heartbeat; you can look down at your own rigged body (job 2) with the cords in it.</li>
+<li>Intake on the pad: bumpers change tab, stick moves rows and values, Cross confirms, Circle goes back, Triangle rerolls; big targets; the quick-start preset is the default button. Rename by an on-screen pad keyboard. Every on-screen key hint follows the device. (Arcade-cabinet redesign is later.)</li>
+<li>Brain screen after intake: pick Brawler and Marksman (the two v0.1 disciplines), third person switches on.</li>
+<li>Brain hack: the existing scream, screen break, memory flashes, 1.2 s of silence, BRAIN HACKED / SOUL OVERTAKEN.</li>
+<li>Breakout with your hands: tear the cords out (pain, blood, scream each), hit the glass until it cracks and bursts (Cell Fracture pieces), the fluid floods the floor and you fall with it, crawl a few metres, pull up on the tank, stand.</li>
+<li>Declutter and enlarge the experimentation room so the vat, the lab, the examiner's door and the exit read clearly.</li>
+</ol>
+<p><b>PROOF.</b> PNGs of each beat (underwater, intake on pad, brain screen, glass cracking, the flood, standing). A timed run under 4 minutes. <b>TESTS.</b> <code>opening_handoff_test</code>, <code>vat_smash_test</code>, <code>demo_launch_timing_test</code>, intake tests stay green. New: the whole beat chain completes using only joypad events. <b>OPEN.</b> Exact line of the player's own thoughts at each beat (Greg writes these). Whether mismatched discipline pairs matter in v0.1 (only two exist). <b>OUT.</b> The other routes, the Support Unit, character art. <b>Skills.</b> <code>create-game-vfx</code>, <code>godot-shaders</code>, <code>godot-ui-control</code>, <code>maximizing-game-feel</code>.</p></div></details>
+<details class="brief"><summary>Job 5: The facility, one map</summary><div class="bb"><p><b>GOAL.</b> Greg: <i>"one coherent map in one section that has all the interconnection tunnels… not constant loading screens"</i>, <i>"take the elevator down and then it's actually going down"</i>. v0.1 walks vat floor, examiner office, service arcade and Lower Works, then rides the heat elevator up.</p>
+<p><b>EXISTS.</b> <code>DESIGN/FACILITY.md</code> (the map: levels, room origins, grid, connections), <code>facility.tscn/.gd</code>, <code>facility_tunnel_network.tscn</code>, <code>systems/facility_elevator.gd</code>, <code>systems/facility_tunnel_door.gd</code>, <code>systems/breakable_door.gd</code>, <code>systems/facility_routes.gd</code>, the room scenes (<code>vat_chamber</code>, <code>service_arcade</code>, <code>buried_city</code> for Lower Works). The tunnel kit (Higgsfield, 4 Oct) is imported.</p>
+<p><b>OWNS.</b> <code>facility.gd/.tscn</code>, <code>facility_tunnel_network.tscn</code>, the elevator and tunnel-door scripts, room-to-room corridor geometry. Room scripts: only their exits and the removal of the items listed below.</p>
+<p><b>BUILD.</b></p>
+<ol class="bl">
+<li>Place the four v0.1 rooms at their <code>FACILITY.md</code> origins in one scene (or streamed cells with no visible load) joined by corridors on the 4 m grid.</li>
+<li>Transit lift and heat elevator are real rides: doors close, the cab moves through a visible shaft with passing light strips, floor indicator and hum, doors open on the new level; you keep control and can look around.</li>
+<li>Remove from v0.1 (switch off behind a flag, do not delete): the breach tool and pressure-gate scan puzzle, the vent, "creep past it", the lift-fuse hunt, the scavenger stashes, power-line cutting, the wound minigame, undressing the subject, text inspections, and the invisible demo barrier.</li>
+<li>One objective line, never clipped at any resolution, always naming the next doable thing and matching the door in front of you.</li>
+<li>Retexture greybox with ambientCG grime; Quaternius or Kenney CC0 modular sci-fi pieces where the tunnel kit has gaps; pools of light per the lighting decisions in <code>DESIGN.md</code> (28 September).</li>
+</ol>
+<p><b>PROOF.</b> A walk from the vat to the surface door with zero <code>Interstitial.travel</code> calls (log it). PNGs of every corridor join and both lift rides. <b>TESTS.</b> <code>first_thirty_route_test</code> (update to the new route), facility and elevator tests from 4 Oct stay green. New: walkable path vat to surface with no scene change. <b>OPEN.</b> Whether the switched-off routes come back as dead ends or sealed doors in v0.1. <b>OUT.</b> Drains, Support Unit, doctor chase, the derby. <b>Skills.</b> <code>author-game-levels</code>, <code>godot-3d-essentials</code>, <code>performance-profiling</code>.</p></div></details>
+<details class="brief"><summary>Job 6: The examiner</summary><div class="bb"><p><b>GOAL.</b> Greg: <i>"it's a boss fight. I hit him once, hit him twice, his head's all broken… he's dead"</i>, and <i>"I literally killed him, where is his key"</i>. A real, fair boss; his keycard always drops and always opens the staff door.</p>
+<p><b>EXISTS.</b> <code>systems/examiner_fight.gd</code>, <code>systems/doctor_examination.gd</code>, <code>systems/doctor_route.gd</code>, <code>addons/limboai</code> (behaviour trees), the staff-door and cupboard code in <code>vat_chamber.gd</code>, <code>systems/field_inventory.gd</code> (the STAFF KEYCARD item already appears there; the door checks a different thing).</p>
+<p><b>OWNS.</b> <code>examiner_fight.gd</code>, a LimboAI tree for him, the keycard drop and the staff-door check.</p>
+<p><b>BUILD.</b></p>
+<ol class="bl">
+<li>On the rigged body (job 2): about 30 seconds of fight. Telegraphed scalpel slashes, a syringe lunge that slows you for 6 s, a stagger window after a parried slash, two phases (he gets desperate under half health). Readable wind-ups, fair damage, the arena lit so you can read him.</li>
+<li>Fix the head breaking apart after two hits: dismemberment is deliberate and earned, not a mesh glitch.</li>
+<li>On death his keycard drops as a visible pickup; the staff door reads the same inventory item; its prompt names what it needs and where it is.</li>
+<li>The cupboard behind it gives loot that matters for v0.1 (ammunition, a heal, the staff weapon if job 3 places it there).</li>
+</ol>
+<p><b>PROOF.</b> PNGs of his telegraphs, the keycard on the floor, the door opening. <b>TESTS.</b> Examiner and doctor tests stay green. New: kill him, card in inventory, door opens, every time (run it ten times with random seeds). <b>OPEN.</b> His lines (Greg writes them). His final model (stand-in until Greg says). <b>OUT.</b> The hologram, the vehicle bay, the chase route. <b>Skills.</b> <code>tune-enemy-ai</code>, <code>design-action-combat</code>, <code>adversarially-validating-game-repairs</code>.</p></div></details>
+<details class="brief"><summary>Job 7: Death, saves and the screen</summary><div class="bb"><p><b>GOAL.</b> You can die, come back, carry on and always know where to go, on a pad, without clutter. Greg: <i>"there's no inventory… there's not even a menu showing my items"</i>, <i>"there's like a trillion different UI things"</i>.</p>
+<p><b>EXISTS.</b> <code>systems/vat_rebirth.gd</code>, <code>systems/rebirth_site.gd</code>, <code>systems/quantum_saves.gd</code>, <code>systems/character_presets.gd</code>, <code>systems/field_inventory.gd</code>, <code>systems/key_hints.gd</code>, <code>systems/gothic_field_hud.gd</code>, <code>systems/input_profile.gd</code>.</p>
+<p><b>OWNS.</b> The v0.1 HUD layout, the death and bloodstain flow, checkpoint triggers, the pause/settings and inventory entry points.</p>
+<p><b>BUILD.</b></p>
+<ol class="bl">
+<li>Death: regrow in the vat; your carried items stay at your corpse; your blood fragments drop as a pulsing organ-sigil you hear before you see (heartbeat rising, red-copper glow); walk into it to recover; die again first and it is gone.</li>
+<li>Checkpoints at the vat, the examiner office door and each lift.</li>
+<li>Inventory on one button (Touchpad / Tab), pad-navigable, showing what you carry; the first time an item matters, one hint shows the button.</li>
+<li>HUD for v0.1: health and stamina, one objective line, one context prompt. Everything else off. One-time button hints, big, bottom centre, device aware.</li>
+<li>Pause and settings on Options / Esc, pad-navigable: volume, sensitivity, invert, FOV, subtitles, gore and censor, graphics preset.</li>
+</ol>
+<p><b>PROOF.</b> PNGs of the HUD in each room, the bloodstain, the inventory on pad, the pause menu. <b>TESTS.</b> Rebirth, saves, presets and key-hint tests stay green. New: die, recover the stain, quit, load the checkpoint. <b>OPEN.</b> What the blood fragments buy in v0.1 (nothing until the brain board exists, unless Greg says otherwise). <b>OUT.</b> The Black Mirror, the brain board, the Wire. <b>Skills.</b> <code>godot-ui-control</code>, <code>build-game-inventory</code>, <code>audit-ai-design-slop</code>.</p></div></details>
+<details class="brief"><summary>Job 8: Play it, fix it</summary><div class="bb"><p><b>GOAL.</b> Greg plays v0.1 from START to the surface on the pad and the five worst problems get fixed, then again.</p>
+<p><b>BUILD.</b> Merge jobs 1–7. Build the tag <code>v0.1-escape</code>. Hand Greg <code>P:/GameDev/PLAY.cmd</code>. Record his notes verbatim into the direction file. Fix the five worst, one builder each, then repeat.</p>
+<p><b>PROOF.</b> The tag, a full-run capture, and Greg saying it feels right.</p></div></details>
+</section>
+
+<section>
+  <h2><span class="no">07</span>After v0.1</h2>
+  <ul class="plain">
+    <li><b>v0.2:</b> Support Unit and bingyangers, the drains route, the doctor chase, Black Mirror, two more disciplines.</li>
+    <li><b>v0.3:</b> the surface first hour: exit reveals, random events, monks, posters and the Board.</li>
+    <li><b>v0.4 and on:</b> the world systems from the game plan, one at a time, each proven in the mechanics lab before it touches the map.</li>
+  </ul>
+</section>
+
+<footer><span>One game · P:\GameDev\AllusionsTooGrandeur</span><span>Ideas live in the Game Plan; this page is what gets built</span></footer>
+</div>

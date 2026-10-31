@@ -30,6 +30,8 @@ func _ready() -> void:
 		get_tree().quit(2)
 		return
 	var tree := get_tree()
+	# The root is still adding this test during _ready; add_child would fail.
+	await tree.process_frame
 	var scene: Node = load("res://vat_chamber.tscn").instantiate()
 	tree.root.add_child(scene)
 	tree.current_scene = scene

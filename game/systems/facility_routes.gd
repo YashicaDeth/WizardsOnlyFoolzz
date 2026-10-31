@@ -13,6 +13,21 @@ const ROUTE_STEALTH := "maintenance_ascent"
 const ROUTE_COOPERATION := "undercroft_compact"
 const ROUTE_ASSAULT := "executive_breach"
 const ROUTE_RECAPTURE := "containment_derby"
+## Greg, 24 September: with the derby shelved as an exit, the Lower Works
+## heat elevator carries the player up to the surface. It is the demo's first
+## route out; the old drains (ROUTE_STEALTH, walked in `old_drains.tscn`) are
+## the second.
+const ROUTE_HEAT_ELEVATOR := "heat_elevator_ascent"
+## Greg, 24 September (DESIGN/ESCAPE_ROUTES.md): the third way out is chasing
+## the doctor. Through his examination room, down the support unit corridor to
+## his vehicle bay, where he turns out to be a hologram; the bay's ramp is the
+## way up. The bay is played in `doctor_vehicle_bay.tscn`.
+const ROUTE_DOCTOR := "doctor_pursuit"
+## Greg, 24 September: the derby comes out through a gate in the arena into old
+## tunnels you drive (`derby_tunnels.tscn`), which empty at the dry blood
+## waterfall (`blood_waterfall_exit.tscn`). Begun at the colosseum, not at the
+## Growing Floor: the pit is where this way out starts.
+const ROUTE_DERBY_TUNNELS := "derby_tunnels"
 
 const CONTAINMENT_MECHANISMS := {
 	"implant_suppression_lattice": "The rewritten brain implant is pinned by a tuned suppression lattice.",
@@ -22,8 +37,8 @@ const CONTAINMENT_MECHANISMS := {
 
 const DISTRICTS := {
 	"growing_floor": {"name": "Growing Floor", "kind": "occult_laboratory"},
-	"waste_gallery": {"name": "Waste Gallery", "kind": "trafficking_tunnel"},
-	"maintenance_cistern": {"name": "Maintenance Cistern", "kind": "maintenance_network"},
+	"waste_gallery": {"name": "The Old Drains", "kind": "trafficking_tunnel"},
+	"maintenance_cistern": {"name": "The Drain Cistern", "kind": "maintenance_network"},
 	"storm_outfall": {"name": "Storm Outfall", "kind": "surface_exit"},
 	"ossuary_exchange": {"name": "Ossuary Exchange", "kind": "catacombs"},
 	"undercroft_settlement": {"name": "Undercroft Settlement", "kind": "underground_settlement"},
@@ -36,6 +51,17 @@ const DISTRICTS := {
 	"underground_colosseum": {"name": "Underground Colosseum", "kind": "occult_entertainment"},
 	"lockdown_grid": {"name": "Lockdown Grid", "kind": "maintenance_network"},
 	"vehicle_sallyport": {"name": "Vehicle Sallyport", "kind": "surface_exit"},
+	# The Lower Works lift. The Service Arcade and Lower Works themselves are
+	# not districts of this graph yet, so it hangs off the facility interior.
+	"heat_elevator": {"name": "Lower Works Heat Elevator", "kind": "surface_exit"},
+	# The doctor's way out: the room he watched from behind the player's vat,
+	# the support unit his staff use, and the bay his vehicle waits in.
+	"examination_room": {"name": "Examination Room", "kind": "corporate_laboratory"},
+	"support_unit": {"name": "Support Unit", "kind": "maintenance_network"},
+	"doctor_vehicle_bay": {"name": "The Doctor's Vehicle Bay", "kind": "surface_exit"},
+	# Behind the derby's tunnel gate, and where those tunnels empty.
+	"derby_tunnels": {"name": "The Derby Tunnels", "kind": "maintenance_network"},
+	"dry_falls": {"name": "The Dry Falls", "kind": "surface_exit"},
 }
 
 const CONNECTIONS := [
@@ -53,15 +79,27 @@ const CONNECTIONS := [
 	["processing_chute", "underground_colosseum"],
 	["underground_colosseum", "lockdown_grid"],
 	["lockdown_grid", "vehicle_sallyport"],
+	["growing_floor", "heat_elevator"],
+	["growing_floor", "examination_room"],
+	["examination_room", "support_unit"],
+	["support_unit", "doctor_vehicle_bay"],
+	["underground_colosseum", "derby_tunnels"],
+	["derby_tunnels", "dry_falls"],
 ]
 
+## Greg's playtest (29 September): every way out comes up somewhere of its
+## own. The heat elevator, the first-run exit, stays by the pit gate; the
+## rest are spread over the 470 x 370 m expanse, one quarter each:
+##   drains west, dry falls south-west, lantern lift south, freight spur
+##   south-east, doctor's bay east, blast shaft north-east, sallyport north-west.
 const ROUTES := {
 	ROUTE_STEALTH: {
 		"approach": "stealth_exploration",
-		"label": "MAINTENANCE ASCENT",
+		# Greg: named for what you walk (ids kept for saves).
+		"label": "THE OLD DRAINS",
 		"steps": ["waste_gallery", "maintenance_cistern", "storm_outfall"],
 		"exit": "storm_outfall",
-		"surface_position": Vector3(-26.0, 0.0, 12.0),
+		"surface_position": Vector3(-110.0, 0.0, 10.0),
 		"surface_relationships": {"gate_lanterns": 4, "celloutz": -8},
 		"mastery_route": true,
 		"avoids_derby": true,
@@ -76,12 +114,12 @@ const ROUTES := {
 		"outcomes": {
 			"honour": {
 				"final_step": "lantern_lift", "exit": "lantern_lift",
-				"surface_position": Vector3(-8.0, 0.0, 26.0),
+				"surface_position": Vector3(-20.0, 0.0, 120.0),
 				"surface_relationships": {"gate_lanterns": 14, "undercroft_freehold": 10, "celloutz": -6},
 			},
 			"betray": {
 				"final_step": "stolen_freight_spur", "exit": "stolen_freight_spur",
-				"surface_position": Vector3(18.0, 0.0, 20.0),
+				"surface_position": Vector3(60.0, 0.0, 110.0),
 				"surface_relationships": {"gate_lanterns": -12, "undercroft_freehold": -20, "ashline_wreckers": 8},
 			},
 		},
@@ -91,18 +129,57 @@ const ROUTES := {
 		"label": "EXECUTIVE BREACH",
 		"steps": ["containment_concourse", "executive_transit", "blast_shaft"],
 		"exit": "blast_shaft",
-		"surface_position": Vector3(30.0, 0.0, -14.0),
+		"surface_position": Vector3(120.0, 0.0, -100.0),
 		"surface_relationships": {"celloutz": -30, "ashline_wreckers": 5},
 		"required_control_points": ["concourse", "transit", "shaft"],
 		"mastery_route": true,
 		"avoids_derby": true,
+	},
+	ROUTE_HEAT_ELEVATOR: {
+		"approach": "heat_elevator",
+		"label": "HEAT ELEVATOR",
+		"steps": ["heat_elevator"],
+		"exit": "heat_elevator",
+		# The sallyport's arrival point: the derby used to surface the player
+		# here, and the lift that replaced it as the way up comes out beside it.
+		"surface_position": Vector3(-2.0, 0.0, -31.0),
+		"surface_relationships": {},
+		"mastery_route": false,
+		"avoids_derby": true,
+	},
+	ROUTE_DOCTOR: {
+		"approach": "pursuit",
+		"label": "CHASING THE DOCTOR",
+		"steps": ["examination_room", "support_unit", "doctor_vehicle_bay"],
+		"exit": "doctor_vehicle_bay",
+		# Assistant placement, not Greg's: north-west of the start, clear of
+		# the outfall (west), the sallyport (south) and the ridge (east).
+		"surface_position": Vector3(110.0, 0.0, -10.0),
+		# Breaking into a CellOutz officer's private bay is noticed.
+		"surface_relationships": {"celloutz": -12},
+		"mastery_route": false,
+		"avoids_derby": true,
+	},
+	ROUTE_DERBY_TUNNELS: {
+		"approach": "derby_tunnels",
+		"label": "DERBY TUNNELS / THE DRY FALLS",
+		"start": "underground_colosseum",
+		"steps": ["derby_tunnels", "dry_falls"],
+		"exit": "dry_falls",
+		# Assistant placement, not Greg's (blood_waterfall_exit.gd
+		# SURFACE_POSITION): beside the storm outfall, since the drains are
+		# what feed the falls. Relationships as the derby's recapture exit.
+		"surface_position": Vector3(-90.0, 0.0, 100.0),
+		"surface_relationships": {"ashline_wreckers": 12, "celloutz": -18},
+		"mastery_route": false,
+		"avoids_derby": false,
 	},
 	ROUTE_RECAPTURE: {
 		"approach": "recapture_into_derby",
 		"label": "CONTAINMENT / UNDERGROUND DERBY",
 		"steps": ["processing_chute", "underground_colosseum", "lockdown_grid", "vehicle_sallyport"],
 		"exit": "vehicle_sallyport",
-		"surface_position": Vector3(4.0, 0.0, -24.0),
+		"surface_position": Vector3(-80.0, 0.0, -120.0),
 		"surface_relationships": {"ashline_wreckers": 12, "celloutz": -18},
 		"mastery_route": false,
 		"avoids_derby": false,
@@ -129,6 +206,12 @@ static func ensure() -> Dictionary:
 	return record
 
 
+## Greg's playtest: the first run is one guided breakout out of the heat
+## elevator. Side exits (his lift, the drains) open once you have got out once.
+static func escaped_once() -> bool:
+	return not (ensure().get("completed_routes", []) as Array).is_empty()
+
+
 static func route(route_id: String) -> Dictionary:
 	return (ROUTES.get(route_id, {}) as Dictionary).duplicate(true)
 
@@ -152,6 +235,10 @@ static func begin(route_id: String) -> bool:
 	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(SUBJECT, {
 		"active_route": route_id,
+		# Every chosen route starts from the Growing Floor. Without this a
+		# route abandoned halfway left `current_district` deep in another
+		# branch, and the next route's first step was refused as unconnected.
+		"current_district": str(definition.get("start", "growing_floor")),
 		"route_steps": [],
 		"route_choice": "",
 		"assault_control_points": [],
@@ -232,6 +319,20 @@ static func apply_recapture(mechanism_id: String, demonstrated_in_play: bool) ->
 	return true
 
 
+## Greg's playtest: the colosseum was unreachable on a fresh run. After your
+## first escape, a facility guard who puts you down takes you alive: the
+## implant flash pins you (the suppression lattice) and you go to the chute
+## and the derby instead of the vat. Returns the travel request, or {}.
+static func recapture_on_guard_kill() -> Dictionary:
+	if not escaped_once() or not apply_recapture("implant_suppression_lattice", true):
+		return {}
+	return {
+		"scene": "res://underground_colosseum.tscn",
+		"next": "THEY TAKE YOU ALIVE  //  THE REPROCESSING CHUTE",
+		"after": "YOU WAKE IN THE DERBY PIT",
+	}
+
+
 static func earn_derby_exit(demonstrated_cause: String) -> bool:
 	var record := ensure()
 	if str(record.get("active_route", "")) != ROUTE_RECAPTURE or demonstrated_cause.is_empty():
@@ -305,6 +406,29 @@ static func consume_surface_handoff() -> Dictionary:
 	})
 	WorldHistory.commit_ledger_batch()
 	return handoff
+
+
+## A place that sends you up with no route handoff of its own (the dry
+## falls, reached through the derby tunnels) files one here, so the Hunt
+## still lands you where you came out. A route's own handoff always wins.
+static func hand_off_at(exit_id: String, at: Vector3) -> bool:
+	if not pending_surface_handoff().is_empty():
+		return false
+	var record := ensure()
+	var route_id := str(record.get("active_route", ""))
+	if route_id.is_empty():
+		route_id = "derby_tunnels"
+	WorldHistory.amend_subject(SUBJECT, {
+		"active_route": "",
+		"pending_surface_handoff": {
+			"route_id": route_id,
+			"exit_id": exit_id,
+			"surface_position": [at.x, at.y, at.z],
+			"relationships": {},
+			"avoided_derby": false,
+		},
+	})
+	return true
 
 
 static func _complete(route_id: String, definition: Dictionary) -> void:

@@ -47,6 +47,7 @@ func _ready() -> void:
 	hunt.third_person = false
 	var switch := InputEventKey.new()
 	switch.keycode = KEY_F
+	switch.physical_keycode = KEY_F
 	switch.pressed = true
 	hunt._unhandled_input(switch)
 	check(hunt.third_person, "the actual F binding enters third person after first contact")

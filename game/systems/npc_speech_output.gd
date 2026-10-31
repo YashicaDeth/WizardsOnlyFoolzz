@@ -82,8 +82,8 @@ class NativeVoice extends Voice:
 	var pitch := 0.88
 	var volume := 62
 
-	func _init(preferred_language := "en_AU") -> void:
-		voice_id = NPCSpeechOutput.best_voice(preferred_language, true)
+	func _init(selected_voice_id: String) -> void:
+		voice_id = selected_voice_id
 
 	func speak(text: String, interrupt: bool = true) -> void:
 		if voice_id.is_empty() or text.strip_edges().is_empty():
@@ -121,11 +121,26 @@ class PipedVoice extends Voice:
 	## slows a delivery without dropping the pitch into parody.
 	const LENGTH_SCALE := 1.12
 
-	var player: AudioStreamPlayer
+	## The speaker, and the only clock this class has. It is a `Node` because the
+	## worker's result has to be picked up on the main thread, and `_process` is
+	## where a `RefCounted` can borrow one. See `_synthesise` for why the worker
+	## is polled rather than poked.
+	class Speaker extends AudioStreamPlayer:
+		var pump: Callable
+
+		func _process(_delta: float) -> void:
+			if pump.is_valid():
+				pump.call()
+
+	var player: Speaker
 	var last_error := ""
 	var _spoken_path := ""
 	var _thread: Thread = null
 	var _sequence := 0
+	## The worker's outbox. Everything the worker learns goes in here under the
+	## mutex, and nothing it learns is ever applied to the tree from there.
+	var _mail := Mutex.new()
+	var _posted: Dictionary = {}
 
 	static func installed() -> bool:
 		return FileAccess.file_exists(EXE) and FileAccess.file_exists(MODEL)
@@ -133,9 +148,33 @@ class PipedVoice extends Voice:
 	## Needs somewhere in the tree to put its speaker, which is the one thing
 	## the other backends do not -- `DisplayServer` speaks without a node.
 	func _init(host: Node) -> void:
-		player = AudioStreamPlayer.new()
+		player = Speaker.new()
 		player.bus = "Master"
+		player.pump = _collect
+		player.set_process(false)
 		host.add_child(player)
+		# A voice can outlive the node that made it -- anything still holding one
+		# at exit keeps it from ever reaching `NOTIFICATION_PREDELETE` -- so the
+		# one join that has to happen is hooked to the tree going away instead.
+		if host.is_inside_tree():
+			_watch_the_exit(host)
+		else:
+			host.tree_entered.connect(_watch_the_exit.bind(host), CONNECT_ONE_SHOT)
+
+	## The engine does not wait for threads. A worker still inside `OS.execute()`
+	## when the process tears down is `exit 139`, which is what a test that
+	## speaks a line and quits had been doing all along. This is the only place a
+	## line is waited for rather than polled, and it only happens on the way out.
+	func _watch_the_exit(host: Node) -> void:
+		var tree := host.get_tree()
+		if tree != null and not tree.root.tree_exiting.is_connected(_wait_for_worker):
+			tree.root.tree_exiting.connect(_wait_for_worker)
+
+	func _wait_for_worker() -> void:
+		if _thread == null:
+			return
+		_thread.wait_to_finish()
+		_thread = null
 
 	func speak(text: String, interrupt: bool = true) -> void:
 		var line := text.strip_edges()
@@ -148,10 +187,13 @@ class PipedVoice extends Voice:
 		# the conversation has moved on.
 		if _thread != null and _thread.is_alive():
 			return
-		_reap()
+		# A finished worker may have landed since the last frame. It belongs to
+		# the line this one is replacing, so it goes rather than plays over it.
+		_discard(_settle())
 		_sequence += 1
 		_thread = Thread.new()
 		_thread.start(_synthesise.bind(line, _sequence))
+		_listen(true)
 
 	func stop() -> void:
 		if player != null and is_instance_valid(player):
@@ -160,12 +202,22 @@ class PipedVoice extends Voice:
 	func is_speaking() -> bool:
 		return player != null and is_instance_valid(player) and player.playing
 
+	## Runs on the worker. It writes files and runs `OS.execute()` and touches
+	## nothing else: no node, no `call_deferred`, no `_play`.
+	##
+	## Posting a deferred call from here was the bug. `call_deferred()` is a
+	## message queued on the main thread's queue from the wrong thread, and when
+	## the tree quits with one still in flight it is delivered into an object that
+	## is already gone -- which took the whole process down on exit (exit 139 in
+	## `standing_contact_test`). The result goes into `_posted` behind the mutex
+	## instead, and the main thread collects it in `_collect`.
 	func _synthesise(line: String, sequence: int) -> void:
 		var base := OS.get_user_data_dir()
 		var text_path := "%s/piper_in_%d.txt" % [base, sequence]
 		var wav_path := "%s/piper_out_%d.wav" % [base, sequence]
 		var handle := FileAccess.open(text_path, FileAccess.WRITE)
 		if handle == null:
+			_post({"text": text_path, "error": "cannot write %s" % text_path})
 			return
 		handle.store_string(line)
 		handle.close()
@@ -182,9 +234,55 @@ class PipedVoice extends Voice:
 		# Captured rather than discarded: a synthesis that fails silently is a
 		# character who has simply stopped speaking, with nothing anywhere
 		# saying why.
-		last_error = "" if code == 0 else "piper exit %d: %s" % [code, "
-".join(output)]
-		call_deferred("_play", wav_path, text_path)
+		_post({
+			"wav": wav_path, "text": text_path,
+			"error": "" if code == 0 else "piper exit %d: %s" % [code, "
+".join(output)],
+		})
+
+	func _post(line: Dictionary) -> void:
+		_mail.lock()
+		_posted = line
+		_mail.unlock()
+
+	## Main thread, once a frame while a worker is out. Applies what the worker
+	## posted, if anything, and stops asking to be called when nothing is left.
+	func _collect() -> void:
+		var line := _settle()
+		if _thread != null:
+			return
+		_listen(false)
+		if line.is_empty():
+			return
+		last_error = str(line.get("error", ""))
+		var wav := str(line.get("wav", ""))
+		if wav.is_empty():
+			_discard(line)
+			return
+		_play(wav, str(line.get("text", "")))
+
+	func _listen(on: bool) -> void:
+		if player != null and is_instance_valid(player):
+			player.set_process(on)
+
+	## Main thread only. Joins a worker that has finished and hands back what it
+	## posted, or `{}` while it is still working. `_thread` stays set until the
+	## join has happened, so "still working" and "nothing to say" are not the
+	## same answer.
+	func _settle() -> Dictionary:
+		if _thread == null or _thread.is_alive():
+			return {}
+		# Always joined, never merely observed: `is_alive()` reads false the
+		# instant the worker returns, but the Thread itself is not finished with
+		# until it has been waited for, and freeing it unjoined is the warning
+		# and the crash this class used to leave on exit.
+		_thread.wait_to_finish()
+		_thread = null
+		_mail.lock()
+		var line := _posted
+		_posted = {}
+		_mail.unlock()
+		return line
 
 	func _play(wav_path: String, text_path: String) -> void:
 		# The one before this is finished with now that a new line is starting.
@@ -198,13 +296,26 @@ class PipedVoice extends Voice:
 			if stream != null and player != null and is_instance_valid(player):
 				player.stream = stream
 				player.play()
-		DirAccess.remove_absolute(text_path)
+		if not text_path.is_empty():
+			DirAccess.remove_absolute(text_path)
 
-	## A finished `Thread` still has to be collected or Godot complains on exit.
-	func _reap() -> void:
-		if _thread != null and not _thread.is_alive():
-			_thread.wait_to_finish()
-			_thread = null
+	## A line nobody is going to hear, with the files it left behind.
+	func _discard(line: Dictionary) -> void:
+		if line.is_empty():
+			return
+		for key in ["wav", "text"]:
+			var path := str(line.get(key, ""))
+			if not path.is_empty():
+				DirAccess.remove_absolute(path)
+
+	## A synthesis still running when this is freed takes its `Thread` with it, and
+	## Godot tears a Thread that was never waited for down badly enough to take the
+	## process with it. The last thing this does is let its worker finish.
+	func _notification(what: int) -> void:
+		if what != NOTIFICATION_PREDELETE or _thread == null:
+			return
+		_thread.wait_to_finish()
+		_thread = null
 
 
 ## Subtitles only. Used when the OS has no speech, and in headless tests, where
@@ -229,5 +340,8 @@ static func make(preferred_language := "en_AU", host: Node = null) -> Voice:
 	if host != null and PipedVoice.installed():
 		return PipedVoice.new(host)
 	if available():
-		return NativeVoice.new(preferred_language)
+		# Resolve the voice in the owning script before constructing the nested
+		# class. Having NativeVoice name its owner creates a script-resource
+		# reference cycle that otherwise retains the Hunt's loaded resource graph.
+		return NativeVoice.new(best_voice(preferred_language, true))
 	return SilentVoice.new()

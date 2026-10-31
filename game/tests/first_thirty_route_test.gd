@@ -1,0 +1,281 @@
+extends Node
+
+## The first 30 minutes, end to end (/goal): the real scenes in order, driven
+## through their own verbs, out by all four ways Greg chose, and into the
+## Hunt at each route's own arrival point.
+##
+##   vat: examination filed -> the examiner leaves -> the tank drains ->
+##        END ALL SUFFERING, four wires torn out -> GET REVENGE -> breakout;
+##        the rejected dead-subject undressing beat stays switched off
+##   Service Arcade: the ram and the card -> Hollis coerced, his hand on the
+##        reader, his gun taken -> the pressure gate
+##   Lower Works: then either the fuse and the heat elevator up, or the drain
+##        hatch -> the old drains -> the storm outfall
+##   The doctor's bay: his hologram, the call, and up his ramp.
+##   The derby tunnels: out at the dry falls.
+##   Hunt: arrives where that route surfaces, with the handoff consumed.
+
+var failures: Array[String] = []
+
+
+func check(condition: bool, label: String) -> void:
+	print("PASS " if condition else "FAIL ", label)
+	if not condition:
+		failures.append(label)
+
+
+func _carries(label: String) -> bool:
+	return VatRebirth.carries(label)
+
+
+func _key(code: Key) -> InputEventKey:
+	var event := InputEventKey.new()
+	event.keycode = code
+	event.physical_keycode = code
+	event.pressed = true
+	return event
+
+
+func _click() -> InputEventMouseButton:
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.pressed = true
+	return event
+
+
+## Every beat is timed and printed, so a pacing regression shows up as a number
+## in the log instead of a memory of "it felt slower". These are wall-clock
+## seconds: the route drives physics-heavy maps far faster than a player can,
+## so the numbers compare one run of this suite to the next, not to a human.
+var _started_msec := 0
+var _marks: Array = []
+
+
+func mark(label: String) -> void:
+	if _started_msec == 0:
+		_started_msec = Time.get_ticks_msec()
+		_marks.append([label, 0.0])
+		print("  %6.2fs  +0.00s  %s" % [0.0, label])
+		return
+	var at := (Time.get_ticks_msec() - _started_msec) / 1000.0
+	var since := at
+	if not _marks.is_empty():
+		since = at - float(_marks[_marks.size() - 1][1])
+	_marks.append([label, at])
+	print("  %6.2fs  +%.2fs  %s" % [at, since, label])
+
+
+func _print_timings() -> void:
+	if _marks.is_empty():
+		return
+	print("--- route timing (wall clock) ---")
+	for row: Array in _marks:
+		print("  %6.2fs  %s" % [float(row[1]), str(row[0])])
+	print("  route wall total: %.2fs" % float(_marks[_marks.size() - 1][1]))
+
+
+## A route test replaces whole physics-heavy maps much faster than a player
+## can. Give Jolt one physics step after the deferred free so its completed
+## jobs are reclaimed before the next map creates another full batch.
+func _free_route_scene(scene: Node) -> void:
+	scene.queue_free()
+	await get_tree().process_frame
+	await get_tree().physics_frame
+
+
+## The demo's first real player sequence. This deliberately uses the same
+## inputs as the hands-on breakout instead of relying on the test-mode legacy
+## auto-breach, because a route that only works after a private helper call is
+## not a route a friend can play.
+func _complete_live_breakout(vat: Node, route_name: String) -> void:
+	var wire_count: int = vat.umbilicals.size()
+	for _wire in wire_count:
+		if vat.umbilicals.is_empty():
+			break
+		var cable: Node3D = vat.umbilicals[0]
+		var aim: Vector3 = ((cable.get_child(3) as Node3D).global_position - vat.camera.global_position).normalized()
+		vat.yaw = atan2(-aim.x, -aim.z)
+		vat.pitch = asin(aim.y)
+		vat._update_wired(0.0)
+		for _tug in vat.WIRE_TUGS:
+			vat._unhandled_input(_key(KEY_E))
+		check(not vat.umbilicals.has(cable), "%s: aiming and E tears each wire" % route_name)
+	check(vat.phase == "cord" and vat.mouth_cord != null, "%s: the wires lead to the mouth cord" % route_name)
+	if vat.phase != "cord" or vat.mouth_cord == null:
+		return
+	for _pull in vat.CORD_TUGS:
+		vat._unhandled_input(_key(KEY_E))
+	check(vat.phase == "smash", "%s: E tears the cord before the glass" % route_name)
+	if vat.phase != "smash":
+		return
+	for _blow in vat.GLASS_BLOWS:
+		vat._unhandled_input(_click())
+	check(vat.phase == "knees" and vat.breakout_complete, "%s: every authored glass strike breaks free" % route_name)
+	if vat.boot_hud == null:
+		check(false, "%s: the HUD boot starts on the floor" % route_name)
+		return
+	for _tick in 120:
+		if vat.boot_hud.done:
+			break
+		vat._physics_process(0.05)
+	check(vat.boot_hud.done, "%s: the implant finishes booting before standing" % route_name)
+	if not vat.boot_hud.done:
+		return
+	vat._unhandled_input(_key(KEY_SPACE))
+	for _tick in ceili((vat.RISE_SECONDS + 0.2) / 0.05):
+		if vat.can_move:
+			break
+		vat._physics_process(0.05)
+	check(vat.can_move and vat.phase == "aisle", "%s: crawl and stand deliver normal control" % route_name)
+
+
+## Everything up to standing in the Lower Works, shared by both routes.
+func _through_the_facility(route_name: String) -> Node:
+	WorldHistory.clear_history()
+	WorldHistory.amend_subject(FacilityRoutes.SUBJECT, {"completed_routes": [FacilityRoutes.ROUTE_HEAT_ELEVATOR]})  # a returning run: this walks every route, not the first-run lessons
+	mark("%s: vat entered" % route_name)
+	print("--- %s: the vat ---" % route_name)
+	var vat = load("res://vat_chamber.tscn").instantiate()
+	vat.hands_on_breakout = true
+	add_child(vat)
+	await get_tree().process_frame
+	vat.intake._finish_filing()
+	await get_tree().process_frame
+	vat.departure_clock = vat.DEPARTURE_SECONDS
+	vat._update_departure(0.0)
+	vat.clock = vat.DRAINED_AT
+	vat.phase = "voiding"
+	vat._update_sequence(0.05)
+	check(vat.phase == "wired", "%s: the drained tank leaves you in the wires" % route_name)
+	_complete_live_breakout(vat, route_name)
+	check(vat.breakout_complete and vat.can_move, "%s: GET REVENGE, the glass goes, and you stand" % route_name)
+	mark("%s: out of the tank" % route_name)
+	check(vat.facility_map != null and vat.facility_map.player == vat.player, "%s: the connected facility keeps the opening player" % route_name)
+	vat.player.global_position = vat.stuck_tank_marker.global_position + Vector3(0, 0.9, 1.2)
+	vat._interact()
+	vat._interact()
+	check(Clothing.worn("player") == "bare" and WorldHistory.event_count("opening_first_object_used") == 0,
+		"%s: the rejected tank-pry and undressing beat is switched off" % route_name)
+	vat._record_service_arcade_entry()
+	await _free_route_scene(vat)
+
+	print("--- %s: the Service Arcade ---" % route_name)
+	var arcade = load("res://service_arcade.tscn").instantiate()
+	add_child(arcade)
+	await get_tree().process_frame
+	arcade.player.global_position = arcade.WEAPON_AT
+	arcade._interact()
+	arcade.player.global_position = arcade.CARD_AT
+	arcade._interact()
+	var post: FacilityGuardPost = arcade.guard_post
+	arcade.player.global_position = post.guard.global_position + Vector3(0, 0, 1.6)
+	arcade._interact()
+	arcade._interact()
+	check(post.door_open and _carries(FacilityGuardPost.GUN_LABEL), "%s: Hollis coerced, the D-section door open, his gun in Carry" % route_name)
+	arcade.player.global_position = arcade.GATE_AT + Vector3(0, 0, 2.0)
+	arcade._interact()
+	arcade._interact()
+	check(arcade.gate_open and arcade.lower_works_requested, "%s: the card opens the pressure gate onward" % route_name)
+	mark("%s: arcade cleared" % route_name)
+	await _free_route_scene(arcade)
+
+	print("--- %s: the Lower Works ---" % route_name)
+	var city = load("res://buried_city.tscn").instantiate()
+	add_child(city)
+	await get_tree().process_frame
+	check(city.breach_tool_ready, "%s: the ram came down with you" % route_name)
+	return city
+
+
+func _into_the_hunt(route_name: String, expected_route: String) -> void:
+	var handoff := FacilityRoutes.pending_surface_handoff()
+	check(str(handoff.get("route_id", "")) == expected_route, "%s: the route graph holds this route's surface handoff" % route_name)
+	var arrival: Array = handoff.get("surface_position", [])
+	var hunt = load("res://bone_yard_hunt.tscn").instantiate()
+	add_child(hunt)
+	await get_tree().process_frame
+	# On the ground there, not at the exact authored height: the Hunt settles
+	# the body onto its terrain (the drains' outfall sits 3.4 m up a bank) and
+	# the sallyport's props nudge the elevator's arrival about a metre.
+	var landed: Vector3 = hunt.player
+	check(arrival.size() == 3 and Vector2(landed.x, landed.z).distance_to(Vector2(float(arrival[0]), float(arrival[2]))) < 2.5,
+		"%s: the Hunt opens where this route surfaces (at %s, expected %s)" % [route_name, str(hunt.player), str(arrival)])
+	check(FacilityRoutes.pending_surface_handoff().is_empty(), "%s: and the handoff is consumed, once" % route_name)
+	mark("%s: Hunt arrived" % route_name)
+	check(OpeningDirector.reached("left_facility"), "%s: the opening run is out of the facility" % route_name)
+	await _free_route_scene(hunt)
+
+
+func _ready() -> void:
+	if OS.get_environment("ATG_TEST_MODE") != "1":
+		get_tree().quit(2)
+		return
+
+	mark("route start")
+	var city = await _through_the_facility("heat elevator")
+	city.player.global_position = city.FUSE_AT + Vector3(0, 0.1, 0)
+	city._interact()
+	city.player.global_position = city.LIFT_AT + Vector3(0, 0.9, 3.2)
+	city._interact()
+	check(city.lift_requested, "heat elevator: the fuse powers the lift and it carries you up")
+	mark("heat elevator: lift requested")
+	await _free_route_scene(city)
+	await _into_the_hunt("heat elevator", FacilityRoutes.ROUTE_HEAT_ELEVATOR)
+	var lift_arrival: Vector3 = FacilityRoutes.route(FacilityRoutes.ROUTE_HEAT_ELEVATOR).surface_position
+
+	city = await _through_the_facility("old drains")
+	city.player.global_position = city.DRAIN_AT + Vector3(0, 0.9, 1.0)
+	city._interact()
+	check(city.drains_requested, "old drains: the hatch drops you into the drains")
+	await _free_route_scene(city)
+	var drains = load("res://old_drains.tscn").instantiate()
+	add_child(drains)
+	await get_tree().process_frame
+	for at in [Vector3(0, 1.0, -6.0), Vector3(0, 1.0, drains.CISTERN_Z - 4.0), drains.EXIT_AT + Vector3(0, 0.9, 2.0)]:
+		drains.player.global_position = at
+		drains._physics_process(0.016)
+	drains._interact()
+	check(drains.surfaced, "old drains: gallery, cistern, and out through the storm outfall")
+	mark("old drains: outfall")
+	await _free_route_scene(drains)
+	await _into_the_hunt("old drains", FacilityRoutes.ROUTE_STEALTH)
+	var drain_arrival: Vector3 = FacilityRoutes.route(FacilityRoutes.ROUTE_STEALTH).surface_position
+	check(drain_arrival.distance_to(lift_arrival) > 20.0, "the two routes out surface in different parts of the map")
+
+	# The doctor's route: his bay, the hologram, the call, and up his ramp.
+	WorldHistory.clear_history()
+	WorldHistory.amend_subject(FacilityRoutes.SUBJECT, {"completed_routes": [FacilityRoutes.ROUTE_HEAT_ELEVATOR]})  # a returning run: this walks every route, not the first-run lessons
+	WorldHistory.register_subject("player", {"name": "THE HUNTER", "kind": "person", "status": "loose", "anatomy": {"cybernetics": []}})
+	WorldHistory.register_subject("inventory", {"kind": "inventory", "items": []})
+	DoctorExamination.begin_departure()
+	var bay = load("res://doctor_vehicle_bay.tscn").instantiate()
+	add_child(bay)
+	await get_tree().physics_frame
+	bay.player.global_position = bay.DOCTOR_AT + Vector3(0, 0.9, 1.5)
+	bay.attack()
+	bay.step(bay.REVEAL_SECONDS + 0.05)
+	bay.holo_call.skip()
+	bay.player.global_position = Vector3(0, bay.RAMP_RISE + 0.9, bay.RAMP_TOP_Z + 0.5)
+	bay.step(0.05)
+	check(bay.surface_requested, "doctor's route: his bay, the call, and up the ramp")
+	mark("doctor's route: ramp")
+	await _free_route_scene(bay)
+	await _into_the_hunt("doctor's route", FacilityRoutes.ROUTE_DOCTOR)
+
+	# The derby's secret route: the tunnels come out at the dry falls, and the
+	# falls send you up with no route of their own.
+	WorldHistory.clear_history()
+	WorldHistory.amend_subject(FacilityRoutes.SUBJECT, {"completed_routes": [FacilityRoutes.ROUTE_HEAT_ELEVATOR]})  # a returning run: this walks every route, not the first-run lessons
+	var falls = load("res://blood_waterfall_exit.tscn").instantiate()
+	add_child(falls)
+	await get_tree().process_frame
+	falls._complete("driving")
+	check(falls.travel_requested, "derby tunnels: out of the gorge past the dry falls")
+	mark("derby tunnels: dry falls")
+	await _free_route_scene(falls)
+	await _into_the_hunt("derby tunnels", "derby_tunnels")
+
+	mark("route complete")
+	_print_timings()
+	print("FIRST_THIRTY_ROUTE_TEST_RESULT failures=", failures.size())
+	get_tree().quit(0 if failures.is_empty() else 1)

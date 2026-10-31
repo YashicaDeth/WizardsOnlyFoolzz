@@ -79,6 +79,9 @@ static func set_quality_name(value: String) -> void:
 		"ULTRA": quality = Quality.ULTRA
 		"PERFORMANCE": quality = Quality.PERFORMANCE
 		_: quality = Quality.HIGH
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree != null:
+		apply_viewport_quality(tree.root)
 
 
 ## Applies the part of a graphics tier owned by the viewport rather than its
@@ -88,6 +91,8 @@ static func apply_viewport_quality(viewport: Viewport) -> void:
 	if viewport == null:
 		return
 	viewport.scaling_3d_scale = float(QUALITY_RENDER_SCALE[quality])
+	# Below native, FSR 1 sharpens the upscale where bilinear would smear it.
+	viewport.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR if viewport.scaling_3d_scale < 1.0 else Viewport.SCALING_3D_MODE_BILINEAR
 	viewport.msaa_3d = int(QUALITY_MSAA[quality]) as Viewport.MSAA
 	viewport.use_taa = quality != Quality.PERFORMANCE
 
@@ -189,15 +194,40 @@ const PRESETS := {
 	"lower_works": {
 		"zenith": "07090a", "horizon": "1b1512", "ground": "0c0a08",
 		"fog": "1d1a16", "fog_density": 0.0065, "volumetric": 0.010,
-		"ambient": 0.46, "saturation": 0.96, "contrast": 1.26, "exposure": 1.05,
+		"ambient": 0.46, "saturation": 0.96, "contrast": 1.26, "exposure": 1.4,
+	},
+	# The Growing Floor (Greg, 26 September, the Higgsfield vat renders: a
+	# black room, the colour held in the red vat glow, a faint green haze at
+	# the walls). It ran `ossuary`, and the vat room measured a pastel mauve
+	# median of 90/255 under 0.02 violet fog -- the same wash `front_door` and
+	# `lower_works` above were cut loose from. Dark red-brown air at under half
+	# the density, so the lamps and the tank do the colouring.
+	# Greg, 26 September: the vat room "darker, red only in the glow". The sky
+	# and fog were blood-brown, which tinted every surface red; now they are
+	# near-neutral black, and the red comes only from the vat's own light.
+	"growing_floor": {
+		"zenith": "050505", "horizon": "121010", "ground": "080707",
+		"fog": "151312", "fog_density": 0.009, "volumetric": 0.012,
+		"ambient": 0.24, "saturation": 1.0, "contrast": 1.22, "exposure": 0.95,
+	},
+	# The old drains (the brick drain and the bingyanger renders): wet brick
+	# under green-brown air, not the sodium orange the lamps pushed them to.
+	"old_drains": {
+		"zenith": "070907", "horizon": "1a1d14", "ground": "0b0c09",
+		"fog": "262a1c", "fog_density": 0.0075, "volumetric": 0.011,
+		"ambient": 0.5, "saturation": 0.9, "contrast": 1.2, "exposure": 1.15,
 	},
 }
+
+## The preset the scene on screen last asked for. HouseLook grades by it.
+static var current_preset := ""
 
 static var _noise_cache: Dictionary = {}
 
 
 static func environment(preset_name: String = "bone_yard") -> Environment:
 	var preset: Dictionary = PRESETS.get(preset_name, PRESETS.bone_yard)
+	current_preset = preset_name
 	var env := Environment.new()
 
 	# A6.1. The sky was a `ProceduralSkyMaterial` for five passes: a two-colour
@@ -385,6 +415,9 @@ static func surface(color: Color, kind: String = "paint", variation_seed: int = 
 		tint = tint.lightened(maxf(0.0, drift * 0.16)).darkened(maxf(0.0, -drift * 0.2))
 		tint.h = fposmod(tint.h + drift * 0.015, 1.0)
 	material.albedo_color = tint
+	# The grain maps are generated from the colour as asked for; the seed's
+	# drift rides on top as a tint (see `_apply_grain`).
+	material.set_meta("grain_base", color)
 
 	# A5.1. Up to v4 a kind was two scalars and a pattern, which is why every
 	# surface in the game answered a lamp with the same highlight: the world was
@@ -549,7 +582,15 @@ static func emissive(color: Color, energy: float) -> StandardMaterial3D:
 static func _apply_grain(material: StandardMaterial3D, scale: float, strength: float, kind := "paint", seed_value := 0) -> void:
 	material.uv1_triplanar = true
 	material.uv1_scale = Vector3(scale, scale, scale)
-	var maps := _surface_maps(kind, material.albedo_color, seed_value)
+	# Greg's 30 Sep playtest dropped to 7 fps: the maps were keyed on the
+	# seed-drifted colour, so nearly every blood droplet, body zone and wound
+	# state missed the cache and generated a new 96x96 pair (10 ms each, with
+	# a dozen per landed blow). Keyed on the base colour there are six per
+	# kind and colour (the seed's bucket); the drift is a multiplier below.
+	var drifted := material.albedo_color
+	var base: Color = material.get_meta("grain_base", drifted)
+	material.remove_meta("grain_base")
+	var maps := _surface_maps(kind, base, seed_value)
 	# Albedo was a flat colour on every surface in the game, with only roughness
 	# varying — which is the whole reason the world read as untextured primitives
 	# no matter how the geometry was built. Contamination arrives on the albedo
@@ -618,7 +659,11 @@ static func _apply_grain(material: StandardMaterial3D, scale: float, strength: f
 	# The tint now lives in the texture, so leave the multiplier neutral or the
 	# surface is coloured twice and goes muddy. The alpha is kept: glass carries
 	# its transparency there and the texture has none of its own.
-	material.albedo_color = Color(1, 1, 1, material.albedo_color.a)
+	material.albedo_color = Color(
+		clampf(drifted.r / maxf(base.r, 0.02), 0.6, 1.6),
+		clampf(drifted.g / maxf(base.g, 0.02), 0.6, 1.6),
+		clampf(drifted.b / maxf(base.b, 0.02), 0.6, 1.6),
+		material.albedo_color.a)
 
 
 ## A low-resolution, posterised, contaminated surface for one material kind,

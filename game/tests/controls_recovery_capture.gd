@@ -35,6 +35,7 @@ func _ready() -> void:
 	WorldHistory.record_event("melee_body_hit", {"target": "capture_contact", "location": hunt.HUNT_LOCATION})
 	var switch := InputEventKey.new()
 	switch.keycode = KEY_F
+	switch.physical_keycode = KEY_F
 	switch.pressed = true
 	hunt._unhandled_input(switch)
 	hunt.perspective_blend = 1.0

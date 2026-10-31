@@ -123,9 +123,18 @@ static func up_now(at: float) -> Array:
 	return present
 
 
+## The gods cross the sky over hours; four updates a second is plenty.
+var _sky_clock := 0.0
+
+
 func _process(delta: float) -> void:
 	if sky_material == null:
 		return
+	_sky_clock += delta
+	if _sky_clock < 0.25:
+		return
+	delta = _sky_clock
+	_sky_clock = 0.0
 	var at := WorldClock.hour()
 	var present := up_now(at)
 	for slot in SLOTS:

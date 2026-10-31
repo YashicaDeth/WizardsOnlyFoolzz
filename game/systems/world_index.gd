@@ -159,9 +159,21 @@ var _rail_cache: Array = []
 var _dead_pixels: Array = []
 
 
+## Item 5 (Greg, 2026-09-24): the contract prints as a thermal receipt and the
+## Wire as continuous tractor-feed paper. Each is a ThermalPrint laid over the
+## panel, re-printing what the page draws underneath it.
+var _receipt: ThermalPrint
+var _feed: ThermalPrint
+
+
 func _ready() -> void:
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	_receipt = ThermalPrint.make("register")
+	_feed = ThermalPrint.make("feed")
+	for paper in [_receipt, _feed]:
+		paper.visible = false
+		add_child(paper)
 	# Offsets as well as anchors. A Control parented straight to a CanvasLayer
 	# has no parent rect to inherit from, so anchors alone leave it at zero size
 	# and `_draw` bails on its own minimum-size guard without drawing anything.
@@ -248,7 +260,14 @@ func _rebuild_rail() -> void:
 				if not _is_person(subject):
 					continue
 				var person_label := str(subject.get("name", subject_id))
+				# Slice 9. Land is a subject in this list too, but every holding's
+				# `role` is the same "ASHBLOOM HOLDING", so the search matched names
+				# only: typing what the survey actually wrote on a place — its field
+				# note — found nothing. Land reports the field note; people report
+				# their role, which is the thing that distinguishes them.
 				var person_note := str(subject.get("role", ""))
+				if str(subject.get("kind", "")) == "place":
+					person_note = str(subject.get("note", ""))
 				if _matches(person_label, person_note):
 					_rail_cache.append({"id": subject_id, "label": person_label, "note": person_note})
 		1:
@@ -280,6 +299,19 @@ func _process(delta: float) -> void:
 	if not visible:
 		return
 	elapsed += delta
+	# Paper only once the page has fully arrived, so the slide-in stays a
+	# screen and the print lands on it.
+	var settled := page_blend >= 1.0 and open_blend >= 0.99
+	var panel := _panel_rect().grow(10.0)
+	if settled and page == 5:
+		_receipt.cover(Rect2(panel.position - Vector2(16, 0), panel.size + Vector2(32, 0)))
+	else:
+		_receipt.visible = false
+	if settled and page == 2:
+		# The sprocket margins sit outside the text, not over it.
+		_feed.cover(Rect2(panel.position - Vector2(30, 0), panel.size + Vector2(60, 0)))
+	else:
+		_feed.visible = false
 	action_life = maxf(0.0, action_life - delta)
 	page_blend = Motion.blend(page_blend, delta, Motion.PANEL, true)
 	_wire_glow = Motion.blend(_wire_glow, delta, Motion.PANEL, PAGES[page] == "WIRE")
@@ -292,6 +324,7 @@ func _process(delta: float) -> void:
 	rail_scroll = Motion.approach(rail_scroll, rail_scroll_target, delta, Motion.SCROLL)
 	if cursor_follows_mouse:
 		cursor_at = get_global_mouse_position()
+	_rebuild_rail_rects()
 	_rebuild_links()
 	queue_redraw()
 
@@ -752,6 +785,58 @@ func _panel_rect() -> Rect2:
 	return Rect2(body.position + Vector2(262, 0), body.size - Vector2(262, 0))
 
 
+## The rail column, exactly as `_draw()` derives it. `_rail_rects` used to exist
+## only as a side effect of painting the rail, which meant nothing but the paint
+## loop could ask what was pointable — and on `--headless` nothing paints at all,
+## so the list stayed empty forever. Same fix as `_rebuild_links()`, for the same
+## reason.
+func _rail_rect() -> Rect2:
+	var viewport := size
+	if viewport.x < 640.0 or viewport.y < 400.0:
+		viewport = get_viewport_rect().size
+	if viewport.x < 640.0 or viewport.y < 400.0:
+		return Rect2()
+	var plate := Rect2(Vector2(54, 44), viewport - Vector2(108, 88))
+	var body := Rect2(plate.position + Vector2(22, 122), plate.size - Vector2(44, 176))
+	return Rect2(body.position, Vector2(246, body.size.y))
+
+
+## Where each visible row sits, as plain geometry with no drawing attached.
+## `_draw_rail()` paints against these rows and `_rebuild_rail_rects()` stores
+## them, so the painted row and the clickable row are the same rect by
+## construction rather than by two copies of the same arithmetic.
+func _rail_row_rects(rect: Rect2) -> Array:
+	if rect.size == Vector2.ZERO:
+		return []
+	var row_height := 34.0
+	var top := rect.position.y + 56.0
+	var offset := rail_scroll * row_height
+	var rows: Array = []
+	for index in _rail_cache.size():
+		var y := top + float(index) * row_height - offset
+		if y < top - row_height or y > rect.position.y + rect.size.y - 8.0:
+			continue
+		rows.append({
+			"index": index,
+			"rect": Rect2(Vector2(rect.position.x - 6, y - 13), Vector2(rect.size.x - 8, row_height - 2.0)),
+		})
+	return rows
+
+
+func _rebuild_rail_rects() -> void:
+	var rect := _rail_rect()
+	if rect.size == Vector2.ZERO:
+		_rail_rects = []
+		return
+	# The scroll follows the selection. Set here rather than in the paint so the
+	# target still advances on a machine that never draws a frame.
+	var row_height := 34.0
+	var top := rect.position.y + 56.0
+	var visible_rows := int((rect.position.y + rect.size.y - top) / row_height)
+	rail_scroll_target = clampf(float(rail_index) - float(visible_rows) * 0.5, 0.0, maxf(0.0, float(_rail_cache.size() - visible_rows)))
+	_rail_rects = _rail_row_rects(rect)
+
+
 ## The wound and implant rows `_draw_file` prints down its right column,
 ## as plain layout with no drawing attached — the same row heights and
 ## offsets `_draw_file` paints against, kept in the one place instead of two.
@@ -1087,7 +1172,6 @@ func _draw_rail(rect: Rect2) -> void:
 	var row_height := 34.0
 	var top := rect.position.y + 56.0
 	var visible_rows := int((rect.position.y + rect.size.y - top) / row_height)
-	rail_scroll_target = clampf(float(rail_index) - float(visible_rows) * 0.5, 0.0, maxf(0.0, float(_rail_cache.size() - visible_rows)))
 	var offset := rail_scroll * row_height
 
 	# A8.3. The highlight is drawn at its travelling position, not at the row.
@@ -1100,16 +1184,14 @@ func _draw_rail(rect: Rect2) -> void:
 			]), COPPER * Color(1, 1, 1, 0.17))
 			draw_line(Vector2(rect.position.x - 6, marker_y - 13), Vector2(rect.position.x - 6, marker_y + 15), HOT, 2.5)
 
-	_rail_rects.clear()
-	for index in _rail_cache.size():
-		var y := top + float(index) * row_height - offset
-		if y < top - row_height or y > rect.position.y + rect.size.y - 8.0:
-			continue
+	# The rows, and the areas a click can land in, from one geometry pass.
+	_rail_rects = _rail_row_rects(rect)
+	for row: Dictionary in _rail_rects:
+		var index: int = int(row["index"])
+		var row_rect: Rect2 = row["rect"]
+		var y := row_rect.position.y + 13.0
 		var entry: Dictionary = _rail_cache[index]
 		var active := index == rail_index
-		# The row's hit area, in the same place the row is actually painted.
-		var row_rect := Rect2(Vector2(rect.position.x - 6, y - 13), Vector2(rect.size.x - 8, row_height - 2.0))
-		_rail_rects.append({"index": index, "rect": row_rect})
 		# Hover is a lighter mark than selection on purpose: it says "this is
 		# where a click would land", not "this is what you are reading".
 		if index == rail_hover and not active:
@@ -2072,12 +2154,68 @@ func _draw_post(feed: Rect2, post: Dictionary, y: float) -> void:
 
 # --- page six: one-use hunt work -------------------------------------------
 
+## Slice 8. Local work orders used to exist only on the FILE page of the place
+## that posted them, so finding something to do nearby meant opening every
+## revealed holding in turn. WORK is where a player goes looking for work, so
+## the orders are listed here too.
+##
+## Plain data, no drawing: the same reason `_rebuild_links()` was pulled out of
+## the paint, so a test can ask what the page would show without a frame.
+func local_work_lines() -> Array:
+	var rows: Array = []
+	for holding: Dictionary in AshbloomHoldings.overview().get("holdings", []):
+		var place := WorldHistory.subject(str(holding.get("record", "")))
+		if not bool(place.get("revealed", false)):
+			continue
+		var place_name := str(place.get("name", str(holding.get("name", holding.get("id", "")))))
+		var progress := "%d/%d" % [int(place.get("local_work_completed", 0)), int(place.get("local_work_required", 0))]
+		for job: Dictionary in AshbloomHoldings.work_orders(str(holding.get("id", ""))):
+			rows.append({
+				"id": str(job.get("id", "")),
+				"place": place_name,
+				"name": str(job.get("name", "LOCAL ORDER")),
+				"status": str(job.get("status", "offered")),
+				"progress": progress,
+			})
+	return rows
+
+
+func _draw_local_work(rect: Rect2, top: float, limit: int) -> float:
+	var font := ThemeDB.fallback_font
+	var rows := local_work_lines()
+	if rows.is_empty():
+		return top
+	CellOutzType.draw_text(self, Vector2(rect.position.x, top), "LOCAL WORK", 12.0, MOSS, 1.1)
+	draw_line(Vector2(rect.position.x, top + 16), Vector2(rect.end.x, top + 16), MOSS * Color(1, 1, 1, 0.3), 1.0)
+	var y := top + 44.0
+	for row: Dictionary in rows.slice(0, limit):
+		# Deliberately larger than the rail's rows. `_draw_screen_decay()` puts a
+		# black line every 3px over the whole plate *after* the page draws, and at
+		# 10-12px that slices a glyph into unreadable mush on white paper. The note
+		# is plain ink for the same reason: a saturated accent at this weight
+		# survives the slicing worse than dark text does.
+		draw_string(font, Vector2(rect.position.x, y), str(row.name), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 4, 16, INK)
+		# The row's name already begins with the place that posted it, so the
+		# note carries only what the name does not: its state and the claim it
+		# presses on.
+		draw_string(font, Vector2(rect.position.x + 2, y + 20), "%s  //  CLAIM %s" % [str(row.status).to_upper(), str(row.progress)], HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 4, 14, INK * Color(1, 1, 1, 0.66))
+		y += 50.0
+	if rows.size() > limit:
+		draw_string(font, Vector2(rect.position.x + 2, y), "+%d MORE" % (rows.size() - limit), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 11, INK * Color(1, 1, 1, 0.5))
+		y += 16.0
+	return y
+
+
 func _draw_contract(rect: Rect2) -> void:
 	var font := ThemeDB.fallback_font
 	var entry := _selected()
 	if entry.is_empty():
 		CellOutzType.draw_stamped(self, rect.position, "NO CONTRACTS CIRCULATING", 20.0, INK * Color(1, 1, 1, 0.5), COPPER * Color(1, 1, 1, 0.2), 1.3)
 		draw_string(font, rect.position + Vector2(2, 48), "TOP-TIER WORK APPEARS ONLY AFTER A REAL PATRON POSTS AN EXACT OBSTRUCTION.", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 12, INK * Color(1, 1, 1, 0.48))
+		# No contract is the state where this page has room to spare, so the
+		# local orders a player can actually take get the whole body.
+		# `top` is an absolute Y, so it must be offset by the page's own origin.
+		_draw_local_work(rect, rect.position.y + 84.0, 8)
 		return
 	var contract := WorldHistory.subject(str(entry.id))
 	var status := str(contract.get("status", "offered")).to_upper()
@@ -2125,6 +2263,9 @@ func _draw_contract(rect: Rect2) -> void:
 	if not str(contract.get("target_outcome", "")).is_empty():
 		draw_string(font, Vector2(rect.position.x + 2, sy + 32), "RECORDED OUTCOME // %s" % str(contract.target_outcome).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 12, SPORE)
 
+	var waiting := local_work_lines().size()
+	if waiting > 0:
+		draw_string(font, Vector2(rect.position.x + 2, rect.size.y - 104), "%d LOCAL ORDER%s WAITING AT NEARBY HOLDINGS" % [waiting, "" if waiting == 1 else "S"], HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 10, COPPER * Color(1, 1, 1, 0.9))
 	var action_rect := Rect2(rect.position + Vector2(0, rect.size.y - 82), Vector2(rect.size.x, 48))
 	if status == "OFFERED":
 		var hot := action_rect.has_point(cursor_at)

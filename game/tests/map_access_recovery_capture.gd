@@ -32,6 +32,7 @@ func _ready() -> void:
 	await _shot("map_underground_facility_layer.png")
 	var layer := InputEventKey.new()
 	layer.keycode = KEY_L
+	layer.physical_keycode = KEY_L
 	layer.pressed = true
 	hunt._unhandled_input(layer)
 	await _wait(12)

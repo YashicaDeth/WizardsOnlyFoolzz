@@ -47,6 +47,8 @@ const THINGS := {
 	"bare_hand": {"mass": 0.45, "reach": 0.62, "stiffness": 74.0, "keep": 1.0, "hands": 1, "attached": true},
 	"fist": {"mass": 0.60, "reach": 0.58, "stiffness": 80.0, "keep": 1.0, "hands": 1, "attached": true},
 	"sword": {"mass": 1.40, "reach": 1.05, "stiffness": 58.0, "keep": 0.52, "hands": 1},
+	# imp-64: the Hunt's issued blade; the sword's mass on a shorter reach.
+	"cleaver": {"mass": 1.40, "reach": 0.80, "stiffness": 58.0, "keep": 0.52, "hands": 1},
 	"shotgun": {"mass": 3.20, "reach": 0.96, "stiffness": 46.0, "keep": 0.44, "hands": 2},
 	"sidearm": {"mass": 0.95, "reach": 0.44, "stiffness": 66.0, "keep": 0.58, "hands": 1},
 	# O7.1. A person you have hold of. Not a special case — a mass and a reach

@@ -155,16 +155,21 @@ func _ready() -> void:
 	# 6. And it is a transient. A routine shot's shake used to outlast its kick.
 	feel.shake = 0.0
 	feel.kick = Vector2.ZERO
+	# Stepped at a fixed 60 Hz rather than awaited: on a loaded machine a
+	# headless frame is ~50 ms, and a 54 ms ring measured in those read 0.15 s.
+	var step := 1.0 / 60.0
+	feel.set_process(false)
 	feel.strike(0.7, "ballistic", false)
 	var shot_ring := 0.0
 	while feel.shake > 0.0 and shot_ring < 1.0:
-		await get_tree().process_frame
-		shot_ring += get_process_delta_time()
+		feel._process(step)
+		shot_ring += step
 	feel.strike(1.0, "cut", true)
 	var sever_ring := 0.0
 	while feel.shake > 0.0 and sever_ring < 1.0:
-		await get_tree().process_frame
-		sever_ring += get_process_delta_time()
+		feel._process(step)
+		sever_ring += step
+	feel.set_process(true)
 	_check(shot_ring < 0.12, "a shot's shake is a flick, not a hum (%.3fs)" % shot_ring)
 	_check(sever_ring > shot_ring * 1.5, "and a sever rings for meaningfully longer (%.3fs)" % sever_ring)
 	while feel.holding():

@@ -2,6 +2,7 @@ class_name HunterAppearance
 extends Node
 
 const HELD_GEAR := preload("res://systems/held_gear.gd")
+const GENERATED_MODEL := preload("res://systems/generated_model.gd")
 
 
 ## Greg: *"the gore in the gore sandbox is not up to date with the gore in the
@@ -15,7 +16,12 @@ const HELD_GEAR := preload("res://systems/held_gear.gd")
 ## One implementation, called from both, so they cannot drift apart again. The
 ## look is derived from the identity rather than randomised, so the same person
 ## is the same person in the hunt, in the sandbox and on a later run.
-static func style_world_rig(rig: BaselineHuman, identity: String, armed: bool) -> void:
+## `coat`: the placeholder coat boxes (a slab over the chest, collars and a
+## strap). Greg, 29 September: *"deleting this chunky shit from the middle of
+## his torso"*; they sat over the ClothingShell garments every world person
+## now wears and in the way of the body work. Only a person with no garments
+## (the derby's ringmaster) still asks for them.
+static func style_world_rig(rig: BaselineHuman, identity: String, armed: bool, coat := false) -> void:
 	if rig == null or not is_instance_valid(rig):
 		return
 	var seed: int = abs(hash(identity))
@@ -28,6 +34,7 @@ static func style_world_rig(rig: BaselineHuman, identity: String, armed: bool) -
 		"ink": 0.20 + float((seed / 11) % 50) / 100.0,
 		"piercings": 0.15 + float((seed / 31) % 35) / 100.0,
 		"mutation": (0.22 + float((seed / 7) % 35) / 100.0) if armed else 0.08,
+		"coat": coat,
 	})
 	# The body casts a shadow; the ink, the piercings and the tooth detail do
 	# not. Styling a world rig adds dozens of centimetre-scale meshes to it --
@@ -41,12 +48,21 @@ static func style_world_rig(rig: BaselineHuman, identity: String, armed: bool) -
 	var arm := rig.parts.get("right_arm") as Node3D
 	if arm == null:
 		return
-	var weapon := HELD_GEAR.build_weapon("sword")
+	# Greg, 30 September: sword variation. Each armed person carries one of
+	# the generated swords, picked from who they are (the same person always
+	# carries the same one); the drawn cleaver when the models are missing.
+	var weapon: Node3D = GENERATED_MODEL.make(GENERATED_MODEL.SWORDS[seed % GENERATED_MODEL.SWORDS.size()])
+	if weapon == null:
+		weapon = HELD_GEAR.build_weapon("sword")
 	weapon.name = "HeldAshlineCleaver"
 	# The grip sits at the wrist, with the edge projected forward of the body;
 	# it is parented to the arm so a severed arm takes its weapon with it.
 	weapon.position = Vector3(0.0, -0.34, -0.07)
-	weapon.rotation = Vector3(-PI * 0.48, 0.12, 0.0)
+	# Blade forward and down in front of the body, pommel just above the fist
+	# (Greg, 30 Sep: "sword models are backwards in the hands"; -0.48 PI hung
+	# the blade down behind the legs like a reversed cane). Chosen from side
+	# renders of four candidates.
+	weapon.rotation = Vector3(PI * 0.48, 0.12, 0.0)
 	arm.add_child(weapon)
 
 ## Replaceable procedural hero detail mounted directly on BaselineHuman zones.
@@ -66,7 +82,10 @@ func configure(body_rig: BaselineHuman, appearance: Dictionary = {}) -> void:
 	_build_face()
 	_build_hands()
 	_build_feet()
-	_build_clothing()
+	# The player (whose coat tint shows the worn layer) and the examiner (whose
+	# coat is his lab coat) keep it by default; world people opt out above.
+	if bool(appearance.get("coat", true)):
+		_build_clothing()
 	_build_prosthetic_readout()
 	_build_body_mods()
 	_build_head_mutations()

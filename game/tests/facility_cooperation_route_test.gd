@@ -26,7 +26,7 @@ func _ready() -> void:
 	check(ROUTES.choose_cooperation_outcome("honour"), "the settlement compact can be honoured")
 	check(ROUTES.traverse("lantern_lift"), "cooperation opens the Lantern freight lift")
 	var allied := ROUTES.consume_surface_handoff()
-	check(allied.surface_position == [-8.0, 0.0, 26.0], "the honoured compact reaches the Lantern waystation")
+	check(allied.surface_position == [-20.0, 0.0, 120.0], "the honoured compact reaches the Lantern waystation")
 	check(int(WorldHistory.subject("undercroft_freehold").get("standing", 0)) == 10, "the freehold remembers cooperation")
 
 	WorldHistory.clear_history()
@@ -35,7 +35,7 @@ func _ready() -> void:
 	check(not ROUTES.traverse("lantern_lift"), "betrayal cannot use the allies' lift")
 	check(ROUTES.traverse("stolen_freight_spur"), "betrayal escapes aboard the stolen freight spur")
 	var betrayed := ROUTES.consume_surface_handoff()
-	check(betrayed.surface_position == [18.0, 0.0, 20.0], "betrayal reaches a different surface position")
+	check(betrayed.surface_position == [60.0, 0.0, 110.0], "betrayal reaches a different surface position")
 	check(int(WorldHistory.subject("undercroft_freehold").get("standing", 0)) == -20, "the freehold remembers the betrayal")
 	check(int(WorldHistory.subject("ashline_wreckers").get("standing", 0)) == 8, "the theft creates an Ashline relationship")
 	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "choice and arrival transactions close")

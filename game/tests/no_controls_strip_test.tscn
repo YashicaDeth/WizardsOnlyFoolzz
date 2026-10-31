@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://tests/no_controls_strip_test.gd" id="1"]
+
+[node name="NoControlsStripTest" type="Node"]
+script = ExtResource("1")

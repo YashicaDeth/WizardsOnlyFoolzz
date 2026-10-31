@@ -29,13 +29,23 @@ func _ready() -> void:
 	add_child(layer)
 	var index_panel: Control = INDEX.new()
 	layer.add_child(index_panel)
+	# The panel lays itself out against its own size, falling back to the
+	# viewport. Headless reports a 64x64 viewport, which is under the 640x400
+	# floor the layout refuses to draw below, so the suite passed only on a
+	# machine with a real window and silently proved nothing anywhere else.
+	# Give it the design resolution instead of inheriting the host's.
+	index_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	index_panel.size = Vector2(
+		float(ProjectSettings.get_setting("display/window/size/viewport_width", 1280)),
+		float(ProjectSettings.get_setting("display/window/size/viewport_height", 720)))
 	await get_tree().process_frame
 	index_panel.open()
 	# Rects are collected while painting, so the panel has to actually paint.
+	# No paint needed: the rail's hit areas come from `_process`, so a few frames
+	# are enough. The old wait on `RenderingServer.frame_post_draw` never returned
+	# under `--headless` and turned this suite into a 200s timeout.
 	for _frame in 6:
 		await get_tree().process_frame
-	await RenderingServer.frame_post_draw
-	await get_tree().process_frame
 
 	var rects: Array = index_panel.get("_rail_rects")
 	_check(rects.size() > 0, "the rail collects a hit area per visible row (%d)" % rects.size())
@@ -66,8 +76,6 @@ func _ready() -> void:
 	# also exactly what a real pointer does.
 	for _frame in 4:
 		await get_tree().process_frame
-	await RenderingServer.frame_post_draw
-	await get_tree().process_frame
 	rects = index_panel.get("_rail_rects")
 
 	# Hovering marks it without selecting it.
@@ -85,6 +93,44 @@ func _ready() -> void:
 	index_panel._unhandled_input(away)
 	_check(int(index_panel.get("rail_hover")) == -1, "moving off the rail clears the hover")
 
+	# Slice 8. Local work used to be readable only on the FILE page of the place
+	# that posted it. WORK is where a player looks for work, so it lists them.
+	AshbloomHoldings.ensure()
+	WorldHistory.amend_subject("ashbloom:bone_yard", {"revealed": true})
+	AshbloomHoldings.work_orders("bone_yard")
+	var expected := 0
+	for definition: Dictionary in AshbloomHoldings.DEFINITIONS:
+		if bool(WorldHistory.subject(str(definition["record"])).get("revealed", false)):
+			expected += AshbloomHoldings.work_orders(str(definition["id"])).size()
+	var lines: Array = index_panel.local_work_lines()
+	_check(expected > 0, "a revealed holding posts real local work (%d orders)" % expected)
+	_check(lines.size() == expected, "the WORK page lists every posted order (%d of %d)" % [lines.size(), expected])
+	var complete := not lines.is_empty()
+	for line: Dictionary in lines:
+		if ["name", "place", "status", "progress"].any(func(key: String) -> bool: return str(line.get(key, "")).is_empty()):
+			complete = false
+	_check(complete, "every row names its order, its place, its state and the claim it presses on")
+
+	# Slice 9. Land is already a subject in this list, but every holding's role is
+	# the same "ASHBLOOM HOLDING", so the search matched names only and the note
+	# the survey wrote on a place was unreachable.
+	index_panel.set("search_query", "quarry")
+	index_panel.call("_rebuild_rail")
+	var rail_rows: Array = index_panel.get("_rail_cache")
+	var hit := rail_rows.any(func(row: Dictionary) -> bool: return str(row.get("id", "")) == "ashbloom:bone_yard")
+	_check(hit, "searching a field note finds the land it was written on (%d rows)" % rail_rows.size())
+	var note_text := ""
+	for row: Dictionary in rail_rows:
+		if str(row.get("id", "")) == "ashbloom:bone_yard":
+			note_text = str(row.get("note", ""))
+	_check(note_text.to_lower().contains("quarry"), "and the row shows the field note rather than the holding type (%s)" % note_text)
+	index_panel.set("search_query", "raider")
+	index_panel.call("_rebuild_rail")
+	var unrevealed := (index_panel.get("_rail_cache") as Array).any(func(row: Dictionary) -> bool: return str(row.get("id", "")) == "ashbloom:black_mile_yards")
+	_check(not unrevealed, "land the player has not stood on stays out of the search")
+	index_panel.set("search_query", "")
+	index_panel.call("_rebuild_rail")
+
 	_finish()
 
 
@@ -96,4 +142,8 @@ func _finish() -> void:
 		print("FAIL: %d" % failures.size())
 		for failure in failures:
 			print("  - ", failure)
+	# The runner reads `<NAME>_RESULT failures=N`; without it this suite reported
+	# "(no marker)" even when it passed, which reads exactly like a suite that
+	# proved nothing.
+	print("RAIL_CLICK_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
