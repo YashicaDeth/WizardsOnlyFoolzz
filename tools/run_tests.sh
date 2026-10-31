@@ -127,7 +127,7 @@ trap 'stop_in_flight; exit 143' TERM
 CORE=(
   baseline_human_test body_slice_test body_cut_test cavity_test
   bone_fragment_test chunk_test gore_demo_test lab_dressing_test gore_sandbox_systems_parity_test
-  combat_stance_test blade_read_test climb_test lower_works_gantry_test
+  combat_stance_test blade_read_test melee_grip_clearance_test climb_test lower_works_gantry_test
   npc_conversation_test npc_relationship_test npc_async_turn_test
   npc_voice_test spoken_contact_test standing_contact_test npc_ruling_test facility_characters_test kill_shot_test sniper_killcam_test
   skull_burst_test
