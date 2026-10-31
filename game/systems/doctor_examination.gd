@@ -56,6 +56,10 @@ const OBSERVATIONS := {
 		{"line": "A real birth time. You'd be amazed how few of you have one.", "hold": 3.2},
 		{"line": "The chart is not superstition here. That is the unkind part.", "hold": 3.4},
 	],
+	# Greg's line, the moment you reach the page.
+	"style": [
+		{"line": "What style of fighting do you want?", "hold": 2.8},
+	],
 	"declined": [
 		{"line": "Declining is an answer. I have written it down as one.", "hold": 3.2},
 		{"line": "Good. Refusal reads clearly on the instrument. Do it again.", "hold": 3.4},
@@ -71,11 +75,47 @@ const OBSERVATIONS := {
 ## together ran the route to 26 seconds from one keypress, which
 ## `opening_handoff_test` is right to refuse. Same four sentences, less waiting
 ## between them.
+## Greg, 25 September, in his own words: the first thing the examiner says,
+## once his terminal is up. The last line turns the room's cameras on you.
+const OPENING := [
+	{"line": "Hello. Hey. You're going to do a psychology test for me.", "hold": 3.0},
+	{"line": "You're going to tell me your birthday, and I'm going to find out everything I need to know. Everything we need to know.", "hold": 4.4},
+	{"line": "Hurry up now. I'm being watched too.", "hold": 3.0, "cue": "watched"},
+]
+## Beat 5: he reads your birthday back to you, from the numbers on the sheet
+## (sun, rising, modality, and the element that feeds a stat). The last line is
+## Greg's own promise from the opening.
+static func read_chart(sheet) -> Array:
+	var birth: Dictionary = sheet.birth
+	var day := int(birth.get("day", 1))
+	var suffix := "th"
+	if day % 100 < 11 or day % 100 > 13:
+		suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+	var when := "The %d%s of %s, %d" % [day, suffix, str(CharacterSheet.MONTH_NAMES[clampi(int(birth.get("month", 1)), 1, 12) - 1]).capitalize(), int(birth.get("year", 2000))]
+	if bool(birth.get("time_known", true)):
+		when += ", at %02d:%02d." % [int(birth.get("hour", 12)), int(birth.get("minute", 0))]
+	else:
+		when += ". No time. I'll take noon."
+	var element: String = sheet.dominant_element()
+	var attribute := str(CharacterSheet.ELEMENT_ATTRIBUTE.get(element, "presence"))
+	return [
+		{"line": when, "hold": 2.6},
+		{"line": "Sun in %s. %s rising. %s." % [str(sheet.sun_sign()).capitalize(), str(sheet.ascendant()).capitalize(), str(sheet.modality()).capitalize()], "hold": 3.0},
+		{"line": "Mostly %s. That goes to your %s." % [element, attribute], "hold": 2.8},
+		{"line": "Everything I need to know.", "hold": 2.2, "event": "examiner_read_chart"},
+	]
+
+
+## The first time you think out loud (V). Greg: "because they have a brain chip".
+const READS_THOUGHTS := {"line": "Hey. I can read your thoughts. Don't forget. We own you. Brain chip.", "hold": 3.8}
+
 const VERDICT_CLOSE := [
 	{"line": "That is the examination. Thank you — I mean that.", "hold": 2.6},
 	{"line": "You have told me how you are put together.", "hold": 2.6},
 	{"line": "Which means you have told me how to take you apart.", "hold": 3.0},
 	{"line": "Someone will be along. It will not be me.", "hold": 2.8},
+	# Greg, 25 September: once he has what he needs, he says so and goes.
+	{"line": "Okay. Great. We can break you now.", "hold": 2.4},
 ]
 
 ## He records it without asking. The notice is on screen for the player, not

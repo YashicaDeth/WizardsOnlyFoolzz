@@ -1,7 +1,7 @@
 name: Bug report
 description: Tell the build team what failed and how to reproduce it.
 title: "[BUG]: "
-labels: []
+labels: ["bug"]
 body:
   - type: markdown
     attributes:

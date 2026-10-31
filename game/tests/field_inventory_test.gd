@@ -37,6 +37,13 @@ func _ready() -> void:
 	check(hunt.field_inventory.carry == hunt.handheld.carry, "field and phone expose the same Carry instance")
 	check(hunt.field_inventory.body == hunt.player_rig and hunt.field_inventory.arsenal == hunt.arsenal, "the screen reads the live body and weapons rather than copied display data")
 
+	print("AG5.31 - the inventory head opens the one real Wetwire index")
+	hunt.field_inventory.handle_input(key(KEY_B))
+	check(hunt.field_inventory.visible and hunt.field_inventory.brain_index_open, "B on the inventory head opens the built-in Wetwire Brain Index")
+	check(not hunt.handheld.is_open, "the brain remains reachable even when the handheld is not raised")
+	hunt.field_inventory.handle_input(key(KEY_B))
+	check(not hunt.field_inventory.brain_index_open, "the same head control returns to the live body inventory")
+
 	print("AG5.30 - navigation changes real pocket/equipment state")
 	hunt.field_inventory.handle_input(key(KEY_P))
 	check(bool((hunt.handheld.carry.items[0] as Dictionary).get("pocketed", false)), "P pockets the selected small item through Carry's capacity rules")

@@ -24,3 +24,8 @@ artifacts/
 # Vosk model and the voice bridge live outside the repo (Tools/ and Temp/),
 # but guard against a stray copy: a 40MB acoustic model is not source.
 tools/vosk-model-*/
+
+# Greg, 28 September: Godot regenerates these on every import. Files already
+# tracked stay tracked; add a new one deliberately with `git add -f`.
+*.import
+*.uid

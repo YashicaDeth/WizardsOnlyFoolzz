@@ -1,0 +1,15 @@
+name: Chat
+description: Talk about the game, the world, theories, clips, anything.
+title: "[CHAT]: "
+labels: ["chat"]
+body:
+  - type: textarea
+    id: message
+    attributes:
+      label: Say something
+    validations:
+      required: true
+  - type: textarea
+    id: links
+    attributes:
+      label: Links, clips or pictures (optional)

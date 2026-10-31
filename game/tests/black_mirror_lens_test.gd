@@ -27,6 +27,10 @@ func _ready() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 
+	# Night vision is the phone's camera (Greg, 2026-09-24): the suite holds
+	# the phone, so raising it is a lens test and not a possession test.
+	hunt.handheld.possessed = true
+
 	var world_env: Environment = hunt.get_node("WorldEnvironment").environment
 
 	print("Black Mirror lens - off by default, the naked-eye view untouched")
@@ -52,6 +56,16 @@ func _ready() -> void:
 	var noon_brightness: float = hunt.camera.environment.adjustment_brightness
 	check(noon_brightness < night_brightness, "noon amplifies far less than the middle of the night (%.2f vs %.2f)" % [noon_brightness, night_brightness])
 	check(noon_brightness > 1.0, "but is not a pure no-op even then - the lens is always at least a real lens")
+
+	print("Black Mirror lens - the phone's sensor is live, and needs the phone")
+	var sensor = hunt._mirror
+	check(sensor != null and sensor.active and sensor.visible, "raising it runs the BlackMirrorCamera sensor feed, not only a grade")
+	hunt._toggle_black_mirror()
+	check(not sensor.active, "lowering it stops the feed")
+	hunt.dropped_handheld = RigidBody3D.new()
+	hunt.add_child(hunt.dropped_handheld)
+	hunt._toggle_black_mirror()
+	check(not hunt.black_mirror_active and hunt.camera.environment == null, "with the phone on the ground there is nothing to raise")
 
 	print("BLACK_MIRROR_LENS_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

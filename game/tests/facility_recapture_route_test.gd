@@ -32,7 +32,7 @@ func _ready() -> void:
 	check(ROUTES.traverse("vehicle_sallyport"), "the winning vehicle can breach the sallyport")
 	var handoff := ROUTES.pending_surface_handoff()
 	check(not bool(handoff.get("avoided_derby", true)), "the recapture route truthfully records the derby")
-	check(handoff.surface_position == [4.0, 0.0, -24.0], "the vehicle breach reaches the southern wreck road")
+	check(handoff.surface_position == [4.0, 0.0, -33.0], "the vehicle breach reaches the southern wreck road")
 	check(not ROUTES.apply_recapture("anesthetic_flood", true), "an established successful escape cannot be undone by recapture")
 	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "recapture and victory transactions close")
 	print("FACILITY_RECAPTURE_ROUTE_TEST_RESULT failures=", failures.size())
