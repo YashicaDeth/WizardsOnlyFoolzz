@@ -59,6 +59,6 @@ func _ready() -> void:
 	ledger.free()
 	check(WorldHistory.event_count("fighting_style_chosen") == 1, "the choice is recorded")
 	check(BloodTrees.starting_weapon("firearm") == "sidearm" and HunterArsenal.SLOT_ORDER.has("sidearm"), "iron walks into the Hunt on the sidearm")
-	check(BloodTrees.starting_weapon("melee") == "sword", "blade / blunt keeps the sword")
+	check(BloodTrees.starting_weapon("melee") == "cleaver", "blade / blunt keeps the issued cleaver, not the retired sword")
 	print("FIGHTING_STYLE_TEST_RESULT failures=%d" % failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

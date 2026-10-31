@@ -347,15 +347,19 @@ func _ready() -> void:
 	check(pistol_left.position.y > pistol_left_rest.y + 0.05,
 		"the pistol support hand leaves its cup and pinches the slide for a press-check")
 
-	# The sword presents its edge and opens the off hand toward the forte.
+	# The issued blade is the cleaver, not the retired sword. It presents its
+	# edge with the one hand that holds it; there is no off hand to open.
 	hunt.call("_equip_weapon", 0)
 	hunt.call("_advance_arm", 1.0 / 60.0)
-	var sword := arsenal.models.get("sword") as Node3D
-	var sword_left := sword.get_node("LeftGripHand") as Node3D
-	var sword_left_rest: Vector3 = sword_left.position
-	hunt.call("_update_held_inspection", 0.0)
-	check(sword_left.position.z < sword_left_rest.z - 0.05,
-		"the sword inspection releases the off hand to read the edge instead of mimicking a firearm")
+	var cleaver := arsenal.models.get("cleaver") as Node3D
+	check(cleaver != null and cleaver.visible, "the issued blade is the cleaver the arsenal actually builds")
+	if cleaver != null:
+		check(cleaver.get_node_or_null("LeftGripHand") == null,
+			"the cleaver is one-handed, so inspection does not invent an off hand")
+		var cleaver_rest: Vector3 = cleaver.rotation
+		hunt.call("_update_held_inspection", 0.0)
+		check(cleaver.rotation.y > cleaver_rest.y + 0.15,
+			"inspecting the cleaver turns its edge to the light instead of mimicking a firearm")
 	hunt.set("inspect_held", false)
 
 	# The help card must teach every bind this added.
