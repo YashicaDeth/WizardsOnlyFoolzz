@@ -876,12 +876,13 @@ func _detail_lines(entry: Dictionary) -> Array:
 		var weapon_id := str(entry.get("weapon_id", ""))
 		var spec: Dictionary = HunterArsenal.WEAPONS.get(weapon_id, {})
 		out.append("KIND // %s" % str(spec.get("kind", "weapon")).to_upper())
+		var wear := roundi((arsenal.weapon_condition(weapon_id) if arsenal != null else 1.0) * 100.0)
 		if str(spec.get("kind", "")) == "firearm":
 			var state: Dictionary = arsenal.ammo.get(weapon_id, {}) if arsenal != null else {}
 			out.append("LOADED // %d / %d" % [int(state.get("loaded", -1)), int(state.get("reserve", -1))])
+			out.append("WEAR // %d%%" % wear)
 		else:
-			out.append("EDGE // %d%%" % roundi((arsenal.weapon_condition(weapon_id) if arsenal != null else 1.0) * 100.0))
-		out.append("MASS // %0.1f KG" % float(spec.get("mass", 0.0)))
+			out.append("EDGE // %d%%" % wear)
 		return out
 	var item: Dictionary = entry.get("item", {})
 	out.append("KIND // %s" % str(item.get("kind", "goods")).to_upper())
