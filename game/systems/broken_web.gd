@@ -22,6 +22,7 @@ extends RefCounted
 ## Nothing here reaches for the real internet. Every site is authored fiction in
 ## this world's own voice.
 
+const Branding := preload("res://systems/celloutz_branding.gd")
 const INK := Color("dce6ba")
 const ACID := Color("b4da48")
 const ARTERIAL := Color("c81f16")
@@ -219,12 +220,11 @@ static func guestbook(canvas: CanvasItem, rect: Rect2, entries: Array, ink: Colo
 	canvas.draw_rect(rect, ink * Color(1, 1, 1, 0.04))
 	canvas.draw_rect(rect, accent * Color(1, 1, 1, 0.45), false, 1.0)
 	CellOutzType.draw_text(canvas, rect.position + Vector2(8, 6), "SIGN MY GUESTBOOK", 11.0, accent, 1.2)
-	var font := ThemeDB.fallback_font
 	var y := rect.position.y + 30.0
 	for entry in entries:
 		if y > rect.end.y - 12.0:
 			break
-		canvas.draw_string(font, Vector2(rect.position.x + 10, y), str(entry), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 20, 11, ink * Color(1, 1, 1, 0.7))
+		CellOutzType.draw_string_compat(canvas, Vector2(rect.position.x + 10, y), str(entry), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 20, 11, ink * Color(1, 1, 1, 0.7))
 		y += 16.0
 
 
@@ -281,6 +281,9 @@ static func popup(canvas: CanvasItem, rect: Rect2, title: String, body: String, 
 ## a template with a palette swap is a platform again, and a platform is the
 ## thing this is supposed to be the opposite of.
 static func draw_site(canvas: CanvasItem, rect: Rect2, entry: Dictionary, clock: float) -> void:
+	# The support desk speaks in the shared CellOutz voice, not its own copy.
+	if str(entry.get("id", "")) == Branding.SUPPORT_SITE_ID:
+		entry = entry.merged({"strap": Branding.copy_for("support", "strap"), "lines": Branding.support_lines()}, true)
 	var colours := palette(str(entry.get("palette", "moss")))
 	var ground: Color = colours.ground
 	var ink: Color = colours.ink
@@ -289,7 +292,6 @@ static func draw_site(canvas: CanvasItem, rect: Rect2, entry: Dictionary, clock:
 	canvas.draw_rect(rect, ground)
 	tiled_ground(canvas, rect, ink, str(entry.id).hash())
 
-	var font := ThemeDB.fallback_font
 	var lines: Array = entry.get("lines", [])
 	var dead := is_dead(entry)
 
@@ -298,11 +300,11 @@ static func draw_site(canvas: CanvasItem, rect: Rect2, entry: Dictionary, clock:
 			# Centred masthead, a rule, then threads. Somebody's pride and joy.
 			CellOutzType.draw_stamped(canvas, rect.position + Vector2(16, 12), str(entry.title), 20.0, accent, ARTERIAL * Color(1, 1, 1, 0.25), 2.0)
 			canvas.draw_line(rect.position + Vector2(14, 42), Vector2(rect.end.x - 14, rect.position.y + 42), accent * Color(1, 1, 1, 0.5), 1.0)
-			canvas.draw_string(font, rect.position + Vector2(16, 60), str(entry.strap), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 32, 11, ink * Color(1, 1, 1, 0.55))
+			CellOutzType.draw_string_compat(canvas, rect.position + Vector2(16, 60), str(entry.strap), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 32, 11, ink * Color(1, 1, 1, 0.55))
 			var fy := rect.position.y + 84.0
 			for line in lines:
 				canvas.draw_rect(Rect2(rect.position.x + 14, fy - 12, rect.size.x - 28, 20), ink * Color(1, 1, 1, 0.04))
-				canvas.draw_string(font, Vector2(rect.position.x + 20, fy), str(line), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 40, 12, link)
+				CellOutzType.draw_string_compat(canvas, Vector2(rect.position.x + 20, fy), str(line), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 40, 12, link)
 				fy += 24.0
 			guestbook(canvas, Rect2(rect.position.x + 14, rect.end.y - 92, rect.size.x - 28, 78), ["nobody has signed this since the moderator died."], ink, accent)
 		"shop":
@@ -315,7 +317,7 @@ static func draw_site(canvas: CanvasItem, rect: Rect2, entry: Dictionary, clock:
 			marquee(canvas, Rect2(rect.position.x + 110, rect.position.y + 40, rect.size.x - 124, 22), str(entry.strap), accent, clock)
 			var sy := rect.position.y + 78.0
 			for line in lines:
-				canvas.draw_string(font, Vector2(rect.position.x + 112, sy), str(line), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 128, 12, ink)
+				CellOutzType.draw_string_compat(canvas, Vector2(rect.position.x + 112, sy), str(line), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 128, 12, ink)
 				sy += 20.0
 			hit_counter(canvas, Vector2(rect.end.x - 130, rect.end.y - 34), 4120031, accent)
 		"conspiracy":
@@ -325,7 +327,7 @@ static func draw_site(canvas: CanvasItem, rect: Rect2, entry: Dictionary, clock:
 			marquee(canvas, Rect2(rect.position.x + 12, rect.position.y + 48, rect.size.x - 210, 22), str(entry.strap), ARTERIAL, clock)
 			var cy := rect.position.y + 90.0
 			for line in lines:
-				canvas.draw_string(font, Vector2(rect.position.x + 16, cy), str(line), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 220, 13, ink)
+				CellOutzType.draw_string_compat(canvas, Vector2(rect.position.x + 16, cy), str(line), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 220, 13, ink)
 				cy += 26.0
 			popup(canvas, Rect2(rect.position + Vector2(40, rect.size.y - 120), Vector2(230, 92)), "A MESSAGE", "you have been selected. do not close this window.", ARTERIAL)
 		"storefront":
@@ -338,7 +340,7 @@ static func draw_site(canvas: CanvasItem, rect: Rect2, entry: Dictionary, clock:
 			canvas.draw_rect(Rect2(rect.position, Vector2(rect.size.x, 40)), accent * Color(1, 1, 1, 0.18))
 			CellOutzType.draw_stamped(canvas, rect.position + Vector2(16, 10), str(entry.title), 18.0, accent, ARTERIAL * Color(1, 1, 1, 0.2), 2.4)
 			CellOutzType.draw_condensed(canvas, Vector2(rect.end.x - 78, rect.position.y + 16), "CART (0)", 10.0, ink * Color(1, 1, 1, 0.7), 0.8)
-			canvas.draw_string(font, rect.position + Vector2(16, 58), str(entry.strap), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 32, 12, ink * Color(1, 1, 1, 0.75))
+			CellOutzType.draw_string_compat(canvas, rect.position + Vector2(16, 58), str(entry.strap), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 32, 12, ink * Color(1, 1, 1, 0.75))
 			var columns := 2
 			var tile_size := Vector2((rect.size.x - 44.0) / float(columns), 66.0)
 			for index in lines.size():
@@ -353,7 +355,7 @@ static func draw_site(canvas: CanvasItem, rect: Rect2, entry: Dictionary, clock:
 				var thumb := Rect2(tile.position + Vector2(8, 8), Vector2(tile.size.y - 16, tile.size.y - 16))
 				canvas.draw_rect(thumb, ink * Color(1, 1, 1, 0.09))
 				canvas.draw_rect(thumb, ink * Color(1, 1, 1, 0.25), false, 1.0)
-				canvas.draw_string(font, tile.position + Vector2(tile.size.y, 22), str(lines[index]), HORIZONTAL_ALIGNMENT_LEFT, tile.size.x - tile.size.y - 10, 10, ink * Color(1, 1, 1, 0.85))
+				CellOutzType.draw_string_compat(canvas, tile.position + Vector2(tile.size.y, 22), str(lines[index]), HORIZONTAL_ALIGNMENT_LEFT, tile.size.x - tile.size.y - 10, 10, ink * Color(1, 1, 1, 0.85))
 				CellOutzType.draw_condensed(canvas, tile.position + Vector2(tile.size.y, tile.size.y - 22), "ADD TO CART", 8.0, link, 0.7)
 			CellOutzType.draw_condensed(canvas, Vector2(rect.position.x + 14, rect.end.y - 16), "SUBSCRIBE FOR 4% OFF YOUR FIRST REPOSSESSION", 9.0, ink * Color(1, 1, 1, 0.5), 0.5)
 		"corporate":
@@ -361,21 +363,21 @@ static func draw_site(canvas: CanvasItem, rect: Rect2, entry: Dictionary, clock:
 			# who were paid, which is why it is the emptiest.
 			canvas.draw_rect(Rect2(rect.position, Vector2(rect.size.x, 46)), accent * Color(1, 1, 1, 0.16))
 			CellOutzType.draw_text(canvas, rect.position + Vector2(16, 14), "CELLOUTZ", 18.0, accent, 3.0)
-			CellOutzType.draw_condensed(canvas, rect.position + Vector2(150, 20), "SUPPORT CENTRE", 11.0, ink * Color(1, 1, 1, 0.6), 0.9)
-			canvas.draw_string(font, rect.position + Vector2(16, 74), str(entry.strap), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 32, 13, ink * Color(1, 1, 1, 0.8))
+			CellOutzType.draw_condensed(canvas, rect.position + Vector2(150, 20), Branding.copy_for("support", "section_label", "SUPPORT CENTRE"), 11.0, ink * Color(1, 1, 1, 0.6), 0.9)
+			CellOutzType.draw_string_compat(canvas, rect.position + Vector2(16, 74), str(entry.strap), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 32, 13, ink * Color(1, 1, 1, 0.8))
 			var oy := rect.position.y + 104.0
 			for line in lines:
 				canvas.draw_rect(Rect2(rect.position.x + 14, oy - 13, rect.size.x - 28, 1), ink * Color(1, 1, 1, 0.12))
-				canvas.draw_string(font, Vector2(rect.position.x + 18, oy), str(line), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 40, 12, ink * Color(1, 1, 1, 0.75))
+				CellOutzType.draw_string_compat(canvas, Vector2(rect.position.x + 18, oy), str(line), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 40, 12, ink * Color(1, 1, 1, 0.75))
 				oy += 28.0
 		_:
 			# A ring. Mostly navigation, almost no content, which was the point.
 			CellOutzType.draw_text(canvas, rect.position + Vector2(16, 16), str(entry.title), 18.0, accent, 2.0)
-			canvas.draw_string(font, rect.position + Vector2(16, 48), str(entry.strap), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 32, 11, ink * Color(1, 1, 1, 0.6))
+			CellOutzType.draw_string_compat(canvas, rect.position + Vector2(16, 48), str(entry.strap), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 32, 11, ink * Color(1, 1, 1, 0.6))
 			webring(canvas, Rect2(rect.position.x + 14, rect.position.y + 70, rect.size.x - 28, 48), link, 3, 14)
 			var wy := rect.position.y + 140.0
 			for line in lines:
-				canvas.draw_string(font, Vector2(rect.position.x + 18, wy), str(line), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 40, 12, ink * Color(1, 1, 1, 0.7))
+				CellOutzType.draw_string_compat(canvas, Vector2(rect.position.x + 18, wy), str(line), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 40, 12, ink * Color(1, 1, 1, 0.7))
 				wy += 22.0
 			hit_counter(canvas, Vector2(rect.position.x + 18, rect.end.y - 40), 219, link)
 

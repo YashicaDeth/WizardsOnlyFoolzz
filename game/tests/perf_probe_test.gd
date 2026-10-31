@@ -22,13 +22,19 @@ func _ready() -> void:
 	old_phone_key.pressed = true
 	PerfProbe._unhandled_input(old_phone_key)
 	check(not PerfProbe.showing, "phone function keys no longer also toggle diagnostics")
+	var photo_key := InputEventKey.new()
+	photo_key.keycode = KEY_F10
+	photo_key.pressed = true
+	PerfProbe._unhandled_input(photo_key)
+	check(not PerfProbe.showing, "plain F10 remains available to the Hunt photo mode")
 	var probe_key := InputEventKey.new()
 	probe_key.keycode = KEY_F10
 	probe_key.pressed = true
+	probe_key.ctrl_pressed = true
 	PerfProbe._unhandled_input(probe_key)
-	check(PerfProbe.showing and PerfProbe.visible, "F10 opens the isolated performance overlay")
+	check(PerfProbe.showing and PerfProbe.visible, "Ctrl+F10 opens the isolated performance overlay")
 	PerfProbe._unhandled_input(probe_key)
-	check(not PerfProbe.showing and not PerfProbe.visible, "F10 closes the overlay cleanly")
+	check(not PerfProbe.showing and not PerfProbe.visible, "Ctrl+F10 closes the overlay cleanly")
 
 	for _f in 12:
 		await get_tree().process_frame

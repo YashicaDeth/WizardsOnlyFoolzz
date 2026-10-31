@@ -1,0 +1,26 @@
+name: Contact Greg
+description: A question, a collaboration idea, press, or anything that isn't a bug.
+title: "[CONTACT]: "
+labels: ["contact"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This board is public. Don't post private information here; say what it's about and Greg will reply in the thread.
+  - type: dropdown
+    id: about
+    attributes:
+      label: What's it about?
+      options:
+        - Collaboration
+        - Question about the game
+        - Press or content creator
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: message
+    attributes:
+      label: Message
+    validations:
+      required: true

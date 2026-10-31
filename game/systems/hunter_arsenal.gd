@@ -19,6 +19,14 @@ const WEAPONS := {
 		"impulse": 28.0, "reach": 3.7, "cooldown": 0.58,
 		"windup": 0.28, "stamina": 20.0, "damage_type": "cut",
 	},
+	# Greg, 28 September: the shiv from the den is a real weapon. Fast, it
+	# opens wounds that bleed (puncture), short reach, and armour stops most
+	# of it (low impulse, low damage per hit).
+	"shiv": {
+		"label": "SHIV", "kind": "melee", "damage": 20.0,
+		"impulse": 8.0, "reach": 2.2, "cooldown": 0.3,
+		"windup": 0.12, "stamina": 9.0, "damage_type": "puncture",
+	},
 	"shotgun": {
 		"label": "BONE YARD 12G", "kind": "firearm", "damage": 16.0,
 		"impulse": 34.0, "range": 42.0, "cooldown": 0.92,
@@ -110,6 +118,11 @@ var condition: Dictionary = {}
 ## weapon it actually has. Part records remain data (id, label, provenance and
 ## modifiers) so a later crafting/persistence layer can move them intact.
 var customization: Dictionary = {}
+## Greg, 24 September: weapons evolve through fighting, not shops. What a
+## style's blood tree has unlocked for one weapon, as the same scale vocabulary
+## a fitted part uses (`BloodLedger` writes it; nothing else should). Kept apart
+## from `customization` so removing a part never strips a learned skill.
+var blood_modifiers: Dictionary = {}
 var models: Dictionary = {}
 var hand: Node3D
 
@@ -155,6 +168,38 @@ func configure(rig: BaselineHuman) -> void:
 			_magazine_nodes[weapon_id] = magazine
 			_magazine_rest[weapon_id] = magazine.position
 	_update_models()
+
+
+## Paint each held model with the skin applied to it (`SkinLoadout`), or its
+## own finish when none is. Called on arrival and whenever a skin changes or
+## wears.
+func apply_skins() -> void:
+	for weapon_id: String in models:
+		var model := models[weapon_id] as Node3D
+		if model == null or not is_instance_valid(model):
+			continue
+		var item := SkinLoadout.applied(weapon_id)
+		var original: Dictionary = _unskinned.get(weapon_id, {})
+		if original.is_empty():
+			original = _collect_materials(model, {})
+			_unskinned[weapon_id] = original
+		if item.is_empty():
+			for node: MeshInstance3D in original:
+				if is_instance_valid(node):
+					node.material_override = original[node]
+		else:
+			WeaponSkins.apply_to(model, item)
+
+
+var _unskinned: Dictionary = {}
+
+
+func _collect_materials(node: Node, found: Dictionary) -> Dictionary:
+	if node is MeshInstance3D:
+		found[node] = (node as MeshInstance3D).material_override
+	for child in node.get_children():
+		found = _collect_materials(child, found)
+	return found
 
 
 func tick(delta: float) -> void:
@@ -278,7 +323,28 @@ func weapon_definition(weapon_id: String) -> Dictionary:
 			var property_name := str(scale_name).trim_suffix("_scale")
 			if result.has(property_name):
 				result[property_name] = float(result[property_name]) * float(modifiers[scale_name])
+	var learned := blood_modifiers.get(weapon_id, {}) as Dictionary
+	for scale_name in learned:
+		var property_name := str(scale_name).trim_suffix("_scale")
+		if result.has(property_name):
+			result[property_name] = float(result[property_name]) * float(learned[scale_name])
 	return result
+
+
+## The blood tree's side of `install_customization`: same scale names, same
+## clamp, one dictionary per weapon, replaced whole each time.
+func set_blood_modifiers(weapon_id: String, modifiers: Dictionary) -> void:
+	if not WEAPONS.has(weapon_id):
+		return
+	var clamped: Dictionary = {}
+	for scale_name in modifiers:
+		if CUSTOMIZATION_SCALES.has(scale_name):
+			var bounds: Vector2 = CUSTOMIZATION_SCALES[scale_name]
+			clamped[scale_name] = clampf(float(modifiers[scale_name]), bounds.x, bounds.y)
+	if clamped.is_empty():
+		blood_modifiers.erase(weapon_id)
+	else:
+		blood_modifiers[weapon_id] = clamped
 
 
 func weapon_customization(weapon_id: String = "") -> Dictionary:
@@ -339,6 +405,19 @@ func acquire_sniper(rounds_left: int = -1) -> bool:
 			_magazine_rest[current_id] = magazine_node.position
 	_update_models()
 	equipped.emit(current_id)
+	return true
+
+
+## A melee weapon you came by (the den's shiv): carried from now on.
+func acquire_melee(weapon_id: String) -> bool:
+	if not WEAPONS.has(weapon_id) or str(WEAPONS[weapon_id].kind) != "melee":
+		return false
+	acquired[weapon_id] = true
+	if hand != null and not models.has(weapon_id):
+		var model := _build_weapon_model(weapon_id)
+		hand.add_child(model)
+		models[weapon_id] = model
+		model.visible = weapon_id == current_id
 	return true
 
 

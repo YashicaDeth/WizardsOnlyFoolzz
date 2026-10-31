@@ -1,4 +1,6 @@
 extends Node3D
+const LOOK := preload("res://systems/look_settings.gd")
+const AMBIENT_AUDIO := preload("res://systems/ambient_audio.gd")
 
 # Ashbloom Expanse vertical slice. World Zero is the development milestone;
 # Limbo is the realm; Ashbloom is this first irradiated region.
@@ -87,6 +89,9 @@ const SLEEP_WAKE_HOUR := 7.0
 const RESTRICTED_STORAGE_POSITION := Vector3(-2.6, 0.0, 18.0)
 const HANDHELD := preload("res://systems/handheld_device.gd")
 const ANATOMY_COMPONENT := preload("res://systems/anatomy_component.gd")
+const WORLD_BREAK := preload("res://systems/world_break.gd")
+const STREET_LIGHT := preload("res://systems/street_light.gd")
+const BREAKABLE_PROP := preload("res://systems/breakable_prop.gd")
 const WORLD_GENERATOR := preload("res://systems/ashbloom_world_generator.gd")
 const MISFIRE_DIRECTOR := preload("res://systems/reality_misfire_director.gd")
 ## AP1.6. Was `preload()` — evaluated at script compile time, which meant
@@ -116,12 +121,20 @@ const GLITCH_SPIDER := preload("res://systems/glitch_spider.gd")
 ## verdict at all — the same reason `storm_weather.gd`'s exposure only
 ## starts mattering past a real severity, not from the first drop of rain.
 const PERCEPTION_MAX_RANGE := 30.0
+const PERCEPTION_RID_REFRESH_MS := 1000
+const UPKEEP_INTERVAL := 0.25
 ## The screen spills some light back onto its holder, but much less than the
 ## beam broadcasts its own source. That gap is C7.1's warning interval: a
 ## hunter can notice the light before resolving the body behind it.
 const HANDHELD_BODY_LIGHT := 0.25
 const PSYCHEDELIC_OSC := preload("res://systems/psychedelic_osc.gd")
 const KEYS_CARD := preload("res://systems/keys_card.gd")
+const SIGNAL_SIGHT := preload("res://systems/signal_sight.gd")
+## Greg, 26 September: "inventory to Tab; re-decant to holding K". A tap of K
+## is wizard eyes, as everywhere since the brain hack; held this long it
+## re-decants.
+const REDECANT_HOLD_SECONDS := 1.2
+const WIZARD_TAP_SECONDS := 0.35
 ## AS1.1. Bright enough to actually read as a light source against
 ## `world_look.gd`'s low-ambient presets rather than a glow nobody would notice.
 const HANDHELD_LAMP_ENERGY := 6.0
@@ -234,6 +247,13 @@ const EYE_ABOVE_CENTRE := 0.78
 const STANDING_HEIGHT := 1.8
 var stamina := 100.0
 var health := 100
+const FIELD_MEDS := preload("res://systems/field_meds.gd")
+## Middle mouse: how long a hold becomes a guard break, what it costs, reach.
+const GUARD_BREAK_HOLD := 0.35
+const GUARD_BREAK_STAMINA := 20.0
+const GUARD_BREAK_REACH := 2.4
+var heavy_held := -1.0
+var field_meds := FIELD_MEDS.new()
 var attack_cooldown := 0.0
 ## O2.4. Guarding. Dodging already existed and was already consulted on
 ## incoming damage, which made evasion real — but it was the *only* defensive
@@ -325,6 +345,13 @@ var guard_stamina_drain := 14.0
 ## retained as a keyboard fallback, but RMB is the production first-person bind.
 var guard_aim := Vector2.ZERO
 var guard_side := ""
+## What happened in the current fight, for the readout when it ends (Greg,
+## 24 September: "a stats readout" is one of the ways to learn the curve).
+var fight_stats: Dictionary = {}
+var _fight_quiet := 0.0
+var fight_readout: Label
+var _fight_readout_time := 0.0
+const FIGHT_QUIET_SECONDS := 6.0
 var last_blade_read: Dictionary = {}
 ## A timed parry used to change only numbers and text.  Keep the most recent
 ## burst as a reference for the tiny presentation test; it is never used as
@@ -349,6 +376,34 @@ var _pending_shots: Dictionary = {}
 ## AN1.2. The arm the weapon hangs off. Fed the same mouse delta the camera
 ## turns by, so the weapon is thrown by you turning rather than by a curve.
 var arm: LimbMomentum = null
+## What a swing leaves in the air, and the wire under a locked target.
+var strike_trail: StrikeTrail = null
+var lock_ring: LockRing = null
+var strike_smear: StrikeSmear = null
+var strike_audio: StrikeAudio = null
+var dust_puff: DustPuff = null
+var hit_flash: HitFlash = null
+## Blob tracking over the fight (item 4): hit markers and enemy awareness.
+var block_tracker: BlockTracker = null
+## Tab: the Brain Index hub (Greg, 2026-09-24).
+var brain_hub: BrainIndexHub = null
+var photo_mode: PhotoMode = null
+## The camera rise over the overworld from wherever a facility route surfaced.
+var exit_reveal: ExitReveal = null
+## Arriving hurt: the pain of the decant eases over the first minute, unless
+## something new hurts you (Greg, 2026-09-24). Seconds left, and where from.
+const ARRIVAL_EASE_SECONDS := 60.0
+const ARRIVAL_PAIN_FLOOR := 12.0
+var _arrival_ease := -1.0
+var _arrival_pain_from := 0.0
+var threat_compass: ThreatCompass = null
+var lock_readout: LockReadout = null
+## Blood: per-weapon, per-style experience from fighting, and its trees (7).
+var blood_ledger: BloodLedger = null
+## After a strike lands, the body faces it this long (third-person turn-in).
+const STRIKE_FACE_SECONDS := 0.35
+var strike_face_yaw := 0.0
+var strike_face_time := 0.0
 ## Mouse movement this frame, in radians, accumulated in `_unhandled_input` and
 ## spent in `_physics_process`. It has to be a frame total rather than a
 ## per-event value: a 1000Hz mouse delivers several motion events per frame and
@@ -389,6 +444,8 @@ var enemy_retreating := false
 var pulse := 0.0
 var generated_world: Node3D
 var misfire_director: Node3D
+## Overworld random events (DESIGN/OVERWORLD_EVENTS.md); off under ATG_TEST_MODE.
+var overworld_events: OverworldEventDirector
 var encounter_actors: Array[Dictionary] = []
 var loose_loot: Array[Node3D] = []
 ## AU3.5/AU3.6. The same station the shed and the sandbox drop. Nothing
@@ -404,6 +461,18 @@ var body_motion: Node
 var hunter_appearance: Node
 var crouching := false
 var strike_windup := -1.0
+## The last breakable a blow or round landed on, for the HUD and tests.
+var last_world_break: Dictionary = {}
+## The blood-tree moves (Greg, 24 September). Riposte: until when the next
+## blow after a parry cannot be stopped. Combo: who the last clean hits went
+## into, how many, and when the last one landed.
+const FEINT_STAMINA := 12.0
+const FEINT_BAIT_RANGE := 4.5
+const RIPOSTE_WINDOW := 1.0
+const COMBO_WINDOW := 1.4
+const BACKSTAB_DAMAGE := 3.0
+var riposte_until := -1.0
+var combo_chain := {"subject": "", "count": 0, "at": -99.0}
 var rival_attack_clock := 0.0
 var dodge_remaining := 0.0
 ## AD1.1. Set on the keypress, consumed the next physics step. Not applied
@@ -871,6 +940,18 @@ var _black_mirror_env: Environment
 
 
 func _ready() -> void:
+	# Greg, 26 September: "start me at the day time in the overworld".
+	# Play-Overworld.bat launches this scene directly with --daytime.
+	if "--daytime" in OS.get_cmdline_user_args():
+		WorldHistory.world_minute = WorldClock.OPENING_MINUTE
+	# Surfacing ends the timed run; the card shows how long each area took.
+	var run_summary: Dictionary = preload("res://systems/run_timer.gd").finish()
+	if not run_summary.is_empty():
+		# Greg, 28 September: surfacing is the payoff (Surfacing): daylight,
+		# silence then wind, the title, the keys, then the run card.
+		var surfacing := preload("res://systems/surfacing.gd").new()
+		add_child(surfacing)
+		surfacing.begin(run_summary)
 	# The gore setting was only ever applied in the derby, so OFF did nothing
 	# once the player walked into the Hunt Grounds and REDUCED leaked across as
 	# a static the hunt never reset.
@@ -958,6 +1039,27 @@ func _ready() -> void:
 	# and the panel they opened.
 	# AN1.2. The arm exists before the first swing does.
 	arm = LIMB_MOMENTUM.new()
+	strike_trail = StrikeTrail.new()
+	add_child(strike_trail)
+	lock_ring = LockRing.new()
+	add_child(lock_ring)
+	strike_smear = StrikeSmear.new()
+	add_child(strike_smear)
+	strike_audio = StrikeAudio.new()
+	add_child(strike_audio)
+	dust_puff = DustPuff.new()
+	add_child(dust_puff)
+	hit_flash = HitFlash.new()
+	add_child(hit_flash)
+	threat_compass = ThreatCompass.new()
+	threat_compass.name = "ThreatCompass"
+	$HUD.add_child(threat_compass)
+	block_tracker = BlockTracker.new()
+	block_tracker.name = "BlockTracker"
+	$HUD.add_child(block_tracker)
+	lock_readout = LockReadout.new()
+	lock_readout.name = "LockReadout"
+	$HUD.add_child(lock_readout)
 	_carry_current_weapon()
 	# AF1. Rounds and brass live in the world, not in the HUD.
 	ballistics = BALLISTICS.new()
@@ -1019,6 +1121,7 @@ func _ready() -> void:
 	keys_card.name = "KeysCard"
 	$HUD.add_child(keys_card)
 	_build_keys_card()
+	_build_sight()
 	_order_hud_layers()
 	# SpokenContact owns the capture and adds the recogniser beside it, so a
 	# downed NPC hears the words rather than only the fact of being spoken to.
@@ -1066,7 +1169,17 @@ func _ready() -> void:
 	arsenal.name = "HunterArsenal"
 	player_body.add_child(arsenal)
 	arsenal.configure(player_rig)
+	# The fighting style you gave the examiner decides what is in your hand.
+	arsenal.select_weapon(BloodTrees.starting_weapon(str(WorldHistory.subject("player").get("fighting_style", ""))))
+	# The shiv from the den comes with you (Greg, 28 September).
+	if VatRebirth.carries("SHIV"):
+		arsenal.acquire_melee("shiv")
+	arsenal.apply_skins()
+	arsenal.fired.connect(_on_skin_fired)
 	arsenal.reload_finished.connect(_on_weapon_reload_finished)
+	blood_ledger = BloodLedger.new()
+	blood_ledger.attach(self)
+	blood_ledger.blood_earned.connect(_on_skin_blood)
 	body_motion = HUNTER_BODY_MOTION.new()
 	body_motion.name = "HunterBodyMotion"
 	player_body.add_child(body_motion)
@@ -1081,15 +1194,25 @@ func _ready() -> void:
 	$HUD.add_child(field_inventory)
 	field_inventory.close_requested.connect(_toggle_inventory)
 	field_inventory.activate_requested.connect(_activate_inventory_item)
+	brain_hub = BrainIndexHub.new()
+	brain_hub.name = "BrainIndexHub"
+	$HUD.add_child(brain_hub)
+	brain_hub.open_surface.connect(_on_hub_surface)
+	brain_hub.blood_ledger = blood_ledger
+	photo_mode = PhotoMode.new()
+	add_child(photo_mode)
 	case_menu = CASE_MENU.new()
 	case_menu.name = "CaseMenu"
 	$HUD.add_child(case_menu)
 	case_menu.close_requested.connect(_toggle_cases)
+	case_menu.loadout_changed.connect(arsenal.apply_skins)
 	contact_menu = CONTACT_MENU.new()
 	contact_menu.name = "ContactMenu"
 	$HUD.add_child(contact_menu)
 	contact_menu.close_requested.connect(_toggle_contact)
 	_spawn_friend()
+	_build_sparring_post()
+	_build_breakables()
 	# AE.1. The captain is still spawned exactly as she always was, and this
 	# runs alongside her rather than instead of her or through her. The order
 	# matters: `_spawn_rival()` owns the Ashline captain and stays untouched,
@@ -1118,6 +1241,7 @@ func _ready() -> void:
 		}, player + Vector3(4.0, 0, -6.0))
 	_update_camera()
 	WorldHistory.record_event("player_entered_hunt_ground", {"location": HUNT_LOCATION, "hunt_id": CAST.id_for(CAPTAIN_SLOT)})
+	exit_reveal = ExitReveal.attach(self, facility_handoff, camera)
 	# A wreck in the derby already routed the player through `DefeatRouter`
 	# before this scene loaded (`rift_derby.gd::_finish_round`), so a lost heat
 	# and a lost fight land in the same captivity rather than one of them being
@@ -1187,6 +1311,10 @@ func _build_player_rig() -> void:
 	# every build — CellOutz re-dresses its bodies, which is also what keeps a
 	# scene change from having to solve wardrobe persistence today.
 	player_rig.dress(ClothingShell.humiliation_wardrobe())
+	# Greg, 24 September: the jester set is four parts you can take off once
+	# the collar's lock is broken. The outfit record says what is worn; a
+	# world that has none yet is the forced set, collar locked, as before.
+	Outfit.dress(player_rig)
 	# The same rule the world rigs get through `style_world_rig`. The player
 	# never goes through it -- they are built here rather than styled from a
 	# name -- so their 124 casters were the largest single body in the scene
@@ -1461,6 +1589,9 @@ func _register_people() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if resolution_ui.visible or kill_cam.active:
 		return
+	if panel_mode == "hub" and brain_hub != null and brain_hub.handle_input(event):
+		get_viewport().set_input_as_handled()
+		return
 	if panel_mode == "inventory" and field_inventory != null and field_inventory.handle_input(event):
 		get_viewport().set_input_as_handled()
 		return
@@ -1549,8 +1680,16 @@ func _unhandled_input(event: InputEvent) -> void:
 					_shape_smoke_trick()
 				else:
 					_attack()
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_MIDDLE:
-		_toggle_lock()
+	# Greg, 28 September: middle mouse is the heavy. Tap = a heavy swing; hold
+	# = a guard break (randomly knocks their guard open or throws them).
+	# Lock-on is Z.
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_MIDDLE and panel_mode.is_empty():
+		if event.pressed:
+			heavy_held = 0.0
+		else:
+			if heavy_held >= 0.0 and heavy_held < GUARD_BREAK_HOLD:
+				_attack(true)
+			heavy_held = -1.0
 	if event is InputEventMouseButton and event.pressed and not lock_target.is_empty():
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			_cycle_lock(1)
@@ -1624,6 +1763,19 @@ func _unhandled_input(event: InputEvent) -> void:
 				})
 		else:
 			inspected_world_item.clear()
+	# J held is the depth scan; K tapped is wizard eyes, K held re-decants.
+	if event is InputEventKey and not event.echo and event.keycode == KEY_J and sight != null:
+		sight.call("hold_depth", event.pressed and panel_mode.is_empty())
+		return
+	if event is InputEventKey and not event.echo and event.keycode == KEY_K:
+		if event.pressed:
+			_k_held_for = 0.0
+			_k_fired = false
+		else:
+			if not _k_fired and _k_held_for >= 0.0 and _k_held_for < WIZARD_TAP_SECONDS and sight != null and panel_mode.is_empty():
+				sight.call("toggle_wizard")
+			_k_held_for = -1.0
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_1: _equip_weapon(0)
@@ -1632,6 +1784,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_4: _equip_carried_limb()
 			KEY_5: _put_the_weapons_down()
 			KEY_6: _cycle_smokeable()
+			KEY_7: blood_ledger.toggle_tree()
 			KEY_Y: _toggle_mouth_hold()
 			KEY_B:
 				if not grapple_target.is_empty():
@@ -1653,7 +1806,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 			KEY_F:
 				if not third_person and not third_person_unlocked():
-					prompt.text = third_person_refusal()
+					_feedback(third_person_refusal())
 				else:
 					third_person = not third_person
 					body_motion.set_perspective(not third_person)
@@ -1678,22 +1831,31 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_G: _toggle_handheld_surface()
 			KEY_TAB:
 				# The handheld owns Tab while raised: one object, modes on it.
+				# Otherwise, Greg, 26 September: "inventory to Tab". The Brain
+				# Index hub (the world index is its TASKS tab) moves to
+				# Shift+Tab, next to it.
 				if handheld.is_open:
 					handheld.cycle_mode(1)
+				elif event.shift_pressed:
+					_toggle_panel("hub")
 				else:
-					_toggle_panel("index")
+					_toggle_inventory()
 			KEY_M: _toggle_panel("map")
 			KEY_T: _toggle_panel("tree")
-			# Greg: *"j shouldent be anything if anything j should be the
-			# inventory button not just this other button for nothing"*. J sat
-			# next to the movement hand on a panel nobody reaches for, while the
-			# bag -- the screen you open constantly -- was over on O. O still
-			# works; this is the one under your fingers.
-			KEY_J: _toggle_inventory()
+			# J was the inventory (Greg: "j should be the inventory button");
+			# on 26 September he moved the inventory to Tab and gave J to the
+			# depth scan, handled above the match because it is held.
 			# Moved rather than dropped. Every letter on the board is already
 			# spoken for, so the artwork goes to the function row with the other
 			# panels rather than losing its only way in.
 			KEY_F9: _toggle_artwork()
+			# Item 6: photo mode freezes the world around a free camera. F10 is
+			# provisional; every letter is spoken for.
+			KEY_F10:
+				if panel_mode.is_empty():
+					photo_mode.rigs = _all_rigs()
+					photo_mode.location = HUNT_LOCATION
+					photo_mode.enter(camera, player_body.global_position)
 			KEY_P: _toggle_panel("board")
 			KEY_O: _toggle_inventory()
 			KEY_U: _toggle_cases()
@@ -1702,7 +1864,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			# still snaps a photo instantly, unchanged; L holds the view amplified
 			# so looking through it is a real choice you can hold rather than a
 			# single instant.
-			KEY_L: _toggle_black_mirror()
+			KEY_L:
+				# Shift+L swaps the raised phone between its low-light sensor and
+				# its depth camera; plain L raises and lowers it.
+				if event.shift_pressed and black_mirror_active and _mirror != null:
+					prompt.text = "BLACK MIRROR // " + _mirror.cycle_mode().to_upper()
+				else:
+					_toggle_black_mirror()
 			KEY_C: _start_grapple()
 			KEY_Z: _toggle_lock()
 			KEY_E: _interact()
@@ -1744,12 +1912,11 @@ func _unhandled_input(event: InputEvent) -> void:
 						_dodge()
 					else:
 						_jump()
-			KEY_K: _deliberate_redecant()
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		if _pulmonary_diagnostic_active():
 			field_interface.rotate_pulmonary(event.relative)
 		else:
-			apply_look(Vector2(event.relative.x * 0.0026, event.relative.y * 0.0024))
+			apply_look(Vector2(LOOK.dx(event.relative) * 0.0026, LOOK.dy(event.relative) * 0.0024))
 			if guarding or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 				guard_aim += event.relative
 				var aimed_side := BladeRead.guard_side(guard_aim)
@@ -1770,6 +1937,8 @@ func _captain_name() -> String:
 
 
 func _physics_process(delta: float) -> void:
+	_tick_k_hold(delta)
+	_tick_fight(delta)
 	if kill_cam.active:
 		return
 	# The resolution window does not stop the world. Standing over someone
@@ -1782,6 +1951,17 @@ func _physics_process(delta: float) -> void:
 		_update_hud()
 		return
 	pulse += delta
+	if heavy_held >= 0.0:
+		heavy_held += delta
+		if heavy_held >= GUARD_BREAK_HOLD:
+			heavy_held = -1.0
+			guard_break()
+	# Hold 4: a FIELD DRESSING (Greg, 26 September). A tap of 4 still takes the
+	# carried limb on the key press, as before.
+	field_meds.step(self, delta, func() -> void:
+		health = mini(100, health + int(FIELD_MEDS.HEALS))
+		if player_rig != null and is_instance_valid(player_rig):
+			FIELD_MEDS.heal_anatomy(player_rig.anatomy))
 	# AP1. Charged per call, because nobody knows which of these is the frame.
 	# `process` has sat at 20.16ms against a 16.67ms budget since it was first
 	# measured, the brief has carried "script cost is unattributed" as its
@@ -1854,6 +2034,8 @@ func _physics_process(delta: float) -> void:
 	# is worse than a control that does nothing.
 	var holding_melee_guard := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and arsenal != null and str(arsenal.current().get("kind", "")) != "firearm"
 	var wants_guard := (holding_melee_guard or Input.is_key_pressed(KEY_X)) and panel_mode.is_empty() and not resolution_ui.visible and grapple_target.is_empty() and dodge_remaining <= 0.0
+	if wants_guard and strike_windup >= 0.0:
+		try_feint()
 	if wants_guard and guard_strength() > 0.0 and stamina > 1.0 and not stumbling():
 		if not guarding:
 			guard_raised = 0.0
@@ -1879,7 +2061,13 @@ func _physics_process(delta: float) -> void:
 	cost = ScriptCost.lap("_update_rival", cost)
 	_update_encounter_actors(delta)
 	cost = ScriptCost.lap("_update_encounter_actors", cost)
-	_maintain_roamers(delta)
+	# World bookkeeping (holding work, contractor teams, roamer detail tiers,
+	# spawns) reads the ledger and walks every actor. Four times a second is
+	# as often as any of it changes; sixty was a sixth of the Hunt's frame.
+	_upkeep_clock += delta
+	if _upkeep_clock >= UPKEEP_INTERVAL:
+		_maintain_roamers(_upkeep_clock)
+		_upkeep_clock = 0.0
 	cost = ScriptCost.lap("_maintain_roamers", cost)
 	_update_carrion(delta)
 	cost = ScriptCost.lap("_update_carrion", cost)
@@ -1898,6 +2086,8 @@ func _physics_process(delta: float) -> void:
 	cost = ScriptCost.lap("_answer_local_reports", cost)
 	if misfire_director != null:
 		misfire_director.call("update_player_position", player)
+	if overworld_events != null:
+		overworld_events.tick(delta, player)
 	if not grapple_target.is_empty():
 		_update_grapple(delta)
 	_steer_lock(delta)
@@ -1908,6 +2098,8 @@ func _physics_process(delta: float) -> void:
 		_check_third_person_unlock_feel()
 	_update_camera()
 	cost = ScriptCost.lap("_update_camera", cost)
+	_update_strike_fx(delta)
+	_ease_arrival_pain(delta)
 	_update_hud()
 	cost = ScriptCost.lap("_update_hud", cost)
 	_update_sleep_prompt(delta)
@@ -2263,11 +2455,12 @@ func _cycle_grip() -> void:
 	var id := str(arsenal.current_id) if arsenal != null else ""
 	var options: Array = GRIP_CYCLE.get(id, [])
 	if options.is_empty():
+		_feedback("ONLY THE BLADE CHANGES GRIP // 1 FOR THE SWORD")
 		return
 	var index := options.find(current_grip)
 	current_grip = options[(index + 1) % options.size()] if index >= 0 else options[0]
 	var spec: Dictionary = HeldGear.GRIPS.get(current_grip, {})
-	prompt.text = "%s // %s GRIP" % [str(arsenal.current().label), current_grip.to_upper().replace("_", "-")]
+	_feedback("%s // %s GRIP" % [str(arsenal.current().label), current_grip.to_upper().replace("_", "-")])
 	arsenal.apply_grip(current_grip)
 	PLAYER_ACTION_LEDGER.record("grip_changed", {"weapon": id, "grip": current_grip, "location": HUNT_LOCATION})
 	_carry_current_weapon(true)
@@ -2374,7 +2567,14 @@ func _pose_weapon() -> void:
 func _attack(heavy := false) -> void:
 	if resolution_ui.visible or kill_cam.active or player_rig.is_downed() or player_rig.anatomy.dead:
 		return
+	# No fighting while a dressing goes on (hold 4).
+	if field_meds.busy():
+		return
 	if smoke_model != null and is_instance_valid(smoke_model) and not smoke_weapon_drawn:
+		# A click with a smokeable in hand used to do nothing at all, which read
+		# as being stuck on it (Greg, 2026-09-24). It pockets the smokeable and
+		# draws the weapon you were carrying; the next click swings.
+		_equip_weapon(maxi(arsenal.carried().find(str(arsenal.current_id)), 0))
 		return
 	# In a clinch the strike button is the press, not a swing.
 	if not grapple_target.is_empty():
@@ -2560,6 +2760,11 @@ func _resolve_strike() -> void:
 		ballistics.mark_impact(wall_hit.position, wall_hit.normal, float(report.get("damage", 24.0)) * 0.05)
 		PLAYER_ACTION_LEDGER.record("melee_struck_wall", {"weapon": str(report.get("weapon", "")), "location": HUNT_LOCATION})
 		prompt.text = "STEEL ON STONE"
+		# Whatever the blade met, if it can break, it takes the blow.
+		var broke: Dictionary = WORLD_BREAK.hit(wall_hit.get("collider"), float(report.get("damage", 24.0)), "melee", wall_hit.position, Vector3(sin(yaw), 0.0, cos(yaw)), str(report.get("weapon", "")), "melee")
+		if not broke.is_empty():
+			prompt.text = "IT GIVES" if not bool(broke.get("broken", false)) else "IT BREAKS APART"
+			last_world_break = broke
 		connected = true
 		return
 	if enemy == null or not enemy.visible or enemy_retreating:
@@ -2624,6 +2829,8 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	var best_aim_score := INF
 	var reach := float(attack.get("range", 4.1))
 	var view := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
+	# Omnidirectional in third person: the blow follows the push, not the camera.
+	var strike_dir := StrikeHeading.heading(view, HUNTER_MOTOR.wish_direction(Input.get_vector("move_left", "move_right", "move_forward", "move_back"), yaw), third_person)
 	for index in encounter_actors.size():
 		var candidate: Dictionary = encounter_actors[index]
 		var node := candidate.get("node") as Node3D
@@ -2661,7 +2868,7 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		# *zone* on the body already picked — `hit_at()` reads it to tell a head
 		# from a thigh — so folding pitch in here means looking up or down
 		# refuses the body you are standing in front of.
-		var flat_view := Vector3(view.x, 0.0, view.z)
+		var flat_view := strike_dir
 		var flat_to := Vector3(node.global_position.x - player.x, 0.0, node.global_position.z - player.z)
 		var aim_dot := 1.0
 		if flat_view.length_squared() > 0.0001 and flat_to.length_squared() > 0.0001:
@@ -2676,11 +2883,56 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	if nearest_index < 0 or nearest_distance > reach:
 		return false
 	var actor: Dictionary = encounter_actors[nearest_index]
+	# Read before the blow provokes them: were they unaware, facing away?
+	var unaware_behind := _unaware_and_behind(actor)
 	_provoke_actor(actor)
 	var target: Node3D = actor.node as Node3D
-	var facing := Vector3(sin(yaw), 0, cos(yaw)).normalized().dot((target.global_position - player).normalized())
+	var facing := strike_dir.dot((target.global_position - player).normalized())
 	if facing < 0.12:
 		return false
+	# Greg, 24 September: they defend by tier. A fighter inside their own
+	# wind-up is committed and open; otherwise they may block the swing or
+	# turn it, which costs you footing.
+	fight_stats["swings"] = int(fight_stats.get("swings", 0)) + 1
+	_fight_active()
+	var defence_sequence := int(actor.get("defence_sequence", 0))
+	actor["defence_sequence"] = defence_sequence + 1
+	var committed := float(actor.get("attack_time", 0.0)) > _actor_attack_cycle(actor) * float(FighterTier.spec(str(actor.get("tier", "hunter"))).telegraph)
+	var move := _forced_open(actor, unaware_behind)
+	var defence := "open" if not move.is_empty() else FighterTier.defend(str(actor.get("tier", "hunter")), str(actor.subject_id), defence_sequence, committed or _actor_stumbling(actor))
+	if not move.is_empty():
+		fight_stats[move] = int(fight_stats.get(move, 0)) + 1
+		prompt.text = _MOVE_CALLS[move] % str(actor.display_name).to_upper()
+		if move == "backstab":
+			attack = attack.duplicate()
+			attack["damage"] = float(attack.get("damage", 0.0)) * BACKSTAB_DAMAGE
+		PLAYER_ACTION_LEDGER.record("blood_move", {"move": move, "subject_id": actor.subject_id, "weapon": attack.get("weapon", ""), "location": HUNT_LOCATION})
+	_note_combo(actor, defence, move)
+	if defence == "parry":
+		fight_stats["they_parried"] = int(fight_stats.get("they_parried", 0)) + 1
+		if bool(actor.get("sparring", false)):
+			_spar_said(actor, "TURNED. YOU SWUNG INTO MY GUARD. WAIT FOR MY WIND-UP.")
+		lose_footing(0.5, "%s TURNED YOUR BLOW // CATCH THEM MID-SWING" % str(actor.display_name).to_upper())
+		impact_feel.strike(0.7, "cut", false)
+		return true
+	if defence == "block":
+		fight_stats["they_blocked"] = int(fight_stats.get("they_blocked", 0)) + 1
+		attack = attack.duplicate()
+		attack["damage"] = float(attack.get("damage", 0.0)) * 0.25
+		prompt.text = "%s BLOCKED IT" % str(actor.display_name).to_upper()
+	else:
+		fight_stats["landed"] = int(fight_stats.get("landed", 0)) + 1
+		if committed:
+			fight_stats["punished"] = int(fight_stats.get("punished", 0)) + 1
+	# Sparring: a clean hit is a point, a blocked one is not; nobody bleeds.
+	if bool(actor.get("sparring", false)):
+		_spar_landed(actor, defence)
+		return true
+	# The hunter turns into the blow for a moment, so a strike behind you is
+	# seen landing rather than connecting through your back.
+	var turn := target.global_position - player
+	strike_face_yaw = atan2(turn.x, turn.z) + PI
+	strike_face_time = STRIKE_FACE_SECONDS
 	var anatomy: Node = actor.anatomy as Node
 	var rig := actor.get("rig") as BaselineHuman
 	var zone := "torso"
@@ -2713,6 +2965,14 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		prompt.text = "%s IS OPENED UP" % str(actor.display_name).to_upper()
 	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": anatomy.call("snapshot")}, "anatomy_changed")
 	_spawn_blood(target.global_position + Vector3(0, 1.1, 0), roundi(float(attack.damage)))
+	AMBIENT_AUDIO.hit(self, target.global_position + Vector3(0, 1.1, 0), result, anatomy.dead)
+	if hit_flash != null:
+		hit_flash.burst(target.global_position + Vector3(0, 1.1, 0), strike_dir, float(attack.damage) / 30.0)
+	if block_tracker != null:
+		# Locks onto the part that was actually struck, not the body's middle.
+		var struck := rig.parts.get(zone) as Node3D if rig != null else null
+		var marker_at: Vector3 = struck.global_position if struck != null and is_instance_valid(struck) else target.global_position + Vector3(0, 1.1, 0)
+		block_tracker.report_hit(marker_at, zone, float(result.get("damage", attack.damage)), str(attack.damage_type))
 	var hit_motion := actor.get("motion") as HunterBodyMotion
 	if hit_motion != null and is_instance_valid(hit_motion):
 		var zone_max: float = float((AnatomyComponent.DEFAULT_ZONES.get(zone, {}) as Dictionary).get("health", 100.0))
@@ -2792,12 +3052,27 @@ func _on_round_hit(hit: Dictionary) -> void:
 	# reached, exactly the way `_trace_actor()`'s instant raycast already did.
 	if struck != null and struck is Node and _resolve_body_hit(struck as Node, hit, payload):
 		return
-	WorldHistory.record_event("round_struck_world", {
+	# A round that met something breakable breaks it a little, or all the way.
+	if struck != null:
+		var broke: Dictionary = WORLD_BREAK.hit(struck, float(payload.get("damage", 20.0)), "round", hit.get("position", Vector3.ZERO), hit.get("direction", Vector3.FORWARD), str(payload.get("weapon", "")), "firearm")
+		if not broke.is_empty():
+			last_world_break = broke
+	var struck_world := {
 		"calibre": str(hit.get("calibre", "")),
 		"energy": snappedf(float(hit.get("energy", 0.0)), 0.01),
 		"shooter": str(hit.get("shooter", "")),
 		"location": HUNT_LOCATION,
-	})
+	}
+	# 0.2b: Ballistics has already dug the hole; the world keeps where it is.
+	var at: Vector3 = hit.get("position", Vector3.ZERO)
+	if GroundHole.is_ground(struck, hit.get("normal", Vector3.ZERO)):
+		struck_world["ground_hole"] = {
+			"at": [snappedf(at.x, 0.01), snappedf(at.y, 0.01), snappedf(at.z, 0.01)],
+			"radius": snappedf(GroundHole.radius_for_round(float(hit.get("energy", 0.0))), 0.001),
+		}
+		if dust_puff != null:
+			dust_puff.burst(at, hit.get("direction", Vector3.DOWN), 0.6)
+	WorldHistory.record_event("round_struck_world", struck_world)
 	if not payload.is_empty():
 		_settle_shot(int(payload.get("shot_id", 0)), false)
 
@@ -3052,7 +3327,7 @@ func _attack_wall(reach: float) -> Dictionary:
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
 	if hit.is_empty():
 		return {}
-	return {"position": hit.position, "normal": hit.normal}
+	return {"position": hit.position, "normal": hit.normal, "collider": hit.get("collider")}
 
 
 func _player_collision_exclusions() -> Array[RID]:
@@ -3098,10 +3373,11 @@ func _cycle_smokeable() -> void:
 
 func _toggle_mouth_hold() -> void:
 	if smoke_model == null or not is_instance_valid(smoke_model) or smoke_drawing:
+		_feedback("NOTHING TO HOLD IN YOUR MOUTH // 6 PICKS A SMOKEABLE")
 		return
 	var device_id := str(smoke_model.get_meta("device_id", ""))
 	if device_id == "bong":
-		prompt.text = "THE BONG NEEDS BOTH HANDS"
+		_feedback("THE BONG NEEDS BOTH HANDS")
 		return
 	# Taking it back requires the hand that currently owns the weapon. Holster
 	# first, then let the existing transfer animation bring the same object back
@@ -4004,6 +4280,12 @@ func _cycle_carried_weapon(step: int) -> void:
 
 
 func _equip_weapon(slot: int) -> void:
+	# The same weapon key again while a smoke is kept at the lips puts the
+	# smoke away: the way out of lip-holding that did not exist.
+	if smoke_weapon_drawn and smoke_model != null and is_instance_valid(smoke_model) and arsenal.carried().find(str(arsenal.current_id)) == slot:
+		_put_smokeable_away(false)
+		prompt.text = ""
+		return
 	var preserve_mouth_smoke := false
 	if smoke_model != null and is_instance_valid(smoke_model) and smoke_mouth_held:
 		var smoke_id := str(smoke_model.get_meta("device_id", ""))
@@ -4568,6 +4850,8 @@ func _dodge() -> void:
 	var move := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	dodge_direction = _combat_dodge_direction(move)
 	dodge_remaining = 0.28
+	if dust_puff != null:
+		dust_puff.burst(player_body.global_position, dodge_direction)
 	# Evasion owns the body for its short window. Do not drag a shouldered gun
 	# or raised guard through it and then snap those poses off a frame later.
 	firearm_aiming = false
@@ -4864,6 +5148,8 @@ func _update_sleep_prompt(delta: float) -> void:
 ## The signal is the seam between them, producing one physical, colliding body
 ## whose payload is the exact serial/condition/charge that just left the HUD.
 func _on_handheld_dropped(payload: Dictionary) -> void:
+	if black_mirror_active:
+		_toggle_black_mirror()
 	if dropped_handheld != null and is_instance_valid(dropped_handheld):
 		return
 	var forward := -camera.global_transform.basis.z.normalized()
@@ -5049,14 +5335,24 @@ func _begin_extraction() -> void:
 		return
 	var body := _nearest_robbable()
 	if body.is_empty():
-		prompt.text = "NOTHING WITHIN REACH WORTH OPENING"
+		_feedback("NOTHING WITHIN REACH WORTH OPENING")
 		extraction_session = {}
 		return
 	# AU1.2. A pocket, not a wound: checked and taken in one motion, before
 	# whatever the body's actual anatomy might also be worth digging for.
 	# The same key finishes the job on a second press if there is still a
 	# real dig left, rather than needing a control of its own to discover.
-	var carried_substance := str(WorldHistory.subject(str(body.subject_id)).get("carried_substance", ""))
+	# Greg, 24 September: cases drop from bodies. About one in sixteen carries
+	# one, decided by who they are, so searching twice does not reroll it.
+	var body_record := WorldHistory.subject(str(body.subject_id))
+	var dropped := SkinCase.drop_for(float(absi(str(body.subject_id).hash()) % 10000) / 10000.0)
+	if not dropped.is_empty() and not bool(body_record.get("case_taken", false)):
+		handheld.carry.items.append(SkinCase.case_item(dropped))
+		handheld.carry.save_to_history()
+		WorldHistory.update_subject(str(body.subject_id), {"case_taken": true}, "robbed")
+		prompt.text = "%s TAKEN FROM THEIR POCKET // [U] OPEN IT AT THE EXCHANGE" % str(SkinCase.CASES[dropped].label)
+		return
+	var carried_substance := str(body_record.get("carried_substance", ""))
 	if not carried_substance.is_empty():
 		var body_node := body.get("node") as Node3D
 		var at := body_node.global_position if body_node != null and is_instance_valid(body_node) else player
@@ -5309,7 +5605,7 @@ func _nearest_takeable_chunk(radius: float) -> Node3D:
 func _equip_carried_limb() -> void:
 	var index: int = handheld.carry.first_index("limb")
 	if index < 0:
-		prompt.text = "CARRY HAS NO WHOLE LIMB"
+		_feedback("CARRY HAS NO WHOLE LIMB // CUT ONE OFF AND PICK IT UP")
 		return
 	_equip_carried_limb_index(index)
 
@@ -5484,9 +5780,48 @@ func _enter_captivity(result: Dictionary) -> void:
 	prompt.text = "%s // HELD AT %s // [K] DIE DELIBERATELY" % [str(result.outcome).to_upper(), str(result.destination).replace("_", " ").to_upper()]
 
 
+## K held long enough re-decants; the tap is read on release instead.
+func _tick_k_hold(delta: float) -> void:
+	if _k_held_for < 0.0 or _k_fired:
+		return
+	_k_held_for += delta
+	if _k_held_for >= WIZARD_TAP_SECONDS:
+		_feedback("HOLD K // RE-DECANT  %d%%" % int(clampf(_k_held_for / REDECANT_HOLD_SECONDS, 0.0, 1.0) * 100.0))
+	if _k_held_for >= REDECANT_HOLD_SECONDS:
+		_k_fired = true
+		_deliberate_redecant()
+
+
+## K and J from the brain hack on: camera signals, the dead where they fell,
+## the living through walls. The Hunt reads the keys itself (see above).
+func _build_sight() -> void:
+	sight = SIGNAL_SIGHT.new()
+	sight.name = "SignalSight"
+	add_child(sight)
+	sight.call("setup", camera)
+	sight.set("handle_keys", false)
+	sight.set("enabled", true)
+	# What the phone camera sees: the carriers its signal comes from. A mast's
+	# transmitter sits at its top; a terminal at head height.
+	sight.set("emitters", func() -> Array:
+		var out: Array = []
+		for emitter: Dictionary in SignalField.EMITTERS:
+			var flat: Vector2 = emitter.at
+			out.append({"at": Vector3(flat.x, 18.0 if str(emitter.kind) == "mast" else 1.6, flat.y), "name": str(emitter.name), "reach": float(emitter.reach)})
+		return out)
+	sight.set("bodies", func() -> Array:
+		var out: Array = []
+		for actor: Dictionary in encounter_actors:
+			var node := actor.get("node") as Node3D
+			if node != null and is_instance_valid(node) and not bool(actor.get("dead", false)):
+				out.append(node.global_position - Vector3.UP * 0.9)
+		return out)
+
+
 func _deliberate_redecant() -> void:
 	var result := DEFEAT_ROUTER.redecant()
 	if result.is_empty():
+		_feedback("RE-DECANT ONLY WORKS WHILE YOU ARE HELD CAPTIVE")
 		return
 	health = 65
 	stamina = 70.0
@@ -5527,6 +5862,11 @@ func _fresh_rival_tactic(subject_id: String) -> Dictionary:
 	if not bool(subject.get("is_rival", false)):
 		return {}
 	return RIVAL_TACTICS.tactic_for(subject_id)
+
+
+const FAR_POSE_DISTANCE := 35.0
+const FAR_POSE_EVERY := 4
+const ENEMY_STEP_RANGE := 24.0
 
 
 func _update_encounter_actors(delta: float) -> void:
@@ -5573,7 +5913,30 @@ func _update_encounter_actors(delta: float) -> void:
 			actor_motion.set_combat_pose(prior_windup, prior_kind)
 			var actor_velocity := (node as CharacterBody3D).velocity
 			var actor_horizontal_speed := Vector2(actor_velocity.x, actor_velocity.z).length()
-			actor_motion.update(actor_delta, actor_velocity, true, actor_horizontal_speed > 3.2, false, false)
+			# Greg, 28 September: you hear them coming. A step each stride,
+			# only within earshot, heavier when they run.
+			if actor_horizontal_speed > 0.6 and player.distance_squared_to(node.global_position) < ENEMY_STEP_RANGE * ENEMY_STEP_RANGE:
+				var strode := float(actor.get("step_walked", 0.0)) + actor_horizontal_speed * actor_delta
+				if strode >= AMBIENT_AUDIO.STRIDE:
+					strode -= AMBIENT_AUDIO.STRIDE
+					AMBIENT_AUDIO.play_at(self, "step_concrete", node.global_position, -6.0 if actor_horizontal_speed > 3.2 else -12.0, randf_range(0.8, 1.0))
+				actor["step_walked"] = strode
+			# 26 September perf: posing every limb of a body 35 m away, every
+			# tick, was the Hunt's biggest script cost. Far bodies pose a
+			# quarter as often on the time they saved up; close ones as before.
+			var motion_delta := actor_delta
+			if player.distance_squared_to(node.global_position) > FAR_POSE_DISTANCE * FAR_POSE_DISTANCE:
+				motion_delta = float(actor.get("pose_saved", 0.0)) + actor_delta
+				var ticks := int(actor.get("pose_ticks", 0)) + 1
+				if ticks < FAR_POSE_EVERY:
+					actor["pose_saved"] = motion_delta
+					actor["pose_ticks"] = ticks
+					motion_delta = -1.0
+				else:
+					actor["pose_saved"] = 0.0
+					actor["pose_ticks"] = 0
+			if motion_delta >= 0.0:
+				actor_motion.update(motion_delta, actor_velocity, true, actor_horizontal_speed > 3.2, false, false)
 		if anatomy.dead and not bool(actor.get("dead", false)):
 			_kill_encounter_actor(index, "bleed_out")
 			continue
@@ -5725,18 +6088,33 @@ func _update_encounter_actors(delta: float) -> void:
 			# already enforces, on the other side of the fight.
 			if float(actor.get("attack_time", 0.0)) <= 0.0:
 				var sequence := int(actor.get("attack_sequence", 0))
-				var side_index := posmod(hash(str(actor.get("subject_id", index))) + sequence, BladeRead.SIDES.size())
-				actor["attack_side"] = BladeRead.SIDES[side_index]
+				var tier := str(actor.get("tier", "hunter"))
+				var fighter_id := str(actor.get("subject_id", index))
+				# Lower tiers work round their sides; higher ones read the guard
+				# you are holding and go for the side it leaves open, and some
+				# wind-ups are feints that change side late.
+				actor["attack_side"] = FighterTier.choose_side(tier, fighter_id, sequence, guard_side if guarding else "")
+				actor["feint_to"] = FighterTier.feint_side(tier, fighter_id, sequence, str(actor.attack_side))
 				actor["attack_sequence"] = sequence + 1
 			var pressing := 2.2 if strike_windup >= 0.0 else 1.0
 			actor["attack_time"] = float(actor.get("attack_time", 0.0)) + actor_delta * pressing
 			var attack_cycle := _actor_attack_cycle(actor)
+			if threat_compass != null:
+				threat_compass.report(str(actor.get("subject_id", index)), node.global_position, float(actor.attack_time) / maxf(attack_cycle, 0.01))
 			if actor_motion != null:
 				actor_motion.set_combat_pose(clampf(float(actor.attack_time) / maxf(attack_cycle * 0.57, 0.01), 0.0, 1.0), "melee")
-			if float(actor.attack_time) > attack_cycle * 0.57:
+			var telegraph_from := float(FighterTier.spec(str(actor.get("tier", "hunter"))).telegraph)
+			if not str(actor.get("feint_to", "")).is_empty() and float(actor.attack_time) > attack_cycle * FighterTier.FEINT_AT:
+				actor["attack_side"] = str(actor.feint_to)
+				actor["feint_to"] = ""
+				fight_stats["feints_seen"] = int(fight_stats.get("feints_seen", 0)) + 1
+				prompt.text = "FEINT // %s SWITCHES TO %s" % [str(actor.display_name).to_upper(), str(actor.attack_side).to_upper()]
+			elif float(actor.attack_time) > attack_cycle * telegraph_from:
 				prompt.text = "%s RAISES FROM %s" % [str(actor.display_name).to_upper(), str(actor.get("attack_side", BladeRead.HIGH)).to_upper()]
+			_show_telegraph(actor, node, float(actor.attack_time) / maxf(attack_cycle, 0.01) >= telegraph_from)
 			if float(actor.attack_time) >= attack_cycle:
 				actor.attack_time = 0.0
+				_show_telegraph(actor, node, false)
 				if actor_motion != null:
 					actor_motion.set_combat_pose(0.0, "")
 					actor_motion.trigger_attack(0.62, "melee")
@@ -5746,14 +6124,24 @@ func _update_encounter_actors(delta: float) -> void:
 					# spends stamina instead of blood.
 					var incoming := float(_actor_attack_damage(actor))
 					var guarded: Dictionary = guard_absorb(incoming, node.global_position, str(actor.get("attack_side", "")))
+					_note_incoming(str(actor.get("attack_side", "")), guarded)
 					if bool(guarded.get("parried", false)):
 						# The attacker eats their own commitment. This wrote to
 						# "stagger" and "cooldown" — neither of which anything
 						# ever read — so a parry cost the enemy nothing beyond
 						# the damage it already blocked. Real footing loss now.
 						_actor_lose_footing(actor, 0.45, "%s LOSES THEIR FOOTING // PRESS THE OPENING" % str(actor.display_name).to_upper())
+						_after_parry(actor, index)
+					# A sparring partner's blows are padded: they count, they do
+					# not wound.
+					if bool(actor.get("sparring", false)):
+						_spar_struck(actor, guarded)
+						continue
 					var health_after := health - roundi(float(guarded.get("damage", incoming)))
 					_wound_player(node.global_position, maxf(5.0, 15.0 * _actor_combat_ratio(actor)), "cut")
+					if hit_flash != null and third_person:
+						# `player` is already about eye height (body + 0.6 m); the chest is just below.
+						hit_flash.burst(player + Vector3(0, -0.3, 0), player - node.global_position, incoming / 30.0)
 					# AE10.13. Ordinary hostiles keep the old one-health floor: the
 					# undying player is not silently killed by a roaming damage tick.
 					# A physical law team is different. Its finishing blow performs the
@@ -5763,6 +6151,418 @@ func _update_encounter_actors(delta: float) -> void:
 						_complete_local_law_arrest(actor)
 						return
 					health = maxi(1, health_after)
+
+
+# --- the blood-tree moves (Greg, 24 September) ------------------------------
+# Blade: FEINT and COMBO. Meat: RIPOSTE. Iron: HIP COUNTER. Hush: BACKSTAB.
+# Each is a node bought with blood; without it the fight works as before.
+
+const _MOVE_CALLS := {
+	"backstab": "BACKSTAB // %s NEVER SAW IT",
+	"riposte": "RIPOSTE // STRAIGHT THROUGH %s'S GUARD",
+	"baited": "%s BIT ON THE FEINT // WIDE OPEN",
+	"combo": "COMBO // %s CAN'T KEEP UP",
+}
+
+
+func _move_clock() -> float:
+	return Time.get_ticks_msec() / 1000.0
+
+
+func _has_move(flag: String) -> bool:
+	return blood_ledger != null and blood_ledger.has_flag(flag)
+
+
+## FEINT: raise the guard inside your own wind-up and the swing never comes.
+## It costs stamina, and whoever was reading it is left guarding air.
+func try_feint() -> bool:
+	if strike_windup < 0.0 or not _has_move("melee_feint") or stamina < FEINT_STAMINA:
+		return false
+	if str(pending_attack.get("kind", "melee")) == "firearm":
+		return false
+	strike_windup = -1.0
+	pending_attack = {}
+	stamina -= FEINT_STAMINA
+	if body_motion != null:
+		body_motion.trigger_attack(0.0, "")
+	var baited := 0
+	for candidate in encounter_actors:
+		var node := candidate.get("node") as Node3D
+		if node == null or not is_instance_valid(node) or bool(candidate.get("dead", false)):
+			continue
+		if player.distance_to(node.global_position) <= FEINT_BAIT_RANGE:
+			candidate["baited"] = true
+			baited += 1
+	fight_stats["feints"] = int(fight_stats.get("feints", 0)) + 1
+	prompt.text = "FEINT // THEY BIT" if baited > 0 else "FEINT"
+	PLAYER_ACTION_LEDGER.record("blood_move", {"move": "feint", "baited": baited, "location": HUNT_LOCATION})
+	return true
+
+
+## Hush: they had not noticed you, and you came from behind them.
+func _unaware_and_behind(actor: Dictionary) -> bool:
+	if bool(actor.get("tracking_player", false)) or bool(actor.get("tracking_light", false)):
+		return false
+	if str(actor.get("state", "")) in ["hunting", "noticing", "fleeing"]:
+		return false
+	var node := actor.get("node") as Node3D
+	if node == null or not is_instance_valid(node):
+		return false
+	var ahead := -node.global_transform.basis.z
+	ahead.y = 0.0
+	var to_player := player - node.global_position
+	to_player.y = 0.0
+	if ahead.length_squared() < 0.0001 or to_player.length_squared() < 0.0001:
+		return false
+	return ahead.normalized().dot(to_player.normalized()) < -0.25
+
+
+## Which move, if any, takes the defence away from this blow. Spends it.
+func _forced_open(actor: Dictionary, unaware_behind: bool) -> String:
+	if unaware_behind and _has_move("stealth_backstab"):
+		return "backstab"
+	if riposte_until >= 0.0 and _move_clock() <= riposte_until:
+		riposte_until = -1.0
+		return "riposte"
+	if bool(actor.get("baited", false)):
+		actor["baited"] = false
+		return "baited"
+	if _has_move("melee_combo") and str(combo_chain.subject) == str(actor.subject_id) \
+			and int(combo_chain.count) >= 2 and _move_clock() - float(combo_chain.at) <= COMBO_WINDOW:
+		return "combo"
+	return ""
+
+
+## Counts clean hits into one body; a block or a slow gap breaks the chain,
+## and the combo hit itself starts it again.
+func _note_combo(actor: Dictionary, defence: String, move: String) -> void:
+	var now := _move_clock()
+	if defence != "open":
+		combo_chain = {"subject": "", "count": 0, "at": -99.0}
+		return
+	if move == "combo":
+		combo_chain = {"subject": "", "count": 0, "at": -99.0}
+		return
+	var same := str(combo_chain.subject) == str(actor.subject_id) and now - float(combo_chain.at) <= COMBO_WINDOW
+	combo_chain = {"subject": str(actor.subject_id), "count": int(combo_chain.count) + 1 if same else 1, "at": now}
+
+
+## After you turn a blow: RIPOSTE opens the next one, HIP COUNTER shoots.
+func _after_parry(actor: Dictionary, index: int) -> void:
+	if _has_move("martial_riposte"):
+		riposte_until = _move_clock() + RIPOSTE_WINDOW
+	if _has_move("firearm_hip_counter"):
+		hip_counter(actor, index)
+
+
+## HIP COUNTER: a gun in hand when you parry goes off into them, point blank.
+## It spends a real round; an empty or jammed gun only clicks.
+func hip_counter(actor: Dictionary, index: int) -> bool:
+	if arsenal == null or bool(actor.get("sparring", false)):
+		return false
+	var gun: Dictionary = arsenal.current()
+	if str(gun.get("kind", "")) != "firearm":
+		return false
+	var rounds: Dictionary = arsenal.ammo.get(arsenal.current_id, {})
+	if int(rounds.get("loaded", 0)) <= 0 or bool(arsenal.jammed.get(arsenal.current_id, false)):
+		prompt.text = "HIP COUNTER // CLICK"
+		return false
+	rounds["loaded"] = int(rounds.loaded) - 1
+	arsenal.ammo[arsenal.current_id] = rounds
+	var damage := float(gun.get("damage", 20.0)) * float(maxi(1, int(gun.get("pellets", 1))))
+	var anatomy: Node = actor.anatomy as Node
+	var result: Dictionary = anatomy.call("apply_hit", "torso", damage, float(gun.get("impulse", 10.0)), str(gun.get("damage_type", "ballistic")))
+	var node := actor.node as Node3D
+	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": anatomy.call("snapshot")}, "anatomy_changed")
+	_spawn_blood(node.global_position + Vector3(0, 1.1, 0), roundi(damage))
+	AMBIENT_AUDIO.hit(self, node.global_position + Vector3(0, 1.1, 0), result, anatomy.dead)
+	if body_motion != null:
+		body_motion.trigger_recoil(float(gun.get("impulse", 10.0)))
+	fight_stats["hip_counter"] = int(fight_stats.get("hip_counter", 0)) + 1
+	PLAYER_ACTION_LEDGER.record("npc_anatomy_hit", {"subject_id": actor.subject_id, "weapon": arsenal.current_id, "zone": "torso", "result": result, "location": HUNT_LOCATION, "move": "hip_counter"})
+	prompt.text = "HIP COUNTER // POINT BLANK INTO %s" % str(actor.display_name).to_upper()
+	if anatomy.dead:
+		_kill_encounter_actor(index, "combat_trauma")
+	return true
+
+
+# --- telegraphs and the fight readout (Greg, 24 September) ------------------
+
+## Where the next swing comes from, on the fighter, in the same red as the
+## body-cam's REC: over the head for high, at the knees for low, and on your
+## left or right of them for the sides. Tiers decide how early it shows.
+func _show_telegraph(actor: Dictionary, node: Node3D, on: bool) -> void:
+	# On the HUD, pinned to where the fighter is on screen. A 3D label sat
+	# under the body-cam post effect, which paints over the transparent pass.
+	var mark := actor.get("telegraph_mark") as Label
+	if mark == null or not is_instance_valid(mark):
+		if not on:
+			return
+		mark = Label.new()
+		mark.name = "Telegraph"
+		mark.add_theme_font_size_override("font_size", 30)
+		mark.add_theme_color_override("font_color", Color("ff3a26"))
+		mark.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+		mark.add_theme_constant_override("outline_size", 10)
+		mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		$HUD.add_child(mark)
+		actor["telegraph_mark"] = mark
+	if not on:
+		mark.visible = false
+		return
+	var side := str(actor.get("attack_side", BladeRead.HIGH))
+	var toward := node.global_position - player
+	toward.y = 0.0
+	var right := toward.normalized().cross(Vector3.UP) if toward.length_squared() > 0.001 else Vector3.RIGHT
+	var at := node.global_position + Vector3(0, 1.3, 0)
+	match side:
+		BladeRead.HIGH:
+			at = node.global_position + Vector3(0, 2.15, 0)
+			mark.text = "▼ HIGH"
+		BladeRead.LOW:
+			at = node.global_position + Vector3(0, 0.45, 0)
+			mark.text = "▲ LOW"
+		BladeRead.LEFT:
+			at += -right * 0.55
+			mark.text = "LEFT ▶"
+		_:
+			at += right * 0.55
+			mark.text = "◀ RIGHT"
+	var view := get_viewport().get_camera_3d()
+	if view == null or view.is_position_behind(at):
+		mark.visible = false
+		return
+	var screen := view.unproject_position(at)
+	mark.reset_size()
+	mark.position = screen - mark.size * 0.5
+	# A blink, so it reads as a warning and not as a name tag.
+	mark.visible = fmod(Time.get_ticks_msec() * 0.001, 0.5) < 0.36
+
+
+func _fight_active() -> void:
+	_fight_quiet = FIGHT_QUIET_SECONDS
+
+
+func _note_incoming(side: String, guarded: Dictionary) -> void:
+	_fight_active()
+	if bool(guarded.get("parried", false)):
+		fight_stats["parries"] = int(fight_stats.get("parries", 0)) + 1
+	elif bool(guarded.get("blocked", false)):
+		fight_stats["blocks"] = int(fight_stats.get("blocks", 0)) + 1
+	else:
+		var by_side: Dictionary = fight_stats.get("hit_from", {})
+		by_side[side] = int(by_side.get(side, 0)) + 1
+		fight_stats["hit_from"] = by_side
+
+
+## The readout, once a fight has gone quiet: what you did, what they did, and
+## the side that beat you most, so the next fight has something to fix.
+static func fight_summary(stats: Dictionary) -> String:
+	var swings := int(stats.get("swings", 0))
+	var landed := int(stats.get("landed", 0))
+	var lines := ["FIGHT OVER // YOUR SWINGS %d  LANDED %d  BLOCKED %d  TURNED %d  CAUGHT MID-SWING %d" % [
+		swings, landed, int(stats.get("they_blocked", 0)), int(stats.get("they_parried", 0)), int(stats.get("punished", 0))]]
+	var by_side: Dictionary = stats.get("hit_from", {})
+	var taken := 0
+	var worst := ""
+	for side: String in by_side:
+		taken += int(by_side[side])
+		if worst.is_empty() or int(by_side[side]) > int(by_side[worst]):
+			worst = side
+	lines.append("YOU BLOCKED %d  PARRIED %d  WERE HIT %d  FEINTS SEEN %d" % [int(stats.get("blocks", 0)), int(stats.get("parries", 0)), taken, int(stats.get("feints_seen", 0))])
+	var moves: Array[String] = []
+	for move in ["feints", "baited", "combo", "riposte", "hip_counter", "backstab"]:
+		if int(stats.get(move, 0)) > 0:
+			moves.append("%s %d" % [move.to_upper().replace("_", " "), int(stats[move])])
+	if not moves.is_empty():
+		lines.append("MOVES  " + "  ".join(moves))
+	if not worst.is_empty():
+		lines.append("WHAT BEAT YOU: SWINGS FROM %s. HOLD THE GUARD THAT WAY WHEN IT SHOWS." % worst.to_upper())
+	elif swings > 0 and landed * 2 < swings:
+		lines.append("MOST OF YOUR SWINGS WERE STOPPED. HIT THEM WHILE THEY WIND UP.")
+	return "\n".join(lines)
+
+
+func _tick_fight(delta: float) -> void:
+	if _fight_readout_time > 0.0:
+		_fight_readout_time -= delta
+		if _fight_readout_time <= 0.0 and fight_readout != null:
+			fight_readout.visible = false
+	if _fight_quiet <= 0.0:
+		return
+	_fight_quiet -= delta
+	if _fight_quiet > 0.0:
+		return
+	if int(fight_stats.get("swings", 0)) + (fight_stats.get("hit_from", {}) as Dictionary).size() + int(fight_stats.get("blocks", 0)) == 0:
+		fight_stats.clear()
+		return
+	if fight_readout == null:
+		fight_readout = Label.new()
+		fight_readout.name = "FightReadout"
+		fight_readout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		fight_readout.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+		fight_readout.position = Vector2(-520, 96)
+		fight_readout.size = Vector2(1040, 90)
+		fight_readout.add_theme_font_size_override("font_size", 15)
+		fight_readout.add_theme_color_override("font_color", Color("e8e1d2"))
+		fight_readout.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+		fight_readout.add_theme_constant_override("outline_size", 6)
+		$HUD.add_child(fight_readout)
+	fight_readout.text = fight_summary(fight_stats)
+	fight_readout.visible = true
+	_fight_readout_time = 8.0
+	WorldHistory.record_event("fight_summarised", {"stats": fight_stats.duplicate(true)})
+	fight_stats.clear()
+
+
+# --- sparring (Greg, 24 September: "sparring in the Hunt") ----------------
+
+## A post near Nix where a partner fights you with padded blows: first to
+## five clean hits. Winning moves the next partner up a tier (scavenger,
+## hunter, captain, elite); after each bout they say what beat you.
+const SPAR_SUBJECT := "sparring"
+const SPAR_POINTS := 5
+const SPAR_POST_AT := Vector3(14.5, 0.0, 8.0)
+var spar_bout: Dictionary = {}
+
+
+func spar_tier() -> String:
+	return str(WorldHistory.subject(SPAR_SUBJECT).get("tier", "scavenger"))
+
+
+func _build_sparring_post() -> void:
+	var post := Node3D.new()
+	post.name = "SparringPost"
+	post.position = SPAR_POST_AT
+	add_child(post)
+	_add_mesh_to(post, CylinderMesh.new(), Vector3(0, 1.0, 0), Color("5a4634"), 0.8, Vector3(0.3, 1.0, 0.3))
+	_add_mesh_to(post, BoxMesh.new(), Vector3(0, 1.7, 0), Color("8a2a1e"), 0.6, Vector3(0.9, 0.12, 0.12))
+	_register_interactable(post, "[E] SPAR // PADDED BLOWS, FIRST TO FIVE", _start_spar)
+
+
+## The first things in the Hunt that break (DESIGN/GOAL_LOOP_2.md 0.1): two
+## streetlights and two scrap barricades by the sparring post. Rounds and
+## blades reach them through `WorldBreak`, the lights keep their condition in
+## WorldHistory, and a barricade bursts into capped, persistent fragments.
+const BREAKABLE_YARD := [
+	["light", "hunt_yard_light_west", Vector3(10.5, 0.0, 4.0)],
+	["light", "hunt_yard_light_east", Vector3(18.5, 0.0, 4.0)],
+	["barricade", "hunt_yard_barricade_west", Vector3(12.0, 0.0, 11.5)],
+	["barricade", "hunt_yard_barricade_east", Vector3(17.0, 0.0, 11.5)],
+	# 0.2: one of every prop kind behind the barricades, turned to the post.
+	["crate", "hunt_yard_crate_1", Vector3(11.2, 0.0, 13.6), 0.0],
+	["crate", "hunt_yard_crate_2", Vector3(12.1, 0.0, 13.9), 0.35],
+	["barrel", "hunt_yard_barrel_1", Vector3(13.3, 0.0, 13.7), 0.0],
+	["barrel", "hunt_yard_barrel_2", Vector3(14.1, 0.0, 14.2), 0.0],
+	["locker", "hunt_yard_locker", Vector3(15.4, 0.0, 14.0), PI],
+	["monitor", "hunt_yard_monitor", Vector3(16.5, 0.0, 13.5), PI],
+	["chair", "hunt_yard_chair", Vector3(17.4, 0.0, 13.4), PI * 0.8],
+	["jar", "hunt_yard_jar_1", Vector3(18.3, 0.0, 13.6), 0.0],
+	["jar", "hunt_yard_jar_2", Vector3(18.7, 0.0, 13.9), 0.0],
+]
+## Where the yard's ground actually is. The slab `_build_world()` lays is a
+## metre deep centred at -0.6, so its top is -0.1, not the 0 the AE.2 note
+## says, and everything above stood at 0 hung 10 cm in the air (seen from
+## grass height, 25 September).
+const YARD_GROUND_Y := -0.1
+var breakables: Array[Node3D] = []
+
+
+func _build_breakables() -> void:
+	for spec in BREAKABLE_YARD:
+		var piece: Node3D
+		var at: Vector3 = spec[2] + Vector3(0, YARD_GROUND_Y, 0)
+		if str(spec[0]) == "light":
+			var light = STREET_LIGHT.new()
+			light.name = str(spec[1])
+			light.position = at
+			add_child(light)
+			light.build(str(spec[1]), 4.4)
+			piece = light
+		elif str(spec[0]) != "barricade":
+			piece = BREAKABLE_PROP.place(self, str(spec[0]), str(spec[1]), at, float(spec[3]))
+		else:
+			var prop = BREAKABLE_PROP.new()
+			prop.name = str(spec[1])
+			# Its box is centred on its origin, so it stands on half its height.
+			prop.position = at + Vector3(0, 1.35 * 0.5, 0)
+			add_child(prop)
+			prop.build("scrap_barricade", Vector3(2.4, 1.35, 0.42), 28.0)
+			piece = prop
+		breakables.append(piece)
+
+
+func _start_spar() -> void:
+	if not spar_bout.is_empty():
+		return
+	var tier := spar_tier()
+	var at := player + Vector3(sin(yaw), 0.0, cos(yaw)) * 3.0
+	at.y = player.y - 1.6
+	var spawned := _spawn_encounter_actor({
+		"instance_id": "spar_%d" % WorldHistory.event_count("spar_bout_started"),
+		"kind": "hostile", "tier": tier, "name": "SPARRING PARTNER",
+		"loot": ["nothing"],
+	}, at)
+	var partner: Dictionary = encounter_actors.back()
+	partner["sparring"] = true
+	partner["display_name"] = "%s PARTNER" % str(FighterTier.spec(tier).label)
+	spar_bout = {"subject_id": str(partner.subject_id), "tier": tier, "landed": 0, "taken": 0}
+	fight_stats.clear()
+	WorldHistory.record_event("spar_bout_started", {"tier": tier})
+	prompt.text = "SPAR // %s // FIRST TO FIVE CLEAN HITS. WATCH THE RED MARK AND GUARD THAT SIDE." % str(FighterTier.spec(tier).label)
+
+
+func _spar_said(actor: Dictionary, line: String) -> void:
+	prompt.text = "%s: %s" % [str(actor.display_name), line]
+
+
+func _spar_landed(actor: Dictionary, defence: String) -> void:
+	if spar_bout.is_empty() or str(actor.subject_id) != str(spar_bout.subject_id):
+		return
+	if defence == "block":
+		_spar_said(actor, "BLOCKED. I SAW IT COMING FROM THAT SIDE.")
+		return
+	spar_bout["landed"] = int(spar_bout.landed) + 1
+	impact_feel.strike(0.4, "blunt", false)
+	prompt.text = "CLEAN HIT // %d - %d" % [int(spar_bout.landed), int(spar_bout.taken)]
+	if int(spar_bout.landed) >= SPAR_POINTS:
+		_end_spar(actor, true)
+
+
+func _spar_struck(actor: Dictionary, guarded: Dictionary) -> void:
+	if spar_bout.is_empty() or str(actor.subject_id) != str(spar_bout.subject_id):
+		return
+	if bool(guarded.get("parried", false)):
+		_spar_said(actor, "GOOD PARRY. NOW HIT ME WHILE I RECOVER.")
+		return
+	if bool(guarded.get("blocked", false)):
+		_spar_said(actor, "BLOCKED. RIGHT SIDE, RIGHT TIME.")
+		return
+	spar_bout["taken"] = int(spar_bout.taken) + 1
+	lose_footing(0.2, "")
+	_spar_said(actor, "TOUCH. IT CAME FROM %s AND YOUR GUARD WAS NOT THERE." % str(actor.get("attack_side", "high")).to_upper())
+	if int(spar_bout.taken) >= SPAR_POINTS:
+		_end_spar(actor, false)
+
+
+func _end_spar(actor: Dictionary, won: bool) -> void:
+	var tier := str(spar_bout.tier)
+	var next := tier
+	if won:
+		var at := FighterTier.ORDER.find(tier)
+		next = str(FighterTier.ORDER[mini(at + 1, FighterTier.ORDER.size() - 1)])
+		WorldHistory.update_subject(SPAR_SUBJECT, {"tier": next, "best": next}, "spar_tier_up")
+	WorldHistory.record_event("spar_bout_ended", {"tier": tier, "won": won, "landed": int(spar_bout.landed), "taken": int(spar_bout.taken)})
+	var tip := fight_summary(fight_stats).get_slice("\n", 2)
+	prompt.text = ("YOU WIN %d - %d. NEXT PARTNER: %s." % [int(spar_bout.landed), int(spar_bout.taken), str(FighterTier.spec(next).label)] if won else "YOU LOSE %d - %d. %s" % [int(spar_bout.landed), int(spar_bout.taken), tip if not tip.is_empty() else "WATCH THE RED MARK AND GUARD THAT SIDE."])
+	# The partner steps out of the ring.
+	actor["dead"] = true
+	actor["disposition"] = "friendly"
+	var node := actor.get("node") as Node3D
+	if node != null and is_instance_valid(node):
+		node.visible = false
+	_show_telegraph(actor, node, false)
+	spar_bout = {}
 
 
 func _complete_local_law_arrest(actor: Dictionary) -> void:
@@ -5867,7 +6667,7 @@ func _actor_attack_cycle(actor: Dictionary) -> float:
 	# O6.1. A fist comes back faster than a weapon does — the same reason the
 	# player's own bare-hand attacks run at a shorter cooldown than a cleaver.
 	var unarmed := NPC_UNARMED_CYCLE_SCALE if bool(actor.get("disarmed", false)) else 1.0
-	return lerpf(2.4, 1.4, _actor_combat_ratio(actor)) * lerpf(1.6, 1.0, _actor_footing(actor)) * unarmed
+	return lerpf(2.4, 1.4, _actor_combat_ratio(actor)) * lerpf(1.6, 1.0, _actor_footing(actor)) * unarmed * float(FighterTier.spec(str(actor.get("tier", "hunter"))).cycle)
 
 
 func _actor_attack_damage(actor: Dictionary) -> int:
@@ -6857,14 +7657,59 @@ func _lock_candidates() -> Array:
 	return found
 
 
+## Hold middle mouse: at the body in front of you, a shove that either breaks
+## their guard (a stagger and a free hit) or throws them back off their feet.
+## Returns "break", "throw", or "" when nothing happened.
+func guard_break(force := "") -> String:
+	if field_meds.busy() or resolution_ui.visible or player_rig.anatomy.dead:
+		return ""
+	if stamina < GUARD_BREAK_STAMINA:
+		_feedback("TOO WINDED TO SHOVE")
+		return ""
+	var forward := -camera.global_transform.basis.z
+	forward.y = 0.0
+	forward = forward.normalized()
+	var best: Dictionary = {}
+	var best_distance := GUARD_BREAK_REACH
+	for actor: Dictionary in encounter_actors:
+		var node := actor.get("node") as Node3D
+		if node == null or not is_instance_valid(node) or bool(actor.get("dead", false)):
+			continue
+		var to := node.global_position - player
+		to.y = 0.0
+		if to.length() < best_distance and forward.dot(to.normalized()) > 0.55:
+			best_distance = to.length()
+			best = actor
+	if best.is_empty():
+		_feedback("NOBODY IN REACH TO SHOVE")
+		return ""
+	stamina -= GUARD_BREAK_STAMINA
+	var kind := force if force != "" else ("break" if randf() < 0.5 else "throw")
+	best.state = "staggered"
+	best.attack_time = 0.0
+	if kind == "break":
+		best["stagger_remaining"] = 1.4
+		_actor_lose_footing(best, 0.35)
+		prompt.text = "YOU BREAK %s'S GUARD // A FREE HIT" % str(best.display_name).to_upper()
+	else:
+		best["stagger_remaining"] = 2.2
+		_actor_lose_footing(best, 1.0)
+		var body := best.get("node") as CharacterBody3D
+		if body != null:
+			body.velocity += forward * 6.0 + Vector3.UP * 2.0
+		prompt.text = "YOU THROW %s DOWN" % str(best.display_name).to_upper()
+	WorldHistory.record_event("guard_break", {"subject_id": str(best.get("subject_id", "")), "kind": kind, "location": HUNT_LOCATION})
+	return kind
+
+
 func _toggle_lock() -> void:
 	if not lock_target.is_empty():
 		lock_target = ""
-		prompt.text = "LOCK RELEASED"
+		_feedback("LOCK RELEASED")
 		return
 	var candidates := _lock_candidates()
 	if candidates.is_empty():
-		prompt.text = "NOTHING TO LOCK"
+		_feedback("NOTHING TO LOCK ONTO")
 		return
 	# Prefer what the player is already looking at; fall back to the nearest.
 	var forward := Vector3(sin(yaw), 0, cos(yaw)).normalized()
@@ -7242,14 +8087,51 @@ func _black_mirror_environment() -> Environment:
 ## for at night and reads as barely more than a tint at noon, rather than one
 ## fixed amplification regardless of the hour.
 func _toggle_black_mirror() -> void:
+	# Night vision is the phone's camera (Greg, 2026-09-24): no phone in hand,
+	# nothing to raise.
+	if not black_mirror_active and dropped_handheld != null and is_instance_valid(dropped_handheld):
+		_feedback("THE BLACK MIRROR IS ON THE GROUND")
+		return
+	if not black_mirror_active and (handheld == null or not is_instance_valid(handheld) or not handheld.possessed):
+		_feedback("NO PHONE IN HAND // THE BLACK MIRROR IS IN RESTRICTED STORAGE")
+		return
 	black_mirror_active = not black_mirror_active
+	# Greg, 26 September: the phone camera shows signals too (SignalSight).
+	if sight != null and is_instance_valid(sight):
+		sight.set("phone_lens", black_mirror_active)
+	var sensor := _mirror_sensor()
 	if not black_mirror_active:
+		sensor.set_active(false)
 		camera.environment = null
 		return
 	var graded := _black_mirror_environment()
 	var darkness := 1.0 - WorldClock.daylight()
 	graded.adjustment_brightness = lerpf(1.05, 3.4, darkness)
-	camera.environment = graded
+	# The grade is the sensor's source: BlackMirrorCamera copies it and adds its
+	# own exposure, gain noise, focus hunt and battery on top, with the phone
+	# feed drawn over the screen.
+	sensor.bind(camera, graded)
+	sensor.set_active(true)
+	if not sensor.active:
+		# A dead cell still lets you look through the glass, just not amplified.
+		camera.environment = graded
+
+
+## BlackMirrorCamera existed, complete, and nothing ever made one. It lives on
+## the HUD layer and is made the first time the phone is raised.
+var _mirror: BlackMirrorCamera
+
+
+func _mirror_sensor() -> BlackMirrorCamera:
+	if _mirror == null or not is_instance_valid(_mirror):
+		_mirror = BlackMirrorCamera.new()
+		_mirror.name = "BlackMirrorSensor"
+		$HUD.add_child(_mirror)
+		# Directly above the field lens: that is a full-screen screen-reading
+		# pass too, and anything under it is painted over by its copy of the
+		# frame -- which is how the whole feed and its REC overlay went missing.
+		$HUD.move_child(_mirror, field_lens.get_index() + 1 if field_lens != null else 0)
+	return _mirror
 
 
 func _take_photograph() -> Dictionary:
@@ -7570,12 +8452,15 @@ func _build_keys_card() -> void:
 		]},
 		{"group": "FIGHTING", "rows": [
 			["LMB", "ATTACK"],
-			["RMB", "AIM FIREARMS / HEAVY MELEE"],
+			["RMB", "AIM FIREARMS / GUARD (MOUSE PICKS SIDE)"],
+			["MMB", "HEAVY // HOLD: GUARD BREAK"],
 			["HOLD X", "GUARD"],
+			["GUARD MID-SWING", "FEINT (BLOOD TREE)"],
 			["Z", "LOCK ON"],
 			["WHEEL", "CYCLE TARGET"],
 			["1 2 3", "SWORD / SHOTGUN / PISTOL"],
 			["4", "CARRIED LIMB"],
+			["HOLD 4", "FIELD DRESSING // +20 BLOOD"],
 			["5", "PUT THEM DOWN"],
 			["B", "CYCLE GRIP"],
 			["R", "RELOAD"],
@@ -7591,7 +8476,7 @@ func _build_keys_card() -> void:
 			["CLINCH SPACE", "LET GO"],
 			["HOLD V", "LUNGS / CLINCH: PERSUADE"],
 			["X", "THREATEN"],
-			["H", "EXTRACTION"],
+			["H", "SEARCH A BODY"],
 			["N", "PHOTOGRAPH"],
 			["6", "CYCLE SMOKEABLE"],
 			["Y", "HAND / LIP-HOLD SMOKEABLE"],
@@ -7600,19 +8485,23 @@ func _build_keys_card() -> void:
 			["LMB EXHALE", "O / DOUBLE O / GHOST"],
 		]},
 		{"group": "WHAT YOU CARRY", "rows": [
-			["O", "FIELD INVENTORY / BODY / LOOT"],
+			["TAB / O", "FIELD INVENTORY / BODY / LOOT"],
 			["U", "DEAD CLOUD EXCHANGE // CASES"],
+			["7", "BLOOD TREE // SPEND BLOOD"],
 			["F8", "CONTACT // PEOPLE, ENTITIES, MATERIA"],
 			["G", "RAISE / LOWER BLACK MIRROR"],
-			["TAB", "INDEX / NEXT DEVICE APP"],
+			["SHIFT+TAB", "INDEX"],
+			["TAB (DEVICE UP)", "NEXT DEVICE APP"],
 			["CLICK / F1-F7", "SELECT DEVICE APP"],
 			["M", "LIVING MAP"],
 			["T", "CHARACTER TREE"],
 			["P", "THE BOARD"],
-			["J", "ALLUSIONS ARTWORK"],
+			["F9", "ALLUSIONS ARTWORK"],
+			["K", "WIZARD EYES // WHAT HIDES, WHAT IS LIVE"],
+			["HOLD J", "DEPTH SCAN // BODIES THROUGH WALLS"],
 			["HOLD L + WASD", "LEAN / WAVE DEVICE LIGHT"],
 			[HANDHELD.DROP_KEY_LABEL, "DROP DEVICE"],
-			["K", "RE-DECANT // A RESET THAT COSTS YOU"],
+			["HOLD K", "RE-DECANT // A RESET THAT COSTS YOU"],
 			["ESC", "CLOSE"],
 		]},
 	])
@@ -7651,6 +8540,13 @@ func _order_hud_layers() -> void:
 		slot += 1
 
 
+func _on_hub_surface(surface: String) -> void:
+	if surface == "close":
+		_toggle_panel("hub")
+	else:
+		_toggle_panel(surface)
+
+
 func _toggle_panel(mode: String) -> void:
 	var opening := panel_mode != mode
 	if opening:
@@ -7676,6 +8572,11 @@ func _toggle_panel(mode: String) -> void:
 		world_index.open()
 	elif world_index.visible:
 		world_index.close()
+	if brain_hub != null:
+		if panel_mode == "hub":
+			brain_hub.open(handheld.carry, arsenal, player_rig)
+		else:
+			brain_hub.close()
 	if panel_mode == "board":
 		pin_board.open()
 	elif pin_board.visible:
@@ -7693,6 +8594,7 @@ func _toggle_panel(mode: String) -> void:
 	# nothing breaks on arrival, it breaks the first time you open a panel.
 	var covering: bool = living_map.visible or world_index.visible or pin_board.visible
 	covering = covering or (field_inventory != null and field_inventory.visible)
+	covering = covering or (brain_hub != null and brain_hub.visible)
 	covering = covering or (case_menu != null and case_menu.visible)
 	covering = covering or (contact_menu != null and contact_menu.visible)
 	prompt.visible = not covering
@@ -7726,6 +8628,10 @@ func _close_panel_views() -> void:
 		world_index.visible = false
 	if pin_board.visible:
 		pin_board.close()
+	# The Brain Index was the one surface this missed, so closing "everything"
+	# (raising the phone, Escape from code) left it hanging over play.
+	if brain_hub != null and brain_hub.visible:
+		brain_hub.close()
 	panel.visible = false
 
 
@@ -7754,6 +8660,23 @@ func _toggle_inventory() -> void:
 
 ## The dead cloud's shopfront, on U. Same mutual exclusion as every other
 ## full-size reader: opening it shuts the rest, closing it gives the mouse back.
+## Skins wear with use (Greg, 24 September): a shot scuffs the finish, a hit
+## scuffs and bloods it, and a kill is counted on it. Hits and kills arrive
+## through the blood ledger, which already knows which weapon did what.
+func _on_skin_fired(weapon_id: String, _report: Dictionary) -> void:
+	if not SkinLoadout.applied(weapon_id).is_empty():
+		SkinLoadout.scuff(weapon_id, 0.0008)
+		arsenal.apply_skins()
+
+
+func _on_skin_blood(weapon_id: String, _style_id: String, _amount: int, kind: String) -> void:
+	var target := "ram" if weapon_id == "breach_tool" else weapon_id
+	if SkinLoadout.applied(target).is_empty():
+		return
+	SkinLoadout.scuff(target, 0.004, 0.06, kind in ["kill", "finisher", "takedown"])
+	arsenal.apply_skins()
+
+
 func _toggle_cases() -> void:
 	var opening := panel_mode != "cases"
 	if opening:
@@ -7763,6 +8686,7 @@ func _toggle_cases() -> void:
 		keys_card.close()
 		_close_panel_views()
 		panel_mode = "cases"
+		case_menu.weapon_hint = str(arsenal.current_id)
 		case_menu.open_menu(handheld.carry, player_rig)
 		prompt.visible = false
 		Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
@@ -7834,10 +8758,22 @@ func _close_active_interface() -> bool:
 	return false
 
 
+## Greg, 26 September: every key on the F1 card answers. A refusal or a
+## result is held on the prompt line for a moment, where before the next
+## frame's context prompt wrote over it and the key seemed to do nothing.
+func _feedback(text: String) -> void:
+	prompt.visible = true
+	prompt.text = text
+	sleep_prompt_hold = maxf(sleep_prompt_hold, 1.8)
+
+
 func _toggle_handheld_surface() -> void:
 	if handheld.is_open:
 		handheld.close_device()
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		return
+	if not handheld.possessed:
+		_feedback("NO PHONE IN HAND // THE BLACK MIRROR IS IN RESTRICTED STORAGE")
 		return
 	firearm_aiming = false
 	# Pocket every other reader before raising the physical device. This also
@@ -7940,6 +8876,7 @@ func _update_hud() -> void:
 			"weapon": arsenal.state() if arsenal != null else {},
 			"wound_regions": _interface_wound_regions(),
 			"lock_screen": lock_screen,
+			"pockets": handheld.carry.pocketed_items() if handheld != null and handheld.get("carry") != null else [],
 		})
 
 
@@ -8072,7 +9009,10 @@ func _update_held_reliquary() -> void:
 	if held_reliquary == null or not is_instance_valid(held_reliquary):
 		return
 	held_reliquary.set_arm_damage(float(_interface_wound_regions().arms))
-	var covered := world_index.visible or character_archive.visible or allusions_artwork.visible or living_map.visible or pin_board.visible
+	# The raised phone fills the screen; its lower-right corner was hidden
+	# under the held-item panel.
+	var phone_up: bool = handheld != null and is_instance_valid(handheld) and bool(handheld.is_open)
+	var covered := phone_up or world_index.visible or character_archive.visible or allusions_artwork.visible or living_map.visible or pin_board.visible
 	if covered:
 		held_reliquary.clear_item()
 		return
@@ -8099,6 +9039,78 @@ func _update_held_reliquary() -> void:
 			held_reliquary.show_item(held_weapon, str(state.get("label", arsenal.current_id)), detail)
 			return
 	held_reliquary.clear_item()
+
+
+## The swing's trail follows whatever is actually in the hand, and the lock
+## ring follows whoever the camera is actually framing. Both only read state.
+func _ease_arrival_pain(delta: float) -> void:
+	if player_rig == null or player_rig.anatomy == null:
+		return
+	var anatomy_now = player_rig.anatomy
+	if _arrival_ease == -1.0:
+		# First frame here: arriving hurting starts the ease, arriving well
+		# never does.
+		_arrival_ease = ARRIVAL_EASE_SECONDS if float(anatomy_now.pain) > ARRIVAL_PAIN_FLOOR + 8.0 else 0.0
+		_arrival_pain_from = float(anatomy_now.pain)
+		return
+	if _arrival_ease <= 0.0:
+		return
+	_arrival_ease = maxf(0.0, _arrival_ease - delta)
+	var target := lerpf(ARRIVAL_PAIN_FLOOR, _arrival_pain_from, _arrival_ease / ARRIVAL_EASE_SECONDS)
+	if float(anatomy_now.pain) > target + 4.0:
+		# Something new hurt you: that pain is yours to keep.
+		_arrival_ease = 0.0
+		return
+	anatomy_now.pain = minf(float(anatomy_now.pain), target)
+
+
+func _update_strike_fx(delta: float) -> void:
+	strike_face_time = maxf(0.0, strike_face_time - delta)
+	if block_tracker != null:
+		block_tracker.camera = camera
+		block_tracker.visible = panel_mode.is_empty() and not resolution_ui.visible
+		var seen_by: Array = []
+		for actor in encounter_actors:
+			if bool(actor.get("tracking_player", false)) and not bool(actor.get("dead", false)) and actor.get("node") != null and is_instance_valid(actor.node):
+				# Framed on the torso, so the box sits on the body, not over the head.
+				var body_rig := actor.get("rig") as BaselineHuman
+				var torso := body_rig.parts.get("torso") as Node3D if body_rig != null else null
+				var centre: Vector3 = torso.global_position if torso != null and is_instance_valid(torso) else (actor.node as Node3D).global_position + Vector3(0, 0.9, 0)
+				seen_by.append({"at": centre, "certainty": 1.0})
+		block_tracker.watch(seen_by)
+	if threat_compass != null:
+		threat_compass.visible = panel_mode.is_empty() and not resolution_ui.visible
+	if strike_trail != null:
+		var held: Node3D = null
+		if carried_limb_index >= 0 and carried_limb_model != null and is_instance_valid(carried_limb_model):
+			held = carried_limb_model
+		elif arsenal != null and not bare_handed and arsenal.models.has(arsenal.current_id):
+			held = arsenal.models[arsenal.current_id] as Node3D
+		var commit := arm.commitment() if arm != null else 0.0
+		strike_trail.feed_weapon(held, delta, commit)
+		# Afterimages are a third-person read of the swing. In first person a
+		# ghost blade flicking over the real one read as the arm itself
+		# jumping back and forth (Greg's walkthrough, 2026-09-24).
+		if strike_smear != null and not body_motion.first_person:
+			var tip := held.global_transform * strike_trail.tip_local(held) if held != null and is_instance_valid(held) else Vector3.ZERO
+			strike_smear.feed(held, tip, delta, commit)
+			if strike_audio != null:
+				strike_audio.feed(tip, delta, commit, held != null and is_instance_valid(held))
+	if lock_readout != null:
+		var locked_actor := _actor_by_id(lock_target) if not lock_target.is_empty() else {}
+		var locked_node := locked_actor.get("node") as Node3D if not locked_actor.is_empty() else null
+		if locked_node != null and camera != null and not camera.is_position_behind(locked_node.global_position) and panel_mode.is_empty():
+			var body_anatomy = locked_actor.get("anatomy")
+			var zones: Dictionary = body_anatomy.zones if body_anatomy != null else {}
+			lock_readout.show_for(camera.unproject_position(locked_node.global_position + Vector3.UP * 1.1), str(locked_actor.get("display_name", "")), zones, ANATOMY_COMPONENT.DEFAULT_ZONES)
+		else:
+			lock_readout.hide_readout()
+	if lock_ring != null:
+		var focus := _camera_combat_focus()
+		if focus != null and is_instance_valid(focus):
+			lock_ring.follow(focus.global_position)
+		else:
+			lock_ring.release()
 
 
 func _update_camera() -> void:
@@ -8207,7 +9219,7 @@ func _update_camera() -> void:
 	# nominal third-person blend here made the player's torso fill the complete
 	# frame at the Hunt spawn even though collision avoidance itself was working.
 	var camera_blend := perspective_blend * HUNTER_MOTOR.third_person_clearance_blend(fp_position, tp_position)
-	var base_fov := lerpf(FIRST_PERSON_FOV, THIRD_PERSON_FOV, camera_blend) + fov_add
+	var base_fov := lerpf(FIRST_PERSON_FOV, THIRD_PERSON_FOV, camera_blend) + fov_add + LOOK.fov_offset()
 	var aimed_fov := lerpf(56.0, 50.0, camera_blend)
 	camera.fov = lerpf(base_fov, aimed_fov, firearm_aim_blend)
 	# Locked, the shot is about the pair, so aim between them. Unlocked, aim
@@ -8235,6 +9247,8 @@ func _update_camera() -> void:
 		if locked_body != null and third_person:
 			var toward := locked_body.global_position - player
 			facing = atan2(toward.x, toward.z) + PI
+		elif strike_face_time > 0.0 and third_person:
+			facing = strike_face_yaw
 		player_rig.rotation.y = lerp_angle(player_rig.rotation.y, facing, clampf(get_physics_process_delta_time() * 12.0, 0.0, 1.0))
 		# The first-person camera sits inside the skull, so the head would fill
 		# the view. Fading this on the blend instead of the toggle means the
@@ -8244,6 +9258,11 @@ func _update_camera() -> void:
 		var head := player_rig.parts.get("head") as Node3D
 		if head != null and is_instance_valid(head):
 			head.visible = camera_blend > 0.5
+	# The arms follow the camera actually used, like the head: a room that
+	# forces the eye gets first-person arms, and nothing that sets
+	# third_person without the F key leaves them stretched back to the lens.
+	if body_motion != null:
+		body_motion.set_perspective(camera_blend <= 0.5)
 
 
 ## The pointer, in the project's own hand rather than the operating system's. A
@@ -8299,6 +9318,9 @@ func _build_world() -> void:
 	add_child(air)
 	_add_mesh(BoxMesh.new(), Vector3(0, -0.6, 0), Vector3(470, 1, 370), Color("17150f"), 0.0)
 	var floor_body := StaticBody3D.new()
+	# 0.2b: the ground, so a round fired into it leaves a hole (`GroundHole`).
+	floor_body.name = "Ground"
+	floor_body.add_to_group(GroundHole.GROUP)
 	var floor_collider := CollisionShape3D.new()
 	var floor_shape := BoxShape3D.new()
 	floor_shape.size = Vector3(470, 1, 370)
@@ -8708,6 +9730,39 @@ func _update_storm_exposure(delta: float) -> void:
 ## `_update_camera()`'s own obstruction check already uses: nothing in the
 ## way reads as a clear sightline, anything else in the way reads as full
 ## cover.
+var _upkeep_clock := 0.0
+var sight: Node
+var _k_held_for := -1.0
+var _k_fired := false
+var _perception_player_cache: Array[RID] = []
+var _perception_player_stamp := -1000000
+
+
+func _perception_player_rids() -> Array[RID]:
+	var now := Time.get_ticks_msec()
+	if now - _perception_player_stamp > PERCEPTION_RID_REFRESH_MS or _perception_player_cache.is_empty():
+		_perception_player_stamp = now
+		_perception_player_cache = [player_body.get_rid()]
+		for zone in player_body.find_children("*", "CollisionObject3D", true, false):
+			_perception_player_cache.append((zone as CollisionObject3D).get_rid())
+	return _perception_player_cache
+
+
+func _perception_rig_rids(actor: Dictionary, hostile: Node3D) -> Array[RID]:
+	var now := Time.get_ticks_msec()
+	if actor.get("_perception_rig") == hostile and now - int(actor.get("_perception_stamp", -1000000)) <= PERCEPTION_RID_REFRESH_MS:
+		return actor["_perception_rids"]
+	var rids: Array[RID] = []
+	if hostile is CollisionObject3D:
+		rids.append((hostile as CollisionObject3D).get_rid())
+	for zone in hostile.find_children("*", "CollisionObject3D", true, false):
+		rids.append((zone as CollisionObject3D).get_rid())
+	actor["_perception_rig"] = hostile
+	actor["_perception_stamp"] = now
+	actor["_perception_rids"] = rids
+	return rids
+
+
 func _update_perception(delta: float) -> void:
 	var sprinting_now := Input.is_action_pressed("sprint") and player_body.velocity.length() > 0.5
 	player_noise = move_toward(player_noise, 1.0 if sprinting_now else 0.0, delta * 2.0)
@@ -8731,18 +9786,17 @@ func _update_perception(delta: float) -> void:
 			continue
 		var eye := hostile.global_position + Vector3.UP * 1.5
 		var distance := eye.distance_to(target)
-		var excluded: Array[RID] = [player_body.get_rid()]
 		# The ray starts at one anatomical rig and ends inside another. Excluding
 		# only the two CharacterBody roots left every Area3D zone in both rigs as
 		# fake "cover", so a hunter looking straight at a raised screen read their
 		# own chest hitbox as a wall. Real walls remain in the query; body zones at
 		# either endpoint do not.
-		for player_collider_node in player_body.find_children("*", "CollisionObject3D", true, false):
-			excluded.append((player_collider_node as CollisionObject3D).get_rid())
-		if hostile is CollisionObject3D:
-			excluded.append((hostile as CollisionObject3D).get_rid())
-		for hostile_collider_node in hostile.find_children("*", "CollisionObject3D", true, false):
-			excluded.append((hostile_collider_node as CollisionObject3D).get_rid())
+		# Greg, 26 September, "60 to 160 fps": walking both rigs for their zones
+		# was redone for every hunter on every physics frame, the largest single
+		# cost in the Hunt's script. The zones are collected once per rig and
+		# refreshed every second, which still catches a rig rebuilt mid-fight.
+		var excluded: Array[RID] = _perception_player_rids().duplicate()
+		excluded.append_array(_perception_rig_rids(actor, hostile))
 		var query := PhysicsRayQueryParameters3D.create(eye, target)
 		query.exclude = excluded
 		var obstruction := get_world_3d().direct_space_state.intersect_ray(query)
@@ -8850,6 +9904,8 @@ func _build_expanse_systems() -> void:
 	add_child(misfire_director)
 	misfire_director.connect("misfire_triggered", _on_reality_misfire)
 	misfire_director.call("generate", 774013, Vector2(470, 370), 18)
+	overworld_events = OverworldEventDirector.new()
+	add_child(overworld_events)
 	if living_map != null:
 		living_map.bind(generated_world, misfire_director, _map_contacts)
 		# The field radar and the opened map share this one sleeping satellite.
@@ -8997,6 +10053,10 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> Dictionary:
 	var initial_state := "hunting" if initial_disposition == "hostile" else "idle"
 	encounter_actors.append({"subject_id": subject_id, "display_name": display_name, "node": actor, "rig": rig, "motion": actor_motion, "anatomy": anatomy, "state": initial_state, "disposition": initial_disposition, "speed": 3.7, "loot": loot, "loot_at_risk": false, "dead": false})
 	encounter_actors.back()["encounter_id"] = str(encounter.get("instance_id", ""))
+	# Greg, 24 September: difficulty is who you fight (`FighterTier`).
+	var tier_source := encounter.duplicate()
+	tier_source["name"] = display_name
+	encounter_actors.back()["tier"] = FighterTier.tier_for(tier_source, returning_rival)
 	if returning_rival:
 		encounter_actors.back()["returning_rival"] = true
 	if str(saved_actor.get("status", "")) in ["spared", "recruited"]:

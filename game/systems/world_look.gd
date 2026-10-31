@@ -79,6 +79,9 @@ static func set_quality_name(value: String) -> void:
 		"ULTRA": quality = Quality.ULTRA
 		"PERFORMANCE": quality = Quality.PERFORMANCE
 		_: quality = Quality.HIGH
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree != null:
+		apply_viewport_quality(tree.root)
 
 
 ## Applies the part of a graphics tier owned by the viewport rather than its
@@ -88,6 +91,8 @@ static func apply_viewport_quality(viewport: Viewport) -> void:
 	if viewport == null:
 		return
 	viewport.scaling_3d_scale = float(QUALITY_RENDER_SCALE[quality])
+	# Below native, FSR 1 sharpens the upscale where bilinear would smear it.
+	viewport.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR if viewport.scaling_3d_scale < 1.0 else Viewport.SCALING_3D_MODE_BILINEAR
 	viewport.msaa_3d = int(QUALITY_MSAA[quality]) as Viewport.MSAA
 	viewport.use_taa = quality != Quality.PERFORMANCE
 
@@ -191,13 +196,38 @@ const PRESETS := {
 		"fog": "1d1a16", "fog_density": 0.0065, "volumetric": 0.010,
 		"ambient": 0.46, "saturation": 0.96, "contrast": 1.26, "exposure": 1.05,
 	},
+	# The Growing Floor (Greg, 26 September, the Higgsfield vat renders: a
+	# black room, the colour held in the red vat glow, a faint green haze at
+	# the walls). It ran `ossuary`, and the vat room measured a pastel mauve
+	# median of 90/255 under 0.02 violet fog -- the same wash `front_door` and
+	# `lower_works` above were cut loose from. Dark red-brown air at under half
+	# the density, so the lamps and the tank do the colouring.
+	# Greg, 26 September: the vat room "darker, red only in the glow". The sky
+	# and fog were blood-brown, which tinted every surface red; now they are
+	# near-neutral black, and the red comes only from the vat's own light.
+	"growing_floor": {
+		"zenith": "050505", "horizon": "121010", "ground": "080707",
+		"fog": "151312", "fog_density": 0.009, "volumetric": 0.012,
+		"ambient": 0.24, "saturation": 1.0, "contrast": 1.22, "exposure": 0.95,
+	},
+	# The old drains (the brick drain and the bingyanger renders): wet brick
+	# under green-brown air, not the sodium orange the lamps pushed them to.
+	"old_drains": {
+		"zenith": "070907", "horizon": "1a1d14", "ground": "0b0c09",
+		"fog": "262a1c", "fog_density": 0.0075, "volumetric": 0.011,
+		"ambient": 0.5, "saturation": 0.9, "contrast": 1.2, "exposure": 1.05,
+	},
 }
+
+## The preset the scene on screen last asked for. HouseLook grades by it.
+static var current_preset := ""
 
 static var _noise_cache: Dictionary = {}
 
 
 static func environment(preset_name: String = "bone_yard") -> Environment:
 	var preset: Dictionary = PRESETS.get(preset_name, PRESETS.bone_yard)
+	current_preset = preset_name
 	var env := Environment.new()
 
 	# A6.1. The sky was a `ProceduralSkyMaterial` for five passes: a two-colour

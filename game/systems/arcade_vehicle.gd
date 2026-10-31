@@ -481,9 +481,8 @@ func refuel(amount: float = 1.0) -> void:
 	fuel = clampf(fuel + amount, 0.0, 1.0)
 
 
-func recover(at: Vector3) -> void:
-	global_position = at
-	rotation = Vector3.ZERO
+func recover(at: Vector3, facing := Basis.IDENTITY) -> void:
+	teleport(Transform3D(facing, at))
 	linear_velocity = Vector3.ZERO
 	angular_velocity = Vector3.ZERO
 	previous_velocity = Vector3.ZERO
@@ -491,3 +490,16 @@ func recover(at: Vector3) -> void:
 	contact_seconds = 0.0
 	stuck_seconds = 0.0
 	contact_cooldowns.clear()
+
+
+## Moves the car for real. Setting the node's transform alone was undone on
+## the next physics step (the body's server state kept the old one), so a
+## reset or a recovery left the car exactly where it was.
+func teleport(to: Transform3D) -> void:
+	global_transform = to
+	PhysicsServer3D.body_set_state(get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM, to)
+	PhysicsServer3D.body_set_state(get_rid(), PhysicsServer3D.BODY_STATE_LINEAR_VELOCITY, Vector3.ZERO)
+	PhysicsServer3D.body_set_state(get_rid(), PhysicsServer3D.BODY_STATE_ANGULAR_VELOCITY, Vector3.ZERO)
+	PhysicsServer3D.body_set_state(get_rid(), PhysicsServer3D.BODY_STATE_SLEEPING, false)
+	_last_safe_transform = to
+	_has_safe_transform = true
