@@ -29,7 +29,7 @@ func _ready() -> void:
 
 	hunt._equip_weapon(0)
 	hunt._carry_current_weapon()
-	check(is_equal_approx(hunt.arm.mass, hunt.ARM_WEIGHTS.sword.mass), "holding the sword carries the sword's own mass (%.2f)" % hunt.arm.mass)
+	check(is_equal_approx(hunt.arm.mass, hunt.ARM_WEIGHTS.cleaver.mass), "holding the cleaver carries the cleaver's own mass (%.2f)" % hunt.arm.mass)
 
 	hunt._spawn_encounter_actor({"instance_id": "grapple_mass_probe", "kind": "hostile"}, hunt.player + Vector3(0, -0.5, 1))
 	var actor: Dictionary = hunt.encounter_actors.back()
@@ -38,7 +38,7 @@ func _ready() -> void:
 	hunt.grapple_pushing_override = false
 	hunt.grapple_pushing_now = false
 	hunt._carry_current_weapon()
-	check(is_equal_approx(hunt.arm.mass, hunt.ARM_WEIGHTS.grapple.mass), "just holding on carries the grapple's own mass, not the sword's (%.2f)" % hunt.arm.mass)
+	check(is_equal_approx(hunt.arm.mass, hunt.ARM_WEIGHTS.grapple.mass), "just holding on carries the grapple's own mass, not the cleaver's (%.2f)" % hunt.arm.mass)
 	check(hunt.ARM_WEIGHTS.grapple.mass > hunt.ARM_WEIGHTS.bare.mass, "and that mass is real weight over an empty fist")
 
 	hunt.grapple_pushing_now = true
@@ -49,7 +49,7 @@ func _ready() -> void:
 	hunt._break_grapple()
 	check(not hunt.grapple_pushing_now, "breaking the hold clears the pushing state too")
 	hunt._carry_current_weapon()
-	check(is_equal_approx(hunt.arm.mass, hunt.ARM_WEIGHTS.sword.mass), "letting go hands the arm back to whatever was actually equipped (%.2f)" % hunt.arm.mass)
+	check(is_equal_approx(hunt.arm.mass, hunt.ARM_WEIGHTS.cleaver.mass), "letting go hands the arm back to the issued cleaver (%.2f)" % hunt.arm.mass)
 
 	hunt._put_the_weapons_down()
 	hunt._carry_current_weapon()

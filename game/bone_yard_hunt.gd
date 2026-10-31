@@ -2222,6 +2222,7 @@ func apply_look(turn: Vector2) -> void:
 ## A bare hand is about 0.4kg, a cleaver 1.4, a sledge 6.
 const ARM_WEIGHTS := {
 	"sword": {"mass": 1.45, "reach": 0.62},
+	"cleaver": {"mass": 1.4, "reach": 0.5},
 	"shotgun": {"mass": 3.2, "reach": 0.5},
 	"sidearm": {"mass": 0.95, "reach": 0.22},
 	"severed_limb": {"mass": 2.6, "reach": 0.58},
@@ -2241,16 +2242,20 @@ const ARM_WEIGHTS := {
 ## worn weapon now needs a real number to be worn *from*.
 const WEAPON_BASE_STIFFNESS := 58.0
 ## AN2.5. Which grips a weapon actually offers, in the order `B` cycles them.
-## Only the sword has a real choice to make — a shotgun and a sidearm each
-## have exactly one grip already (`HeldGear._default_grip`), so cycling them
-## would be a key that does nothing every time it is pressed.
+## A shotgun and a sidearm each have exactly one grip already
+## (`HeldGear._default_grip`), so cycling them would be a key that does nothing
+## every time it is pressed; `_cycle_grip()` names those honestly instead.
+##
+## The issued melee is the hotline cleaver. It is a one-hand tool, but it has
+## two real grips: the handle for reach, and choked up against the bolster for
+## control. The sword keeps its three grips for the rooms and rigs that draw it.
 const GRIP_CYCLE := {
+	"cleaver": ["one_hand", "choke_up"],
 	"sword": ["two_hand", "one_hand", "half_sword"],
 }
-## `HeldGear`'s own default for the sword — kept in sync by `_cycle_grip()`
-## rather than duplicated, since a fresh sword pull should start exactly
-## where `_default_grip()` already puts it.
-var current_grip := "two_hand"
+## The grip the issued cleaver starts in. A draw resets any weapon on
+## `GRIP_CYCLE` to that weapon's own first grip, so this matches the cleaver's.
+var current_grip := "one_hand"
 
 ## AN2.5. "Two-handing changes the numbers, not just the pose." `held_gear.gd`'s
 ## `GRIPS` table already carried `reach`, `damage_type` and now `control` per
@@ -2263,6 +2268,10 @@ func _cycle_grip() -> void:
 	var id := str(arsenal.current_id) if arsenal != null else ""
 	var options: Array = GRIP_CYCLE.get(id, [])
 	if options.is_empty():
+		var label := "THAT WEAPON"
+		if arsenal != null:
+			label = str(arsenal.current().get("label", label))
+		prompt.text = "NO GRIP CHANGE // %s" % label
 		return
 	var index := options.find(current_grip)
 	current_grip = options[(index + 1) % options.size()] if index >= 0 else options[0]
@@ -2364,7 +2373,8 @@ func _pose_weapon() -> void:
 	# not a shotgun receiver check). Restore authored contact before the current
 	# frame's inspection choreography is layered on, so release cannot leave a
 	# hand stranded away from its grip.
-	var active_grip: Dictionary = HeldGear.GRIPS.get(current_grip, {}) if str(arsenal.current_id) == "sword" else {}
+	var held_id := str(arsenal.current_id)
+	var active_grip: Dictionary = HeldGear.GRIPS.get(current_grip, {}) if GRIP_CYCLE.has(held_id) else {}
 	var right_pose := str((active_grip.get("right", {}) as Dictionary).get("pose", "trigger" if str(arsenal.current_id) in ["shotgun", "sidearm"] else "wrap"))
 	var left_pose := str((active_grip.get("left", {}) as Dictionary).get("pose", "cup" if str(arsenal.current_id) == "sidearm" else "wrap"))
 	_restore_grip_hand(model.get_node_or_null("RightGripHand") as Node3D, right_pose)
@@ -7574,10 +7584,10 @@ func _build_keys_card() -> void:
 			["HOLD X", "GUARD"],
 			["Z", "LOCK ON"],
 			["WHEEL", "CYCLE TARGET"],
-			["1 2 3", "SWORD / SHOTGUN / PISTOL"],
+			["1 2 3", "CLEAVER / SHOTGUN / PISTOL"],
 			["4", "CARRIED LIMB"],
 			["5", "PUT THEM DOWN"],
-			["B", "CYCLE GRIP"],
+			["B", "CYCLE GRIP // ONE-HAND / CHOKE-UP"],
 			["R", "RELOAD"],
 			["TAP Q", "PROSTHETIC SURGE // COSTS STAMINA"],
 			["HOLD Q", "FREE X-RAY / KEEP HOLDING FOR WHEEL"],

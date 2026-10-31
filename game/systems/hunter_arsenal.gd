@@ -14,6 +14,13 @@ signal reload_finished(weapon_id: String)
 signal customization_changed(weapon_id: String, customization: Dictionary)
 
 const WEAPONS := {
+	# imp-64: the Hunt issues the HOTLINE CLEAVER, not the old sword. The
+	# sword stays in `WEAPONS` for the rooms and rigs that still draw it.
+	"cleaver": {
+		"label": "HOTLINE CLEAVER", "kind": "melee", "damage": 38.0,
+		"impulse": 26.0, "reach": 2.5, "cooldown": 0.46,
+		"windup": 0.20, "stamina": 16.0, "damage_type": "cut",
+	},
 	"sword": {
 		"label": "ASHLINE CLEAVER", "kind": "melee", "damage": 44.0,
 		"impulse": 28.0, "reach": 3.7, "cooldown": 0.58,
@@ -67,7 +74,7 @@ const WEAPONS := {
 ## `facility_sidearm` is not: it is a weapon you come into possession of, and
 ## a rifle that reaches across the whole bone yard is not something the game
 ## should hand you at spawn.
-const SLOT_ORDER := ["sword", "shotgun", "sidearm"]
+const SLOT_ORDER := ["cleaver", "shotgun", "sidearm"]
 ## AF10.10. These are attachment points on the object, not perks on its
 ## holder. The future crafting screen may decide where a part comes from, but
 ## it must install through this vocabulary so the Hunt, range and cab all read
@@ -85,7 +92,7 @@ const CUSTOMIZATION_SCALES := {
 	"reload_scale": Vector2(0.5, 2.0),
 }
 
-var current_id := "sword"
+var current_id := "cleaver"
 var cooldown := 0.0
 var reload_remaining := 0.0
 var shot_serial := 0
@@ -616,7 +623,7 @@ func apply_grip(grip_name: String) -> bool:
 ## parented to that arm inherits the pitch a second time unless it is cancelled;
 ## read from the constant rather than copied, so retuning the pose does not
 ## quietly lay the blade down across the view again.
-func _build_weapon_model(weapon_id: String) -> Node3D:
+static func _build_weapon_model(weapon_id: String) -> Node3D:
 	var root := Node3D.new()
 	root.name = "%s_mount" % weapon_id
 	root.position = Vector3(0.098, -0.232, -0.706)
@@ -660,7 +667,8 @@ func _build_weapon_model(weapon_id: String) -> Node3D:
 	root.add_child(right)
 	var off_anchor_name := "forend" if visual_id == "shotgun" else ("grip_support" if visual_id == "sidearm" else "grip_low")
 	var off_anchor := gear.get_node_or_null("anchor_%s" % off_anchor_name) as Node3D
-	if off_anchor != null:
+	# The cleaver is a one-hand tool; the off hand stays free.
+	if off_anchor != null and visual_id != "cleaver":
 		var left := HeldGear.build_humiliation_hand(-1)
 		left.name = "LeftGripHand"
 		HeldGear.set_pose(left, "cup" if visual_id == "sidearm" else "wrap")

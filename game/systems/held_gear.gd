@@ -66,6 +66,18 @@ const GRIPS := {
 		"rest": {"at": Vector3(0.205, -0.255, -0.225), "turn": Vector3(0.52, 0.34, 0.30)},
 		"reach": 1.0, "damage_type": "cut", "control": 0.82,
 	},
+	# A cleaver has a second honest grip: the working hand chokes up the handle
+	# to the bolster, taking the mass off the end of the arm. It is the same
+	# trade a half-sword makes in miniature — less reach, more control — and it
+	# keeps the hand on the insulated handle. On this weapon that last part is
+	# not a nicety: the edge is a heating element. The off hand stays free; this
+	# is still a one-hand tool.
+	"choke_up": {
+		"right": {"anchor": "choke", "pose": "wrap"},
+		"left": {"anchor": "", "pose": "open"},
+		"rest": {"at": Vector3(0.185, -0.240, -0.235), "turn": Vector3(0.44, 0.30, 0.30)},
+		"reach": 0.86, "damage_type": "cut", "control": 1.05,
+	},
 	"two_hand": {
 		"right": {"anchor": "grip", "pose": "wrap"},
 		"left": {"anchor": "grip_low", "pose": "wrap"},
@@ -403,6 +415,7 @@ static func build_weapon(weapon_id: String) -> Node3D:
 	root.name = "%s_model" % weapon_id
 	match weapon_id:
 		"sword": _build_sword(root)
+		"cleaver": _build_hotline_cleaver(root)
 		"shotgun": _build_shotgun(root)
 		"sidearm": _build_sidearm(root)
 		"launcher": _build_launcher(root)
@@ -550,6 +563,67 @@ static func _build_sword(root: Node3D) -> void:
 	_anchor(root, "blade_grip", Vector3(0, 0, 0.230), Vector3.ZERO)
 	_anchor(root, "blade_high", Vector3(0, 0, 0.430), Vector3.ZERO)
 	_anchor(root, "muzzle", Vector3(0, 0, 0.760), Vector3.ZERO)
+
+
+## v0.1 Brawler (job 3). Greg, 5 Oct: "200 years in the future, why would they
+## just have an axe" -- a meat-processing cleaver with a heating element down
+## the edge, working name HOTLINE CLEAVER. Same axis convention as the sword
+## (along +Z, flat faces +-Y, edge +X). The edge strip is its own mesh with
+## its own material, named `heat_edge`, so `MeleeDriver` can brighten it as the
+## blade takes heat from hits.
+static func _build_hotline_cleaver(root: Node3D) -> void:
+	var steel := Color("6f7376")
+	var housing := _metal(Color("1d1f1e"), 0.55, 61)
+	# A wide, square-nosed slab: most of the mass is in the blade, as on a
+	# butcher's cleaver, so a light swing still lands heavy.
+	_part(root, "blade", _box(Vector3(0.112, 0.006, 0.290)), Vector3(0.026, 0, 0.175), _metal(steel, 0.38, 62))
+	# The element housing along the spine, with a cable run back to the grip.
+	_part(root, "element_housing", _box(Vector3(0.020, 0.013, 0.270)), Vector3(-0.036, 0, 0.170), housing)
+	for index in 6:
+		_part(root, "element_rib%d" % index, _box(Vector3(0.022, 0.015, 0.006)),
+			Vector3(-0.036, 0, 0.060 + float(index) * 0.044), _metal(Color("3a2b20"), 0.5, 63 + index))
+	# The heated edge: a thin strip proud of the blade, lit from inside.
+	var edge := _part(root, "heat_edge", _box(Vector3(0.010, 0.0068, 0.284)), Vector3(0.086, 0, 0.175), heat_edge_material())
+	edge.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# The hang hole a cleaver has near its nose, punched through as a dark plug.
+	var hole := _part(root, "hang_hole", BodyMesh.revolve([Vector3(-0.004, 0.009, 0.009), Vector3(0.004, 0.009, 0.009)], 10),
+		Vector3(0.0, 0, 0.292), _bore())
+	# Bolster and an industrial grip: hazard-yellow over black rubber, a
+	# battery block for a pommel and a short cable between them.
+	_part(root, "bolster", _box(Vector3(0.060, 0.022, 0.026)), Vector3(-0.004, 0, 0.018), _metal(Color("4a4b48"), 0.42, 70))
+	var grip := _part(root, "grip", BodyMesh.revolve([
+		Vector3(0.0, 0.0175, 0.0135),
+		Vector3(0.060, 0.0190, 0.0145),
+		Vector3(0.130, 0.0180, 0.0140),
+	], 10), Vector3(0, 0, 0.004), _leather(Color("1a1816"), 71))
+	grip.rotation.x = -PI * 0.5
+	for index in 3:
+		var band := _part(root, "band%d" % index, BodyMesh.revolve([
+			Vector3(-0.006, 0.0197, 0.0152), Vector3(0.006, 0.0197, 0.0152),
+		], 10), Vector3(0, 0, -0.020 - float(index) * 0.042), _leather(Color("b88a1c"), 72 + index))
+		band.rotation.x = -PI * 0.5
+	_part(root, "battery", _box(Vector3(0.042, 0.034, 0.050)), Vector3(0, 0, -0.152), housing)
+	_part(root, "battery_lamp", _box(Vector3(0.010, 0.036, 0.010)), Vector3(0.012, 0, -0.140), _glow(Color("d24a1e")))
+	_part(root, "cable", _box(Vector3(0.007, 0.007, 0.170)), Vector3(-0.026, 0.004, -0.050), housing)
+
+	_anchor(root, "grip", Vector3(0, 0, -0.060), Vector3.ZERO)
+	# Where the working hand goes when it chokes up: forward on the handle,
+	# against the bolster. Not on the blade — the edge is a heating element.
+	_anchor(root, "choke", Vector3(0, 0, -0.010), Vector3.ZERO)
+	_anchor(root, "grip_low", Vector3(0, 0, -0.110), Vector3.ZERO)
+	_anchor(root, "muzzle", Vector3(0.030, 0, 0.320), Vector3.ZERO)
+
+
+## Shared so a fresh model and a driver-brightened one start from one look.
+static func heat_edge_material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color("5a2010")
+	material.roughness = 0.4
+	material.metallic = 0.6
+	material.emission_enabled = true
+	material.emission = Color("ff5a1a")
+	material.emission_energy_multiplier = 0.6
+	return material
 
 
 static func _build_shotgun(root: Node3D) -> void:
@@ -853,6 +927,7 @@ func _default_grip(weapon_id: String) -> String:
 	match weapon_id:
 		"": return "fists"
 		"sword": return "two_hand"
+		"cleaver": return "one_hand"
 		"shotgun": return "long_gun"
 		"sidearm": return "pistol"
 		"launcher": return "long_gun"
@@ -925,6 +1000,42 @@ func _place(hand: Node3D, spec: Dictionary, side: int) -> void:
 	# than inside it, and it rolls so the fingers close across the object.
 	hand.position = placed.origin + Vector3(0.019 * float(side), -0.013, 0.0)
 	hand.rotation = placed.basis.get_euler() + Vector3(-PI * 0.5, 0.0, (PI * 0.5) * float(side))
+
+
+static func _part(parent: Node3D, part_name: String, mesh: Mesh, at: Vector3, material: Material) -> MeshInstance3D:
+	var part := MeshInstance3D.new()
+	part.name = part_name
+	part.mesh = mesh
+	part.position = at
+	part.material_override = material
+	parent.add_child(part)
+	return part
+
+
+static func _box(size: Vector3) -> BoxMesh:
+	var box := BoxMesh.new()
+	box.size = size
+	return box
+
+
+static func _bore() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color("050505")
+	material.roughness = 1.0
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return material
+
+
+## Sight dots and the bead: faintly lit so they hold in the dark, which is
+## the one thing a sight has to do.
+static func _glow(tint: Color) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = tint
+	material.roughness = 0.5
+	material.emission_enabled = true
+	material.emission = tint
+	material.emission_energy_multiplier = 0.9
+	return material
 
 
 # ------------------------------------------------------------------- the meshes

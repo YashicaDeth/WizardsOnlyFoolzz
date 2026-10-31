@@ -41,7 +41,7 @@ CORE=(
   npc_voice_test spoken_contact_test standing_contact_test npc_ruling_test facility_characters_test kill_shot_test sniper_killcam_test
   skull_burst_test
   world_clock_test opening_handoff_test opening_direction_test
-  arsenal_test armor_resolution_test blood_flow_test
+  arsenal_test armor_resolution_test blood_flow_test melee_grip_clearance_test
 )
 
 list_only=0
