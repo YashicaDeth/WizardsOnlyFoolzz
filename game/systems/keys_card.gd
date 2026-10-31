@@ -37,6 +37,8 @@ const FADE_PER_SECOND := 6.5
 ## unreadable at the playtest window size. Two focused groups per leaf keep the
 ## type large enough to scan while the arrows make the second leaf explicit.
 const GROUPS_PER_PAGE := 2
+## Where the verb starts, right of the key.
+const KEY_COLUMN := 170.0
 
 ## Groups of rows: `{"group": "MOVING", "rows": [["WASD", "MOVE"], ...]}`.
 var groups: Array = []
@@ -133,7 +135,9 @@ func _draw_card() -> void:
 	var columns := visible_groups.size()
 	if columns <= 0:
 		return
-	var column_width := 330.0
+	# Wide enough for the longest key ("GUARD MID-SWING", "TAB (DEVICE UP)")
+	# and the longest verb, so neither runs into its neighbour or off the plate.
+	var column_width := 470.0
 	var row_height := 23.0
 	var plate := Vector2(
 		column_width * float(columns) + 56.0,
@@ -173,7 +177,7 @@ func _draw_card() -> void:
 			# hierarchy rather than each inventing one.
 			CellOutzType.draw_condensed(self, column + Vector2(0.0, y), str(row[0]), 10.5,
 				Color(COPPER, 0.92 * alpha), 1.8)
-			CellOutzType.draw_condensed(self, column + Vector2(104.0, y), str(row[1]), 10.0,
+			CellOutzType.draw_condensed(self, column + Vector2(KEY_COLUMN, y), str(row[1]), 10.0,
 				Color(BONE, 0.62 * alpha), 1.2)
 			y += row_height
 

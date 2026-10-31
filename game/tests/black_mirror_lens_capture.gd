@@ -29,6 +29,11 @@ func _ready() -> void:
 	naked_eye.save_png("%s/black_mirror_naked_eye.png" % out_dir)
 	print("CAPTURED: %s/black_mirror_naked_eye.png" % out_dir)
 
+	# The save may hold a dropped phone; the shot needs it in hand.
+	if hunt.dropped_handheld != null:
+		hunt.dropped_handheld.queue_free()
+		hunt.dropped_handheld = null
+	hunt.handheld.possessed = true
 	hunt._toggle_black_mirror()
 	for _frame in 10:
 		await tree.process_frame
@@ -36,5 +41,13 @@ func _ready() -> void:
 	var through_lens := get_viewport().get_texture().get_image()
 	through_lens.save_png("%s/black_mirror_through_lens.png" % out_dir)
 	print("CAPTURED: %s/black_mirror_through_lens.png" % out_dir)
+
+	hunt._mirror.cycle_mode()
+	for _frame in 10:
+		await tree.process_frame
+	await RenderingServer.frame_post_draw
+	var depth := get_viewport().get_texture().get_image()
+	depth.save_png("%s/black_mirror_depth.png" % out_dir)
+	print("CAPTURED: %s/black_mirror_depth.png" % out_dir)
 
 	tree.quit()

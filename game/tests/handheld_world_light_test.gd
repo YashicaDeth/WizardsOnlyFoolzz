@@ -31,6 +31,10 @@ func _ready() -> void:
 	check(lamp.position.x > 0.0 and lamp.position.y < 0.0, "the source sits off-centre where the raised device is held")
 	check(is_equal_approx(lamp.spot_range, hunt.handheld.LAMP_RANGE), "the rendered beam and device visibility radius share one range")
 
+	# The Hunt starts without the phone now (stolen from RESTRICTED STORAGE in
+	# play); hand it over the way the other phone tests do.
+	hunt.handheld.possessed = true
+	hunt.handheld.save_device()
 	hunt.handheld.battery = 1.0
 	hunt.handheld.open_device()
 	hunt.handheld.raised = 1.0
@@ -39,6 +43,10 @@ func _ready() -> void:
 	check(lamp.visible and lamp.light_energy > 0.0, "raising it puts real light into the running world")
 	var index_energy: float = lamp.light_energy
 	hunt.handheld.set_mode("MAP")
+	# App changes travel through the page shutter now; let it land on MAP.
+	for _frame in 40:
+		hunt.handheld._process(0.05)
+	hunt.handheld.raised = 1.0
 	hunt._update_handheld_lamp(0.016)
 	check(lamp.spot_range > hunt.handheld.LAMP_RANGE, "the satellite map's greater exposure expands the real rendered beam")
 	check(lamp.light_energy > index_energy, "and its extra battery draw appears as more world light rather than an invisible tax")

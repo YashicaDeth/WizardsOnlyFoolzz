@@ -66,6 +66,8 @@ const ZONE_PLAN := {
 }
 
 var buttons: Array[Button] = []
+## House-type labels drawn over the choice buttons.
+var _row_labels: Control
 var cancel_button: Button
 var voice_button: Button
 var subject_name := ""
@@ -159,7 +161,37 @@ func _ready() -> void:
 		cancel_button.add_theme_stylebox_override(state, style)
 	cancel_button.pressed.connect(cancel_menu)
 	sheet.add_child(cancel_button)
+	# The buttons keep hit testing, focus and their styled plates; the words on
+	# them are set in the house face by this overlay, last in the sheet so it
+	# draws above the plates. Same trade `menu_plate.gd` makes for the front door.
+	for control in buttons + [voice_button, cancel_button]:
+		_silence_engine_type(control)
+	_row_labels = Control.new()
+	_row_labels.name = "RowLabels"
+	_row_labels.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_row_labels.draw.connect(_draw_row_labels)
+	sheet.add_child(_row_labels)
 	hide()
+
+
+func _silence_engine_type(control: Button) -> void:
+	for slot in ["font_color", "font_hover_color", "font_pressed_color",
+			"font_focus_color", "font_hover_pressed_color", "font_disabled_color"]:
+		control.add_theme_color_override(slot, Color(0, 0, 0, 0))
+
+
+func _draw_row_labels() -> void:
+	for index in buttons.size():
+		var row := buttons[index]
+		var accent := RED if index == 0 else ACID
+		var tone := accent * Color(1, 1, 1, 1.0 if index == highlighted else 0.78)
+		if row.disabled:
+			tone = INK * Color(1, 1, 1, 0.22)
+		var cap := 17.0 if index == highlighted else 15.0
+		CellOutzType.draw_text(_row_labels, row.position + Vector2(58, (row.size.y - cap) * 0.5), TITLES[index], cap, tone, 2.2)
+	for pair in [[voice_button, SCAN], [cancel_button, INK * Color(1, 1, 1, 0.7)]]:
+		var control: Button = pair[0]
+		CellOutzType.draw_condensed(_row_labels, control.position + Vector2(14, (control.size.y - 9.5) * 0.5), control.text, 9.5, pair[1], 1.2)
 
 
 func _build_row(index: int) -> Button:
@@ -325,6 +357,8 @@ func _process(delta: float) -> void:
 	if not visible:
 		return
 	clock += delta
+	if _row_labels != null:
+		_row_labels.queue_redraw()
 	if compact_context:
 		_factor = clampf(minf(size.x / 1280.0, size.y / 720.0), 0.72, 1.15)
 		var anchor := world_anchor if world_anchor.x >= 0.0 else size * Vector2(0.48, 0.42)
@@ -419,18 +453,24 @@ func _serial_for(id: String) -> String:
 	return "%03d-%03d-%02d" % [value % 997, (value / 997) % 887, (value / 91) % 71]
 
 
+## Every line on this sheet is set in the house face. `font_size` is the size
+## the old engine-font call used and `at.y` its baseline, so the cap line is
+## lifted by the cap height: a converted line lands where the old one did.
 func _tracked(at: Vector2, value: String, font_size: int, color: Color, tracking := 2.0) -> float:
-	var font := ThemeDB.fallback_font
-	var cursor := at
-	for index in value.length():
-		var glyph := value.substr(index, 1)
-		draw_string(font, cursor, glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
-		cursor.x += font.get_string_size(glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x + tracking
-	return cursor.x - at.x
+	var cap := float(font_size) * 0.72
+	return CellOutzType.draw_text(self, Vector2(at.x, at.y - cap), value.to_upper(), cap, color, tracking)
 
 
-func _text(at: Vector2, value: String, font_size: int, color: Color) -> void:
-	draw_string(ThemeDB.fallback_font, at, value, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
+func _text(at: Vector2, value: String, font_size: int, color: Color) -> float:
+	return _tracked(at, value, font_size, color, float(font_size) * 0.06)
+
+
+## Right-aligned: `right` is the x the last glyph ends on.
+func _text_right(right: float, baseline: float, value: String, font_size: int, color: Color) -> void:
+	var cap := float(font_size) * 0.72
+	var tracking := float(font_size) * 0.06
+	var width := CellOutzType.width(value.to_upper(), cap, tracking)
+	CellOutzType.draw_text(self, Vector2(right - width, baseline - cap), value.to_upper(), cap, color, tracking)
 
 
 func _draw() -> void:
@@ -470,7 +510,7 @@ func _draw_context_overlay() -> void:
 	draw_polyline(PackedVector2Array([Vector2(8, 4), Vector2(356, 4), Vector2(374, 20)]), ACID * Color(1, 1, 1, 0.55), 1.2)
 	_tracked(Vector2(18, 21), "CELLOUTZ / LIVE DISPOSITION", 10, ACID, 1.25)
 	_text(Vector2(18, 42), subject_name.to_upper(), 18, INK)
-	draw_string(ThemeDB.fallback_font, Vector2(222, 42), "DOWNED / ALIVE", HORIZONTAL_ALIGNMENT_RIGHT, 146, 10, RED)
+	_text_right(368, 42, "DOWNED / ALIVE", 10, RED)
 	for index in buttons.size():
 		if index != highlighted:
 			continue
@@ -488,8 +528,8 @@ func _draw_context_overlay() -> void:
 		draw_rect(Rect2(202 + meter * 3.0, 251 - meter_height, 2, meter_height), SCAN * Color(1, 1, 1, 0.8))
 	if not voice_reply.is_empty():
 		draw_rect(Rect2(18, 203, 350, 48), Color(0.01, 0.02, 0.016, 0.92))
-		draw_string(ThemeDB.fallback_font, Vector2(25, 223), "SUBJECT / %s" % voice_reply, HORIZONTAL_ALIGNMENT_LEFT, 334, 11, INK)
-	_text(Vector2(368, 289), "1—3 / ↑↓ / ENTER", 9, INK * Color(1, 1, 1, 0.45))
+		_text(Vector2(25, 223), "SUBJECT / %s" % voice_reply, 11, INK)
+	_text_right(368, 289, "1—3 / ↑↓ / ENTER", 9, INK * Color(1, 1, 1, 0.45))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
@@ -521,7 +561,7 @@ func _draw_tether(rise: float) -> void:
 	draw_line(world_anchor + Vector2(-tick, -tick), world_anchor + Vector2(-tick, tick), SPORE * Color(1, 1, 1, 0.6 * reach), 1.0)
 	draw_line(world_anchor + Vector2(tick, -tick), world_anchor + Vector2(tick, tick), SPORE * Color(1, 1, 1, 0.6 * reach), 1.0)
 	draw_arc(world_anchor, 15.0 * _factor + sin(clock * 3.0) * 2.0, 0.0, TAU, 20, SPORE * Color(1, 1, 1, 0.3 * reach), 1.0)
-	draw_string(ThemeDB.fallback_font, world_anchor + Vector2(tick + 6.0, -tick), "SUBJECT", HORIZONTAL_ALIGNMENT_LEFT, -1, int(10 * _factor), SPORE * Color(1, 1, 1, 0.7 * reach))
+	_text(world_anchor + Vector2(tick + 6.0, -tick), "SUBJECT", int(10 * _factor), SPORE * Color(1, 1, 1, 0.7 * reach))
 
 
 func _draw_substrate() -> void:
@@ -632,8 +672,8 @@ func _draw_scan_cell() -> void:
 		var at: Vector2 = focus + half * corner
 		draw_line(at, at - Vector2(arm * corner.x, 0), RED * Color(1, 1, 1, 0.85), 1.6)
 		draw_line(at, at - Vector2(0, arm * corner.y), RED * Color(1, 1, 1, 0.85), 1.6)
-	draw_string(ThemeDB.fallback_font, Vector2(24, 300), "TRAUMA  %s" % worst.to_upper().replace("_", " "), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, RED)
-	draw_string(ThemeDB.fallback_font, Vector2(24, 316), "SCAN PLATE 1:1  DOSE 04  OPERATOR UNLISTED", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, INK * Color(1, 1, 1, 0.34))
+	_text(Vector2(24, 300), "TRAUMA  %s" % worst.to_upper().replace("_", " "), 14, RED)
+	_text(Vector2(24, 316), "SCAN PLATE 1:1  DOSE 04  OPERATOR UNLISTED", 9, INK * Color(1, 1, 1, 0.34))
 
 
 func _draw_zone(center: Vector2, scale: float, zone_id: String, focused: bool) -> void:
@@ -693,15 +733,15 @@ func _draw_organs(center: Vector2, scale: float) -> void:
 		# Leader out to a labelled column, so every organ is named on the plate.
 		var label_at := Vector2(196, 76 + row * 21)
 		draw_line(at, label_at - Vector2(6, 4), (ARTERIAL if ruptured else INK) * Color(1, 1, 1, 0.22), 1.0)
-		draw_string(ThemeDB.fallback_font, label_at, organ_id.replace("_", " ").to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 9, (ARTERIAL if ruptured else INK) * Color(1, 1, 1, 0.85 if ruptured else 0.45))
-		draw_string(ThemeDB.fallback_font, label_at + Vector2(0, 9), "RUPTURED" if ruptured else "INTACT", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, (ARTERIAL if ruptured else SCAN) * Color(1, 1, 1, 0.8 if ruptured else 0.35))
+		_text(label_at, organ_id.replace("_", " "), 9, (ARTERIAL if ruptured else INK) * Color(1, 1, 1, 0.85 if ruptured else 0.45))
+		_text(label_at + Vector2(0, 9), "RUPTURED" if ruptured else "INTACT", 8, (ARTERIAL if ruptured else SCAN) * Color(1, 1, 1, 0.8 if ruptured else 0.35))
 		row += 1
 
 
 func _draw_condition_cell() -> void:
 	_tracked(Vector2(296, 52), "SUBJECT CONDITION", 11, SPORE * Color(1, 1, 1, 0.75), 1.8)
-	draw_string(ThemeDB.fallback_font, Vector2(294, 88), subject_name.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, 366, 27, INK)
-	draw_string(ThemeDB.fallback_font, Vector2(296, 106), "%s   /   FILED %s" % [subject_role, serial], HORIZONTAL_ALIGNMENT_LEFT, -1, 10, INK * Color(1, 1, 1, 0.4))
+	_tracked(Vector2(294, 88), subject_name, 27, INK, 1.5)
+	_text(Vector2(296, 106), "%s   /   FILED %s" % [subject_role, serial], 10, INK * Color(1, 1, 1, 0.4))
 
 	# Status chip. Downed is a state with a clock on it, and it should look like
 	# one: the stamp breathes and the word ALIVE is the thing at stake.
@@ -719,16 +759,16 @@ func _draw_condition_cell() -> void:
 
 	var ruptured := ruptured_organs()
 	var wounds: Array = anatomy.get("wounds", [])
-	draw_string(ThemeDB.fallback_font, Vector2(296, 276), "HAEMORRHAGE %.1f mL/s   LOGGED WOUNDS %02d" % [float(anatomy.get("bleed_rate", 0.0)), wounds.size()], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, INK * Color(1, 1, 1, 0.6))
+	_text(Vector2(296, 276), "HAEMORRHAGE %.1f ML/S   LOGGED WOUNDS %02d" % [float(anatomy.get("bleed_rate", 0.0)), wounds.size()], 11, INK * Color(1, 1, 1, 0.6))
 	var rupture_text := "INTERNALS INTACT" if ruptured.is_empty() else "RUPTURED: " + ", ".join(ruptured).replace("_", " ").to_upper()
-	draw_string(ThemeDB.fallback_font, Vector2(296, 290), rupture_text, HORIZONTAL_ALIGNMENT_LEFT, 364, 11, (SCAN if ruptured.is_empty() else ARTERIAL) * Color(1, 1, 1, 0.85))
+	_text(Vector2(296, 290), rupture_text, 11, (SCAN if ruptured.is_empty() else ARTERIAL) * Color(1, 1, 1, 0.85))
 	_draw_trace(Rect2(296, 298, 364, 24))
 
 
 func _meter(at: Vector2, label: String, readout: String, ratio: float, tint: Color) -> void:
 	var width := 364.0
-	draw_string(ThemeDB.fallback_font, at, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, INK * Color(1, 1, 1, 0.5))
-	draw_string(ThemeDB.fallback_font, at + Vector2(width, 0), readout, HORIZONTAL_ALIGNMENT_RIGHT, width, 12, INK)
+	_text(at, label, 10, INK * Color(1, 1, 1, 0.5))
+	_text_right(at.x + width, at.y, readout, 12, INK)
 	var bar := Rect2(at + Vector2(0, 6), Vector2(width, 9))
 	draw_rect(bar, Color(0, 0, 0, 0.5))
 	draw_rect(Rect2(bar.position, Vector2(width * clampf(ratio, 0.0, 1.0), bar.size.y)), tint * Color(1, 1, 1, 0.72))
@@ -751,11 +791,11 @@ func _draw_trace(rect: Rect2) -> void:
 
 func _draw_disposition_cell() -> void:
 	_tracked(Vector2(686, 52), "SELECT DISPOSITION", 11, SPORE * Color(1, 1, 1, 0.75), 1.8)
-	draw_string(ThemeDB.fallback_font, Vector2(686 + 474, 52), "1-3  ↑↓  ENTER  ESC", HORIZONTAL_ALIGNMENT_RIGHT, 474, 10, INK * Color(1, 1, 1, 0.4))
+	_text_right(686 + 474, 52, "1-3  ↑↓  ENTER  ESC", 10, INK * Color(1, 1, 1, 0.4))
 	for index in buttons.size():
 		var row := buttons[index]
 		var at := row.position
-		draw_string(ThemeDB.fallback_font, at + Vector2(18, 30), "%02d" % (index + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 17, INK * Color(1, 1, 1, 0.4))
+		_text(at + Vector2(18, 30), "%02d" % (index + 1), 17, INK * Color(1, 1, 1, 0.4))
 		if index != highlighted:
 			continue
 		# Focus is a marked-up row, not a hover tint: a caret, a bracket pair and
@@ -776,23 +816,23 @@ func _draw_disposition_cell() -> void:
 	if not recruit_allowed:
 		var at := buttons[2].position
 		draw_line(at + Vector2(8, 8), at + Vector2(buttons[2].size.x - 8, buttons[2].size.y - 8), BILE * Color(1, 1, 1, 0.35), 1.4)
-		draw_string(ThemeDB.fallback_font, at + Vector2(buttons[2].size.x - 12, 18), "REFUSED", HORIZONTAL_ALIGNMENT_RIGHT, 0, 11, BILE)
+		_text_right(at.x + buttons[2].size.x - 12, at.y + 18, "REFUSED", 11, BILE)
 	# A voice link is an action in the scene, not a fourth disposition. The
 	# subject keeps bleeding and other enemies keep moving while it is held.
-	draw_string(ThemeDB.fallback_font, Vector2(686, 280), voice_state, HORIZONTAL_ALIGNMENT_LEFT, 474, 10, SCAN * Color(1, 1, 1, 0.8))
+	_text(Vector2(686, 280), voice_state, 10, SCAN * Color(1, 1, 1, 0.8))
 	for meter in 12:
 		var height := 3.0 + voice_level * (4.0 + float((meter * 7) % 11))
 		draw_rect(Rect2(946 + meter * 3.0, 306 - height, 2, height), SCAN * Color(1, 1, 1, 0.8))
 	if not voice_reply.is_empty():
-		draw_string(ThemeDB.fallback_font, Vector2(686, 274), "SUBJECT: “%s”" % voice_reply, HORIZONTAL_ALIGNMENT_LEFT, 474, 11, INK)
+		_text(Vector2(686, 274), "SUBJECT: “%s”" % voice_reply, 11, INK)
 
 
 ## Somebody else has been at this form before you.
 func _draw_wear() -> void:
-	draw_string(ThemeDB.fallback_font, Vector2(686, 210), "— consequence —", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, INK * Color(1, 1, 1, 0.25))
+	_text(Vector2(686, 210), "— consequence —", 9, INK * Color(1, 1, 1, 0.25))
 	var jitter := Vector2(sin(clock * 1.7) * 0.6, cos(clock * 1.3) * 0.6)
 	draw_arc(Vector2(250, 60) + jitter, 26.0, 0.4, 5.6, 22, BILE * Color(1, 1, 1, 0.3), 1.6)
-	draw_string(ThemeDB.fallback_font, Vector2(214, 44) + jitter, "NOT MY CALL", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, BILE * Color(1, 1, 1, 0.45))
+	_text(Vector2(214, 44) + jitter, "NOT MY CALL", 10, BILE * Color(1, 1, 1, 0.45))
 	draw_line(Vector2(292, 300) + jitter, Vector2(470, 300) + jitter, BILE * Color(1, 1, 1, 0.25), 2.0)
 
 
