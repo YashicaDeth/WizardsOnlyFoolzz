@@ -312,15 +312,31 @@ func pose(delta: float) -> void:
 		# forcing the theatrical scale back onto a relaxed hand.
 		left_hand.transform = Transform3D(placed.basis * Basis.from_euler(BARE_TURN) * Basis.from_scale(Vector3.ONE * left_hand.scale.x), placed.origin)
 		HeldGear.set_pose(left_hand, "fist" if weapon_id.is_empty() or _guard_amount > 0.3 else "cup")
-	# The pistol comes up onto its sights through the owner's ADS.
-	if ads != null and aim_blend > 0.0 and is_inside_tree() and camera != null:
-		ads.pose(held, camera.global_transform, weapon_id, aim_blend)
-	drop_ads_hands(held, left_hand, camera as Camera3D, aim_blend)
+	# The pistol comes up onto its sights through the owner's ADS. A reload
+	# takes it back off them for the swap: the aim pose is applied after the
+	# reload pose, so without this the reload was overwritten on the same frame
+	# and the magazine simply fell out of a gun welded to the sight line.
+	var sights := aim_blend * _sights_during_reload()
+	if ads != null and sights > 0.0 and is_inside_tree() and camera != null:
+		ads.pose(held, camera.global_transform, weapon_id, sights)
+	drop_ads_hands(held, left_hand, camera as Camera3D, sights)
 	_jolt = _jolt.lerp(Vector3.ZERO, clampf(delta * 12.0, 0.0, 1.0))
 	_jolt_turn = _jolt_turn.lerp(Vector3.ZERO, clampf(delta * 12.0, 0.0, 1.0))
 	if is_inside_tree() and camera is Camera3D:
 		for hand in [held.get_node_or_null("RightGripHand"), held.get_node_or_null("LeftGripHand"), left_hand]:
 			stretch_forearm(hand as Node3D, camera as Camera3D)
+
+
+## How much of the aim pose survives this frame: all of it, except through
+## the middle of a reload, where the gun comes off the sights so the swap can
+## be seen and goes back on when the fresh magazine is seated. Zero at both
+## ends of the reload, so there is no snap at either side of it.
+func _sights_during_reload() -> float:
+	if arsenal == null or arsenal.reload_remaining <= 0.0:
+		return 1.0
+	var total := float(arsenal.current().get("reload", 1.0))
+	var through := 1.0 - arsenal.reload_remaining / maxf(total, 0.01)
+	return 1.0 - sin(clampf(through, 0.0, 1.0) * PI)
 
 
 ## Lower only the hands after ADS has placed the gun. The Hunt and the
