@@ -36,6 +36,7 @@ func _ready() -> void:
 	hunt._put_the_weapons_down()
 	var inspect := InputEventKey.new()
 	inspect.keycode = KEY_I
+	inspect.physical_keycode = KEY_I
 	inspect.pressed = true
 	hunt._unhandled_input(inspect)
 	await _wait(20)

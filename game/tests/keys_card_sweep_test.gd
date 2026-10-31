@@ -39,6 +39,7 @@ func snapshot() -> Dictionary:
 func press(code: Key, shift := false, hold := false) -> void:
 	var down := InputEventKey.new()
 	down.keycode = code
+	down.physical_keycode = code
 	down.pressed = true
 	down.shift_pressed = shift
 	Input.parse_input_event(down)
@@ -48,6 +49,7 @@ func press(code: Key, shift := false, hold := false) -> void:
 			await get_tree().physics_frame
 	var up := InputEventKey.new()
 	up.keycode = code
+	up.physical_keycode = code
 	up.pressed = false
 	up.shift_pressed = shift
 	Input.parse_input_event(up)
@@ -126,6 +128,7 @@ func _ready() -> void:
 			var code: Key = entry[1]
 			var down := InputEventKey.new()
 			down.keycode = code
+			down.physical_keycode = code
 			down.pressed = true
 			Input.parse_input_event(down)
 			Input.flush_buffered_events()
@@ -134,6 +137,7 @@ func _ready() -> void:
 			var during := snapshot()
 			var up := InputEventKey.new()
 			up.keycode = code
+			up.physical_keycode = code
 			up.pressed = false
 			Input.parse_input_event(up)
 			Input.flush_buffered_events()

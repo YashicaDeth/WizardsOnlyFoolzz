@@ -19,16 +19,19 @@ func _ready() -> void:
 	check(PerfProbe.process_mode == Node.PROCESS_MODE_ALWAYS, "it keeps measuring while the game is paused, which is when people open it")
 	var old_phone_key := InputEventKey.new()
 	old_phone_key.keycode = KEY_F3
+	old_phone_key.physical_keycode = KEY_F3
 	old_phone_key.pressed = true
 	PerfProbe._unhandled_input(old_phone_key)
 	check(not PerfProbe.showing, "phone function keys no longer also toggle diagnostics")
 	var photo_key := InputEventKey.new()
 	photo_key.keycode = KEY_F10
+	photo_key.physical_keycode = KEY_F10
 	photo_key.pressed = true
 	PerfProbe._unhandled_input(photo_key)
 	check(not PerfProbe.showing, "plain F10 remains available to the Hunt photo mode")
 	var probe_key := InputEventKey.new()
 	probe_key.keycode = KEY_F10
+	probe_key.physical_keycode = KEY_F10
 	probe_key.pressed = true
 	probe_key.ctrl_pressed = true
 	PerfProbe._unhandled_input(probe_key)

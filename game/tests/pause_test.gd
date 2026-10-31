@@ -71,12 +71,14 @@ func _ready() -> void:
 	# trying to report a slow scene.
 	var dump_key := InputEventKey.new()
 	dump_key.keycode = KEY_F11
+	dump_key.physical_keycode = KEY_F11
 	dump_key.pressed = true
 	dump_key.ctrl_pressed = true
 	gate._unhandled_key_input(dump_key)
 	check(bool(gate._fullscreen()) == fullscreen, "Ctrl+F11 leaves fullscreen alone for the performance dump")
 	var fullscreen_key := InputEventKey.new()
 	fullscreen_key.keycode = KEY_F11
+	fullscreen_key.physical_keycode = KEY_F11
 	fullscreen_key.pressed = true
 	gate._unhandled_key_input(fullscreen_key)
 	check(bool(gate._fullscreen()) != fullscreen, "plain F11 still toggles fullscreen")

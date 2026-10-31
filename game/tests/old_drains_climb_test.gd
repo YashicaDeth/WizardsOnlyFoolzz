@@ -23,6 +23,7 @@ func settle(frames := 20) -> void:
 func space() -> void:
 	var e := InputEventKey.new()
 	e.keycode = KEY_SPACE
+	e.physical_keycode = KEY_SPACE
 	e.pressed = true
 	drains._unhandled_input(e)
 

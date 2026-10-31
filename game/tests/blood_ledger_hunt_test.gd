@@ -54,6 +54,7 @@ func _ready() -> void:
 
 	var seven := InputEventKey.new()
 	seven.keycode = KEY_7
+	seven.physical_keycode = KEY_7
 	seven.pressed = true
 	hunt._unhandled_input(seven)
 	check(ledger.tree_view.visible, "7 opens the blood tree in the Hunt")

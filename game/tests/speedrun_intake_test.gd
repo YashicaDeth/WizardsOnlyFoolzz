@@ -16,6 +16,7 @@ func check(condition: bool, label: String) -> void:
 func press(target, keycode: Key) -> void:
 	var key := InputEventKey.new()
 	key.keycode = keycode
+	key.physical_keycode = keycode
 	key.pressed = true
 	target._unhandled_input(key)
 

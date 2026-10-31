@@ -64,6 +64,7 @@ func _opening() -> Node:
 func _press(vat: Node, keycode: Key) -> void:
 	var key := InputEventKey.new()
 	key.keycode = keycode
+	key.physical_keycode = keycode
 	key.pressed = true
 	vat._unhandled_input(key)
 

@@ -35,6 +35,7 @@ func _ready() -> void:
 
 	var reset_key := InputEventKey.new()
 	reset_key.keycode = KEY_R
+	reset_key.physical_keycode = KEY_R
 	reset_key.pressed = true
 	Input.parse_input_event(reset_key)
 	for _frame in 4:

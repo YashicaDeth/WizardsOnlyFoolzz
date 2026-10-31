@@ -25,9 +25,11 @@ func _ready() -> void:
 	hunt.player = (ground_pickup["node"] as Node3D).global_position
 	var inspect_press := InputEventKey.new()
 	inspect_press.keycode = KEY_I
+	inspect_press.physical_keycode = KEY_I
 	inspect_press.pressed = true
 	var inspect_release := InputEventKey.new()
 	inspect_release.keycode = KEY_I
+	inspect_release.physical_keycode = KEY_I
 	inspect_release.pressed = false
 	hunt._equip_weapon(1)
 	hunt._unhandled_input(inspect_press)

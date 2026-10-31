@@ -109,6 +109,7 @@ func _ready() -> void:
 	# --- SPACE over the shoulder never jumps. ---
 	var key := InputEventKey.new()
 	key.keycode = KEY_SPACE
+	key.physical_keycode = KEY_SPACE
 	key.pressed = true
 	demo.stamina = 100.0
 	demo._unhandled_input(key)

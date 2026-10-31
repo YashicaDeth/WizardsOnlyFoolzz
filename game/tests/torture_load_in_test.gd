@@ -76,6 +76,7 @@ func _ready() -> void:
 	fast.step(0.3)
 	var key := InputEventKey.new()
 	key.keycode = KEY_F
+	key.physical_keycode = KEY_F
 	key.pressed = true
 	fast._unhandled_input(key)
 	check(fast.skipped and fast.played.has("glitch"), "F cuts straight to the glitch")

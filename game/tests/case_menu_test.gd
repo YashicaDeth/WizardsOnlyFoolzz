@@ -23,6 +23,7 @@ func _on_close() -> void:
 func press(keycode: Key) -> InputEventKey:
 	var ev := InputEventKey.new()
 	ev.keycode = keycode
+	ev.physical_keycode = keycode
 	ev.pressed = true
 	return ev
 

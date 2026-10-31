@@ -62,6 +62,7 @@ func _ready() -> void:
 	var page_before: int = intake.page
 	var event := InputEventKey.new()
 	event.keycode = KEY_RIGHT
+	event.physical_keycode = KEY_RIGHT
 	event.pressed = true
 	intake._unhandled_input(event)
 	check(intake.page == page_before, "you cannot page away while it is being done to you")
@@ -70,6 +71,7 @@ func _ready() -> void:
 	# its remaining beats while retaining the choice that was already signed.
 	var escape := InputEventKey.new()
 	escape.keycode = KEY_ESCAPE
+	escape.physical_keycode = KEY_ESCAPE
 	escape.pressed = true
 	intake._unhandled_input(escape)
 	check(intake.procedure.is_empty(), "Escape returns control immediately during a procedure")
@@ -80,6 +82,7 @@ func _ready() -> void:
 	var confirmed_before: int = intake.touched_pages.size()
 	var space := InputEventKey.new()
 	space.keycode = KEY_SPACE
+	space.physical_keycode = KEY_SPACE
 	space.pressed = true
 	intake._unhandled_input(space)
 	check(intake.touched_pages.size() == confirmed_before + 1, "Space confirms the current page as-is")

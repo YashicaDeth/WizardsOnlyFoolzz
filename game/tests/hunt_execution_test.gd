@@ -91,6 +91,7 @@ func _weapon(id: String, pad: bool, at: Vector3) -> void:
 	else:
 		var key := InputEventKey.new()
 		key.keycode = KEY_1
+		key.physical_keycode = KEY_1
 		key.pressed = true
 		Input.parse_input_event(key)
 		await get_tree().process_frame

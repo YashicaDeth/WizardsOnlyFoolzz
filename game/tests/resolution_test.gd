@@ -76,6 +76,7 @@ func _ready() -> void:
 	hunt.encounter_actors.erase(moving)
 	var escape := InputEventKey.new()
 	escape.keycode = KEY_ESCAPE
+	escape.physical_keycode = KEY_ESCAPE
 	escape.pressed = true
 	hunt.resolution_ui._input(escape)
 	check(not hunt.resolution_ui.visible and actor.rig.is_downed(), "Escape cancels without choosing")

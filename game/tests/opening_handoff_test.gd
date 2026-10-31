@@ -46,6 +46,7 @@ func check(condition: bool, label: String) -> void:
 func press(keycode: Key) -> void:
 	var event := InputEventKey.new()
 	event.keycode = keycode
+	event.physical_keycode = keycode
 	event.pressed = true
 	opening.intake._unhandled_input(event)
 
@@ -53,6 +54,7 @@ func press(keycode: Key) -> void:
 func breakout_key(keycode: Key) -> void:
 	var event := InputEventKey.new()
 	event.keycode = keycode
+	event.physical_keycode = keycode
 	event.pressed = true
 	opening._unhandled_input(event)
 

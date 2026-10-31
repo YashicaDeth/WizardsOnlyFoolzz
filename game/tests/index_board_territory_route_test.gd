@@ -14,6 +14,7 @@ func check(condition: bool, label: String) -> void:
 func press_pin(index: Control) -> void:
 	var event := InputEventKey.new()
 	event.keycode = KEY_P
+	event.physical_keycode = KEY_P
 	event.pressed = true
 	index._unhandled_input(event)
 

@@ -88,6 +88,7 @@ func _ready() -> void:
 	WorldHistory.record_event("melee_body_hit", {"target": aimed.subject_id})
 	var perspective_event := InputEventKey.new()
 	perspective_event.keycode = KEY_F
+	perspective_event.physical_keycode = KEY_F
 	perspective_event.pressed = true
 	hunt._unhandled_input(perspective_event)
 	for camera_tick in range(30):

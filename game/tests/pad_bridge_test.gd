@@ -95,6 +95,7 @@ func _ready() -> void:
 	check(label.text == "SQUARE INTERACT   //   HOLD D-LEFT DRESS", "a prompt label on screen shows buttons: " + label.text)
 	var key := InputEventKey.new()
 	key.keycode = KEY_W
+	key.physical_keycode = KEY_W
 	key.pressed = true
 	Input.parse_input_event(key)
 	await get_tree().process_frame

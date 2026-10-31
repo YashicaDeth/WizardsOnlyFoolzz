@@ -16,6 +16,7 @@ func check(condition: bool, label: String) -> void:
 func key(node, code: Key) -> void:
 	var press := InputEventKey.new()
 	press.keycode = code
+	press.physical_keycode = code
 	press.pressed = true
 	node._unhandled_input(press)
 

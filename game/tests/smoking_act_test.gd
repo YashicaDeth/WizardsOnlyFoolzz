@@ -30,6 +30,7 @@ func _ready() -> void:
 	# The actual key branch, not a private helper call.
 	var six := InputEventKey.new()
 	six.keycode = KEY_6
+	six.physical_keycode = KEY_6
 	six.pressed = true
 	hunt.call("_unhandled_input", six)
 	var held := hunt.get("smoke_model") as Node3D
@@ -86,6 +87,7 @@ func _ready() -> void:
 	# it there before leaving the frame; the same RMB draw then works hands-free.
 	var lip_toggle := InputEventKey.new()
 	lip_toggle.keycode = KEY_Y
+	lip_toggle.physical_keycode = KEY_Y
 	lip_toggle.pressed = true
 	hunt.call("_unhandled_input", lip_toggle)
 	for _transfer in 20:
@@ -111,6 +113,7 @@ func _ready() -> void:
 		"the armed posture restores the weapon and its hands without duplicating the smoking hand")
 	var armed_inspect := InputEventKey.new()
 	armed_inspect.keycode = KEY_I
+	armed_inspect.physical_keycode = KEY_I
 	armed_inspect.pressed = true
 	hunt.call("_unhandled_input", armed_inspect)
 	for _armed_inspect_frame in 14:
@@ -125,6 +128,7 @@ func _ready() -> void:
 		hunt.call("_update_held_inspection", 1.0 / 60.0)
 	var alt_draw := InputEventKey.new()
 	alt_draw.keycode = KEY_ALT
+	alt_draw.physical_keycode = KEY_ALT
 	alt_draw.pressed = true
 	hunt.call("_unhandled_input", alt_draw)
 	check(bool(hunt.get("smoke_drawing")), "holding Alt inhales from a lip-held cigarette while armed")
@@ -296,6 +300,7 @@ func _ready() -> void:
 	# Inspection is the same live hand-and-object assembly, not a separate icon.
 	var inspect_press := InputEventKey.new()
 	inspect_press.keycode = KEY_I
+	inspect_press.physical_keycode = KEY_I
 	inspect_press.pressed = true
 	hunt.call("_unhandled_input", inspect_press)
 	for _inspect_frame in 18:
@@ -304,6 +309,7 @@ func _ready() -> void:
 	check(float(hunt.get("inspect_blend")) > 0.9, "holding I raises the equipped bong into inspection")
 	var inspect_release := InputEventKey.new()
 	inspect_release.keycode = KEY_I
+	inspect_release.physical_keycode = KEY_I
 	inspect_release.pressed = false
 	hunt.call("_unhandled_input", inspect_release)
 
@@ -365,11 +371,13 @@ func _ready() -> void:
 	check(rows.any(func(row): return row[0] == "HOLD V"), "and teaches the held 3D lung diagnostic")
 	var pulmonary_press := InputEventKey.new()
 	pulmonary_press.keycode = KEY_V
+	pulmonary_press.physical_keycode = KEY_V
 	pulmonary_press.pressed = true
 	hunt.call("_unhandled_input", pulmonary_press)
 	check(bool(hunt.get("pulmonary_held")), "holding V outside a grapple raises the pulmonary reliquary")
 	var pulmonary_release := InputEventKey.new()
 	pulmonary_release.keycode = KEY_V
+	pulmonary_release.physical_keycode = KEY_V
 	pulmonary_release.pressed = false
 	hunt.call("_unhandled_input", pulmonary_release)
 	check(not bool(hunt.get("pulmonary_held")), "releasing V lowers it without leaving a modal screen")

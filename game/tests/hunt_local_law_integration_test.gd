@@ -116,6 +116,7 @@ func _ready() -> void:
 	hunt.grapple_target = str(paid_witness.subject_id)
 	var buy_key := InputEventKey.new()
 	buy_key.keycode = KEY_B
+	buy_key.physical_keycode = KEY_B
 	buy_key.pressed = true
 	hunt._unhandled_input(buy_key)
 	hunt.grapple_target = ""

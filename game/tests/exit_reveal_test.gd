@@ -115,12 +115,14 @@ func _ready() -> void:
 	await get_tree().process_frame
 	var early := InputEventKey.new()
 	early.keycode = KEY_SPACE
+	early.physical_keycode = KEY_SPACE
 	early.pressed = true
 	get_viewport().push_input(early)
 	check(reveal.active, "a key in the first half second does not skip (it is the one that brought you here)")
 	reveal.advance(1.0)
 	var key := InputEventKey.new()
 	key.keycode = KEY_SPACE
+	key.physical_keycode = KEY_SPACE
 	key.pressed = true
 	get_viewport().push_input(key)
 	check(not reveal.active and reveal.skipped, "any key after that skips")

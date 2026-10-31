@@ -15,6 +15,7 @@ func check(condition: bool, label: String) -> void:
 func key(hunt, code: int, shift := false) -> void:
 	var event := InputEventKey.new()
 	event.keycode = code
+	event.physical_keycode = code
 	event.pressed = true
 	event.shift_pressed = shift
 	hunt._unhandled_input(event)

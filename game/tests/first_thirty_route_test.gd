@@ -31,6 +31,7 @@ func _carries(label: String) -> bool:
 func _key(code: Key) -> InputEventKey:
 	var event := InputEventKey.new()
 	event.keycode = code
+	event.physical_keycode = code
 	event.pressed = true
 	return event
 

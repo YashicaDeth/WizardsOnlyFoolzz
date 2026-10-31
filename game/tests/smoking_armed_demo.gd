@@ -47,6 +47,7 @@ func _build_caption() -> void:
 func _input_key(code: Key, pressed: bool) -> void:
 	var event := InputEventKey.new()
 	event.keycode = code
+	event.physical_keycode = code
 	event.pressed = pressed
 	hunt._unhandled_input(event)
 

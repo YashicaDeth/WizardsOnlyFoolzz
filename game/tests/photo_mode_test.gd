@@ -17,6 +17,7 @@ func check(condition: bool, label: String) -> void:
 func key(target, code: int) -> void:
 	var event := InputEventKey.new()
 	event.keycode = code
+	event.physical_keycode = code
 	event.pressed = true
 	target._unhandled_input(event)
 
@@ -79,6 +80,7 @@ func _ready() -> void:
 	album.refresh()
 	var right := InputEventKey.new()
 	right.keycode = KEY_RIGHT
+	right.physical_keycode = KEY_RIGHT
 	right.pressed = true
 	check(album.handle_input(right) and album.selected == 1, "arrows move through the album")
 	for old in listed:

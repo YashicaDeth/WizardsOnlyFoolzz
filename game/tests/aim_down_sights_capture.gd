@@ -39,6 +39,7 @@ func _shift() -> void:
 	for pressed in [true, false]:
 		var event := InputEventKey.new()
 		event.keycode = KEY_SHIFT
+		event.physical_keycode = KEY_SHIFT
 		event.pressed = pressed
 		hunt._unhandled_input(event)
 

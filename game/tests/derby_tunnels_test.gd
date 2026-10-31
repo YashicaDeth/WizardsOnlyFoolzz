@@ -125,6 +125,7 @@ func _ready() -> void:
 		if lowest_progress_stall > 3.0 and resets < 6:
 			var r := InputEventKey.new()
 			r.keycode = KEY_R
+			r.physical_keycode = KEY_R
 			r.pressed = true
 			tunnels._unhandled_input(r)
 			resets += 1

@@ -24,6 +24,7 @@ func check(condition: bool, label: String) -> void:
 func key(code: Key) -> InputEventKey:
 	var event := InputEventKey.new()
 	event.keycode = code
+	event.physical_keycode = code
 	event.pressed = true
 	return event
 
