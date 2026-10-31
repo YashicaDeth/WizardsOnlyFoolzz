@@ -655,22 +655,58 @@ func _draw_breath() -> void:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.04, 0.0, 0.0, (spent - 0.7) * 0.12))
 
 
+## Slice 16. The bottom band is one ladder — the condition line, then the
+## scene's prompt, then the control strip — and this file owns the top of it,
+## because the prompt is a Label in the scene's own tree and nothing here can
+## see its text.
+##
+## The block used to sit at `size.y - 110`, which is *inside* the band the
+## prompt occupies: `HUD/Prompt` in `bone_yard_hunt.tscn` runs from 118 above
+## the bottom edge up to 40, and its text is bottom-aligned. At the design size
+## a one-line prompt left the block alone and a wrapped one did not; at the
+## 640x400 layout floor the explanation printed through the prompt it was
+## explaining. Both are measured from the same bottom edge, so moving the block
+## above that band clears it at every window size rather than at one.
+const CONDITION_HOME := 150.0
+## The rect `HUD/Prompt` occupies, measured up from the bottom edge: a 78px
+## band of bottom-aligned text. Held here so this file can be held to staying
+## out of it (`hud_transience_test`). If that label moves in the scene, this
+## moves in the same commit — the two numbers are one layout.
+const PROMPT_BAND := 118.0
+const PROMPT_BAND_HEIGHT := 78.0
+
+
+func prompt_reserve() -> Rect2:
+	return Rect2(0.0, size.y - PROMPT_BAND, size.x, PROMPT_BAND_HEIGHT)
+
+
+func condition_label() -> String:
+	return "BLOOD LOSS // %02d%%" % roundi(blood * 100.0) if blood < 0.55 else "CONSCIOUSNESS // %02d%%" % roundi(consciousness)
+
+
+func condition_detail() -> String:
+	return "FADING // HOLD V: SELF CONDITION" if consciousness < 35.0 else "WOUNDED // HOLD V: SELF CONDITION"
+
+
+## The whole block, rules included, so the test measures what is drawn rather
+## than the words alone.
+func condition_rect() -> Rect2:
+	var width := maxf(CellOutzType.width(condition_label(), 13.0, 1.3), CellOutzType.width_condensed(condition_detail(), 8.0, 0.7))
+	return Rect2(size.x * 0.5 - width * 0.5 - 24.0, size.y - CONDITION_HOME - 17.0, width + 48.0, 34.0)
+
+
 ## The playtest mistook blood-loss collapse for getting progressively higher.
 ## At the point a fullscreen effect changes play, the body must name the cause
-## in the otherwise unused space between the two lower instruments.
+## in the space between the two lower instruments — above the prompt's band,
+## not in it.
 func _draw_critical_condition() -> void:
 	if pulmonary_diagnostic != null and pulmonary_diagnostic.expanded:
 		return
 	if blood >= 0.55 and consciousness >= 55.0:
 		return
-	# Above the contextual E prompt and control strip, between the stable lower
-	# corner instruments. The first capture caught the earlier position printing
-	# directly through a bedroll prompt—the exact overlap this pass is removing.
-	var centre := Vector2(size.x * 0.5, size.y - 110.0)
-	var blood_percent := roundi(blood * 100.0)
-	var consciousness_percent := roundi(consciousness)
-	var label := "BLOOD LOSS // %02d%%" % blood_percent if blood < 0.55 else "CONSCIOUSNESS // %02d%%" % consciousness_percent
-	var detail := "FADING // HOLD V: SELF CONDITION" if consciousness < 35.0 else "WOUNDED // HOLD V: SELF CONDITION"
+	var centre := Vector2(size.x * 0.5, size.y - CONDITION_HOME)
+	var label := condition_label()
+	var detail := condition_detail()
 	var width := maxf(CellOutzType.width(label, 13.0, 1.3), CellOutzType.width_condensed(detail, 8.0, 0.7))
 	draw_line(centre + Vector2(-width * 0.5 - 22, -5), centre + Vector2(-width * 0.5 - 5, -5), BLOOD, 2.0)
 	draw_line(centre + Vector2(width * 0.5 + 5, -5), centre + Vector2(width * 0.5 + 22, -5), BLOOD, 2.0)

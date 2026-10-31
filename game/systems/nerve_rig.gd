@@ -165,9 +165,26 @@ func _process(delta: float) -> void:
 var _redraw_clock := 0.0
 
 
+## Slice 15. One instrument, not three. The heart trace and the brain trace used
+## to hang as two nearly identical CRTs beside the body-cam plate, which is what
+## made the corner read as a pile of widgets rather than one gauge: three
+## housings, two cables and two labels for two squiggles.
+const MONITOR_CABLE := 62.0
+
+
+func _monitor_anchor() -> Vector2:
+	return Vector2(size.x - 316.0, 0.0)
+
+
+## Where the corner's monitor hangs, in canvas space. One entry: the shape of
+## the corner is a decision, and `hud_transience_test` holds it to one.
+func monitor_rects() -> Array[Rect2]:
+	var hang := _monitor_anchor() + Vector2(0, MONITOR_CABLE)
+	return [Rect2(hang + Vector2(-38, 0), Vector2(76, 58))]
+
+
 func _draw() -> void:
-	_draw_monitor(Vector2(size.x - 330.0, 0.0), 0.0, true)
-	_draw_monitor(Vector2(size.x - 238.0, 0.0), 1.9, false)
+	_draw_monitor(_monitor_anchor())
 	_draw_spine()
 	_draw_brain()
 	_draw_tracking()
@@ -179,22 +196,66 @@ func _draw() -> void:
 ## The TouchDesigner-style tracker, turned on yourself: a box on the brain when
 ## the mind is off normal, boxes on every vertebra you have lost, one on the
 ## bleed. Nothing is drawn while you are whole, so a healthy rig stays clean.
+func _mood_tone() -> Color:
+	return BLOOD if mood in ["HURTING", "AGONY", "CHOKING"] else (COPPER if mood in ["WINDED", "FADING"] else TEAL)
+
+
+## The corner's words, in one column, right-aligned against the brain.
+##
+## Slice 15. They used to be placed off three separate anchors — the mood off
+## the brain, the pain ring off a 104px box, the lost run and the bleed off
+## their own vertebrae — so at any real injury `T8-Co2 LOST` printed straight
+## through `BLEED 31%`, and the mood word floated in open sky. One column can
+## only collide with itself.
+func readout_rows() -> Array:
+	var rows: Array = []
+	var mind_off := pain > 15.0 or consciousness < 90.0 or head_damage > 0.05
+	var seated := intact_vertebrae()
+	if mind_off:
+		rows.append({"key": "mind", "text": "PAIN %02d  CONSC %02d" % [roundi(pain), roundi(consciousness)], "size": 7.5, "weight": 0.55,
+			"ink": TEAL.lightened(0.3) if pain < 60.0 else BLOOD.lightened(0.25)})
+	if seated < VERTEBRAE:
+		rows.append({"key": "lost", "text": "%s-%s LOST" % [layout()[seated].label, layout()[VERTEBRAE - 1].label], "size": 7.5, "weight": 0.5,
+			"ink": BLOOD.lightened(0.3)})
+	if blood < 0.9:
+		rows.append({"key": "bleed", "text": "BLEED %02d%%" % roundi(blood * 100.0), "size": 7.5, "weight": 0.5,
+			"ink": BLOOD.lightened(0.15)})
+	rows.insert(0, {"key": "mood", "text": mood, "size": 11.0, "weight": 0.9, "ink": _mood_tone()})
+	var right := _brain_centre().x - 62.0
+	var y := _brain_centre().y - 38.0
+	var out: Array = []
+	for row in rows:
+		var width := CellOutzType.width_condensed(str(row.text), float(row.size), float(row.weight))
+		row["rect"] = Rect2(Vector2(right - width, y), Vector2(width, float(row.size) + 2.0))
+		y += float(row.size) + 6.0
+		out.append(row)
+	return out
+
+
+## What the column is about to say, in canvas space, so a test can prove the
+## rows neither overlap each other nor run into the anatomy.
+func readout_rects() -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for row in readout_rows():
+		out.append(row.rect)
+	return out
+
+
 func _draw_tracking() -> void:
 	var boxes: Array = []
 	var mind_off := pain > 15.0 or consciousness < 90.0 or head_damage > 0.05
 	if mind_off:
 		var centre := _brain_centre()
-		boxes.append({"rect": Rect2(centre - Vector2(52, 40), Vector2(104, 80)), "tag": "PAIN %02d  CONSC %02d" % [roundi(pain), roundi(consciousness)], "ink": TEAL.lightened(0.3) if pain < 60.0 else BLOOD.lightened(0.25)})
+		boxes.append({"rect": Rect2(centre - Vector2(52, 40), Vector2(104, 80)), "key": "mind", "ink": TEAL.lightened(0.3) if pain < 60.0 else BLOOD.lightened(0.25)})
 	var seated := intact_vertebrae()
 	if seated < VERTEBRAE:
 		# One box round the whole lost run, named by its real vertebrae.
 		var first := _spine_point(seated) + Vector2(7, 0)
 		var last := _spine_point(VERTEBRAE - 1) + Vector2(7, 4)
-		var tag := "%s-%s LOST" % [layout()[seated].label, layout()[VERTEBRAE - 1].label]
-		boxes.append({"rect": Rect2(first - Vector2(22, 8), Vector2(44, last.y - first.y + 16)), "tag": tag, "ink": BLOOD.lightened(0.3)})
+		boxes.append({"rect": Rect2(first - Vector2(22, 8), Vector2(44, last.y - first.y + 16)), "key": "lost", "ink": BLOOD.lightened(0.3)})
 	if blood < 0.9:
 		var bleed := _spine_point(maxi(seated - 1, 0))
-		boxes.append({"rect": Rect2(bleed + Vector2(-20, 10), Vector2(40, 34)), "tag": "BLEED %02d%%" % roundi(blood * 100.0), "ink": BLOOD.lightened(0.15)})
+		boxes.append({"rect": Rect2(bleed + Vector2(-20, 10), Vector2(40, 34)), "key": "bleed", "ink": BLOOD.lightened(0.15)})
 	var previous := Vector2.INF
 	for box in boxes:
 		var rect: Rect2 = box.rect
@@ -204,13 +265,29 @@ func _draw_tracking() -> void:
 			var sy := 1.0 if corner.y <= rect.get_center().y else -1.0
 			draw_line(corner, corner + Vector2(6.0 * sx, 0), ink, 1.2)
 			draw_line(corner, corner + Vector2(0, 6.0 * sy), ink, 1.2)
-		# Tags hang to the left, off the anatomy, where the screen edge is not.
-		var tag := str(box.tag)
-		var width := CellOutzType.width_condensed(tag, 7.0, 0.5)
-		CellOutzType.draw_condensed(self, Vector2(rect.position.x - width - 6, rect.position.y + 2), tag, 7.0, ink, 0.5)
 		if previous != Vector2.INF:
 			draw_line(previous, rect.get_center(), ink * Color(1, 1, 1, 0.35), 1.0)
 		previous = rect.get_center()
+	# The words are one column; each box points at its own row with a leader, so
+	# the label stays off the bone and the bone stays the thing being tracked.
+	var by_key := {}
+	for box in boxes:
+		by_key[str(box.key)] = box
+	for row in readout_rows():
+		var key := str(row.key)
+		var row_rect: Rect2 = row.rect
+		if key != "mood" and by_key.has(key):
+			var box: Dictionary = by_key[key]
+			var box_rect: Rect2 = box.rect
+			var from := Vector2(box_rect.position.x - 2.0, box_rect.get_center().y)
+			var row_mid := row_rect.get_center().y
+			# A wire only when the box is actually beside its row. The lost run
+			# sits a third of the screen below, and a diagonal dragged across the
+			# body to reach it is another thing to read rather than a pointer —
+			# the row says LOST and the only boxed run is the one it means.
+			if from.x > row_rect.end.x and absf(from.y - row_mid) < 90.0:
+				draw_line(Vector2(row_rect.end.x, row_mid), from, (row.ink as Color) * Color(1, 1, 1, 0.45), 1.0)
+		CellOutzType.draw_condensed(self, row_rect.position, str(row.text), float(row.size), row.ink, float(row.weight))
 
 
 # --- the brain and the column -------------------------------------------------
@@ -506,20 +583,20 @@ func _draw_brain() -> void:
 	if head_damage > 0.05:
 		var crack := PackedVector2Array([centre + Vector2(-30, -14), centre + Vector2(-9, -3), centre + Vector2(-2, 12) + Vector2(head_damage * 20, head_damage * 8)])
 		draw_polyline(crack, Color(0.05, 0.0, 0.0, 0.9), 2.0 + head_damage * 2.0)
-	var width := CellOutzType.width_condensed(mood, 10.0, 0.9)
-	var mood_tone := BLOOD if mood in ["HURTING", "AGONY", "CHOKING"] else (COPPER if mood in ["WINDED", "FADING"] else TEAL)
-	# Greg's playtest: it sat under the EEG monitor. Below the monitors now,
-	# just left of the spine.
-	CellOutzType.draw_condensed(self, centre + Vector2(-width - 34, 96), mood, 10.0, mood_tone, 0.9)
+	# The mood word is not drawn here any more: it is the first row of the
+	# readout column (`readout_rows`), because it was the third thing in the
+	# corner placed off its own anchor and it floated in open sky.
 
 
 # --- hanging CRTs ---------------------------------------------------------------
 
-func _draw_monitor(anchor: Vector2, phase: float, heart: bool) -> void:
+## One housing, one cable, one label, both traces: the heart above the divider
+## and the brain below it. A screen with two waveforms in it is still one thing
+## to look at, which is the whole difference between a cluster and a pile.
+func _draw_monitor(anchor: Vector2) -> void:
 	var aim_modulate := Color(1.0, 1.0, 1.0, monitor_alpha)
-	var cable := 58.0 + phase * 14.0
-	var swing := sin(elapsed * 1.25 + phase) * (0.045 + head_damage * 0.12)
-	var hang := anchor + Vector2(0, cable).rotated(swing)
+	var swing := sin(elapsed * 1.25) * (0.045 + head_damage * 0.12)
+	var hang := anchor + Vector2(0, MONITOR_CABLE).rotated(swing)
 	draw_line(anchor, hang, Color(0.08, 0.06, 0.06, 0.95) * aim_modulate, 2.0)
 	draw_line(anchor + Vector2(3, 0), hang + Vector2(3, 0), COPPER * Color(1, 1, 1, 0.3) * aim_modulate, 1.0)
 	draw_set_transform(hang, swing, Vector2.ONE)
@@ -527,8 +604,19 @@ func _draw_monitor(anchor: Vector2, phase: float, heart: bool) -> void:
 	draw_rect(box, Color("2a2626") * aim_modulate)
 	draw_rect(box, BONE * Color(1, 1, 1, 0.35) * aim_modulate, false, 1.2)
 	draw_rect(Rect2(box.position + Vector2(20, -5), Vector2(36, 6)), Color("1a1717") * aim_modulate)
-	var screen := Rect2(Vector2(-31, 7), Vector2(62, 42))
+	var screen := Rect2(Vector2(-31, 5), Vector2(62, 44))
 	draw_rect(screen, Color(0.01, 0.05, 0.045) * aim_modulate)
+	_draw_trace(Rect2(screen.position, Vector2(screen.size.x, 20.0)), true, aim_modulate)
+	_draw_trace(Rect2(screen.position + Vector2(0, 23), Vector2(screen.size.x, 20.0)), false, aim_modulate)
+	draw_line(screen.position + Vector2(0, 21.5), screen.position + Vector2(screen.size.x, 21.5), BONE * Color(1, 1, 1, 0.16) * aim_modulate, 1.0)
+	if head_damage > 0.08:
+		var tear := screen.position.y + fposmod(elapsed * 40.0 + 3.0, screen.size.y)
+		draw_rect(Rect2(screen.position.x, tear, screen.size.x, 2.0 + head_damage * 5.0), Color(0.8, 0.9, 0.9, 0.35 * head_damage) * aim_modulate)
+	CellOutzType.draw_condensed(self, Vector2(-31, 50), "VITAL", 6.0, BONE * Color(1, 1, 1, 0.6) * aim_modulate, 0.4)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _draw_trace(rect: Rect2, heart: bool, aim_modulate: Color) -> void:
 	var trace := PackedVector2Array()
 	var steps := 40
 	for s in steps + 1:
@@ -543,17 +631,12 @@ func _draw_monitor(anchor: Vector2, phase: float, heart: bool) -> void:
 			var calm := consciousness / 100.0
 			y = sin(x * 14.0 + elapsed * 5.0) * 0.25 * calm + sin(x * 37.0 - elapsed * 9.0) * 0.18 * (1.0 - calm)
 			y += (fposmod(sin(x * 91.7 + floor(elapsed * 20.0)) * 43758.5, 1.0) - 0.5) * 0.5 * (1.0 - calm)
-		trace.append(screen.position + Vector2(x * screen.size.x, screen.size.y * 0.5 + y * screen.size.y * 0.42))
+		trace.append(rect.position + Vector2(x * rect.size.x, rect.size.y * 0.5 + y * rect.size.y * 0.42))
 	var colour := PHOSPHOR if not (heart and health < 35.0) else Color("ff5a4a")
 	draw_polyline(trace, colour * Color(1, 1, 1, 0.35) * aim_modulate, 3.5)
 	draw_polyline(trace, colour * aim_modulate, 1.3)
-	for line in range(0, int(screen.size.y), 3):
-		draw_line(screen.position + Vector2(0, line), screen.position + Vector2(screen.size.x, line), Color(0, 0, 0, 0.18) * aim_modulate, 1.0)
-	if head_damage > 0.08:
-		var tear := screen.position.y + fposmod(elapsed * 40.0 + phase * 13.0, screen.size.y)
-		draw_rect(Rect2(screen.position.x, tear, screen.size.x, 2.0 + head_damage * 5.0), Color(0.8, 0.9, 0.9, 0.35 * head_damage) * aim_modulate)
-	CellOutzType.draw_condensed(self, Vector2(-31, 50), "HRT" if heart else "EEG", 6.0, BONE * Color(1, 1, 1, 0.6) * aim_modulate, 0.4)
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	for line in range(0, int(rect.size.y), 3):
+		draw_line(rect.position + Vector2(0, line), rect.position + Vector2(rect.size.x, line), Color(0, 0, 0, 0.18) * aim_modulate, 1.0)
 
 
 # --- the pocket rack -------------------------------------------------------------
