@@ -2661,29 +2661,38 @@ const ARM_WEIGHTS := {
 ## worn weapon now needs a real number to be worn *from*.
 const WEAPON_BASE_STIFFNESS := 58.0
 ## AN2.5. Which grips a weapon actually offers, in the order `B` cycles them.
-## Only the sword has a real choice to make — a shotgun and a sidearm each
+## Only the longsword has a real choice to make — a shotgun and a sidearm each
 ## have exactly one grip already (`HeldGear._default_grip`), so cycling them
 ## would be a key that does nothing every time it is pressed.
+##
+## The issued melee is the hotline cleaver, not the sword. It is a one-hand
+## tool with no off-hand anchor and a single grip in `HeldGear`, so it has no
+## entry here and `B` names it honestly rather than offering a cycle it cannot
+## make. The sword keeps its three grips for the rooms and rigs that draw it.
 const GRIP_CYCLE := {
 	"sword": ["two_hand", "one_hand", "half_sword"],
 }
-## `HeldGear`'s own default for the sword — kept in sync by `_cycle_grip()`
-## rather than duplicated, since a fresh sword pull should start exactly
-## where `_default_grip()` already puts it.
-var current_grip := "two_hand"
+## The grip the issued one-hand cleaver is actually held in. A draw resets any
+## weapon on `GRIP_CYCLE` to that weapon's own first grip, so this only ever
+## describes the melee the player carries.
+var current_grip := "one_hand"
 
 ## AN2.5. "Two-handing changes the numbers, not just the pose." `held_gear.gd`'s
-## `GRIPS` table already carried `reach`, `damage_type` and now `control` per
-## grip — its own header comment names the claim directly — and nothing ever
-## read them outside that file. This is the read: three real grips for the
-## one weapon that has a real choice between them, cycled rather than a
-## dedicated key each, because a fourth key for a weapon nobody has drawn yet
-## is exactly the kind of binding that never gets discovered.
+## `GRIPS` table carries `reach`, `damage_type` and `control` per grip, and
+## `_carry_current_weapon()` reads the active one into the arm's reach and
+## stiffness for the weapons that offer a choice.
+##
+## The issued cleaver offers none, so it says so by name. "1 FOR THE SWORD"
+## was worse than a dead key: slot 1 is the cleaver, so the hint pointed at the
+## wrong weapon *and* promised a grip the thing in hand does not have.
 func _cycle_grip() -> void:
 	var id := str(arsenal.current_id) if arsenal != null else ""
 	var options: Array = GRIP_CYCLE.get(id, [])
 	if options.is_empty():
-		_feedback("ONLY THE BLADE CHANGES GRIP // 1 FOR THE SWORD")
+		var label := "THAT WEAPON"
+		if arsenal != null:
+			label = str(arsenal.current().get("label", label))
+		_feedback("NO GRIP CHANGE // %s" % label)
 		return
 	var index := options.find(current_grip)
 	current_grip = options[(index + 1) % options.size()] if index >= 0 else options[0]
@@ -4779,7 +4788,7 @@ func _equip_weapon(slot: int) -> void:
 		# weapon. A persistent READY subtitle duplicated both of them.
 		prompt.text = ""
 		# AN2.5. A fresh draw starts from the grip `HeldGear` itself defaults
-		# to, not whatever the last sword pull happened to be left in —
+		# to, not whatever the last gripped weapon happened to be left in —
 		# holstering is not the same act as choosing a stance.
 		var options: Array = GRIP_CYCLE.get(str(arsenal.current_id), [])
 		if not options.is_empty():
@@ -9231,7 +9240,7 @@ func _build_keys_card() -> void:
 			["4", "CARRIED LIMB"],
 			["HOLD 4", "FIELD DRESSING // +20 BLOOD"],
 			["5", "PUT THEM DOWN"],
-			["B", "CYCLE GRIP"],
+			["B", "GRIP // CLEAVER: ONE-HAND"],
 			["R", "RELOAD"],
 			["TAP Q", "PROSTHETIC SURGE // COSTS STAMINA"],
 			["HOLD Q", "FREE X-RAY / KEEP HOLDING FOR WHEEL"],
