@@ -52,6 +52,11 @@ var shown := 0.0
 ## door. Counted rather than timed: somebody who never opens it keeps being told.
 var opened_count := 0
 var page := 0
+## Slice 13. What the card is being held up *over*. Empty when nothing is
+## showing, which is most of the time. The scene that owns the card sets it,
+## the same way it hands over its own binding rows: the card never guesses
+## what another surface is displaying.
+var reading := ""
 
 
 func _ready() -> void:
@@ -66,6 +71,25 @@ func configure(key_label: String, card_groups: Array) -> void:
 	groups = card_groups
 	page = 0
 	queue_redraw()
+
+
+## Named by the owning scene when a surface that has pages is up behind the
+## card. Pass "" when it closes.
+func set_reading(text: String) -> void:
+	if reading == text:
+		return
+	reading = text
+	queue_redraw()
+
+
+## The line under the KEYS stamp. The card used to print one fixed sentence
+## everywhere, so a player who had forgotten which page of the index they were
+## on had to close the card and look. Readable without a paint, so it can be
+## asserted as well as seen.
+func subject_line() -> String:
+	if reading.is_empty():
+		return "WHAT THIS BODY CAN BE MADE TO DO"
+	return "READING // %s" % reading.to_upper()
 
 
 func toggle() -> void:
@@ -156,7 +180,7 @@ func _draw_card() -> void:
 	CellOutzType.draw_stamped(self, origin + Vector2(28.0, 34.0), "KEYS", 22.0,
 		Color(COPPER, alpha), Color(BLOOD, 0.35 * alpha), 3.2)
 	CellOutzType.draw_condensed(self, origin + Vector2(28.0, 60.0),
-		"CELLOUTZ FIELD ISSUE / WHAT THIS BODY CAN BE MADE TO DO / %d OF %d" % [page + 1, page_count()], 9.0,
+		"CELLOUTZ FIELD ISSUE / %s / %d OF %d" % [subject_line(), page + 1, page_count()], 9.0,
 		Color(BONE, 0.45 * alpha), 0.9)
 	draw_line(origin + Vector2(28.0, 74.0), origin + Vector2(plate.x - 28.0, 74.0),
 		Color(COPPER, 0.3 * alpha), 1.0)
