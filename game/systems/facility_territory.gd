@@ -145,7 +145,9 @@ static func apply_event(event_type: String, details: Dictionary = {}) -> Diction
 			_raise_reaction()
 		"service_ring_relay_disabled":
 			_record_relay(clampi(int(details.get("index", -1)), -1, 2))
-		"ringmaster_joined", "ringmaster_escaped", "ringmaster_challenged":
+		# Out by the heat elevator or the old drains (Greg, 24 September): the
+		# same reach of the surface the derby's exit used to grant.
+		"ringmaster_joined", "ringmaster_escaped", "ringmaster_challenged", "facility_surfaced":
 			_set_sector("surface_gate", SURVEYED, true)
 			_unlock_record("surface_gate")
 	var result := overview()

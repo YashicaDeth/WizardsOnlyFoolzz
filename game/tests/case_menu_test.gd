@@ -37,7 +37,7 @@ func _ready() -> void:
 	menu.close_requested.connect(_on_close)
 	menu.open_menu(PURSE.new(), null)
 	check(menu.visible, "the exchange opens")
-	check(menu.case_ids().size() == 2, "with two boxes on the shelf")
+	check(menu.case_ids().size() == 5, "with two supply caches and three skin cases on the shelf")
 
 	menu.handle_input(press(KEY_ENTER))
 	# The till takes 25 and the box pays its own winnings straight back, so the
@@ -54,6 +54,23 @@ func _ready() -> void:
 	WorldHistory.update_subject("inventory", {"rust_scrip": 0}, "test_drain")
 	menu.handle_input(press(KEY_ENTER))
 	check(not bool(menu.last.get("ok", true)), "a broke wallet is refused at the till")
+	# A skin case: bought, spun on the reel, and the skin is in the bag.
+	WorldHistory.update_subject("inventory", {"rust_scrip": 1000}, "test_fill")
+	menu.selected = menu.case_ids().find("wetwork_case")
+	menu.handle_input(press(KEY_ENTER))
+	check(menu.reeling(), "a skin case opens on the reel")
+	menu.handle_input(press(KEY_ENTER))
+	check(not menu.reeling() and str(menu.last.get("note", "")).contains("WORTH"), "ENTER skips to the result and its Wire price (%s)" % str(menu.last.get("note", "")))
+	menu.handle_input(press(KEY_D))
+	check(menu.tab == 1 and menu.rows().size() == 1, "the SKINS tab lists the new skin")
+	var before := int(WorldHistory.subject("inventory").get("rust_scrip", 0))
+	menu.handle_input(press(KEY_X))
+	check(int(WorldHistory.subject("inventory").get("rust_scrip", 0)) > before and menu.rows().is_empty(), "X sells it on the Wire")
+	menu.handle_input(press(KEY_D))
+	check(menu.tab == 2 and menu.rows().size() == 4, "the WARDROBE tab lists the four jester parts")
+	menu.handle_input(press(KEY_ENTER))
+	check(not bool(menu.last.get("ok", true)) and str(menu.last.get("reason", "")) == "THE COLLAR IS LOCKED", "the collar holds them on")
+
 	menu.handle_input(press(KEY_U))
 	check(closed, "U closes the exchange")
 

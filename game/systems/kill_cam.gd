@@ -179,7 +179,7 @@ func _draw() -> void:
 	var plate := Rect2(size * Vector2(0.5, 0.5) - Vector2(210, 250), Vector2(420, 500))
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.72 * fade))
 	draw_rect(plate, PLATE_BG * Color(1, 1, 1, 0.96 * fade))
-	draw_rect(plate, ACID * Color(1, 1, 1, 0.35 * fade), false, 2)
+	draw_rect(plate, FILM * Color(1, 1, 1, 0.4 * fade), false, 2)
 
 	var center := plate.get_center() + Vector2(0, 10)
 	draw_set_transform(center, 0.0, Vector2(1.7, 1.7))
@@ -203,8 +203,18 @@ func _draw() -> void:
 		draw_line(Vector2(plate.position.x, plate.position.y + scan), Vector2(plate.end.x, plate.position.y + scan), Color(0, 0, 0, 0.14 * fade), 1)
 
 
+## Cold blue film (AGENT_PROMPTS: "a skeleton in cold blue line-art, a blade
+## path through"): a faint body, the skeleton drawn as line art over it, and
+## the cut or round drawn across the struck zone.
+const FILM := Color("7fc8e8")
+const ZONE_POINTS := {
+	"head": Vector2(0, -86), "torso": Vector2(0, -24), "left_arm": Vector2(-38, -4),
+	"right_arm": Vector2(38, -4), "left_leg": Vector2(-17, 74), "right_leg": Vector2(17, 74),
+}
+
+
 func _draw_plate_body(fade: float) -> void:
-	var ghost := ACID * Color(1, 1, 1, 0.1 * fade)
+	var ghost := FILM * Color(1, 1, 1, 0.09 * fade)
 	draw_colored_polygon(PackedVector2Array([
 		Vector2(-20, -62), Vector2(20, -62), Vector2(30, -48), Vector2(27, 2),
 		Vector2(20, 44), Vector2(-20, 44), Vector2(-27, 2), Vector2(-30, -48),
@@ -213,10 +223,39 @@ func _draw_plate_body(fade: float) -> void:
 		draw_line(Vector2(offset * 25, -48), Vector2(offset * 47, 36), ghost, 13)
 		draw_line(Vector2(offset * 13, 42), Vector2(offset * 20, 104), ghost, 16)
 	draw_circle(Vector2(0, -86), 23, ghost)
+	var line := FILM * Color(1, 1, 1, 0.55 * fade)
+	var faint := FILM * Color(1, 1, 1, 0.3 * fade)
+	# Skull and jaw.
+	draw_arc(Vector2(0, -88), 17, 0.0, TAU, 28, line, 1.5)
+	draw_arc(Vector2(0, -76), 10, 0.2, PI - 0.2, 12, faint, 1.2)
 	# Spine and pelvis stay intact so the fractures have something to read against.
-	draw_line(Vector2(0, -58), Vector2(0, 46), BONE * Color(1, 1, 1, 0.85 * fade), 4)
-	draw_arc(Vector2(0, -86), 22, PI, TAU, 22, BONE * Color(1, 1, 1, 0.7 * fade), 2)
+	draw_line(Vector2(0, -68), Vector2(0, 46), BONE * Color(1, 1, 1, 0.85 * fade), 4)
 	draw_line(Vector2(-16, 44), Vector2(16, 44), BONE * Color(1, 1, 1, 0.6 * fade), 5)
+	for side in [-1.0, 1.0]:
+		# Clavicle, ribs, the pelvis wing.
+		draw_line(Vector2(0, -60), Vector2(side * 24, -56), line, 1.5)
+		for rib in 5:
+			var y := -50.0 + rib * 9.0
+			draw_arc(Vector2(side * 2.0, y + 6.0), 18.0 - rib * 0.8, -PI * 0.5 - side * PI * 0.5 + side * 0.25, -PI * 0.5 + side * 0.1, 8, faint, 1.2)
+		draw_arc(Vector2(side * 10, 42), 11, PI, TAU, 10, faint, 1.5)
+		# Arm and leg bones.
+		draw_line(Vector2(side * 26, -52), Vector2(side * 36, -6), line, 1.8)
+		draw_line(Vector2(side * 36, -4), Vector2(side * 46, 34), line, 1.5)
+		draw_line(Vector2(side * 11, 48), Vector2(side * 16, 74), line, 2.0)
+		draw_line(Vector2(side * 16, 76), Vector2(side * 20, 104), line, 1.8)
+	_draw_path(fade)
+
+
+## The blade's or round's path through the struck zone, drawn in over the
+## first third of a second from the side it came from.
+func _draw_path(fade: float) -> void:
+	var at: Vector2 = ZONE_POINTS.get(impact_zone, ZONE_POINTS["torso"])
+	var reach := clampf(clock / 0.3, 0.0, 1.0)
+	var from := at + Vector2(impact_from.x * 70.0, -22.0)
+	var to := at - Vector2(impact_from.x * 70.0, -22.0)
+	var tip := from.lerp(to, reach)
+	draw_line(from, tip, FILM * Color(1, 1, 1, 0.35 * fade), 6.0)
+	draw_line(from, tip, BONE_BREAK * Color(1, 1, 1, 0.9 * fade), 1.5)
 
 
 func _draw_fractures(fade: float) -> void:

@@ -59,15 +59,21 @@ func _ready() -> void:
 
 	var sites: Array = rig.call("_bleeding_sites")
 	check(not sites.is_empty(), "the wound is registered as somewhere blood can come out of")
-	check(str(sites[0]["zone"]) == zone, "and it is the limb that was actually shot")
+	check(not sites.is_empty() and str(sites[0]["zone"]) == zone, "and it is the limb that was actually shot")
 
+	# Wait on the body's own bleeding clock, not a frame count. 90 frames meant
+	# 1.5 s at 60 fps, but headless runs at ~145 fps, so it was ~0.6 s plus
+	# however long the frames around the hit took — against the 0.67 s a streak
+	# needs before it shows. The cap only matters if the body stops bleeding.
 	var before: float = rig.get("_bleed_seconds")
-	for _f in 90:
+	for _f in 1000:
+		if float(rig.get("_bleed_seconds")) >= 1.5:
+			break
 		await get_tree().process_frame
 	check(float(rig.get("_bleed_seconds")) > float(before), "time bleeding accumulates while the wound is open")
 
 	var part := rig.parts.get(zone) as Node3D
-	var streak := part.get_node_or_null("BloodStreak")
+	var streak := part.get_node_or_null("BloodStreak") as Node3D
 	check(streak != null, "and a run of blood appears on the limb below the wound")
 
 	# The streak has to hang the way gravity points, not the way the limb does,
@@ -77,7 +83,12 @@ func _ready() -> void:
 	# world vertical, not which end of it is up. What matters is that a run of
 	# blood follows gravity rather than the limb, which is the whole reason it
 	# reads as fluid instead of as a painted stripe.
-	var axis: Vector3 = (part.global_transform.basis * (streak as Node3D).transform.basis.y).normalized()
+	# No streak means no axis, which fails both checks below instead of crashing
+	# on the null: a script error ends this coroutine before quit(), and a runner
+	# can only see that as a hang.
+	var axis := Vector3.ZERO
+	if streak != null:
+		axis = (part.global_transform.basis * streak.transform.basis.y).normalized()
 	check(absf(axis.dot(Vector3.UP)) > 0.5, "the streak runs along world vertical rather than along the limb's own axis")
 	check(axis.dot(Vector3.DOWN) > 0.5, "and it runs downward from the wound, not upward out of it")
 

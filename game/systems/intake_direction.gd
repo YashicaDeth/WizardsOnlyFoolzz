@@ -76,6 +76,25 @@ const LINES := {
 	"refused": [
 		{"line": "No budget. You get what the vat gave you.", "hold": 3.0},
 	],
+	# Greg, first launch (2026-09-24): you should be able to answer his
+	# straightforward questions. You cannot speak -- the tube is in -- so every
+	# answer is something a body in a tank can actually do.
+	"ask": [
+		{"line": "You awake in there? Blink once for yes.", "hold": 3.0, "answers": ["BLINK ONCE", "BLINK TWICE", "STARE"]},
+		{"line": "Any pain? One blink yes, two no. Doesn't change anything, it's just a box.", "hold": 3.4, "answers": ["BLINK ONCE", "BLINK TWICE", "STARE"]},
+		{"line": "Can you read the form from in there? Blink.", "hold": 3.0, "answers": ["BLINK ONCE", "BLINK TWICE", "STARE"]},
+	],
+	"stared": [
+		{"line": "Staring is not an answer. I'll put yes.", "hold": 2.6},
+		{"line": "Right. Unresponsive. That's a box too.", "hold": 2.6},
+	],
+	# V: thinking out loud. The tube is in, but the pickup on the tank is not
+	# fussy about what counts as speech.
+	"heard": [
+		{"line": "Was that you? Tube's in, you can't -- never mind.", "hold": 3.0},
+		{"line": "Thinking loud again. The mic picks that up, you know.", "hold": 3.0},
+		{"line": "Keep that to yourself. It's all recorded.", "hold": 2.8},
+	],
 	# D4.6 v2. Race was data the world read — build factor, metabolism,
 	# social price, the Tree pull — and the intake never once said so out
 	# loud. He has an opinion on every one of these, because a man who has

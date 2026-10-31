@@ -386,12 +386,11 @@ func _begin_lift() -> void:
 # --- drawing ---------------------------------------------------------------
 
 func draw_into(canvas: CanvasItem, rect: Rect2) -> void:
-	var font := ThemeDB.fallback_font
 	if subject.is_empty():
-		canvas.draw_string(font, rect.position + Vector2(0, 20), "NO BODY ON FILE.", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, INK * Color(1, 1, 1, 0.5))
+		CellOutzType.draw_string_compat(canvas, rect.position + Vector2(0, 20), "NO BODY ON FILE.", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, INK * Color(1, 1, 1, 0.5))
 		return
 	CellOutzType.draw_stamped(canvas, rect.position, str(subject.get("name", "")).to_upper(), 21.0, INK, COPPER * Color(1, 1, 1, 0.3), 1.4)
-	canvas.draw_string(font, rect.position + Vector2(2, 44), "%s   ·   BLOOD %s" % [str(subject.get("role", "")).to_upper(), str((subject.get("anatomy", {}) as Dictionary).get("blood_type", "unresolved")).to_upper()], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COPPER)
+	CellOutzType.draw_string_compat(canvas, rect.position + Vector2(2, 44), "%s   ·   BLOOD %s" % [str(subject.get("role", "")).to_upper(), str((subject.get("anatomy", {}) as Dictionary).get("blood_type", "unresolved")).to_upper()], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COPPER)
 
 	var diagram := Rect2(rect.position + Vector2(0, 70), Vector2(rect.size.x * 0.26, rect.size.y - 90))
 	var list := Rect2(rect.position + Vector2(rect.size.x * 0.29, 70), Vector2(rect.size.x * 0.26, rect.size.y - 90))
@@ -406,15 +405,13 @@ func _draw_xray_findings(canvas: CanvasItem, rect: Rect2) -> void:
 	var findings := xray_findings()
 	if findings.is_empty():
 		return
-	var font := ThemeDB.fallback_font
 	var line_y := rect.position.y
 	for finding in findings:
-		canvas.draw_string(font, Vector2(rect.position.x, line_y), finding, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 10, HOT)
+		CellOutzType.draw_string_compat(canvas, Vector2(rect.position.x, line_y), finding, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 10, HOT)
 		line_y -= 12.0
 
 
 func _draw_diagram(canvas: CanvasItem, rect: Rect2) -> void:
-	var font := ThemeDB.fallback_font
 	CellOutzType.draw_text(canvas, rect.position, "THE BODY", 11.0, MOSS, 1.2)
 	canvas.draw_line(rect.position + Vector2(0, 17), rect.position + Vector2(rect.size.x, 17), MOSS * Color(1, 1, 1, 0.3), 1.0)
 	var field := Rect2(rect.position + Vector2(0, 30), rect.size - Vector2(0, 30))
@@ -449,8 +446,8 @@ func _draw_diagram(canvas: CanvasItem, rect: Rect2) -> void:
 			# and then it runs - this is a chart that has been handled wet.
 			Grunge.hatch(canvas, Rect2(centre - half, half * 2.0), 5.0, Grunge.DRIED, 0.38 * (1.0 - health), hash(zone_id))
 			Grunge.run_down(canvas, centre + Vector2(half.x * 0.2, half.y * 0.6), (1.0 - health) * 46.0, hash(zone_id) + 3)
-			canvas.draw_string(font, centre + Vector2(-14, half.y + 11), "%d%%" % roundi(health * 100.0), HORIZONTAL_ALIGNMENT_CENTER, 30, 9, tone)
-	canvas.draw_string(font, Vector2(rect.position.x, rect.position.y + rect.size.y + 4), ZONE_LABELS.get(zone, "") + "  ·  TAB CYCLES", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 10, COPPER)
+			CellOutzType.draw_string_compat(canvas, centre + Vector2(-14, half.y + 11), "%d%%" % roundi(health * 100.0), HORIZONTAL_ALIGNMENT_CENTER, 30, 9, tone)
+	CellOutzType.draw_string_compat(canvas, Vector2(rect.position.x, rect.position.y + rect.size.y + 4), ZONE_LABELS.get(zone, "") + "  ·  TAB CYCLES", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 10, COPPER)
 
 
 ## A single continuous outline under the zones. Without it the six shapes float
@@ -503,7 +500,6 @@ func _zone_polygon(zone_id: String, centre: Vector2, half: Vector2) -> PackedVec
 
 
 func _draw_list(canvas: CanvasItem, rect: Rect2) -> void:
-	var font := ThemeDB.fallback_font
 	CellOutzType.draw_text(canvas, rect.position, "PARTS", 11.0, MOSS, 1.2)
 	canvas.draw_line(rect.position + Vector2(0, 17), rect.position + Vector2(rect.size.x, 17), MOSS * Color(1, 1, 1, 0.3), 1.0)
 	_part_rects.clear()
@@ -525,15 +521,14 @@ func _draw_list(canvas: CanvasItem, rect: Rect2) -> void:
 			canvas.draw_line(row.position, row.position + Vector2(0, row.size.y), HOT, 2.5)
 		if pinned:
 			canvas.draw_circle(Vector2(row.position.x + row.size.x - 30, y - 4), 2.5, COPPER)
-		canvas.draw_string(font, Vector2(rect.position.x + 4, y), str(part.label), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 56, 12, INK if active else INK * Color(1, 1, 1, 0.72))
-		canvas.draw_string(font, Vector2(rect.position.x + 4, y + 12), str(part.note).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 56, 9, INK * Color(1, 1, 1, 0.34))
+		CellOutzType.draw_string_compat(canvas, Vector2(rect.position.x + 4, y), str(part.label), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 56, 12, INK if active else INK * Color(1, 1, 1, 0.72))
+		CellOutzType.draw_string_compat(canvas, Vector2(rect.position.x + 4, y + 12), str(part.note).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 56, 9, INK * Color(1, 1, 1, 0.34))
 		# A condition pip per row, so the list is scannable without reading it.
 		canvas.draw_circle(Vector2(rect.position.x + rect.size.x - 14, y - 4), 4.0, tone * Color(1, 1, 1, 0.9 if active else 0.6))
 		y += 32.0
 
 
 func _draw_stage(canvas: CanvasItem, rect: Rect2) -> void:
-	var font := ThemeDB.fallback_font
 	var part := selected_part()
 	if part.is_empty():
 		return
@@ -588,6 +583,6 @@ func _draw_stage(canvas: CanvasItem, rect: Rect2) -> void:
 		verdict = "FAILING"
 	elif condition < 0.75:
 		verdict = "DAMAGED"
-	canvas.draw_string(font, Vector2(rect.position.x + 96, caption_y + 60), verdict, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 110, 13, tone)
-	canvas.draw_string(font, Vector2(rect.position.x, caption_y + 84), "IN %s" % str(ZONE_LABELS.get(str(part.zone), "")).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 10, INK * Color(1, 1, 1, 0.4))
-	canvas.draw_string(font, Vector2(rect.position.x, caption_y + 101), "HOVER PREVIEWS  ·  CLICK PINS  ·  DRAG TURNS  ·  WHEEL ZOOMS", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 9, COPPER * Color(1, 1, 1, 0.68))
+	CellOutzType.draw_string_compat(canvas, Vector2(rect.position.x + 96, caption_y + 60), verdict, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 110, 13, tone)
+	CellOutzType.draw_string_compat(canvas, Vector2(rect.position.x, caption_y + 84), "IN %s" % str(ZONE_LABELS.get(str(part.zone), "")).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 10, INK * Color(1, 1, 1, 0.4))
+	CellOutzType.draw_string_compat(canvas, Vector2(rect.position.x, caption_y + 101), "HOVER PREVIEWS  ·  CLICK PINS  ·  DRAG TURNS  ·  WHEEL ZOOMS", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 9, COPPER * Color(1, 1, 1, 0.68))
