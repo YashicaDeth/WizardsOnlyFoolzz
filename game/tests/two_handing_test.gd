@@ -45,7 +45,7 @@ func _ready() -> void:
 	var choke_anchor: Node3D = null
 	if cleaver_weapon != null:
 		choke_anchor = cleaver_weapon.get_node_or_null("anchor_choke") as Node3D
-	check(right_hand != null and choke_anchor != null, "the cleaver models a working hand and a choke anchor on the blade")
+	check(right_hand != null and choke_anchor != null, "the cleaver models a working hand and a choke anchor at the bolster")
 	var one_hand_position := Vector3.ZERO
 	if right_hand != null:
 		one_hand_position = right_hand.position
@@ -56,7 +56,7 @@ func _ready() -> void:
 	if right_hand != null and cleaver_weapon != null and choke_anchor != null:
 		var choke_position: Vector3 = (cleaver_weapon.transform * choke_anchor.transform).origin
 		check(right_hand.position.distance_to(choke_position) < 0.05 and right_hand.position.distance_to(one_hand_position) > 0.04,
-			"the working hand visibly leaves the handle and pinches the blade heel")
+			"the working hand visibly moves up the handle against the bolster")
 	hunt._cycle_grip()
 	check(hunt.current_grip == "one_hand", "and B wraps back to the handle")
 	if right_hand != null:

@@ -66,17 +66,17 @@ const GRIPS := {
 		"rest": {"at": Vector3(0.205, -0.255, -0.225), "turn": Vector3(0.52, 0.34, 0.30)},
 		"reach": 1.0, "damage_type": "cut", "control": 0.82,
 	},
-	# A cleaver has a second honest grip: the working hand leaves the handle and
-	# pinches the blade at its heel, just ahead of the bolster. That is choking
-	# up — the same grip a cook uses on a knife, and the same trade a half-sword
-	# makes in miniature: less reach, much more control, because the mass is no
-	# longer swinging at the end of your arm. The off hand stays free; this is
-	# still a one-hand tool.
+	# A cleaver has a second honest grip: the working hand chokes up the handle
+	# to the bolster, taking the mass off the end of the arm. It is the same
+	# trade a half-sword makes in miniature — less reach, more control — and it
+	# keeps the hand on the insulated handle. On this weapon that last part is
+	# not a nicety: the edge is a heating element. The off hand stays free; this
+	# is still a one-hand tool.
 	"choke_up": {
-		"right": {"anchor": "choke", "pose": "pinch"},
+		"right": {"anchor": "choke", "pose": "wrap"},
 		"left": {"anchor": "", "pose": "open"},
 		"rest": {"at": Vector3(0.185, -0.240, -0.235), "turn": Vector3(0.44, 0.30, 0.30)},
-		"reach": 0.80, "damage_type": "cut", "control": 1.08,
+		"reach": 0.86, "damage_type": "cut", "control": 1.05,
 	},
 	"two_hand": {
 		"right": {"anchor": "grip", "pose": "wrap"},
@@ -644,10 +644,9 @@ static func _build_hotline_cleaver(root: Node3D) -> void:
 	_part(root, "cable", _box(Vector3(0.007, 0.007, 0.170)), Vector3(-0.026, 0.004, -0.050), housing)
 
 	_anchor(root, "grip", Vector3(0, 0, -0.060), Vector3.ZERO)
-	# Where the working hand goes when it chokes up: on the flat of the blade
-	# heel, a finger's width ahead of the bolster, before the edge strip and
-	# the housing make the pinch impossible.
-	_anchor(root, "choke", Vector3(0, 0, 0.052), Vector3.ZERO)
+	# Where the working hand goes when it chokes up: forward on the handle,
+	# against the bolster. Not on the blade — the edge is a heating element.
+	_anchor(root, "choke", Vector3(0, 0, -0.010), Vector3.ZERO)
 	_anchor(root, "grip_low", Vector3(0, 0, -0.110), Vector3.ZERO)
 	_anchor(root, "muzzle", Vector3(0.030, 0, 0.320), Vector3.ZERO)
 
