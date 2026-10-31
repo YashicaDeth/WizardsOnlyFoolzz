@@ -382,6 +382,663 @@ either is how this repository became hard to read.
 - **A7.4, does the chassis roll**: still open. Greg's answer was "I don't
   know", so it stays unanswered rather than being decided for him.
 
+### Stated by Greg, 24 September 2026: how fighting, growth and trust connect
+
+Said in one message during the Dust to Bones remaster. His words are
+paraphrased closely; the last list is the assistant's reading, not his.
+
+- **Many fighting styles, switched live.** Martial-art stances, swordfighting
+  stances, and gun and weapon classes, each distinct and fluid, with
+  "insane" graphics on top. Switching stance mid-fight is part of it.
+- **Styles open skill trees, fed by use.** Each style or weapon earns its own
+  experience, called **blood**, from killing with it or using it well.
+  Weapons evolve through fighting experience, not shops.
+- **How you fight decides what survives.** Going bloodthirsty blows bodies
+  apart: organs and cybernetics (loot, not weapons) are destroyed with them,
+  and so are the connections that person could have become on the
+  relationship tree. Better-evolved weapons kill more cleanly for less
+  damage, so skill starts to pay back in loot.
+- **Stealth has its own reward.** In a mission, stealth can bring great loot
+  benefit, against many enemies.
+- **Playing safe can pay too:** working instead of fighting, befriending, and
+  building a diplomatic relationship through proximity chat, missions,
+  interaction and pre-written dialogue choices.
+- **Trust can be spent.** Trust earned by diplomacy makes infiltration and
+  betrayal possible, such as suddenly turning on people who trusted you.
+  His example: working for a military camp that has been oppressing the
+  locals, as in Fallout 4's story, then turning on it. They notice, or a
+  cutscene before the fight plays.
+- **Many small authored interactions.** Brief but featured moments like
+  ambushes and betrayals, in the manner of Shadow of Mordor.
+- **Boss rooms that know what you did.** Walking into a Dark Souls-style boss
+  room; because you know or have tripped certain triggers, a character boss
+  fight or custom cutscene written into that map area plays.
+- **The kinship tree needs reworking** and moving somewhere better than its
+  current key (T opens the Living Kinship Web), unless the key itself is
+  reworked.
+- **Hornee the zombie mutant.** Greg's handmade plush: stitched corduroy
+  body, a bottle-cap eye and a metal-cap eye, pins, a black rose, a camo
+  wrap and a charm on one ear. His edited artwork of it is titled "Zombie
+  Minion". Sources: `C:\Users\Greg\Downloads\20260327_2103{04,09,16}.jpg`
+  (front, front, back), the edited still and the animated edit (36 s,
+  colour cycling between green and orange with a slow warp).
+  - A **trading card** in the Brain Index, zoomable, using the artwork's
+    textures, text, colour and type, with TouchDesigner-style effects.
+  - Also a **spinnable 3D recreation** of the plush from his photos,
+    switchable from the card ("the live thing"), with slight effects on the
+    model so the two read as one. He will send more photos if needed.
+  - **A minion that fights:** a small companion mutant or pet. The
+    inventory needs a slot for it, where you customise and look at your pet.
+
+Answers to follow-up questions, same day:
+
+- **Stealth is its own fighting style** with its own blood and its own tree.
+- **The Kinship web becomes a tab in the Tab hub**; T is freed.
+- **Job posters are pasted on walls** in the Hunt, with tear-off tabs you
+  take as a job. **Business cards are handed over by people you meet**,
+  kept in Carry, and add a contact on the Wire.
+
+- **The pyramid becomes 33 tiers** and is rebuilt as a 3D structure in the
+  World Index that you spin, zoom and fly into, heavily inspired by the
+  Shadow of Mordor / Shadow of War Nemesis army screen: "a subtle pyramid of
+  different ranks". The reference is for layout feel only; the art is original.
+  - **33 tiers in total:** 16 up, the waist (you), 16 down, keeping the
+    existing double pyramid (Ascent above, Corruption below).
+  - **Horseshoe power:** the tip at the top holds the most power, and so does
+    the tip at the bottom, "being the most scum or worst of whatever". The wide
+    middle is the crowd.
+  - **Filled with everyone the world simulates, plus generated crowds** so it
+    feels massive, the crowds densest in the middle tiers.
+- **The World Index UI** is too small and cramped, overlaps and clips, is hard
+  to navigate and looks dated. All four, to be fixed in the remaster.
+
+- **The first 30 minutes** (Greg, in a chat with a friend he shared the same
+  evening): "30 minutes of gameplay that leads with a strong story and
+  gameplay bond", made of:
+  - character creation, cutscenes and story;
+  - a gameplay intro that teaches the basics while you escape the facility;
+  - **multiple routes out** of the facility, still to be fully made;
+  - **the derby is soft-scrapped and shelved as a different exit route**:
+    a lower level of tunnels and drain networks, "super old", that brings
+    you out in a different part of the map, so the overworld begins
+    differently depending on how you left.
+
+### Answered by Greg in question boxes, 24 September 2026 (night)
+
+Asked in the Code tab because the Dust to Bones page's saved answers sit in
+another account's organisation and could not be read from this one.
+
+- **Death: you are reborn in a vat.** Whoever owns your body grows you back;
+  the world does **not** rewind, so dying has consequences in it. This
+  answers the page's `story-death` and replaces the opening's ordinary
+  reload once it is built.
+  - **And the character preset is kept**, so a death never costs a trip back
+    through character creation: "don't forget the save character preset so
+    you can reload it if you die without wasting time". `CharacterPresets`
+    already has `save()`, `names()` and `apply()`, and the intake's PRESET
+    route already reads them — but nothing in the game ever *saves* one, so
+    the route answers "NO PRESET ON FILE" for everyone. The work is wiring,
+    not building.
+- **Routes out, for the demo: just the two that are built** — the heat
+  elevator, and the drain tunnels the derby became. More routes later.
+  Answers `rm-routes` for now.
+- **The loose opening pieces: the biometric door and the guard's gun
+  first** (AX route beat 5, AX3.3–AX3.4). `BiometricBarrier` and
+  `FacilityGuardLoadout` are written and tested and have no production
+  caller. The honest opening death and the mosaic option wait.
+  - *Built 24 September (assistant placement, not yet Greg's call):* Hollis
+    stands at a biometric D-section door across the Service Arcade, between
+    the staff card and the pressure gate. With the ram at his chest he palms
+    the reader himself and drops the gun; rammed down (three swings), his
+    hand is dragged to the reader. Either way his gun goes into Carry with
+    three rounds. His shots bleed the player to 25% and no further until the
+    vat rebirth exists. Removing his hand waits on a blade. Open: where the
+    door should really sit, and whether the ram should be able to force it.
+- **Merge once verified.** Each look lane merges into this branch one at a
+  time with the core suite re-run after every step, then this branch goes
+  into `codex/primary`. Answers `rebuild-merge`.
+- **Sequence.** When the first 30 minutes work end to end, both routes
+  included and out into the overworld, the next thing is **the next 30
+  minutes**: "furthering the tutorial and starting stage of the gameplay".
+  Nothing in minutes 30–60 is started before minutes 0–30 are right.
+
+### Answered by Greg in question boxes, 24 September 2026 (cloud session)
+
+- **Hollis's door wants tissue.** The breach ram cannot force the D-section
+  biometric door; only his hand, his body, removed anatomy or (later) an
+  implant spoof opens it.
+- **Hollis escalates.** Asked whether his gun should warn, wound or kill,
+  Greg picked all three; read here as an escalation: warning shots first,
+  wounds if you keep coming, and lethal once dying exists (then vat rebirth,
+  and he remembers you). The current build does wounds only, floored at 25%.
+- **Rebirth: you wake in the vat of whoever claims you.** Whichever faction
+  holds your debt or your body at the time grows you back (CellOutz, a
+  rival, a cult), so where you wake depends on who owns you.
+- **Nothing carried survives death.** Gear, the gun and clothes stay where
+  you died, to be looted or recovered; the body resets. The character
+  preset, memories and the world's record of you carry over.
+- **Hollis's look:** placeholder now; fix clothing so garments actually
+  render on every rig (today they show only as a thin outline); a real
+  CellOutz security model later, one Greg provides or picks.
+- **Build order asked for: all of it.** Death as vat rebirth with the preset
+  saved; the opening's wires beat (END ALL SUFFERING, tear the umbilicals
+  out, GET REVENGE) ported onto the reworked vat; the lab's lighting and
+  floor light glitch; the VFX pack.
+- *Built 24 September (the wires beat):* the drain no longer breaks the glass.
+  The body hangs in the four umbilicals under END ALL SUFFERING while the
+  tank's clock stops; the player looks at a wire and presses E, and the third
+  tug tears it out (pain, blood, its own sound). GET REVENGE follows the last
+  wire, and then the glass goes. A regrown body goes through it too.
+  Assistant choices, open to Greg: three tugs per wire, and that neither title
+  has a speaker (CellOutz's slogan or the player's own impulse is undecided).
+- **Workflow:** merge each verified piece into `claude/dust-to-bones-look`,
+  and send a split-zip Windows build after each piece.
+
+### Answered by Greg in question boxes, 24 September 2026 (routes out)
+
+- **The heat elevator goes up to the overworld.** With the derby shelved
+  as an exit, the Lower Works lift carries the player up and out into the
+  Ashbloom Expanse near the facility, not into the colosseum heat.
+- **The drain tunnels are a new walkable route:** an old ("super old")
+  drain network reached from Lower Works that surfaces in a different part
+  of the map, so the overworld starts differently depending on how you
+  left. These are the demo's two routes out.
+- **The floor light glitch was the pale pixel disc under the broken tank**
+  (the breakout puddle). Fixed: a dark, wet puddle.
+- **Job posters and business cards wait** until minutes 0-30 work end to
+  end; they live in the Hunt.
+- *Built 24 September (assistant choices, open to Greg):* the heat
+  elevator surfaces at the old vehicle-sallyport point the derby used; the
+  drain hatch sits on the Lower Works floor east of the lift; the drains are
+  laid out as the three districts `FacilityRoutes` already named for the
+  maintenance ascent (waste gallery, maintenance cistern, storm outfall) and
+  surface where that route always said (west of the start), carrying its
+  relationship changes (Gate Lanterns up, CellOutz down). Nothing threatens
+  the player in the drains yet.
+
+### Answered by Greg in question boxes, 24 September 2026 (what next)
+
+- **Next, all four, then minutes 30-60:** a better examiner model and the
+  readable name line on the intake; animated, skeuomorphic intake pages;
+  the combat overhaul; and threats in the old drains so the second route
+  costs something. Once these are done, minutes 0-30 count as right enough
+  to start minutes 30-60 (furthering the tutorial and the starting stage).
+
+### Answered by Greg in question boxes, 24 September 2026 (the examiner)
+
+- **The examiner has an ordinary human face**, not the player's grown-wrong
+  tank face: matched eyes, no exposed teeth.
+- **His coat is stained and bloodied** from the procedures, not clean white.
+- **The name line becomes a proper header** over the vat panel, bigger and
+  more prominent than a caption.
+- **Better lip sync now:** jaw and lips move with the vowels and consonants
+  of what he is saying, on the new face.
+
+### Answered by Greg in question boxes, 24 September 2026 (intake GUI)
+
+- The SUBJECT / TANK name header is its own band above the vat picture.
+- The examiner reads well now (ordinary face, stained coat, lip sync): keep.
+- Next on the intake GUI: animated tabs, the answer box and transcript, and
+  the stats strip. Keep the current red/copper palette and CellOutz type.
+
+### Answered by Greg in question boxes, 24 September 2026 (intake GUI detail)
+
+- **Tabs print in:** switching to an intake tab feeds the page out line by
+  line like a thermal receipt printer, ink still wet.
+- **Answer box:** his line bigger and typed out at reading pace with a
+  cursor; answers drawn as blink choices (eye icons), not plain buttons;
+  earlier lines kept above as a faded scrolling transcript.
+- **Stats strip:** each stat a small gauge that fills, animating when a
+  choice changes it, with the change flashing (+0.4).
+- A new Windows build after these three.
+
+### Answered by Greg in question boxes, 24 September 2026 (in-game HUD)
+
+- Next GUI pass: the in-game HUD (vat, arcade, Lower Works, drains).
+- It becomes a **body-cam OSD**: REC dot, timestamp, vitals as a thin
+  readout, the objective as a stamped line; matching the Outlast lab look.
+- Prompts become a **drawn [E] key cap with the verb, placed near the thing**
+  in the world, not a line of text at the bottom.
+- The intake is good for now.
+
+### Answered by Greg in question boxes, 24 September 2026 (blood)
+
+- **Blood comes from all of:** kills, damage dealt, your own blood lost, and
+  finishers, which pay the most. (His earlier words: fighting "unlocks the
+  understanding of the blood based combat point and blood fuel xp for weapon
+  combat trees unlocking stuff".)
+- *Built 24 September (assistant proposal, open to Greg):* `BloodLedger`
+  credits blood per weapon from what `WorldHistory` already records (hits,
+  kills, executions, the player's own blood dropping, Hollis rammed down, the
+  Lower Works sentinel breached), so the first fight pays out on arrival in
+  the Hunt. Four placeholder trees, BLADE / BLUNT, IRON, MEAT and HUSH
+  (stealth, credited when nobody can see you), spend a style's blood as fuel;
+  key 7 in the Hunt opens them. Proposed rates: 1 blood per 4 damage dealt,
+  12 per kill, 15 per takedown, 30 per finisher (replacing the kill), 1 per
+  40 ml of your own blood. Only the blade and gun nodes change numbers so far
+  (cleaver damage and cooldown, every gun's spread, reload and damage); the
+  martial and stealth nodes are recorded but not wired. Open: node names and
+  effects, the numbers, spend-as-fuel versus unlock-at-threshold, and the key.
+
+Open: one of Hornee's eyes is a real drink brand's bottle cap with its
+wordmark. Keep it on the shipped model, or swap it for an in-world mark?
+
+Assistant reading, not confirmed: this is one loop. Blood XP rewards
+fighting; precise, evolved weapons protect the loot and the people a
+fight would otherwise destroy; kinship and trust are the other currency,
+earned by not fighting and spent by betrayal. The ambiguities worth asking
+about are whether diplomacy has a tree of its own, and whether "many
+enemies" means stealth missions field more of them.
+
+### Answered by Greg in question boxes, 25 September 2026 (morning)
+
+- **His Instagram art (Allusions Too Grandeur) gets all four**: a place in
+  the game as found art (facility posters, Wire pages, loading screens, the
+  Allusions artwork panel); a matching post style from the game's look (rune
+  seal, CellOutz type, a number, bloody dither); captions and hashtags in
+  the game's voice; and animated loops for Reels. First piece shared: a
+  burnt-out inverted photo with carved type, "I have gone totally insane
+  and lost the plot... grant me passage through this prison and liberate my
+  soul", and the rune seal.
+- **Menus stay with the PC sessions** (FIRST_30_MEGA owns the title screen,
+  boot, logo and demo end card); the cloud session works on gameplay so the
+  two never edit the same files.
+- **"Partly destructible" means authored damage stages**: walls, floors and
+  building pieces crack, hole and break through in stages with real debris,
+  and shooting or blasting the ground leaves impact holes. Not Teardown-style
+  material removal.
+- **First today: every route out working end to end.**
+
+### Answered by Greg by voice, 25 September 2026 (the overnight questions)
+
+- **The doctor's name is withheld** in minutes 0–30; the name is the reward
+  for following him to the roof. One line of his history can be found in his
+  examination room.
+- **The doctor's lines** (two when questioned, four in the 3D call): Greg
+  writes these himself; he is the story's first villain. Placeholders stay
+  until then.
+- **Bingyanger lines: five per register** (horror, funny-insane, prophetic).
+  "Bingyang" is a joke name for now and may change later.
+- **Blood trees keep the four-style structure** (BLADE/BLUNT, IRON, MEAT,
+  HUSH); the node names get renamed.
+- **The splinter monks trade** visions, map knowledge and hidden things, and
+  also items and companions (for example the zombie minion), for blood and
+  memories.
+- **The spirits stay ambiguous**: the monks call them the light of the dead;
+  the game never confirms it.
+- **Wizard eyes** (new): once earned, a key used with the phone (L or K)
+  switches from phone vision to wizard eyes, which shows every spirit. It is
+  like seeing into the Wire.
+- **The Wire's people** (new): everyone on the Wire has a different online
+  persona: an alias, an account, a custom avatar (procedural pixel art and
+  generated assets) and website lore.
+- **Why the splinter left**: they believe they reached the last stage, and the
+  guild calls it heresy.
+- **Calling rules kept**: anyone you have met; the dead don't answer, the
+  doctor always refuses, enemies refuse and screen you, friends accept.
+- **One Hollis only**, at the end of the Support Unit. The Service Arcade's
+  door guard becomes a numbered CellOutz guard.
+- **The doctor route's surface arrival** stays at (-20, 0, -30), CellOutz -12.
+- **Balance waits** until Greg has played v0.1.
+- **Sketchfab**: Greg can't drop the zips; he asked for them to be found and
+  fetched another way.
+
+### Answered by Greg in question boxes, 24 September 2026 (after the lanes)
+
+- **The blood waterfall is where the derby tunnels come out**, as he
+  described: crash in the derby, drive the GTA-style tunnels, surface at the
+  waterfall. The walking old drains keep their own storm outfall.
+- **The doctor leaves through the door behind the vat**: the player watches
+  him walk out through the door they will break down. One door, one revenge.
+- **Blood opens the trees both ways**: small nodes open by themselves once a
+  weapon has earned enough; bigger ones cost blood, spent as fuel.
+- **Random events often, GTA-style**: roughly one every one to two minutes,
+  so the world feels crowded and crazy.
+
+### Answered by Greg in question boxes, 24 September 2026 (the Support Unit)
+
+- **Guards are numbers only**: CELLOUTZ SECURITY 04, 11, 17 and so on.
+  Faceless staff; Hollis is the one with a name.
+- **What the Unit does to bingyangas: all four.** Harvesting (organs and
+  fluids, which CellOutz sells back), reconditioning (screens, sound and chip
+  pulses trying to rewrite the mutation into a sellable body), testing
+  (weapons, drugs and implants tried on them first), and keeping them for
+  the derby (fighters and crowd meat for the underground heats).
+- **Camera hacking, once earned, is look and hold**: with the rewritten
+  implant, hold a key on a camera and it loops its feed for 20 seconds with
+  a sigil glitch on the lens. *Built:* Q held 1.2 s; "earned" is read as
+  `implant_seized` from the breakout (assistant reading).
+
+### Answered by Greg in question boxes, 24 September 2026 (the drains)
+
+- **Something hunts you in the old drains**, so the second route costs
+  something the way the sentinel does on the lift route.
+- **It is a bingyanger, freed long ago**: an escapee from an earlier cycle,
+  always hostile, living in the drains. An exception to "bingyangers are only
+  the ones you free".
+
+### Answered by Greg, 24 September 2026 (cloud session: lore, routes, the first hour)
+
+Recorded in the lane-6-based cloud session and merged here; where this and
+the sections above disagree (rebirth, where Hollis stands), the sections
+above were built on the remaster and win until Greg says otherwise.
+
+- **Bingyang, bingyangas, bingyangers.** Bingyang is the madness and mutation
+  the vats and the torture produce. A **bingyanga** is a mutated vat subject
+  held and tortured in the facility's Mental and Physical Support Unit,
+  insane like Outlast's asylum patients. A **bingyanger** is one the player
+  has freed: mutated like a Fallout ghoul, clinically insane, talking in
+  crazy voice lines, and randomly friendly or hostile, re-rolled every
+  meeting. They come from the same vats as the player. Full definitions,
+  decisions and open questions: `DESIGN/BINGYANG.md`.
+
+- **A third way out: chasing the doctor.** Break down the door behind your
+  vat with any weapon (destruction physics, wanted as soon as possible),
+  chase him to his vehicle bay, and find he is a hologram. He calls you in
+  3D from the elevator and the roof helicopter, and you come away with
+  information, a task and a cybernetic that lets you call and summon NPCs
+  from the Brain Index, Sims-phone style.
+- **The derby route, in full:** after the crash, get out or keep driving
+  through a gate into GTA-style tunnels, out to a drain exit at a dried-up
+  waterfall of blood and gore with destroyed trees. Both routes:
+  `DESIGN/ESCAPE_ROUTES.md`.
+- **Arriving and exploring.** Every exit gets a real reveal: the camera
+  rises from where you came out, sweeps the overworld and marks the nearby
+  settlements. Hundreds of GTA/RDR2-style random events are generated from
+  written parts, each a mini cutscene that can become a quest, a trade or a
+  boss fight (a crazed driver, wizard monks casting hologram-like spirit
+  visions). The monks are a splinter of the wizardsonlyfoolz, dressed as
+  Orthodox monks in blood-stained, creased habits with destroyed sigils. An
+  in-game curiosity bot plays for hours to learn which exploration is the
+  most fun. See `DESIGN/OVERWORLD_EVENTS.md`.
+- **The shape of the first hour.** The facility breakout is the first 30
+  minutes and is itself a subtle tutorial. It bridges into 30 minutes of
+  overworld that still teach, quietly, and that segments into complete
+  personal exploration.
+
+### Answered by Greg in question boxes, 24 September 2026 (skins, cases, the jester)
+
+Greg: "first thing do clothes and the inventory model weapon and skins and
+cases using textures make a csgo case type thing with gun and knife skin
+raritys with gold being the 0.01% make it sellable on economy for heaps",
+"make the jester outfit clothing parts you can put on", and "then from there
+we can make nudity and censors".
+
+- **This comes first**, ahead of the rest of the first-30 checklist.
+- **Cases come from loot and from the shop:** they drop from bodies,
+  contracts and caches, and can be bought with scrip.
+- **A CS-style rarity ladder**, with the game's own tier names: 79.92%,
+  15.98%, 3.2%, 0.63%, 0.26%, and **gold at 0.01%**.
+- **Skins go on** guns, knives and blades, clothes (jester parts included)
+  and the breach tool / ram.
+- **Skins sell on a market on the Wire** for in-game scrip, priced by
+  rarity, wear and how many exist in the world. Gold sells for a fortune.
+  No real money.
+- **Skins are procedural patterns made in the engine**, each drop with its
+  own pattern seed.
+- **Wear rolls on the drop and keeps wearing:** fighting scuffs and bloods
+  a skin further, and clean ones sell for more.
+- **The jester outfit is four parts you put on:**
+  - the belled cap
+  - the ruff collar with the motley doublet
+  - gloves with sleeves
+  - pantaloons with curled shoes
+- **It is forced on, then yours:** the facility dresses you in it with a
+  locked collar. Once you break the lock, every part is an ordinary item
+  you can wear, remove, skin or sell.
+- **Next after this:** nudity and censors, building on the explicit /
+  mosaic presentation option (`AnatomyPresentation`).
+
+### Answered by Greg in question boxes, 24 September 2026 (what next, the censor)
+
+- **Order:** nudity and censors, then rebirth from every killer in minutes
+  0-30, then the Brain Index hub, then the combat overhaul ("all of that
+  above in that order").
+- **The censor is a body-cam glitch**, not a mosaic or black bars.
+- **It is on by default.** It turns off in the title screen's settings.
+- **Merge the HUD, the spine, the sites and the skins** into
+  `claude/dust-to-bones-look`. Done at `6c09d4c`.
+- *Built (assistant proposal, open to Greg):* the chest, groin and buttocks
+  are simple, clinical forms shaped by the intake's ANATOMY answer and the
+  body's frame. They show only where no clothing covers them (`BodyForms`).
+  When the censor is on, each exposed region sits under a volume that
+  re-reads the screen as a tearing, scanlined body-cam feed
+  (`censor_glitch.gdshader`).
+
+### Answered by Greg in question boxes, 24 September 2026 (derby loss)
+
+- **A wreck in the derby is a capture; a crush is a death.** Losing the
+  derby normally keeps the existing capture: the Captain drags you out
+  alive, and you arrive in the Bone Yard as her prisoner. If the killing
+  blow slams the hull well past zero (a crush), you die, and you regrow in
+  the vat of whoever claims you, now the Captain.
+- *Built:* the Lower Works sentinel and the drain bingyanger no longer stop
+  at a quarter of your blood. They can kill you, and you wake in a vat.
+  Your old body stays where you fell (`RebirthSite`), with what you
+  carried and any jester parts you wore, and E beside it takes them back.
+
+### Answered by Greg in question boxes, 24 September 2026 (the combat overhaul)
+
+- **Swing direction is a mouse flick at the click,** as in Mordhau or
+  Chivalry: the way the mouse is moving sets the swing (overhead, left,
+  right, stab, underhand, anything between), in first and third person.
+- **Blocking is directional, with parry timing.** Hold block and point the
+  mouse toward the incoming swing to stop it. Block just as it lands to
+  parry and stagger. The wrong side goes through.
+- **Learning the skill curve, all four:**
+  - telegraphs you can read (wind-ups show direction; faster fighters
+    telegraph less)
+  - a sparring partner in the Hunt
+  - moves (feints, combos, counters) that unlock through the blood trees
+  - a stats readout after a fight
+- **The difficulty tiers are who you fight:** scavengers, hunters, Ashline
+  captains, elites. Each has measured block, parry and feint rates, tuned so
+  a skilled player can beat each tier. There is no menu setting.
+- **Anyone can block** (Greg, in answer to whether an enemy who hasn't
+  noticed you can defend): the tier decides it whether or not they are
+  aware. A fighter inside their own wind-up is always open.
+- *Built (assistant proposal, open to Greg):* a sparring post near Nix in
+  the Hunt. E brings out a partner of your tier, and blows are padded:
+  they count, they don't wound. First to five clean hits wins, and the next
+  partner is a tier higher. After each blow and each bout, the partner says
+  what beat you.
+- **The blood-tree moves** (Greg picked one per tree, plus COMBO):
+  - Blade / Blunt: **FEINT** and **COMBO** (under FEINT).
+  - Meat: **RIPOSTE**.
+  - Iron: **HIP COUNTER**.
+  - Hush: **BACKSTAB**.
+- *Built (assistant's reading of each move, open to Greg):*
+  - FEINT: raise your guard during your own wind-up. The swing is cancelled
+    for 12 stamina, and anyone within 4.5 m bites: your next blow on them
+    can't be stopped.
+  - COMBO: after two clean hits on the same fighter, a third within 1.4 s
+    always lands. A blocked hit breaks the chain.
+  - RIPOSTE: after you parry, your next blow within 1 s can't be stopped.
+  - HIP COUNTER: parry with a gun in hand and it fires point blank into the
+    attacker. It spends a real round, and an empty or jammed gun only
+    clicks.
+  - BACKSTAB: a blow from behind on a fighter who hasn't noticed you can't
+    be stopped and does triple damage. This is the one exception to "anyone
+    can block", and only once the node is bought.
+  - Each move costs 60 blood (COMBO costs 90) and needs its tree's first
+    node. The fight readout counts the moves you used.
+
+### Greg, 24 September 2026 (the examiner's placement)
+
+- **The examiner and his PC stood in the middle of the vat aisle.** Greg
+  asked for somewhere more realistic.
+- *Built (assistant's placement, open to Greg):* the workstation is a
+  monitoring post off the aisle, to the right-front of the tank, turned to
+  face it. The screen is the terminal aimed at the subject, which is what
+  the intake is shown on. He works it from the end of the desk, and walks
+  round its corner and past the tank to his door (`station_placement_test`).
+- **Greg confirmed (question boxes, 24 September):** keep the desk beside
+  the tank; the screen faces the tank; work continues straight down
+  `DESIGN/GOAL_LOOP_2.md`.
+
+### Greg, 24 September 2026 (the logo, menus and the big checklist)
+
+- **The real logo re-animated, in the splash and on the title screen.**
+  Built as `logo_fx.gdshader`.
+- **Its strength stays as it is:** strong on the burn-in, calm behind the
+  menu.
+- **Next, all of the above:**
+  - keep working the checklist
+  - grow it toward 1,000+ lines
+  - more logo detail (embers, sound) at the same strength
+  - menus rebuilt to match the logo's style
+
+### Stated by Greg, 25 September 2026: bodies, destruction and chaos magick
+
+Said across one evening of messages, then set as the session goal. Close to
+his words; the assistant's reading is not mixed in.
+
+- **The body in the vat floats.** Suspended in the liquid, limbs loose, a slow
+  drift and bob, "not just sitting, rod up his ass type of look". The same
+  for the specimens in the other vats.
+- **The vat-room computer sits to the left or right of the lab,** not
+  directly in front, so the doctor's feed on the left of the screen has a
+  reason to be there.
+- **The slideable X-ray looks like version 0.1.** It should match the anatomy
+  loading screen, built from the body models with full, accurately
+  proportioned organs "like it's Sniper Elite 4 or 5", with gritty texture.
+- **Penetration is live and shown.** Bullets and weapons destroy organs and
+  break bones in the real anatomy, and the kill cutscenes cut to X-ray inside
+  the body as the round or blade enters, "most accurate and gorey visceral".
+- **Harvest.** You have to cut bodies open in certain ways, or kill them
+  without damaging the body, to steal organs to sell or use, and cybernetics,
+  loot and money. "It's all destructible from how hard you play."
+- **Teardown-style destruction.** The whole world's surfaces have
+  differentiating levels of hardness and destructibility, and this interacts
+  with the in-game body models and gore.
+- **Blood chaos magick.** "The more you mindlessly destroy, the higher the
+  combat and blood chaos magick system rewards you for pushing the limits of
+  combat." Chaos magick spells: holograms, summoning evil skeletons and dead
+  soldiers ("dead souljahs") to fight for you, casting fireballs, with
+  TouchDesigner-style effects replicated as in-game VFX and casting
+  animations similar to Elden Ring and modern spell casting. Spell names and
+  rules are his to give.
+- **The kinship web is overcomplicated.** It should read as a brain neural
+  network with CRT effects and good UI.
+- **The pyramid is not visualised in the index yet.**
+
+### Greg, 25 September 2026 (after the breakables): a partly destructible world
+
+Asked what "Teardown-style" should mean now that props break (his words):
+"now all the world will also be partly destructible buildings the ground
+ect, if you shoot downwards with a gun or if you blow up the ground there
+will be an impact hole".
+
+- **The world is partly destructible**: buildings and the ground, not only
+  props.
+- **The ground takes holes**: a round fired down into it leaves an impact
+  hole, and blowing it up leaves one too.
+- *Open (assistant's question, not his rule):* whether "partly" means
+  authored damage stages on each surface (`DESIGN/DESTRUCTION.md`) or
+  material really coming away as in Teardown. Asked alongside the first
+  render of a ground hole.
+- **Answered (question box, 25 September evening), for the ground:** shown
+  buckshot, pistol, slug and rifle holes in the Hunt, he picked "yes, keep
+  these" over bigger and rougher holes or a ground that really deforms. So a
+  hole in the ground is a drawn pit with a dirt lip and thrown clods, sized
+  by the round, and the ground itself does not give way. It agrees with his
+  morning answer (question boxes, 25 September morning, above): "partly
+  destructible" means authored damage stages, and not Teardown-style
+  material removal, for buildings as well as the ground.
+
+### Greg, 25 September 2026: the New Vegas opening, again
+
+He sent the Fallout: New Vegas opening (Doc Mitchell's house) with "this
+whole opening segment from like personality test part is awesome".
+The frames he picked: waking to a blurred, overexposed view; the doctor
+sitting and talking to you; entering a name; building the face in a
+mirror device; setting stats on a carnival strength-tester machine; the
+doctor's word-association and picture questions, whose answers pick your
+skills; then the skills page.
+
+- **What he likes is the shape**, and `DESIGN/CHARACTER_CREATION.md` already
+  names Doc Mitchell as the model for the vat intake: the whole character
+  sheet is built inside a scene that is also the story's first beat, by
+  someone questioning you.
+- **The personality test part is the part he singled out.**
+- *Reference, not layout* (his standing rule): nothing of New Vegas's
+  machines, questions, mascot or rooms is reproduced. Our instrument's items
+  are original and already written (`CharacterSheet.ITEMS`).
+- *Found (assistant):* that instrument is built and scored
+  (`CharacterSheet.score_instrument`, `aptitude_verdict`) but has no caller
+  outside `sheet_test`. Picking INSTRUMENT on the intake form does nothing,
+  and neither does CHART. Proposal in `DESIGN/GOAL_LOOP_2.md` A.
+
+### Greg, 25 September 2026 (the opening, the look, the tools)
+
+The full direction is in `DESIGN/OPENING_TORTURE_INTAKE.md`. In short:
+
+- **Loading in is torture:** muffled screaming, something forced into your
+  mouth, memory flashes, and a voice: "hundreds of years of the perpetual
+  post-apocalypse", glitching out.
+- **The doctor taps the glass,** then appears on the left screen: "you're
+  going to do a psychology test for me ... tell me your birthday ... hurry up
+  now, I'm being watched too." The cameras zoom in, seen on the depth map and
+  the X-ray.
+- **V is your real microphone.** Your spoken thoughts are read through the
+  brain chip: "we own you".
+- **The test is your birthday.** He reads your birth back to you, then asks
+  your fighting style.
+- **The intake GUI** is like Fallout: New Vegas: images, customization, big
+  stat indicators, no wasted space. Greg replaces textures with his art.
+- **The look:** Alien Isolation, Outlast 1 and 2, Resident Evil, Silent Hill
+  1 and 2, Cruelty Squad. Old low-poly horror, old-internet gore, a
+  surveillance state, and blatant esoteric symbolism (sigils, demons, Baal).
+- **Assets are human-made and free, not generated.**
+- **Tools Greg named:** Higgsfield, Ponytail, Agent Skills, game-dev agent
+  skills, Mento. How each is used is open (see the questions in the opening
+  doc).
+- **The playtest of the 30-minute demo comes first.**
+- **Higgsfield: generate with it (Greg, 25 September, overriding the
+  "human-made only" line above).** "Let them all use Higgsfield to
+  generate." Every agent may generate art, models, textures and assets with
+  Higgsfield.
+  - Each generated asset is logged in `game/art/GENERATED.md`: tool, prompt,
+    date, and what it's for.
+  - Greg's own art is never overwritten, and wins wherever it exists.
+  - Human-made CC0 and CC-BY assets are still welcome, credited in
+    `CREDITS.md`.
+- **Question boxes (25 September):**
+  - **Build first:** all four opening pieces (the torture load-in, the
+    breakout, the birthday test, real-mic V).
+  - **Voices:** generated in Higgsfield.
+  - **Higgsfield makes:** sigils and the rune, the doctor, anatomy X-ray
+    plates, and the vat and lab. The prompts are in
+    `DESIGN/HIGGSFIELD_PROMPTS.md`.
+  - **Ponytail and Mento:** Greg will send links, and wants help writing
+    precise prompts for them.
+- **Generated art is masked as code (25 September).** Enhance Higgsfield
+  images, then run every generated image through effects so it reads as
+  code and effects, not AI imagery ("TouchDesigner gfx"). (rec) A Godot
+  shader does it live in the game; Greg may also render loops in
+  TouchDesigner on his PC. Prompts for the rest of the demo (maps, gore,
+  loading screens, the phone and its apps, the Wire personas, the pyramid)
+  are in `DESIGN/HIGGSFIELD_DEMO_PROMPTS.md`.
+- **The vat on the right is one big 3D vat you're inside,** full of real,
+  smooth-running liquid (blood, water, fluids), not stacked rings. You're
+  tortured in it: wires in your head, the implant, a tube in your mouth,
+  zaps that flash your organs.
+- **Customization as deep as Bloodborne:** fine face shapes, skin and
+  clothing on Greg's textures, genitalia options (none, asexual, chosen, with
+  size, and the blur), your blood, and your cybernetics. Every choice shows
+  on your body in the vat.
+- **The look comes from the concepts, not the concept images (26 September).**
+  "Reconceptualise the current look of the game" from the Higgsfield set
+  "without making things feel really AI gen"; "pick the distinct and similar
+  enough ... with a grain of salt, there's a lot I don't like, but a lot I do
+  like". Which were kept and set aside, and what was measured:
+  `DESIGN/LOOK_FROM_CONCEPTS.md`. Answered the same day:
+  - **Subtler**: the world renders at full resolution, and the dither only
+    shows in fog and light falloff (not the chunky 2x or 3x framebuffer).
+  - **Not a setting**: the look is the game, always on, like the fog.
+  - **Tune next**, in order: the doctor's office, the heat lift shaft, the
+    surface once played, the derby and the dry falls.
+
 ## Influence register
 
 These entries describe what Greg said he values; proposed extraction is labelled. Liking a reference does not automatically import every mechanic from it.
@@ -449,3 +1106,472 @@ World rules; realm identity and transition rules; what persists across realms; d
 - User's shared conversation: https://chatgpt.com/share/6aa02558-6538-83ec-8ddc-96f57f5ba58d
 - Clarifications and references in the current Codex conversation.
 - HAVKER-MAN X developer description: https://store.steampowered.com/app/3645540/HAVKERMAN_X/
+
+- **Camera signals and the vision modes (Greg, 26 September).** "The blue CCTV
+  camera things are not it, make it send invisible signals that you can only
+  see in those special K and J modes." Question boxes, same day:
+  - **K = wizard eyes**, a toggle. **J = depth / X-ray scan**, held. The phone's
+    camera vision shows the signals too. Both modes unlock at the brain hack.
+  - **They reveal** camera signals, spirits (wizard eyes), bodies through walls
+    (depth), hidden things (secret doors, stashes, weak walls), and wires and
+    power.
+  - **Cost:** free, but the view degrades the longer you stay in.
+  - **Wizard eyes look** like the wizard eyes in Adventure Time's Ice King
+    episodes (Greg's reference; the art is original, not copied).
+  - **Detection:** only hacked cameras notice you using the modes.
+  - **Hunt keys move:** inventory to Tab; re-decant to holding K.
+    *Built:* Tab = inventory (O still works; Tab still cycles the phone's
+    apps while it is raised). Tap K = wizard eyes, hold K 1.2 s = re-decant,
+    hold J = depth scan, in the Hunt as in the opening. *Assistant's choice,
+    open:* the Brain Index hub moved from Tab to Shift+Tab, and the Allusions
+    artwork is on F9 only.
+- **Performance (Greg, 26 September):** asked for "60 fps to 160 fps". After
+  the performance pass, build `a866957` reads about 160 fps on the F10 counter
+  everywhere (vat room, Support Unit, sewers, Hunt, menu) on his NVIDIA RTX at
+  144 Hz+. Hold that as the floor for new work on his machine.
+- **Wires and power (built on the master prompt's recommended answers, open
+  to Greg):** power lines glow and pulse in K/J toward what they feed; once
+  seen, E at the junction cuts one. Vat room strips go dark; Support Unit
+  cameras go blind without the noise of smashing them.
+- **Hidden things (Greg, 26 September, question boxes 6-9):** stashes hold
+  meds and ammo; secret doors open with E once seen; five to eight hidden
+  things in the first 30 minutes; plain eyes get a faint hint (a hairline
+  seam). *Built:* seven (the weak wall; stashes in the vat room, Support Unit,
+  drains and Service Arcade; a Support Unit closet behind a secret door with
+  a second stash). A stash gives a field dressing and four rounds, into the
+  gun if you carry it, otherwise loose.
+- **Question boxes, 26 September (third set, Greg's answers):**
+  - *Movement:* climb stays 1.55 m. Sprint in the vat room, weaker and growing
+    as the body recovers. A crouch-slide: sprint + Ctrl, about a second, a
+    little noise. Fall damage: small, only over 2.5 m, at most 15 blood.
+  - *Timed run:* "working" means no crash, no dead end, under 30 minutes. The
+    run timer is hidden, shown on a card at the end with time per area.
+  - *Kept as built:* the weak wall leads past the arcade gate; the Hunt's
+    Brain Index hub stays on Shift+Tab; the nosebleed stays.
+  - *Sound:* K = a low choir hum that swells with strain; J = a sonar ping
+    with the sweep; the weak wall crumbles with a dust puff, hatches creak,
+    wires spit sparks.
+  - *Wires:* cutting a live one can shock you (8 blood and a flash) unless
+    you saw it in K first. A dead camera or light brings one guard to check
+    for about 20 seconds, then back: a lure.
+  - *The examiner:* an optional fight (revenge OR escape) in his office past
+    the staff door. Surgical tools and a syringe that slows you. Win: his
+    keycard and coat. Lose: back in the vat, and he keeps the coat.
+  - *Meds:* hold 4 to bandage, a few seconds, heals 20, no fighting while
+    you do it. Loose rounds load into any gun you find.
+  - *Gore:* full by default; everywhere (vat room and Support Unit too);
+    remains stay, capped, oldest removed first; hitstop as it is.
+  - *Art:* all four placeholder categories; media through LFS once
+    `lfs.github.com` is allowed in the cloud environment; terrain_3d
+    restored, pinned.
+  - *Process:* merge to Play-Latest after every finished piece. Next in the
+    Claude lane: "all above" (sounds, phone signals, more opening beats,
+    the wizard-eyes look).
+- **Question boxes, 26 September (fourth set, Greg's answers):**
+  - *Real-mic V intake:* speak answers aloud with V, optional; typing still
+    works.
+  - *The examiner looks* tall and gaunt, bloodied coat, surgical mask and
+    loupe glasses.
+  - *Intake length:* 2-4 minutes, all eight pages, F skips.
+  - *The hack card* stays 2.6 s, skippable.
+  - *The Hunt:* roamer count as now; a full day about 40 real minutes;
+    extraction stays H at a point; escaped rivals return when a slot opens.
+  - *Screen:* body-cam minimal HUD; FOV 88, adjustable; subtitles on by
+    default; shake and bob as now, with a Settings slider.
+- **Asset tools (Greg, 26 September): "use all these in game creation."**
+  Six repos, pinned, in `DESIGN/ASSET_TOOLS.md`. The Godot agent skills are
+  installed under `.claude/skills/godot-*`. The generators run on Greg's RTX,
+  and their output is placeholder, curated, and imported only through
+  `tools/import_generated_asset.py` (it logs `GENERATED.md` and refuses
+  Hunyuan output without an explicit licence flag).
+- **No zip files (Greg, 26 September):** "stop making zip files, it's
+  pointless". Builds reach him as merges into `claude/dust-to-bones-look`;
+  `Play-Latest.bat` pulls that branch into `P:\GameDev\playtest` and runs it
+  from source. He also asked for one master prompt for every agent, with
+  question boxes: `DESIGN/MASTER_PROMPT_2026-09-26.md`.
+- **The drains:** SPACE jumps, and climbs out of the channel and the cistern
+  onto a ledge up to 1.5 m ("you can't jump out of here, it's dumb").
+- **Art is placeholder until Greg's own:** curated Higgsfield pieces stand in
+  where they fit; everything is replaced when Greg's art lands.
+- **Question boxes (26 September, second set):**
+  - **Jump and climb everywhere** in the first 30 minutes, not just the drains.
+  - **Placeholder art first:** all of it (breakout frames, loading screens,
+    phone and Wire, kill-cam X-rays) as soon as the files can be pushed.
+  - **GFX:** all of the above: Godot shaders now, Greg's TouchDesigner loops
+    layered over or replacing them later.
+  - **Vat room:** darker, red only in the vat's glow.
+  - **Spirits** in wizard eyes are glowing green figures where people died.
+  - **Camera signals** show as pulsing wave rings out of each lens.
+  - **Degrading view:** static from the edges, blur, and a nosebleed drip;
+    leaving the mode clears it.
+  - **First hidden thing:** a weak wall in the Growing Floor, a shortcut found
+    with wizard eyes.
+    *Built (assistant's layout, open to change):* a 1.4 m panel of the left
+    wall between two bays, identical to plain eyes. K shows its outline and
+    cracks; J shows it as HOLLOW. Once seen, E shoulders through; the
+    crawlway behind drops you into the Service Arcade past its pressure gate,
+    skipping the staff card. The gate itself stays shut.
+
+### Built 27 September (Claude lane), assistant's choices open to Greg
+
+- *The examiner fight* is in the office behind his door (the room you break
+  into with the axe, restraint or shoulder), not behind the sealed staff
+  door. He is at his bench with his back turned; he turns if you come
+  close, hit him or stay about 10 s. Scalpel cuts, every third move the
+  syringe (half speed for 6 s). You lose under 45% blood or downed.
+- *His keycard* opens the sealed staff door in the Growing Floor, on a
+  shallow staff cupboard: two field dressings and eight rounds, once.
+- *Meds*: 2.5 s hold. Tap 4 in the Hunt still takes the carried limb.
+- *Phone signals*: in the Hunt the phone camera shows the Wire's carriers
+  (masts, terminals) as infrared rings with name and distance; the
+  opening's camera signals would show the same way.
+- *Voice intake*: "next", "back", a number, "confirm", "file it", or the
+  words of his question's options.
+- *The checklist* is now 100 boxes (Greg: "add 100 overall").
+## Stated by Greg, 28 September 2026: loose-thread decisions
+
+These decisions came from reviewing the complete loose-thread cutter. They
+replace “compare or rebuild” ambiguity for the named systems, but do not waive
+the project rule that old branches are ported selectively into the current
+playable build and verified before merge.
+
+- **The intake pointer is a jester hand.** The cursor is a pointing jester's
+  finger with the frilled wrist visible, not a generic arrow.
+- **The breach tool must be obvious and reachable.** Its sign clearly says to
+  take it and the normal interaction reaches it from three metres.
+- **The drains route must not softlock.** Restore the exit regression coverage,
+  reproduce the current route, and fix any failure to walk out.
+- **The title/front door remains silent.** Opening Pause or Escape over it must
+  not start ambient crackle, drips, or game-world audio. Treat the old series
+  of commits as one behavior plus one regression test.
+- **Voice listeners die with their owner.** Leaving an intake or voice-input
+  scene must terminate its listener process. No orphaned listeners accumulate.
+- **The heat elevator and sallyport emerge onto usable open ground,** not inside
+  a gate wall or blocked geometry.
+- **The intake always tells the player how to continue,** legibly at 720p,
+  1080p, ultrawide, keyboard/mouse, and controller scale.
+- **Picking things up is a general game verb.** Ordinary items, severed limbs,
+  individual bones and gore chunks can be picked up, held in the hand, rotated
+  or inspected, carried, and dropped whenever their size permits. The rule is
+  shared rather than special-cased to one severed limb.
+- **Vat subjects float visibly.** The player and other specimens drift and
+  slowly rebound around their available tank volume, like a very slow screen
+  saver rather than a rigid seated pose. A tank can be smashed to free its
+  subject; a freed subject may help, flee, panic, or attack according to who it
+  is and what happened to it.
+- **The mouth tube and skull leads are real parts of the opening body.** Rebuild
+  them to the current body/anatomy quality rather than restoring an old scene
+  wholesale.
+- **Save and load belong to the one game.** The menu offers a normal New Game
+  and load flow. “Demo” is a build milestone, not a separate reduced game or a
+  second product door.
+- **The playable game has gore-sandbox parity.** The anatomy, damage, pickup,
+  inspection and destruction verbs proven in the sandbox must work in the real
+  routes; the sandbox is not an isolated feature island.
+- **The old combat-style lane is approved in direction.** Rebuild switchable
+  styles, blood growth and loot preservation against the current combat and
+  body systems, one tested subsystem at a time.
+- **Printed work objects are approved.** Receipt-paper job posters and business
+  cards belong in the 30–60 minute job loop after the first-job structure is
+  settled.
+- **Kinship stays in the Brain Index.** Reconcile its neural-network/CRT hub
+  presentation with the current hub; do not restore stale Hunt edits.
+- **Hornee becomes a real companion.** Preserve Greg's authored plush sources,
+  rebuild and verify the card/model, then make Hornee a summonable companion
+  who can travel and fight alongside the player rather than remaining only a
+  collectible view.
+- **Lab cables are a wiring network, not one decorative tube.** Port the old
+  lane's useful cable system into the current lab after conflicts and frame
+  cost are resolved.
+- **The sky belongs to the Sidereal Concordance.** Port only that chosen result
+  from the old sky-agency branch.
+- **Substances use the real world clock.** Tolerance and comedown remain wanted,
+  but the world map and enterable buildings come first. Their teaching scene
+  belongs in a club or underground party populated by characters using
+  different substances, not in a detached menu tutorial.
+- **Connected underground routes remain wanted.** Review topology, liened-organ
+  routing, discovered-entrance persistence and occlusion as one modern bundle.
+- **Generated Higgsfield or ComfyUI imagery does not ship as final art.** It can
+  guide authored models, textures, composition and effects. Any old generated
+  plate wired directly into the game must be replaced or deliberately kept as
+  temporary reference-only material outside the shipped build.
+- **Controller is the primary combat tuning device, not an exclusive input.**
+  Tune movement, camera pressure, target switching, dodge timing, triggers and
+  feedback on a DualSense first, while keyboard and mouse remain full peers on
+  the same action layer. VR is a later interaction and comfort redesign, not a
+  control preset for the opening milestone.
+- **The Black Mirror is a canonical opening acquisition.** Every escape route
+  gives the player the same actual Black Mirror before its route-specific
+  divergence. Finding it establishes the handheld menu and the interface the
+  rest of the game teaches through.
+- **Routes share learning outcomes, not necessarily props.** A route may omit
+  the service arcade's access card or breach tool, but it must teach the same
+  core movement, interaction, combat and body-management verbs in authored
+  situations. Picking up the first weapon opens the relevant combat/weapon
+  section of the Brain Index, then the route immediately asks the player to use
+  what it revealed.
+- **Polish proceeds as a repeated playable build, not mechanic accumulation.**
+  Finish one golden opening route beat-by-beat, play it on controller and
+  keyboard/mouse, fix the largest observed friction, rebuild, and repeat. Other
+  routes come to parity against that proven spine; new mechanics do not enter
+  the opening merely because a branch contains them.
+
+### Open questions for Greg (28 September)
+
+- **Heavy melee has no key.** Since the combat overhaul made the right
+  mouse button the guard in melee, nothing in the Hunt starts a heavy
+  swing (`_attack(true)` has no caller). Options: hold the left mouse
+  button to charge a heavy; guard (right mouse) then left mouse for a
+  guard-breaking heavy; or a key of its own.
+- **The examiner you beat, then his hologram.** Beat him in his office
+  and the vehicle bay still shows him "by his car" as light from an
+  emitter. Keep both (he was never only one body), or does beating him
+  change what the bay shows?
+
+### Answered by Greg in question boxes, 28 September
+
+- **Heavy melee:** middle mouse. Tap = heavy swing; hold = guard break,
+  which randomly either knocks the guard open (stagger, a free hit) or
+  throws them down. Lock-on stays on Z.
+- **The vehicle bay after you beat the examiner:** an empty bay; his car
+  is there and the hologram emitter lies dark on the floor. The ramp
+  route still works.
+- **The examiner's model:** keep the stand-in until Greg says the M1 sheet
+  is final.
+- **Git:** ignore Godot's `.import` / `.uid` files repo-wide.
+- **Next:** polish minutes 0-30 before minutes 30-60. All four at once:
+  the feel of movement and combat (too floaty, the camera, jump/climb),
+  sound (room ambience, footsteps, combat hits, music beds), look and
+  lighting, and pacing/clarity.
+- **The vat room's darkness:** Greg says after playing.
+- **Brain Index:** keep Shift+Tab, and make it clickable through the
+  inventory body's head: hover glows the head and previews its stats,
+  click zooms into the skull and opens the Brain Index.
+- **The weak wall leads to a hidden room instead of the shortcut:** a
+  failed subject's den (who they were: later) with their notes, a stash,
+  a weapon and a spirit that K shows.
+
+### Answered by Greg in question boxes, 28 September
+
+- **Heavy melee:** middle mouse. Tap = heavy swing; hold = guard break,
+  which randomly either knocks the guard open (stagger, a free hit) or
+  throws them down. Lock-on stays on Z.
+- **The vehicle bay after you beat the examiner:** an empty bay; his car
+  is there and the hologram emitter lies dark on the floor. The ramp
+  route still works.
+- **The examiner's model:** keep the stand-in until Greg says the M1 sheet
+  is final.
+- **Git:** ignore Godot's `.import` / `.uid` files repo-wide.
+- **Next:** polish minutes 0-30 before minutes 30-60, on all four fronts:
+  feel, sound, look and lighting, and pacing/clarity.
+- **The vat room's darkness:** Greg says after playing.
+- **Brain Index:** keep Shift+Tab, and make it clickable through the
+  inventory body's head. Hovering glows the head and previews its stats;
+  clicking zooms into the skull and opens the Brain Index.
+- **The weak wall leads to a hidden room, not the shortcut:** a failed
+  subject's den with their notes, a stash, a weapon and a spirit that K
+  shows. Who they were: decided later.
+- **Room ambience, vat room:** pumps and bubbling, distant screams,
+  electrical hum, heart monitors from the tanks.
+- **Music beds:** dark ambient drones, industrial, and Silent Hill-style
+  sparse noise, blended.
+- **Weight:** grounded, with quick stops. Faster acceleration and stops,
+  stronger gravity, and a dip on landing.
+- **Camera:**
+  - less head bob
+  - more body-cam sway
+  - a kick on landings and hits
+  - a lean with strafing
+- **Footsteps:**
+  - by surface
+  - bare, wet feet in the opening
+  - louder when running
+  - enemies' steps audible too
+- **Combat hits:**
+  - a bone crack on breaks
+  - wet flesh impacts
+  - a weapon whoosh scaled to the weapon
+  - the victim's voice
+- **Look and lighting:** every opening room needs attention: the vat
+  room, the Service Arcade, the Support Unit, Lower Works and the drains.
+- **Guidance:** the waypoint comes through the wizard eyes "chaos magick"
+  view, a blend of the spirit view and the hacked brain-chip UI. It shows
+  current objectives, and nearby sine waves act as distress signals and
+  quest/task indicators, like RDR2's hunting mode or The Last of Us's
+  listen mode.
+- **Guidance waves** (28 September, later set):
+  - They rise like smoke from their source, visible through walls.
+  - Acid = objective, red = distress, bone = task.
+  - They cost the same strain as the rest of wizard eyes.
+- **The chip's "current objectives" are adjectives on things.** It works
+  like the Hunt's block tracker: the brain chip analyses what you look at
+  as if an AI model in your head were reading it, and labels it.
+- **The spirit view shows faces:** spirits, demons and angels, like the
+  Ice King sees them in Adventure Time. Greg's reference is the episode
+  where Finn becomes the lamb / statue idol and is trapped in the spirit
+  realm. The reference is for the quality only; the art is original.
+- **Where wizard eyes grows (Greg, 28 September, long-term vision):**
+  - As the brain-chip UI is upgraded through character progression,
+    wizard eyes can see into lower and higher realms and dimensions,
+    starting with the shadow realm.
+  - With it you can call on or contact entities in other realms, and
+    hunt them, evoke them, do their quests, befriend them or ally with
+    them.
+  - The earth realm's own spirits, angels and demons are "weirdly
+    generated" (procedural).
+  - Not for minutes 0-30. The opening only shows the first sight of it:
+    faces in the spirit view.
+
+### Quality control, answered by Greg, 28 September
+
+- **A room is done when:** it holds 144+ fps on Greg's RTX (F10), Greg
+  played it and it felt right, no placeholder boxes are visible, and
+  every beat has sound.
+- **Ugly but working:** ship to the playtest build and mark it as ugly.
+- **Gore:** full, as set on 26 September.
+- **Unsure how something looks:** render it and ask Greg with a question
+  box.
+- **Continuity:** lore and characters, controls, look rules and Greg's
+  answers are all at risk of getting lost between agents. One master
+  bible, `DESIGN/BIBLE.md`, holds every decision grouped by topic; every
+  agent reads it first. Where two answers conflict, the newest wins and
+  the old one is marked replaced.
+- **Controls:** the Hunt's scheme is master and every scene matches it:
+  - LMB attack, RMB guard or aim, MMB heavy (hold: guard break)
+  - Z lock-on, K/J the sight modes, hold 4 meds, E use
+- **Lore (confirmed):** the examiner is a staff doctor, not the boss; he
+  answers to someone above him. The player is a decanted clone, owned by
+  debt, and each death regrows them.
+- **Look:** crunchy, not retro-kitsch. Low-poly and grainy with modern
+  lighting, and no vertex wobble.
+- **Agents stop and ask Greg** for lore and names, the look of anything
+  new (render and ask), and anything that removes a feature.
+
+### The first 15 minutes for Greg's friends, answered 28 September
+
+- **The first 15 minutes end on surfacing into the Hunt.**
+- **Onboarding:** each new key shows its hint once, then goes (E, K, J,
+  hold 4, Space, Ctrl).
+- **The intake gets a quick-start preset:** one strong default character,
+  one button at the intake's start. The full intake stays optional.
+- **The moment friends must remember is the brain hack.** It should land
+  with a louder, longer scream; the screen breaking apart; a flash of
+  memories from a life that isn't yours; then dead silence before BRAIN
+  HACKED SOUL OVERTAKEN slams in.
+- **The vat part needs work in every beat:** the load-in and intake, the
+  examiner at the glass, the brain hack and the breakout. Right now it is
+  confusing, too slow, looks unfinished and doesn't hit hard enough.
+- **Target length:** about 4 minutes from the load-in to standing up.
+- **Always clear on screen in the vat:** what key to press now (a big
+  prompt at each beat), why it is happening (one line), what you are (a
+  grown clone woken early), and where to go once you stand (the way out
+  lit).
+- **Inside the tank:** liquid distortion through the medium and the glass,
+  bubbles and muffled sound, your own grown body with the cords in it when
+  you look down, and panic (heartbeat, blur).
+- **Scarier:** other subjects twitching and dying in the next tanks; a
+  colder examiner who talks about you like meat and cuts or injects you;
+  body horror on your own body (extra fingers, open wounds, cords under
+  the skin); and sound (screams, alarms, wet noises).
+- **Memory flash in the hack:** the life of the body's donor, in fragments
+  (a kitchen, a dog, a funeral). Never explained yet.
+- **The colder examiner, during the intake:** he injects you through the
+  tank port, a robotic arm cuts a skin sample while you watch, he reads out
+  your value, your parts and your price like meat, and he casually drains
+  the failed subject's tank beside you.
+- **Body horror on your own body** depends on your intake choices.
+- **The next tanks:** subjects twitching and convulsing, a tank draining so
+  its body slumps against the glass, the medium clouding red with blood,
+  and one subject awake and hammering on the glass like you.
+- **The breakout:**
+  - hard, mashing effort: the cords resist and your blood clouds the water
+  - pain on each cord torn out: a flash, a scream, blood
+  - the glass cracking further with every blow until it bursts
+  - the medium flooding out and you falling to the floor with it
+- **Standing up:** crawl a few metres through the spilled medium, pull
+  yourself up on the tank, then stand.
+- **The load-in** is too long, unclear, not scary enough and looks
+  unfinished.
+- **Tank sound:** the room muffled as if underwater, your heartbeat loud
+  and speeding up, your breathing bubbles, and the examiner's voice
+  muffled through the glass.
+- **The load-in** stays a loading screen, made horror: scarier, shorter
+  and clearer.
+- **First seen:** the title, then NEW GAME straight into the load-in, with
+  no menus in the way.
+- **One-time key hints:** bottom centre and big, a key glyph plus the verb,
+  fading once used. They show keyboard or controller buttons, whichever
+  was used last (Greg: "you can choose").
+- *Found 28 September:* the game has **no controller bindings at all**
+  (keyboard and mouse only). The one-time key hints show keyboard keys for
+  now. Controller support is its own job: bindings for every action, then
+  hints that follow the last device used.
+- **The brain hack, answered 28 September:** the memory flashes are all of
+  them, ordinary and dark (a kitchen, a dog, a hospital bed, a face, a car
+  crash, a funeral, a grave). The silence lasts 1.2 s. Greg plays from the
+  very start and talks while he plays.
+- **Built 28 September (Claude):** the empty bay, the hidden den, and
+  middle-mouse heavy / guard break. StarNet moves to the **sound pass**.
+- **Next in minutes 0-30, all of it:** vat horror, the in-tank feel,
+  wizard-eyes guidance (waves and chip adjectives) and the breakout.
+- **The den's subject:** decided later.
+- **The den's shiv** is a real Hunt weapon: a fast blade that makes wounds
+  bleed and is weak against armour.
+
+### Answered by Greg in question boxes, 28 September (the rest of the vat)
+
+- **One line at each breakout beat:** your own thoughts, first person,
+  short and panicked.
+- **Surfacing into the Hunt:**
+  - blinding daylight, then your eyes adjust to open sky
+  - the facility hum cuts to silence, then open air and wind
+  - the title drop, WIZARDS ONLY FOOLS, over the first view of the world
+  - the run card, as now
+- **Sound:** Claude does the sound pass (StarNet is out of usage). Done:
+  a room bed per opening room (the vat: pumps, bubbling, hum, heart monitor,
+  drips, far screams), a music bed (drone, industrial, noise) that rises with
+  the vat's phases, footsteps a stride apart (bare wet feet by default, a
+  scene sets the body's `surface` meta), enemies' steps within 24 m, and on
+  every Hunt hit a wet impact, a bone crack on breaks and the victim's voice.
+  All synthesized; Greg can replace any of it with recorded sound later.
+
+### Question boxes, 28 September (late): light, sound mix, body, load-in
+
+- **Lighting (vat, Service Arcade, Support Unit, vehicle bay):** pools of
+  light: mostly black, harsh pools under lamps, you move between them.
+  Sick green-white lab light; red emergency strobes and a klaxon start when
+  the glass bursts. Lights flicker more as tension rises, and some die for
+  good.
+- **Footstep surfaces per room:** vat wet tile, bay metal grating, drains
+  water, arcade and support concrete, with the bare-feet sound on top.
+- **Sound mix: near silence.** Clearly heard: your breathing and heartbeat,
+  footsteps (yours and enemies'), the far screams (every 16-38 s, kept).
+  Room beds and music sit low; Greg did not pick "music only at peaks", so
+  the bed stays but quiet.
+- **Looking down in the tank:** cords into your skin, twitching hands,
+  surgical scars and stitches, and something wrong.
+- **The something wrong comes from your race and traits,** so every
+  character is wrong differently. Body horror stays unsettling, not gross:
+  extra fingers, mismatched skin, cords under the skin, eyes too dark.
+- **Load-in:** about 15 s. The whispers are spirit voices, and they are
+  warning you ("don't wake up", "they'll take you apart").
+- **Brain Index through the inventory head:** clicking the head zooms into
+  the brain; the lobes glow as groups: body stats, the chip, recovered
+  memories, spirit sight.
+- **At the glass burst:** the green tubes stay on but stutter under the
+  rotating red strobes. One klaxon blast, then silent strobing.
+- **Load-in flashes (all four):** the surgical lamp overhead with masked
+  faces leaning in, your body opened (censored per settings), vitals
+  flatlining then a jolt, and the warning spirits' faces between cuts.
+- **Looking down in the tank:** any time, with the mouse; the body is really
+  there.
+- **Controller support:** later; friends use keyboard and mouse.
+- **Body horror** comes from your race and traits: each adds its own
+  wrongness (extra fingers, mismatched skin, cords under the skin).
+- **Looking down in the tank:** your naked grown body (censored per the
+  nudity setting), the cords into your belly and spine, your hands
+  twitching as you wake, and the wrongness visible there first.
+- **The load-in:** surgical flashes (lights, straps, a drill), your vitals
+  flatlining and restarting, and whispers.
+- **Lighting:** darker, with pools of light that lead you; red only on
+  danger.

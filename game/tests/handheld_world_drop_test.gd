@@ -24,6 +24,9 @@ func _ready() -> void:
 	var hunt = HUNT.instantiate()
 	add_child(hunt)
 	await get_tree().process_frame
+	# The Hunt starts without the phone now (it is stolen from RESTRICTED
+	# STORAGE in play), so hand it over the way the other phone tests do.
+	hunt.handheld.possessed = true
 	var serial: int = hunt.handheld.serial
 	var charge: float = hunt.handheld.battery
 	var before_drop: float = hunt.handheld.condition
