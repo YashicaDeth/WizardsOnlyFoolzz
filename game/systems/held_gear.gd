@@ -66,6 +66,18 @@ const GRIPS := {
 		"rest": {"at": Vector3(0.205, -0.255, -0.225), "turn": Vector3(0.52, 0.34, 0.30)},
 		"reach": 1.0, "damage_type": "cut", "control": 0.82,
 	},
+	# A cleaver has a second honest grip: the working hand leaves the handle and
+	# pinches the blade at its heel, just ahead of the bolster. That is choking
+	# up — the same grip a cook uses on a knife, and the same trade a half-sword
+	# makes in miniature: less reach, much more control, because the mass is no
+	# longer swinging at the end of your arm. The off hand stays free; this is
+	# still a one-hand tool.
+	"choke_up": {
+		"right": {"anchor": "choke", "pose": "pinch"},
+		"left": {"anchor": "", "pose": "open"},
+		"rest": {"at": Vector3(0.185, -0.240, -0.235), "turn": Vector3(0.44, 0.30, 0.30)},
+		"reach": 0.80, "damage_type": "cut", "control": 1.08,
+	},
 	"two_hand": {
 		"right": {"anchor": "grip", "pose": "wrap"},
 		"left": {"anchor": "grip_low", "pose": "wrap"},
@@ -632,6 +644,10 @@ static func _build_hotline_cleaver(root: Node3D) -> void:
 	_part(root, "cable", _box(Vector3(0.007, 0.007, 0.170)), Vector3(-0.026, 0.004, -0.050), housing)
 
 	_anchor(root, "grip", Vector3(0, 0, -0.060), Vector3.ZERO)
+	# Where the working hand goes when it chokes up: on the flat of the blade
+	# heel, a finger's width ahead of the bolster, before the edge strip and
+	# the housing make the pinch impossible.
+	_anchor(root, "choke", Vector3(0, 0, 0.052), Vector3.ZERO)
 	_anchor(root, "grip_low", Vector3(0, 0, -0.110), Vector3.ZERO)
 	_anchor(root, "muzzle", Vector3(0.030, 0, 0.320), Vector3.ZERO)
 

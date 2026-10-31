@@ -4,11 +4,11 @@ extends Node
 ## carries `reach`, `damage_type` and `control` per grip, and the Hunt reads the
 ## active one into the arm's own reach and stiffness.
 ##
-## The issued melee is now the hotline cleaver, not the longsword. It is a
-## one-hand tool with no off-hand anchor and one grip in `HeldGear`, so `B` has
-## nothing to cycle and must say so by name. The sword's grips still exist for
-## the rooms and rigs that draw it, so they are asserted here on a bare
-## `HeldGear` rather than through a Hunt that no longer carries a sword.
+## The issued melee is the hotline cleaver: one hand on the handle for reach,
+## or choked up on the blade heel for control, and `B` cycles those two. The
+## sword's grips still exist for the rooms and rigs that draw it, so they are
+## asserted here on a bare `HeldGear` rather than through a Hunt that no longer
+## carries a sword.
 
 var failures: Array[String] = []
 
@@ -30,32 +30,67 @@ func _ready() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 
-	print("AN2.5 - the issued cleaver is one-hand, and B says so by name")
+	print("AN2.5 - the issued cleaver has two real grips")
 	hunt._equip_weapon(0)
 	check(str(hunt.arsenal.current_id) == "cleaver", "slot 1 is the hotline cleaver the player is issued")
-	check(not hunt.GRIP_CYCLE.has("cleaver"), "the cleaver is not advertised as having a grip cycle")
-	check(hunt.current_grip == "one_hand", "the cleaver sits in the one-hand grip it is actually held in (%s)" % hunt.current_grip)
+	check(hunt.GRIP_CYCLE.get("cleaver", []) == ["one_hand", "choke_up"], "B cycles the cleaver between one_hand and choke_up")
+	check(hunt.current_grip == "one_hand", "a fresh draw starts on the handle (%s)" % hunt.current_grip)
+	var cleaver := hunt.arsenal.models.get("cleaver") as Node3D
+	check(cleaver != null, "the cleaver model is mounted")
+	var right_hand: Node3D = null
+	var cleaver_weapon: Node3D = null
+	if cleaver != null:
+		right_hand = cleaver.get_node_or_null("RightGripHand") as Node3D
+		cleaver_weapon = cleaver.get_node_or_null("cleaver_model") as Node3D
+	var choke_anchor: Node3D = null
+	if cleaver_weapon != null:
+		choke_anchor = cleaver_weapon.get_node_or_null("anchor_choke") as Node3D
+	check(right_hand != null and choke_anchor != null, "the cleaver models a working hand and a choke anchor on the blade")
+	var one_hand_position := Vector3.ZERO
+	if right_hand != null:
+		one_hand_position = right_hand.position
 	var receipts_before := PlayerActionLedger.count("grip_changed")
-	var grip_before: String = hunt.current_grip
 	hunt._cycle_grip()
-	check(hunt.current_grip == grip_before, "B leaves the cleaver's grip alone")
-	check(PlayerActionLedger.count("grip_changed") == receipts_before, "and records no grip change that did not happen")
-	var refusal := str(hunt.prompt.text)
-	check("CLEAVER" in refusal.to_upper(), "the refusal names the weapon in the hand (%s)" % refusal)
-	check(not ("SWORD" in refusal.to_upper()) and not ("1 FOR" in refusal.to_upper()),
-		"the refusal no longer sends the player to the retired sword")
+	check(hunt.current_grip == "choke_up", "B moves the cleaver to its choke-up")
+	check(PlayerActionLedger.count("grip_changed") == receipts_before + 1, "an accepted grip change records exactly one receipt")
+	if right_hand != null and cleaver_weapon != null and choke_anchor != null:
+		var choke_position: Vector3 = (cleaver_weapon.transform * choke_anchor.transform).origin
+		check(right_hand.position.distance_to(choke_position) < 0.05 and right_hand.position.distance_to(one_hand_position) > 0.04,
+			"the working hand visibly leaves the handle and pinches the blade heel")
+	hunt._cycle_grip()
+	check(hunt.current_grip == "one_hand", "and B wraps back to the handle")
+	if right_hand != null:
+		check(right_hand.position.distance_to(one_hand_position) < 0.02, "the hand returns to the grip it started on")
+
+	print("AN2.5 - choking up changes the numbers, not just the hand")
+	hunt.current_grip = "one_hand"
+	hunt._carry_current_weapon(true)
+	var cleaver_one_reach: float = hunt.arm.reach
+	var cleaver_one_stiffness: float = hunt.arm.stiffness
+	hunt.current_grip = "choke_up"
+	hunt._carry_current_weapon(true)
+	check(hunt.arm.reach < cleaver_one_reach,
+		"the choke-up measurably shortens reach (%.3f vs %.3f)" % [hunt.arm.reach, cleaver_one_reach])
+	check(hunt.arm.stiffness > cleaver_one_stiffness,
+		"and measurably steadies the arm (%.2f vs %.2f)" % [hunt.arm.stiffness, cleaver_one_stiffness])
+
+	hunt._equip_weapon(1)
+	hunt._equip_weapon(0)
+	check(hunt.current_grip == "one_hand", "a fresh draw resets to the handle rather than the last stance")
 	var card_rows: Array = []
 	for group: Dictionary in hunt.keys_card.groups:
 		card_rows.append_array(group.get("rows", []) as Array)
 	var grip_row: Array = card_rows.filter(func(row: Array) -> bool: return row[0] == "B")
-	check(grip_row.size() == 1 and not ("CYCLE" in str(grip_row[0][1]).to_upper()),
-		"the keys card does not advertise a cycle the cleaver cannot make (%s)" % (str(grip_row[0][1]) if not grip_row.is_empty() else "no B row"))
+	check(grip_row.size() == 1 and "CHOKE-UP" in str(grip_row[0][1]).to_upper(),
+		"the keys card advertises the cleaver's second grip (%s)" % (str(grip_row[0][1]) if not grip_row.is_empty() else "no B row"))
 
 	print("AN2.5 - a weapon with no real grip choice ignores the key")
 	hunt._equip_weapon(1) # shotgun
 	var gun_grip: String = hunt.current_grip
+	var gun_receipts := PlayerActionLedger.count("grip_changed")
 	hunt._cycle_grip()
 	check(hunt.current_grip == gun_grip, "cycling on a weapon GRIP_CYCLE has no entry for does nothing (%s)" % hunt.current_grip)
+	check(PlayerActionLedger.count("grip_changed") == gun_receipts, "and records no receipt for a grip it cannot take")
 	check(not ("CLEAVER" in str(hunt.prompt.text).to_upper()),
 		"the refusal follows the weapon actually held instead of naming the last one")
 	hunt._equip_weapon(0)
@@ -94,7 +129,7 @@ func _ready() -> void:
 
 	print("TWO_HANDING_RESULT failures=", failures.size())
 	if failures.is_empty():
-		print("two-handing: the issued cleaver is honest about its one grip, and the sword's grips still hold up")
+		print("two-handing: the cleaver's two grips are real, and the sword's still hold up")
 		get_tree().quit(0)
 	else:
 		print("two-handing FAILURES: ", failures)
