@@ -1276,6 +1276,7 @@ func _ready() -> void:
 	$HUD.add_child(field_inventory)
 	field_inventory.close_requested.connect(_toggle_inventory)
 	field_inventory.activate_requested.connect(_activate_inventory_item)
+	field_inventory.weapon_equipped.connect(_on_inventory_weapon_equipped)
 	brain_hub = BrainIndexHub.new()
 	brain_hub.name = "BrainIndexHub"
 	$HUD.add_child(brain_hub)
@@ -9407,7 +9408,9 @@ func _toggle_inventory() -> void:
 		keys_card.close()
 		_close_panel_views()
 		panel_mode = "inventory"
-		field_inventory.open_inventory(handheld.carry, player_rig, arsenal)
+		# The board is a view of the same hand the world uses, so it has to know
+		# when an improvised limb, not a racked weapon, is the thing in it.
+		field_inventory.open_inventory(handheld.carry, player_rig, arsenal, carried_limb_index)
 		prompt.visible = false
 		Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
 		if _pointer != null and is_instance_valid(_pointer):
@@ -9498,6 +9501,16 @@ func _activate_inventory_item(index: int) -> void:
 		return
 	_toggle_inventory()
 	_equip_carried_limb_index(index)
+
+
+## The grid put a racked weapon in the hand without closing. If the hand was
+## holding an improvised limb, that model is this scene's, not the panel's — so
+## the panel asks here instead of reaching into the arm itself. The limb stays
+## in the bag; only the hand changes.
+func _on_inventory_weapon_equipped(_weapon_id: String) -> void:
+	if carried_limb_index < 0 and carried_limb_model == null:
+		return
+	_clear_carried_limb_model()
 
 
 ## Return true only when this scene actually consumed an interface close.
