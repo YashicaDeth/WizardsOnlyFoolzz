@@ -1950,7 +1950,17 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_F2: handheld.jump_to_mode(1)
 			KEY_F3: handheld.jump_to_mode(2)
 			KEY_F4: handheld.jump_to_mode(3)
-			KEY_F5: handheld.jump_to_mode(4)
+			# Slice 20. The bag has its own door. F5 is the CARRY tab while the
+			# device is raised, exactly as F2-F7 are theirs; from play the same
+			# key raises it already on that page, because the card lists what you
+			# carry and the bag otherwise cost two steps — raise, then click.
+			KEY_F5:
+				if handheld.is_open:
+					handheld.jump_to_mode(handheld.carry_mode_index())
+				elif handheld.possessed:
+					_toggle_handheld_surface("CARRY")
+				else:
+					_feedback("NO PHONE IN HAND // THE BLACK MIRROR IS IN RESTRICTED STORAGE")
 			KEY_F6: handheld.jump_to_mode(5)
 			KEY_F7: handheld.jump_to_mode(6)
 			KEY_G: _toggle_handheld_surface()
@@ -9249,6 +9259,7 @@ func _build_keys_card() -> void:
 			["7", "BLOOD TREE // SPEND BLOOD"],
 			["F8", "CONTACT // PEOPLE, ENTITIES, MATERIA"],
 			["G", "RAISE / LOWER BLACK MIRROR"],
+			[HANDHELD.CARRY_KEY_LABEL, "HANDHELD CARRY // RAISES STRAIGHT TO THE BAG"],
 			["SHIFT+TAB", "INDEX"],
 			["TAB (DEVICE UP)", "NEXT DEVICE APP"],
 			["CLICK / F1-F7", "SELECT DEVICE APP"],
@@ -9543,7 +9554,7 @@ func _feedback(text: String) -> void:
 	sleep_prompt_hold = maxf(sleep_prompt_hold, 1.8)
 
 
-func _toggle_handheld_surface() -> void:
+func _toggle_handheld_surface(open_on := "") -> void:
 	if handheld.is_open:
 		handheld.close_device()
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -9559,7 +9570,10 @@ func _toggle_handheld_surface() -> void:
 	keys_card.close()
 	if _pointer != null and is_instance_valid(_pointer):
 		_pointer.visible = false
-	handheld.open_device()
+	if str(open_on).is_empty():
+		handheld.open_device()
+	else:
+		handheld.open_to(str(open_on))
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if handheld.is_open else Input.MOUSE_MODE_CAPTURED
 	if handheld.is_open:
 		prompt.visible = true

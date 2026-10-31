@@ -298,6 +298,13 @@ var _tab_rects: Array[Rect2] = []
 ## `Input.is_key_pressed`.
 const DROP_KEY := KEY_DELETE
 const DROP_KEY_LABEL := "DELETE"
+## Slice 20. The bag has its own way in. F5 is the CARRY tab's letter while the
+## device is raised, and from play the same key raises it already on that page
+## rather than asking the holder to raise the mirror and then walk the rail.
+## The host still owns the pointer and the other interfaces; this file only
+## owns which key names the page and how the device answers it.
+const CARRY_KEY := KEY_F5
+const CARRY_KEY_LABEL := "F5"
 var drop_key_override: Variant = null
 var _drop_key_was_down := false
 
@@ -677,6 +684,24 @@ func toggle_device() -> void:
 		close_device()
 	else:
 		open_device()
+
+
+func carry_mode_index() -> int:
+	return MODES.find("CARRY")
+
+
+## Raise the physical device on a named page. The caller has already done the
+## host-side housekeeping (pointer, closing whatever else was up); this is only
+## the device's half — the page it was asked for, not whichever page it last
+## happened to be on.
+func open_to(mode: String) -> bool:
+	var wanted := mode.to_upper()
+	if not MODES.has(wanted) or not available_modes.has(wanted):
+		return false
+	open_device()
+	if not is_open:
+		return false
+	return jump_to_mode(MODES.find(wanted))
 
 
 ## C2. The wheel the player actually holds. The X-ray is a permanent segment

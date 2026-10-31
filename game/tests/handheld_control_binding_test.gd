@@ -22,6 +22,8 @@ func _ready() -> void:
 	WorldHistory.clear_history()
 	check(HANDHELD.DROP_KEY == KEY_DELETE, "dropping the device uses the dedicated Delete key")
 	check(HANDHELD.DROP_KEY != KEY_K, "drop no longer shares the irreversible re-decant binding")
+	check(HANDHELD.CARRY_KEY == KEY_F5, "holding the carry has its own key")
+	check(HANDHELD.CARRY_KEY != HANDHELD.DROP_KEY, "the carry key is not the destructive drop key")
 
 	var device := HANDHELD.new()
 	add_child(device)
@@ -37,6 +39,16 @@ func _ready() -> void:
 	click.position = ritual_tab.get_center()
 	device._gui_input(click)
 	check(device.current_mode() == "RITUAL", "clicking a drawn tab selects that exact device app")
+	# Slice 20. The bag's key has to work on a lowered device, or it is only a
+	# second way to click a tab.
+	device.close_device()
+	check(device.open_to("CARRY") and device.is_open and device.current_mode() == "CARRY",
+		"the carry key raises a lowered device already on the bag")
+	check(not device.open_to("BONEYARD"),
+		"a page this device does not carry is refused instead of opening on another")
+	device.open_to("CARRY")
+	device._advance_page_transition(1.0)
+	check(device.displayed_mode() == "CARRY", "the bag finishes its own shutter rather than landing mid-page")
 	device.jump_to_mode(3)
 	device._advance_page_transition(1.0)
 	var tune_before: float = device.radio.khz
@@ -75,8 +87,26 @@ func _ready() -> void:
 	var hunt = HUNT.instantiate()
 	add_child(hunt)
 	await get_tree().process_frame
+	# Slice 20. From play, F5 is the bag's own key: it raises the mirror on the
+	# CARRY page rather than making the player raise it on whatever app it last
+	# showed and then click the tab.
+	var f5_key := InputEventKey.new()
+	f5_key.keycode = KEY_F5
+	f5_key.pressed = true
+	hunt._unhandled_input(f5_key)
+	check(hunt.handheld.is_open and hunt.handheld.current_mode() == "CARRY",
+		"F5 raises the Black Mirror already on the bag")
+	var f5_escape := InputEventKey.new()
+	f5_escape.keycode = KEY_ESCAPE
+	f5_escape.pressed = true
+	hunt._unhandled_input(f5_escape)
+	check(not hunt.handheld.is_open, "Escape lowers the bag the carry key raised")
+	# A real keyboard event carries the physical key as well as the label, and
+	# `device` is bound physically. Without it G reads as KEY_NONE and the card's
+	# own row silently answers nothing in this fixture.
 	var g_key := InputEventKey.new()
 	g_key.keycode = KEY_G
+	g_key.physical_keycode = KEY_G
 	g_key.pressed = true
 	hunt._unhandled_input(g_key)
 	check(hunt.handheld.is_open and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE,
@@ -151,6 +181,8 @@ func _ready() -> void:
 	check(rows.any(func(row: Array): return row[0] == "HOLD K" and "RE-DECANT" in row[1]), "holding K is labelled as the re-decant")
 	check(rows.any(func(row: Array): return row[0] == "K" and "WIZARD EYES" in row[1]), "a tap of K is labelled as wizard eyes")
 	check(rows.any(func(row: Array): return row[0] == "HOLD J" and "DEPTH" in row[1]), "holding J is labelled as the depth scan")
+	check(rows.any(func(row: Array): return row[0] == HANDHELD.CARRY_KEY_LABEL and "CARRY" in str(row[1]).to_upper()),
+		"the keys card names the bag's own key")
 
 	print("HANDHELD_CONTROL_BINDING_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
