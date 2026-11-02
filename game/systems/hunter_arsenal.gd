@@ -615,9 +615,17 @@ func _jam_chance(id: String) -> float:
 ## does not go through `_finish_reload()`. Bound to the same input as a
 ## reload (`_reload_weapon()`) because both are "work the action" to a
 ## player, and a jammed gun cannot usefully be reloaded until it is clear.
+##
+## The shot's recovery is not a reason to refuse this. It used to be, and the
+## result was that the most natural input in the game — fire, then tap R —
+## did nothing: the pump shotgun's recovery is 0.92 s, so the request landed
+## inside it and `reload()` returned false with no timer, no animation and no
+## prompt. `cooldown` is the action cycling, and working the action again to
+## load is exactly what that time is for; firing is still refused while
+## `reload_remaining > 0`, so nothing can be gained by asking early.
 func reload() -> bool:
 	var definition: Dictionary = current()
-	if definition.kind != "firearm" or reload_remaining > 0.0 or jam_clear_remaining > 0.0 or cooldown > 0.0:
+	if definition.kind != "firearm" or reload_remaining > 0.0 or jam_clear_remaining > 0.0:
 		return false
 	if bool(jammed.get(current_id, false)):
 		jam_clear_remaining = JAM_CLEAR_TIME
